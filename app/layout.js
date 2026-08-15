@@ -1,5 +1,6 @@
 import "./globals.css";
-
+import CookieConsent from "../components/CookieConsent";
+import AnalyticsConsent from "../components/AnalyticsConsent";
 export const metadata = {
   metadataBase: new URL("https://www.rpgexcellence.com"),
   title: {
@@ -48,7 +49,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+  {children}
+     <AnalyticsConsent />
+  <CookieConsent />
+    </body>
     </html>
   );
 }
