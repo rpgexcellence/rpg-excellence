@@ -1,3 +1,4 @@
+import { organizationSchema, websiteSchema } from "./schema";
 import "./globals.css";
 import CookieConsent from "../components/CookieConsent";
 import AnalyticsConsent from "../components/AnalyticsConsent";
@@ -50,7 +51,21 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-  {children}
+ <script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{
+    __html: JSON.stringify(organizationSchema),
+  }}
+/>
+
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{
+    __html: JSON.stringify(websiteSchema),
+  }}
+/>
+
+{children}
      <AnalyticsConsent />
   <CookieConsent />
     </body>
