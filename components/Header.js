@@ -21,12 +21,18 @@ export default function Header({ locale, nav }) {
         <Link href={`/${locale}/contact`}>{nav.contact}</Link>
       </nav>
 
-      <div className="headerActions">
-        <LanguageSwitcher current={locale} />
-        <Link className="button buttonSmall" href={`/${locale}/contact`}>
-          Book
-        </Link>
-      </div>
+<div className="headerActions">
+  <LanguageSwitcher current={locale} />
+
+  <a
+    className="button buttonSmall"
+    href="https://outlook.office.com/bookwithme/user/3e31957cbcf643eb8e7e828a5eac6aaa@rpgexcellence.com/meetingtype/EUQpnH6tqUOohgd_4L5-8w2?anonymous&ismsaljsauthenabled&ep=mlink"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Book
+  </a>
+</div>
     </header>
   );
 }
