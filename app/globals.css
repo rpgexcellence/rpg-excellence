@@ -133,4 +133,24 @@ a{text-decoration:none;color:inherit}
   .footer{grid-template-columns:1fr}
   .footerLinks{flex-wrap:wrap}
   .simplePage{padding:60px 20px}
+}/* Phase 2 cookie banner */
+.cookieBanner{
+  position:fixed;z-index:100;left:24px;right:24px;bottom:24px;
+  display:flex;justify-content:space-between;align-items:center;gap:30px;
+  padding:22px 24px;border:1px solid #d6e2ed;border-radius:20px;
+  background:rgba(255,255,255,.98);box-shadow:0 25px 70px rgba(5,22,43,.2);
 }
+.cookieBanner strong{display:block;font-size:18px;margin-bottom:5px}
+.cookieBanner p{margin:0 0 5px;max-width:760px;color:#536980;line-height:1.55;font-size:13px}
+.cookieBanner a{color:var(--blue);font-size:12px;font-weight:800}
+.cookieActions{display:flex;flex-shrink:0;gap:10px}
+.cookieSettings{
+  position:fixed;z-index:90;bottom:12px;left:12px;border:1px solid #d6e2ed;
+  background:#fff;color:#536980;border-radius:999px;padding:8px 12px;
+  font-size:11px;font-weight:800;box-shadow:0 8px 24px rgba(5,22,43,.09)
+}
+@media(max-width:850px){
+  .cookieBanner{display:block;left:12px;right:12px;bottom:12px}
+  .cookieActions{margin-top:16px;flex-wrap:wrap}
+}
+
