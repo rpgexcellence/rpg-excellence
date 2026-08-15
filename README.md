@@ -35,3 +35,4 @@ Production-ready starter for the RPG Excellence public website.
 - DKIM and DMARC for business email
 - AI API backend with logging, evaluations and human-review options
 - Cookie consent for non-essential analytics
+Deployment refresh – Analytics and cookie consent
