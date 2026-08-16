@@ -75,6 +75,63 @@ const organization = organizations?.[0] ?? null;
         }}
       >
         <h1>Dashboard</h1>
+{!organization && (
+  <form
+    action={createOrganization}
+    style={{
+      background: "white",
+      padding: "24px",
+      borderRadius: "12px",
+      marginTop: "24px",
+      marginBottom: "30px",
+      display: "grid",
+      gap: "14px",
+      maxWidth: "600px",
+    }}
+  >
+    <h2>Create your organization</h2>
+
+    <input
+      name="name"
+      type="text"
+      placeholder="Organization name"
+      required
+    />
+
+    <input
+      name="industry"
+      type="text"
+      placeholder="Industry"
+    />
+
+    <input
+      name="country"
+      type="text"
+      placeholder="Country"
+    />
+
+    <input
+      name="employees"
+      type="number"
+      placeholder="Number of employees"
+      min="1"
+    />
+
+    <button
+      type="submit"
+      style={{
+        padding: "12px",
+        background: "#1459D9",
+        color: "white",
+        border: "none",
+        borderRadius: "8px",
+        cursor: "pointer",
+      }}
+    >
+      Save Organization
+    </button>
+  </form>
+)}
 
         <div
           style={{
