@@ -75,6 +75,27 @@ const organization = organizations?.[0] ?? null;
         }}
       >
         <h1>Dashboard</h1>
+{organization && (
+  <div
+    style={{
+      marginTop: "12px",
+      marginBottom: "24px",
+      color: "#617087"
+    }}
+  >
+    <strong style={{ color: "#071A33" }}>
+      {organization.name}
+    </strong>
+
+    {organization.industry && (
+      <span> · {organization.industry}</span>
+    )}
+
+    {organization.country && (
+      <span> · {organization.country}</span>
+    )}
+  </div>
+)}
 {!organization && (
   <form
     action={createOrganization}
