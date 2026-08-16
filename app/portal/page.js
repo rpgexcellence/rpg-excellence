@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
-import { createOrganization } from "./actions";
+import { createOrganization, createAssessment } from "./actions";
+
 export const metadata = {
   title: "RPG Intelligence Dashboard",
 };
@@ -8,21 +9,21 @@ export const metadata = {
 export default async function PortalPage() {
   const supabase = await createClient();
 
-const {
-  data: { user },
-} = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-if (!user) {
-  redirect("/portal/login");
-}
+  if (!user) {
+    redirect("/portal/login");
+  }
 
-const { data: organizations } = await supabase
-  .from("organizations")
-  .select("*")
-  .eq("owner_id", user.id)
-  .order("created_at", { ascending: true });
+  const { data: organizations } = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: true });
 
-const organization = organizations?.[0] ?? null;
+  const organization = organizations?.[0] ?? null;
 
   return (
     <main
@@ -41,32 +42,23 @@ const organization = organizations?.[0] ?? null;
       >
         <h2>RPG Intelligence</h2>
         <p>{user.email}</p>
-<form action="/auth/signout" method="post">
-  <button
-    type="submit"
-    style={{
-      marginTop: "15px",
-      padding: "10px 18px",
-      background: "#d32f2f",
-      color: "white",
-      border: "none",
-      borderRadius: "6px",
-      cursor: "pointer"
-    }}
-  >
-    Sign Out
-  </button>
-</form>
 
-
-
-
-
-
-
-
-
-        
+        <form action="/auth/signout" method="post">
+          <button
+            type="submit"
+            style={{
+              marginTop: "15px",
+              padding: "10px 18px",
+              background: "#d32f2f",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Sign Out
+          </button>
+        </form>
       </header>
 
       <section
@@ -75,84 +67,145 @@ const organization = organizations?.[0] ?? null;
         }}
       >
         <h1>Dashboard</h1>
-{organization && (
-  <div
-    style={{
-      marginTop: "12px",
-      marginBottom: "24px",
-      color: "#617087"
-    }}
-  >
-    <strong style={{ color: "#071A33" }}>
-      {organization.name}
-    </strong>
 
-    {organization.industry && (
-      <span> · {organization.industry}</span>
-    )}
+        {organization && (
+          <div
+            style={{
+              marginTop: "12px",
+              marginBottom: "24px",
+              color: "#617087",
+            }}
+          >
+            <strong style={{ color: "#071A33" }}>
+              {organization.name}
+            </strong>
 
-    {organization.country && (
-      <span> · {organization.country}</span>
-    )}
-  </div>
-)}
-{!organization && (
-  <form
-    action={createOrganization}
-    style={{
-      background: "white",
-      padding: "24px",
-      borderRadius: "12px",
-      marginTop: "24px",
-      marginBottom: "30px",
-      display: "grid",
-      gap: "14px",
-      maxWidth: "600px",
-    }}
-  >
-    <h2>Create your organization</h2>
+            {organization.industry && (
+              <span> · {organization.industry}</span>
+            )}
 
-    <input
-      name="name"
-      type="text"
-      placeholder="Organization name"
-      required
-    />
+            {organization.country && (
+              <span> · {organization.country}</span>
+            )}
+          </div>
+        )}
 
-    <input
-      name="industry"
-      type="text"
-      placeholder="Industry"
-    />
+        {!organization && (
+          <form
+            action={createOrganization}
+            style={{
+              background: "white",
+              padding: "24px",
+              borderRadius: "12px",
+              marginTop: "24px",
+              marginBottom: "30px",
+              display: "grid",
+              gap: "14px",
+              maxWidth: "600px",
+            }}
+          >
+            <h2>Create your organization</h2>
 
-    <input
-      name="country"
-      type="text"
-      placeholder="Country"
-    />
+            <input
+              name="name"
+              type="text"
+              placeholder="Organization name"
+              required
+            />
 
-    <input
-      name="employees"
-      type="number"
-      placeholder="Number of employees"
-      min="1"
-    />
+            <input
+              name="industry"
+              type="text"
+              placeholder="Industry"
+            />
 
-    <button
-      type="submit"
-      style={{
-        padding: "12px",
-        background: "#1459D9",
-        color: "white",
-        border: "none",
-        borderRadius: "8px",
-        cursor: "pointer",
-      }}
-    >
-      Save Organization
-    </button>
-  </form>
-)}
+            <input
+              name="country"
+              type="text"
+              placeholder="Country"
+            />
+
+            <input
+              name="employees"
+              type="number"
+              placeholder="Number of employees"
+              min="1"
+            />
+
+            <button
+              type="submit"
+              style={{
+                padding: "12px",
+                background: "#1459D9",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+              }}
+            >
+              Save Organization
+            </button>
+          </form>
+        )}
+
+        {organization && (
+          <form
+            action={createAssessment}
+            style={{
+              background: "white",
+              padding: "24px",
+              borderRadius: "12px",
+              marginTop: "24px",
+              marginBottom: "30px",
+              display: "grid",
+              gap: "14px",
+              maxWidth: "600px",
+            }}
+          >
+            <h2>Start a new assessment</h2>
+
+            <input
+              type="hidden"
+              name="organization_id"
+              value={organization.id}
+            />
+
+            <select
+              name="standard"
+              required
+              defaultValue=""
+              style={{
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid #d8e0ea",
+              }}
+            >
+              <option value="" disabled>
+                Select ISO standard
+              </option>
+
+              <option value="ISO 9001">ISO 9001</option>
+              <option value="ISO 14001">ISO 14001</option>
+              <option value="ISO 45001">ISO 45001</option>
+              <option value="ISO 22301">ISO 22301</option>
+              <option value="ISO 27001">ISO 27001</option>
+            </select>
+
+            <button
+              type="submit"
+              style={{
+                padding: "12px",
+                background: "#1459D9",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+              }}
+            >
+              Start Assessment
+            </button>
+          </form>
+        )}
 
         <div
           style={{
