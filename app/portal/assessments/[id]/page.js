@@ -1,16 +1,53 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import { saveAssessmentAnswers } from "./actions";
+
 import {
+  calculateClauseScore,
+  calculateSimpleOverallScore,
   calculateWeightedOverallScore,
   calculateProgress,
 } from "./scoring";
+
+const CLAUSE_NUMBERS = [
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+];
+
+const CLAUSE_TITLES = {
+  "4": "Context of the Organization",
+  "5": "Leadership",
+  "6": "Planning",
+  "7": "Support",
+  "8": "Operation",
+  "9": "Performance Evaluation",
+  "10": "Improvement",
+};
+
 export default async function AssessmentPage({
   params,
   searchParams,
 }) {
   const { id } = await params;
-  const clause = searchParams?.clause ?? "4";
+
+  const resolvedSearchParams = await searchParams;
+
+  const requestedClause = Array.isArray(
+    resolvedSearchParams?.clause
+  )
+    ? resolvedSearchParams.clause[0]
+    : resolvedSearchParams?.clause;
+
+  const clause = CLAUSE_NUMBERS.includes(
+    requestedClause
+  )
+    ? requestedClause
+    : "4";
 
   const supabase = await createClient();
 
@@ -22,8 +59,14 @@ export default async function AssessmentPage({
     redirect("/portal/login");
   }
 
-  // Load assessment
-  const { data: assessment, error: assessmentError } = await supabase
+  // --------------------------------------------------
+  // LOAD ASSESSMENT
+  // --------------------------------------------------
+
+  const {
+    data: assessment,
+    error: assessmentError,
+  } = await supabase
     .from("assessments")
     .select("*")
     .eq("id", id)
@@ -34,169 +77,234 @@ export default async function AssessmentPage({
     redirect("/portal");
   }
 
-  // Load all questions for this standard
-  const { data: allQuestions, error: allQuestionsError } = await supabase
+  // --------------------------------------------------
+  // LOAD QUESTION BANK
+  // --------------------------------------------------
+
+  const {
+    data: allQuestions,
+    error: allQuestionsError,
+  } = await supabase
     .from("assessment_questions")
     .select("*")
     .eq("standard", assessment.standard)
     .eq("active", true)
-    .order("display_order", { ascending: true });
+    .order("display_order", {
+      ascending: true,
+    });
 
   if (allQuestionsError) {
-    throw new Error(allQuestionsError.message);
+    throw new Error(
+      allQuestionsError.message
+    );
   }
 
-  const questions = (allQuestions ?? []).filter(
-    (question) => question.clause === clause
+  const questions = (
+    allQuestions ?? []
+  ).filter(
+    (question) =>
+      question.clause === clause
   );
 
-  const allQuestionNumbers =
-    allQuestions?.map((question) => question.question_number) ?? [];
+  const allQuestionNumbers = (
+    allQuestions ?? []
+  ).map(
+    (question) =>
+      question.question_number
+  );
 
-  // Load all saved answers for this assessment
+  // --------------------------------------------------
+  // LOAD SAVED ANSWERS
+  // --------------------------------------------------
+
   let allSavedAnswers = [];
 
   if (allQuestionNumbers.length > 0) {
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from("assessment_answers")
       .select("*")
-      .eq("assessment_id", assessment.id)
+      .eq(
+        "assessment_id",
+        assessment.id
+      )
       .eq("owner_id", user.id)
-      .in("clause", allQuestionNumbers);
+      .in(
+        "clause",
+        allQuestionNumbers
+      );
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(
+        error.message
+      );
     }
 
-    allSavedAnswers = data ?? [];
-  }
-const { data: scoringProfile } = await supabase
-  .from("scoring_profiles")
-  .select("id")
-  .eq("standard", assessment.standard)
-  .eq("active", true)
-  .order("created_at", { ascending: false })
-  .limit(1)
-  .maybeSingle();
-
-let weights = {};
-
-if (scoringProfile) {
-  const { data: clauseWeights, error: clauseWeightsError } = await supabase
-    .from("scoring_profile_clauses")
-    .select("clause, weight")
-    .eq("scoring_profile_id", scoringProfile.id);
-
-  if (clauseWeightsError) {
-    throw new Error(clauseWeightsError.message);
+    allSavedAnswers =
+      data ?? [];
   }
 
-  weights = Object.fromEntries(
-    (clauseWeights ?? []).map((row) => [
-      row.clause,
-      Number(row.weight),
-    ])
-  );
-}
+  // --------------------------------------------------
+  // LOAD RPG SCORING PROFILE
+  // --------------------------------------------------
 
-// EXISTING CODE CONTINUES HERE
+  const {
+    data: scoringProfile,
+    error: scoringProfileError,
+  } = await supabase
+    .from("scoring_profiles")
+    .select(
+      "id, profile_name, version_label"
+    )
+    .eq(
+      "standard",
+      assessment.standard
+    )
+    .eq("active", true)
+    .order("created_at", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
 
-const answersByClause = {};
-  
-  // Lookup table for saved answers
+  if (scoringProfileError) {
+    throw new Error(
+      scoringProfileError.message
+    );
+  }
+
+  let weights = {};
+
+  if (scoringProfile) {
+    const {
+      data: clauseWeights,
+      error: clauseWeightsError,
+    } = await supabase
+      .from(
+        "scoring_profile_clauses"
+      )
+      .select("clause, weight")
+      .eq(
+        "scoring_profile_id",
+        scoringProfile.id
+      );
+
+    if (clauseWeightsError) {
+      throw new Error(
+        clauseWeightsError.message
+      );
+    }
+
+    weights = Object.fromEntries(
+      (clauseWeights ?? []).map(
+        (row) => [
+          row.clause,
+          Number(row.weight),
+        ]
+      )
+    );
+  }
+
+  // --------------------------------------------------
+  // ANSWER LOOKUP
+  // --------------------------------------------------
+
   const answersByClause = {};
 
-  for (const answer of allSavedAnswers) {
-    answersByClause[answer.clause] = answer;
+  for (
+    const answer of allSavedAnswers
+  ) {
+    answersByClause[
+      answer.clause
+    ] = answer;
   }
 
-  // Overall score
-  const overallScores = allSavedAnswers
-    .map((answer) => answer.score)
-    .filter(
-      (score) =>
-        score !== null &&
-        score !== undefined
+  // --------------------------------------------------
+  // CALCULATE PROGRESS
+  // --------------------------------------------------
+
+  const progress =
+    calculateProgress(
+      allQuestions,
+      allSavedAnswers
     );
+
+  // --------------------------------------------------
+  // CALCULATE OVERALL SCORE
+  // --------------------------------------------------
+
+  const hasWeightedProfile =
+    Object.keys(weights).length > 0;
 
   const overallScore =
-    overallScores.length > 0
-      ? Math.round(
-          (overallScores.reduce(
-            (sum, score) => sum + Number(score),
-            0
-          ) /
-            (overallScores.length * 5)) *
-            100
+    hasWeightedProfile
+      ? calculateWeightedOverallScore(
+          {
+            clauseNumbers:
+              CLAUSE_NUMBERS,
+            questions:
+              allQuestions,
+            answers:
+              allSavedAnswers,
+            weights,
+          }
         )
-      : null;
+      : calculateSimpleOverallScore(
+          allSavedAnswers
+        );
 
-  const clauseNumbers = [
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "10",
-  ];
-
-  const clauseTitles = {
-    "4": "Context of the Organization",
-    "5": "Leadership",
-    "6": "Planning",
-    "7": "Support",
-    "8": "Operation",
-    "9": "Performance Evaluation",
-    "10": "Improvement",
-  };
-
-  // Score calculator for each clause
-  function calculateClauseScore(clauseNumber) {
-    const clauseQuestionNumbers = (allQuestions ?? [])
-      .filter(
-        (question) =>
-          question.clause === clauseNumber
-      )
-      .map(
-        (question) =>
-          question.question_number
-      );
-
-    const clauseScores = allSavedAnswers
-      .filter((answer) =>
-        clauseQuestionNumbers.includes(
-          answer.clause
-        )
-      )
-      .map((answer) => answer.score)
-      .filter(
-        (score) =>
-          score !== null &&
-          score !== undefined
-      );
-
-    if (clauseScores.length === 0) {
-      return null;
-    }
-
-    return Math.round(
-      (clauseScores.reduce(
-        (sum, score) =>
-          sum + Number(score),
-        0
-      ) /
-        (clauseScores.length * 5)) *
-        100
-    );
-  }
+  // --------------------------------------------------
+  // CURRENT CLAUSE SCORE
+  // --------------------------------------------------
 
   const currentClauseScore =
-    calculateClauseScore(clause);
+    calculateClauseScore(
+      clause,
+      allQuestions,
+      allSavedAnswers
+    );
 
   const clauseTitle =
-    clauseTitles[clause] ??
+    CLAUSE_TITLES[
+      clause
+    ] ??
     `Clause ${clause}`;
+
+  // --------------------------------------------------
+  // MATURITY LEVEL
+  // --------------------------------------------------
+
+  let maturityLevel =
+    "Not assessed";
+
+  if (
+    overallScore !== null
+  ) {
+    if (overallScore <= 20) {
+      maturityLevel =
+        "Initial";
+    } else if (
+      overallScore <= 40
+    ) {
+      maturityLevel =
+        "Developing";
+    } else if (
+      overallScore <= 60
+    ) {
+      maturityLevel =
+        "Managed";
+    } else if (
+      overallScore <= 80
+    ) {
+      maturityLevel =
+        "Controlled";
+    } else {
+      maturityLevel =
+        "Optimized";
+    }
+  }
 
   return (
     <main
@@ -204,7 +312,8 @@ const answersByClause = {};
         minHeight: "100vh",
         background: "#f3f6f9",
         padding: "40px",
-        fontFamily: "Arial, sans-serif",
+        fontFamily:
+          "Arial, sans-serif",
       }}
     >
       <div
@@ -213,6 +322,8 @@ const answersByClause = {};
           margin: "0 auto",
         }}
       >
+        {/* HEADER */}
+
         <p
           style={{
             color: "#1459D9",
@@ -229,7 +340,8 @@ const answersByClause = {};
             marginBottom: "8px",
           }}
         >
-          {assessment.standard} Assessment
+          {assessment.standard}{" "}
+          Assessment
         </h1>
 
         <p
@@ -244,20 +356,23 @@ const answersByClause = {};
           </strong>
         </p>
 
-        {/* Overall readiness */}
+        {/* OVERALL READINESS */}
+
         <section
           style={{
-            background: "#071A33",
+            background:
+              "#071A33",
             color: "#ffffff",
             borderRadius: "16px",
             padding: "28px",
-            marginBottom: "24px",
+            marginBottom: "18px",
           }}
         >
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent:
+                "space-between",
               alignItems: "center",
               gap: "20px",
               flexWrap: "wrap",
@@ -268,11 +383,13 @@ const answersByClause = {};
                 style={{
                   fontSize: "12px",
                   opacity: 0.75,
-                  letterSpacing: "1px",
+                  letterSpacing:
+                    "1px",
                   marginBottom: "7px",
                 }}
               >
-                OVERALL READINESS
+                RPG WEIGHTED
+                READINESS
               </div>
 
               <strong
@@ -280,34 +397,136 @@ const answersByClause = {};
                   fontSize: "21px",
                 }}
               >
-                {assessment.standard}
+                {
+                  assessment.standard
+                }
               </strong>
 
               <p
                 style={{
                   opacity: 0.75,
-                  marginBottom: 0,
+                  marginBottom: "4px",
                 }}
               >
-                Based on completed assessment
-                responses
+                {hasWeightedProfile
+                  ? `${
+                      scoringProfile
+                        ?.profile_name
+                    } ${
+                      scoringProfile
+                        ?.version_label ??
+                      ""
+                    }`
+                  : "Standard readiness model"}
               </p>
+
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color:
+                    "#D6A539",
+                }}
+              >
+                {maturityLevel}
+              </div>
             </div>
 
             <div
               style={{
-                fontSize: "46px",
+                fontSize: "48px",
                 fontWeight: 800,
               }}
             >
-              {overallScore !== null
+              {overallScore !==
+              null
                 ? `${overallScore}%`
                 : "—"}
             </div>
           </div>
         </section>
 
-        {/* Clause score overview */}
+        {/* PROGRESS */}
+
+        <section
+          style={{
+            background: "#ffffff",
+            border:
+              "1px solid #dfe6ee",
+            borderRadius: "14px",
+            padding: "20px 24px",
+            marginBottom: "24px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+              alignItems: "center",
+              gap: "16px",
+              marginBottom: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <strong
+              style={{
+                color: "#071A33",
+              }}
+            >
+              Assessment Progress
+            </strong>
+
+            <strong
+              style={{
+                color: "#1459D9",
+              }}
+            >
+              {
+                progress.percentage
+              }
+              %
+            </strong>
+          </div>
+
+          <div
+            style={{
+              height: "10px",
+              background: "#e7edf4",
+              borderRadius: "999px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${
+                  progress.percentage
+                }%`,
+                background:
+                  "#1459D9",
+                borderRadius:
+                  "999px",
+              }}
+            />
+          </div>
+
+          <p
+            style={{
+              color: "#617087",
+              fontSize: "13px",
+              marginTop: "10px",
+              marginBottom: 0,
+            }}
+          >
+            {progress.answered} of{" "}
+            {progress.total}{" "}
+            questions answered
+          </p>
+        </section>
+
+        {/* CLAUSE SCORE CARDS */}
+
         <div
           style={{
             display: "grid",
@@ -317,12 +536,19 @@ const answersByClause = {};
             marginBottom: "24px",
           }}
         >
-          {clauseNumbers.map(
+          {CLAUSE_NUMBERS.map(
             (number) => {
               const score =
                 calculateClauseScore(
-                  number
+                  number,
+                  allQuestions,
+                  allSavedAnswers
                 );
+
+              const weight =
+                weights[
+                  number
+                ];
 
               return (
                 <a
@@ -337,20 +563,24 @@ const answersByClause = {};
                       clause === number
                         ? "#ffffff"
                         : "#071A33",
-                    borderRadius: "12px",
+                    borderRadius:
+                      "12px",
                     padding: "16px",
                     border:
                       clause === number
                         ? "1px solid #1459D9"
                         : "1px solid #dfe6ee",
-                    textDecoration: "none",
+                    textDecoration:
+                      "none",
                   }}
                 >
                   <div
                     style={{
-                      fontSize: "12px",
+                      fontSize:
+                        "12px",
                       opacity: 0.75,
-                      marginBottom: "7px",
+                      marginBottom:
+                        "7px",
                     }}
                   >
                     CLAUSE {number}
@@ -358,7 +588,8 @@ const answersByClause = {};
 
                   <div
                     style={{
-                      fontSize: "24px",
+                      fontSize:
+                        "24px",
                       fontWeight: 800,
                     }}
                   >
@@ -369,27 +600,50 @@ const answersByClause = {};
 
                   <div
                     style={{
-                      fontSize: "12px",
-                      marginTop: "6px",
-                      lineHeight: 1.35,
+                      fontSize:
+                        "12px",
+                      marginTop:
+                        "6px",
+                      lineHeight:
+                        1.35,
                     }}
                   >
-                    {clauseTitles[
-                      number
-                    ]}
+                    {
+                      CLAUSE_TITLES[
+                        number
+                      ]
+                    }
                   </div>
+
+                  {weight && (
+                    <div
+                      style={{
+                        fontSize:
+                          "10px",
+                        marginTop:
+                          "8px",
+                        opacity:
+                          0.7,
+                      }}
+                    >
+                      Weight:{" "}
+                      {weight}%
+                    </div>
+                  )}
                 </a>
               );
             }
           )}
         </div>
 
-        {/* Current clause score */}
+        {/* CURRENT CLAUSE */}
+
         <div
           style={{
             background: "#ffffff",
             borderRadius: "14px",
-            padding: "22px 24px",
+            padding:
+              "22px 24px",
             marginBottom: "24px",
             border:
               "1px solid #dfe6ee",
@@ -430,13 +684,15 @@ const answersByClause = {};
               fontWeight: 800,
             }}
           >
-            {currentClauseScore !== null
+            {currentClauseScore !==
+            null
               ? `${currentClauseScore}%`
               : "—"}
           </div>
         </div>
 
-        {/* Assessment form */}
+        {/* ASSESSMENT FORM */}
+
         <form
           action={
             saveAssessmentAnswers
@@ -445,7 +701,9 @@ const answersByClause = {};
           <input
             type="hidden"
             name="assessment_id"
-            value={assessment.id}
+            value={
+              assessment.id
+            }
           />
 
           <section
@@ -491,8 +749,9 @@ const answersByClause = {};
                   lineHeight: 1.6,
                 }}
               >
-                Complete each question
-                and record the evidence
+                Complete each
+                question and record
+                the evidence
                 supporting your
                 assessment.
               </p>
@@ -504,7 +763,7 @@ const answersByClause = {};
                 gap: "30px",
               }}
             >
-              {questions?.length ? (
+              {questions.length ? (
                 questions.map(
                   (
                     question,
@@ -529,11 +788,13 @@ const answersByClause = {};
                         }
                         style={{
                           borderTop:
-                            index === 0
+                            index ===
+                            0
                               ? "none"
                               : "1px solid #e6ebf1",
                           paddingTop:
-                            index === 0
+                            index ===
+                            0
                               ? "0"
                               : "26px",
                         }}
@@ -623,9 +884,11 @@ const answersByClause = {};
                           name={`score_${fieldKey}`}
                           required
                           defaultValue={
-                            savedAnswer?.score !==
+                            savedAnswer
+                              ?.score !==
                               null &&
-                            savedAnswer?.score !==
+                            savedAnswer
+                              ?.score !==
                               undefined
                               ? String(
                                   savedAnswer.score
@@ -697,7 +960,8 @@ const answersByClause = {};
                               "7px",
                           }}
                         >
-                          Evidence / notes
+                          Evidence /
+                          notes
                         </label>
 
                         <textarea
@@ -705,7 +969,8 @@ const answersByClause = {};
                           placeholder="Describe supporting evidence, documents, records, observations or gaps..."
                           rows="4"
                           defaultValue={
-                            savedAnswer?.evidence ??
+                            savedAnswer
+                              ?.evidence ??
                             ""
                           }
                           style={{
@@ -733,13 +998,16 @@ const answersByClause = {};
                     padding: "20px",
                     background:
                       "#fff8e8",
-                    borderRadius: "8px",
-                    color: "#735c17",
+                    borderRadius:
+                      "8px",
+                    color:
+                      "#735c17",
                   }}
                 >
                   No questions are
-                  currently configured
-                  for Clause {clause}.
+                  currently
+                  configured for
+                  Clause {clause}.
                 </div>
               )}
             </div>
@@ -762,10 +1030,12 @@ const answersByClause = {};
                 style={{
                   padding:
                     "12px 18px",
-                  borderRadius: "8px",
+                  borderRadius:
+                    "8px",
                   border:
                     "1px solid #d8e0ea",
-                  color: "#071A33",
+                  color:
+                    "#071A33",
                   textDecoration:
                     "none",
                   fontWeight: 700,
@@ -777,21 +1047,23 @@ const answersByClause = {};
               <button
                 type="submit"
                 disabled={
-                  !questions?.length
+                  !questions.length
                 }
                 style={{
                   padding:
                     "12px 18px",
-                  borderRadius: "8px",
+                  borderRadius:
+                    "8px",
                   border: "none",
                   background:
-                    questions?.length
+                    questions.length
                       ? "#1459D9"
                       : "#c8d2df",
-                  color: "#ffffff",
+                  color:
+                    "#ffffff",
                   fontWeight: 700,
                   cursor:
-                    questions?.length
+                    questions.length
                       ? "pointer"
                       : "not-allowed",
                 }}
