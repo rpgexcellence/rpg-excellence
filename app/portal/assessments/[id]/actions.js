@@ -41,12 +41,41 @@ export async function saveClause4(formData) {
     },
   ];
 
-  const { error } = await supabase
-    .from("assessment_answers")
-    .insert(answers);
+  for (const answer of answers) {
+    const { data: existing } = await supabase
+      .from("assessment_answers")
+      .select("id")
+      .eq("assessment_id", assessmentId)
+      .eq("owner_id", user.id)
+      .eq("clause", answer.clause)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+    if (existing) {
+      const { error } = await supabase
+        .from("assessment_answers")
+        .update({
+          score: answer.score,
+          evidence: answer.evidence,
+          question: answer.question,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+        .eq("owner_id", user.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    } else {
+      const { error } = await supabase
+        .from("assessment_answers")
+        .insert(answer);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
   }
 
   redirect(`/portal/assessments/${assessmentId}`);
