@@ -40,3 +40,34 @@ export async function createOrganization(formData) {
 
   redirect("/portal");
 }
+export async function createAssessment(formData) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/portal/login");
+  }
+
+  const organizationId = formData.get("organization_id");
+  const standard = formData.get("standard");
+
+  const { data, error } = await supabase
+    .from("assessments")
+    .insert({
+      organization_id: organizationId,
+      owner_id: user.id,
+      standard,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  redirect(`/portal/assessments/${data.id}`);
+}
