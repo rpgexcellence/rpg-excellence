@@ -15,39 +15,76 @@ export default async function AssessmentPage({ params }) {
     redirect("/portal/login");
   }
 
-  const { data: assessment, error } = await supabase
+  // Load assessment
+  const { data: assessment, error: assessmentError } = await supabase
     .from("assessments")
     .select("*")
     .eq("id", id)
     .eq("owner_id", user.id)
     .single();
 
-  if (error || !assessment) {
+  if (assessmentError || !assessment) {
     redirect("/portal");
   }
 
-  const { data: savedAnswers } = await supabase
-    .from("assessment_answers")
+  // Load Clause 4 questions dynamically
+  const { data: questions, error: questionsError } = await supabase
+    .from("assessment_questions")
     .select("*")
-    .eq("assessment_id", assessment.id)
-    .eq("owner_id", user.id)
-    .in("clause", ["4.1", "4.2"])
-    .order("created_at", { ascending: false });
+    .eq("standard", assessment.standard)
+    .eq("clause", "4")
+    .eq("active", true)
+    .order("display_order", { ascending: true });
 
-  const answer41 =
-    savedAnswers?.find((answer) => answer.clause === "4.1") ?? null;
+  if (questionsError) {
+    throw new Error(questionsError.message);
+  }
 
-  const answer42 =
-    savedAnswers?.find((answer) => answer.clause === "4.2") ?? null;
+  const questionNumbers =
+    questions?.map((question) => question.question_number) ?? [];
 
-  const availableScores = [answer41?.score, answer42?.score].filter(
-    (score) => score !== null && score !== undefined
-  );
+  // Load saved answers
+  let savedAnswers = [];
+
+  if (questionNumbers.length > 0) {
+    const { data, error } = await supabase
+      .from("assessment_answers")
+      .select("*")
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id)
+      .in("clause", questionNumbers);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    savedAnswers = data ?? [];
+  }
+
+  // Create an easy lookup:
+  // answersByClause["4.1"] etc.
+  const answersByClause = {};
+
+  for (const answer of savedAnswers) {
+    answersByClause[answer.clause] = answer;
+  }
+
+  // Calculate Clause 4 score
+  const availableScores = savedAnswers
+    .map((answer) => answer.score)
+    .filter(
+      (score) =>
+        score !== null &&
+        score !== undefined
+    );
 
   const clause4Score =
     availableScores.length > 0
       ? Math.round(
-          (availableScores.reduce((sum, score) => sum + Number(score), 0) /
+          (availableScores.reduce(
+            (sum, score) => sum + Number(score),
+            0
+          ) /
             (availableScores.length * 5)) *
             100
         )
@@ -96,6 +133,7 @@ export default async function AssessmentPage({ params }) {
           Status: <strong>{assessment.status}</strong>
         </p>
 
+        {/* Score card */}
         <div
           style={{
             background: "#071A33",
@@ -136,7 +174,9 @@ export default async function AssessmentPage({ params }) {
               fontWeight: 800,
             }}
           >
-            {clause4Score !== null ? `${clause4Score}%` : "—"}
+            {clause4Score !== null
+              ? `${clause4Score}%`
+              : "—"}
           </div>
         </div>
 
@@ -152,7 +192,8 @@ export default async function AssessmentPage({ params }) {
               background: "white",
               padding: "30px",
               borderRadius: "14px",
-              boxShadow: "0 10px 30px rgba(7, 26, 51, 0.06)",
+              boxShadow:
+                "0 10px 30px rgba(7, 26, 51, 0.06)",
             }}
           >
             <div
@@ -180,152 +221,200 @@ export default async function AssessmentPage({ params }) {
               >
                 Context of the Organization
               </h2>
+
+              <p
+                style={{
+                  color: "#617087",
+                  marginTop: "10px",
+                  lineHeight: 1.6,
+                }}
+              >
+                Complete each question and record the
+                evidence supporting your assessment.
+              </p>
             </div>
 
+            {/* Dynamic questions */}
             <div
               style={{
                 display: "grid",
                 gap: "30px",
               }}
             >
-              <div>
-                <h3
-                  style={{
-                    color: "#071A33",
-                    marginBottom: "10px",
-                  }}
-                >
-                  4.1 Understanding the organization and its context
-                </h3>
+              {questions?.length ? (
+                questions.map((question, index) => {
+                  const savedAnswer =
+                    answersByClause[
+                      question.question_number
+                    ] ?? null;
 
-                <p
-                  style={{
-                    color: "#617087",
-                    lineHeight: 1.6,
-                    marginBottom: "14px",
-                  }}
-                >
-                  Has the organization determined the internal and external
-                  issues relevant to its purpose and strategic direction?
-                </p>
+                  const fieldKey =
+                    question.question_number.replaceAll(
+                      ".",
+                      "_"
+                    );
 
-                <select
-                  name="score_4_1"
-                  required
-                  defaultValue={
-                    answer41?.score !== null &&
-                    answer41?.score !== undefined
-                      ? String(answer41.score)
-                      : ""
-                  }
+                  return (
+                    <div
+                      key={question.id}
+                      style={{
+                        borderTop:
+                          index === 0
+                            ? "none"
+                            : "1px solid #e6ebf1",
+                        paddingTop:
+                          index === 0 ? "0" : "26px",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          color: "#071A33",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        {question.question_number}
+                      </h3>
+
+                      <p
+                        style={{
+                          color: "#071A33",
+                          lineHeight: 1.6,
+                          fontWeight: 600,
+                          marginBottom: "10px",
+                        }}
+                      >
+                        {question.question}
+                      </p>
+
+                      {question.guidance && (
+                        <div
+                          style={{
+                            background: "#f5f8fc",
+                            borderLeft:
+                              "4px solid #1459D9",
+                            padding: "12px 14px",
+                            borderRadius: "6px",
+                            color: "#617087",
+                            lineHeight: 1.55,
+                            marginBottom: "16px",
+                            fontSize: "14px",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              color: "#071A33",
+                            }}
+                          >
+                            Guidance:
+                          </strong>{" "}
+                          {question.guidance}
+                        </div>
+                      )}
+
+                      <label
+                        style={{
+                          display: "block",
+                          fontWeight: 700,
+                          color: "#071A33",
+                          marginBottom: "7px",
+                        }}
+                      >
+                        Assessment score
+                      </label>
+
+                      <select
+                        name={`score_${fieldKey}`}
+                        required
+                        defaultValue={
+                          savedAnswer?.score !== null &&
+                          savedAnswer?.score !== undefined
+                            ? String(savedAnswer.score)
+                            : ""
+                        }
+                        style={{
+                          width: "100%",
+                          maxWidth: "360px",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          border:
+                            "1px solid #d8e0ea",
+                          background: "#fff",
+                        }}
+                      >
+                        <option value="" disabled>
+                          Select score
+                        </option>
+
+                        <option value="0">
+                          0 — Not addressed
+                        </option>
+
+                        <option value="1">
+                          1 — Initial
+                        </option>
+
+                        <option value="2">
+                          2 — Partially implemented
+                        </option>
+
+                        <option value="3">
+                          3 — Implemented
+                        </option>
+
+                        <option value="4">
+                          4 — Effective
+                        </option>
+
+                        <option value="5">
+                          5 — Best practice
+                        </option>
+                      </select>
+
+                      <label
+                        style={{
+                          display: "block",
+                          fontWeight: 700,
+                          color: "#071A33",
+                          marginTop: "18px",
+                          marginBottom: "7px",
+                        }}
+                      >
+                        Evidence / notes
+                      </label>
+
+                      <textarea
+                        name={`evidence_${fieldKey}`}
+                        placeholder="Describe supporting evidence, documents, records, observations or gaps..."
+                        rows="4"
+                        defaultValue={
+                          savedAnswer?.evidence ?? ""
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          border:
+                            "1px solid #d8e0ea",
+                          resize: "vertical",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+                  );
+                })
+              ) : (
+                <div
                   style={{
-                    width: "100%",
-                    maxWidth: "360px",
-                    padding: "12px",
+                    padding: "20px",
+                    background: "#fff8e8",
                     borderRadius: "8px",
-                    border: "1px solid #d8e0ea",
-                    background: "#fff",
+                    color: "#735c17",
                   }}
                 >
-                  <option value="" disabled>
-                    Select score
-                  </option>
-                  <option value="0">0 — Not addressed</option>
-                  <option value="1">1 — Initial</option>
-                  <option value="2">2 — Partially implemented</option>
-                  <option value="3">3 — Implemented</option>
-                  <option value="4">4 — Effective</option>
-                  <option value="5">5 — Best practice</option>
-                </select>
-
-                <textarea
-                  name="evidence_4_1"
-                  placeholder="Evidence or notes"
-                  rows="4"
-                  defaultValue={answer41?.evidence ?? ""}
-                  style={{
-                    width: "100%",
-                    marginTop: "14px",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    border: "1px solid #d8e0ea",
-                    resize: "vertical",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              <div
-                style={{
-                  borderTop: "1px solid #e6ebf1",
-                  paddingTop: "26px",
-                }}
-              >
-                <h3
-                  style={{
-                    color: "#071A33",
-                    marginBottom: "10px",
-                  }}
-                >
-                  4.2 Needs and expectations of interested parties
-                </h3>
-
-                <p
-                  style={{
-                    color: "#617087",
-                    lineHeight: 1.6,
-                    marginBottom: "14px",
-                  }}
-                >
-                  Has the organization identified relevant interested parties
-                  and their applicable requirements?
-                </p>
-
-                <select
-                  name="score_4_2"
-                  required
-                  defaultValue={
-                    answer42?.score !== null &&
-                    answer42?.score !== undefined
-                      ? String(answer42.score)
-                      : ""
-                  }
-                  style={{
-                    width: "100%",
-                    maxWidth: "360px",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    border: "1px solid #d8e0ea",
-                    background: "#fff",
-                  }}
-                >
-                  <option value="" disabled>
-                    Select score
-                  </option>
-                  <option value="0">0 — Not addressed</option>
-                  <option value="1">1 — Initial</option>
-                  <option value="2">2 — Partially implemented</option>
-                  <option value="3">3 — Implemented</option>
-                  <option value="4">4 — Effective</option>
-                  <option value="5">5 — Best practice</option>
-                </select>
-
-                <textarea
-                  name="evidence_4_2"
-                  placeholder="Evidence or notes"
-                  rows="4"
-                  defaultValue={answer42?.evidence ?? ""}
-                  style={{
-                    width: "100%",
-                    marginTop: "14px",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    border: "1px solid #d8e0ea",
-                    resize: "vertical",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
+                  No questions are currently configured
+                  for this clause.
+                </div>
+              )}
             </div>
 
             <div
@@ -344,7 +433,8 @@ export default async function AssessmentPage({ params }) {
                 style={{
                   padding: "12px 18px",
                   borderRadius: "8px",
-                  border: "1px solid #d8e0ea",
+                  border:
+                    "1px solid #d8e0ea",
                   color: "#071A33",
                   textDecoration: "none",
                   fontWeight: 700,
@@ -355,14 +445,19 @@ export default async function AssessmentPage({ params }) {
 
               <button
                 type="submit"
+                disabled={!questions?.length}
                 style={{
                   padding: "12px 18px",
                   borderRadius: "8px",
                   border: "none",
-                  background: "#1459D9",
+                  background: questions?.length
+                    ? "#1459D9"
+                    : "#c8d2df",
                   color: "#ffffff",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: questions?.length
+                    ? "pointer"
+                    : "not-allowed",
                 }}
               >
                 Save Answers
