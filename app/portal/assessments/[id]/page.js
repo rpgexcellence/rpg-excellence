@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
-import { saveClause4 } from "./actions";
+import { saveAssessmentAnswers } from "./actions";
 
 export default async function AssessmentPage({ params }) {
   const { id } = await params;
@@ -61,8 +61,7 @@ export default async function AssessmentPage({ params }) {
     savedAnswers = data ?? [];
   }
 
-  // Create an easy lookup:
-  // answersByClause["4.1"] etc.
+  // Easy lookup by question number
   const answersByClause = {};
 
   for (const answer of savedAnswers) {
@@ -133,7 +132,6 @@ export default async function AssessmentPage({ params }) {
           Status: <strong>{assessment.status}</strong>
         </p>
 
-        {/* Score card */}
         <div
           style={{
             background: "#071A33",
@@ -180,7 +178,7 @@ export default async function AssessmentPage({ params }) {
           </div>
         </div>
 
-        <form action={saveClause4}>
+        <form action={saveAssessmentAnswers}>
           <input
             type="hidden"
             name="assessment_id"
@@ -229,12 +227,11 @@ export default async function AssessmentPage({ params }) {
                   lineHeight: 1.6,
                 }}
               >
-                Complete each question and record the
-                evidence supporting your assessment.
+                Complete each question and record the evidence
+                supporting your assessment.
               </p>
             </div>
 
-            {/* Dynamic questions */}
             <div
               style={{
                 display: "grid",
