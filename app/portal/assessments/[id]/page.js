@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
-import { createClient } from "../../../../../lib/supabase/server";
+import { createClient } from "../../../../lib/supabase/server";
+import { saveAssessmentAnswers } from "./actions";
 
 import {
   calculateClauseScore,
   calculateSimpleOverallScore,
   calculateWeightedOverallScore,
   calculateProgress,
-} from "../scoring";
+} from "./scoring";
 
 const CLAUSE_NUMBERS = [
   "4",
@@ -28,16 +29,50 @@ const CLAUSE_TITLES = {
   "10": "Improvement",
 };
 
-export default async function AssessmentSummaryPage({
+export default async function AssessmentPage({
   params,
+  searchParams,
 }) {
   const { id } = await params;
+  const resolvedSearchParams = await searchParams;
 
-  const supabase = await createClient();
+  const requestedClause = Array.isArray(
+    resolvedSearchParams?.clause
+  )
+    ? resolvedSearchParams.clause[0]
+    : resolvedSearchParams?.clause;
+
+  const clause = CLAUSE_NUMBERS.includes(
+    requestedClause
+  )
+    ? requestedClause
+    : "4";
+
+  const currentClauseIndex =
+    CLAUSE_NUMBERS.indexOf(clause);
+
+  const previousClause =
+    currentClauseIndex > 0
+      ? CLAUSE_NUMBERS[
+          currentClauseIndex - 1
+        ]
+      : null;
+
+  const nextClause =
+    currentClauseIndex <
+    CLAUSE_NUMBERS.length - 1
+      ? CLAUSE_NUMBERS[
+          currentClauseIndex + 1
+        ]
+      : null;
+
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (!user) {
     redirect("/portal/login");
@@ -54,40 +89,55 @@ export default async function AssessmentSummaryPage({
     .eq("owner_id", user.id)
     .single();
 
-  if (assessmentError || !assessment) {
+  if (
+    assessmentError ||
+    !assessment
+  ) {
     redirect("/portal");
   }
 
-  // Load questions
+  // Load all questions
   const {
-    data: questions,
-    error: questionsError,
+    data: allQuestions,
+    error: allQuestionsError,
   } = await supabase
     .from("assessment_questions")
     .select("*")
-    .eq("standard", assessment.standard)
+    .eq(
+      "standard",
+      assessment.standard
+    )
     .eq("active", true)
     .order("display_order", {
       ascending: true,
     });
 
-  if (questionsError) {
+  if (allQuestionsError) {
     throw new Error(
-      questionsError.message
+      allQuestionsError.message
     );
   }
 
-  const questionNumbers = (
-    questions ?? []
+  const questions = (
+    allQuestions ?? []
+  ).filter(
+    (question) =>
+      question.clause === clause
+  );
+
+  const allQuestionNumbers = (
+    allQuestions ?? []
   ).map(
     (question) =>
       question.question_number
   );
 
-  // Load answers
-  let answers = [];
+  // Load all saved answers
+  let allSavedAnswers = [];
 
-  if (questionNumbers.length > 0) {
+  if (
+    allQuestionNumbers.length > 0
+  ) {
     const {
       data,
       error,
@@ -101,7 +151,7 @@ export default async function AssessmentSummaryPage({
       .eq("owner_id", user.id)
       .in(
         "clause",
-        questionNumbers
+        allQuestionNumbers
       );
 
     if (error) {
@@ -110,10 +160,11 @@ export default async function AssessmentSummaryPage({
       );
     }
 
-    answers = data ?? [];
+    allSavedAnswers =
+      data ?? [];
   }
 
-  // Load scoring profile
+  // Load active scoring profile
   const {
     data: scoringProfile,
     error: scoringProfileError,
@@ -149,7 +200,9 @@ export default async function AssessmentSummaryPage({
       .from(
         "scoring_profile_clauses"
       )
-      .select("clause, weight")
+      .select(
+        "clause, weight"
+      )
       .eq(
         "scoring_profile_id",
         scoringProfile.id
@@ -161,44 +214,79 @@ export default async function AssessmentSummaryPage({
       );
     }
 
-    weights = Object.fromEntries(
-      (clauseWeights ?? []).map(
-        (row) => [
+    weights =
+      Object.fromEntries(
+        (
+          clauseWeights ?? []
+        ).map((row) => [
           row.clause,
           Number(row.weight),
-        ]
-      )
-    );
+        ])
+      );
   }
 
+  // Saved answer lookup
+  const answersByClause = {};
+
+  for (
+    const answer of allSavedAnswers
+  ) {
+    answersByClause[
+      answer.clause
+    ] = answer;
+  }
+
+  // Progress
   const progress =
     calculateProgress(
-      questions,
-      answers
+      allQuestions,
+      allSavedAnswers
     );
 
+  // Overall weighted score
   const hasWeightedProfile =
-    Object.keys(weights).length > 0;
+    Object.keys(weights).length >
+    0;
 
   const overallScore =
     hasWeightedProfile
-      ? calculateWeightedOverallScore({
-          clauseNumbers:
-            CLAUSE_NUMBERS,
-          questions,
-          answers,
-          weights,
-        })
+      ? calculateWeightedOverallScore(
+          {
+            clauseNumbers:
+              CLAUSE_NUMBERS,
+            questions:
+              allQuestions,
+            answers:
+              allSavedAnswers,
+            weights,
+          }
+        )
       : calculateSimpleOverallScore(
-          answers
+          allSavedAnswers
         );
 
+  // Current clause score
+  const currentClauseScore =
+    calculateClauseScore(
+      clause,
+      allQuestions,
+      allSavedAnswers
+    );
+
+  const clauseTitle =
+    CLAUSE_TITLES[
+      clause
+    ] ??
+    `Clause ${clause}`;
+
+  // Maturity
   let maturityLevel =
     "Not assessed";
 
   if (overallScore !== null) {
     if (overallScore <= 20) {
-      maturityLevel = "Initial";
+      maturityLevel =
+        "Initial";
     } else if (
       overallScore <= 40
     ) {
@@ -207,7 +295,8 @@ export default async function AssessmentSummaryPage({
     } else if (
       overallScore <= 60
     ) {
-      maturityLevel = "Managed";
+      maturityLevel =
+        "Managed";
     } else if (
       overallScore <= 80
     ) {
@@ -218,51 +307,6 @@ export default async function AssessmentSummaryPage({
         "Optimized";
     }
   }
-
-  const clauseResults =
-    CLAUSE_NUMBERS.map(
-      (number) => ({
-        number,
-        title:
-          CLAUSE_TITLES[number],
-        score:
-          calculateClauseScore(
-            number,
-            questions,
-            answers
-          ),
-        weight:
-          weights[number] ?? null,
-      })
-    );
-
-  const scoredClauses =
-    clauseResults.filter(
-      (result) =>
-        result.score !== null
-    );
-
-  const strongestClause =
-    scoredClauses.length > 0
-      ? scoredClauses.reduce(
-          (best, current) =>
-            current.score >
-            best.score
-              ? current
-              : best
-        )
-      : null;
-
-  const weakestClause =
-    scoredClauses.length > 0
-      ? scoredClauses.reduce(
-          (worst, current) =>
-            current.score <
-            worst.score
-              ? current
-              : worst
-        )
-      : null;
 
   return (
     <main
@@ -296,26 +340,287 @@ export default async function AssessmentSummaryPage({
             marginBottom: "8px",
           }}
         >
-          Executive Summary
+          {assessment.standard}{" "}
+          Assessment
         </h1>
 
         <p
           style={{
             color: "#617087",
-            marginBottom: "28px",
+            marginBottom: "24px",
           }}
         >
-          {assessment.standard}{" "}
-          Assessment
+          Status:{" "}
+          <strong>
+            {assessment.status}
+          </strong>
         </p>
 
+        {/* Weighted score */}
         <section
           style={{
             background: "#071A33",
-            color: "white",
+            color: "#ffffff",
             borderRadius: "16px",
-            padding: "30px",
+            padding: "28px",
+            marginBottom: "18px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+              alignItems: "center",
+              gap: "20px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  opacity: 0.75,
+                  letterSpacing:
+                    "1px",
+                  marginBottom: "7px",
+                }}
+              >
+                RPG WEIGHTED
+                READINESS
+              </div>
+
+              <strong
+                style={{
+                  fontSize: "21px",
+                }}
+              >
+                {
+                  assessment.standard
+                }
+              </strong>
+
+              <p
+                style={{
+                  opacity: 0.75,
+                  marginBottom: "4px",
+                }}
+              >
+                {hasWeightedProfile
+                  ? `${
+                      scoringProfile
+                        ?.profile_name
+                    } ${
+                      scoringProfile
+                        ?.version_label ??
+                      ""
+                    }`
+                  : "Standard readiness model"}
+              </p>
+
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#D6A539",
+                }}
+              >
+                {maturityLevel}
+              </div>
+            </div>
+
+            <div
+              style={{
+                fontSize: "48px",
+                fontWeight: 800,
+              }}
+            >
+              {overallScore !== null
+                ? `${overallScore}%`
+                : "—"}
+            </div>
+          </div>
+        </section>
+
+        {/* Progress */}
+        <section
+          style={{
+            background: "#ffffff",
+            border:
+              "1px solid #dfe6ee",
+            borderRadius: "14px",
+            padding: "20px 24px",
             marginBottom: "24px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+              alignItems: "center",
+              gap: "16px",
+              marginBottom: "12px",
+            }}
+          >
+            <strong
+              style={{
+                color: "#071A33",
+              }}
+            >
+              Assessment Progress
+            </strong>
+
+            <strong
+              style={{
+                color: "#1459D9",
+              }}
+            >
+              {progress.percentage}%
+            </strong>
+          </div>
+
+          <div
+            style={{
+              height: "10px",
+              background: "#e7edf4",
+              borderRadius: "999px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${
+                  progress.percentage
+                }%`,
+                background: "#1459D9",
+                borderRadius: "999px",
+              }}
+            />
+          </div>
+
+          <p
+            style={{
+              color: "#617087",
+              fontSize: "13px",
+              marginTop: "10px",
+              marginBottom: 0,
+            }}
+          >
+            {progress.answered} of{" "}
+            {progress.total} questions
+            answered
+          </p>
+        </section>
+
+        {/* Clause navigation */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(135px, 1fr))",
+            gap: "12px",
+            marginBottom: "24px",
+          }}
+        >
+          {CLAUSE_NUMBERS.map(
+            (number) => {
+              const score =
+                calculateClauseScore(
+                  number,
+                  allQuestions,
+                  allSavedAnswers
+                );
+
+              const weight =
+                weights[number];
+
+              return (
+                <a
+                  key={number}
+                  href={`/portal/assessments/${assessment.id}?clause=${number}`}
+                  style={{
+                    background:
+                      clause === number
+                        ? "#1459D9"
+                        : "#ffffff",
+                    color:
+                      clause === number
+                        ? "#ffffff"
+                        : "#071A33",
+                    borderRadius: "12px",
+                    padding: "16px",
+                    border:
+                      clause === number
+                        ? "1px solid #1459D9"
+                        : "1px solid #dfe6ee",
+                    textDecoration:
+                      "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      opacity: 0.75,
+                      marginBottom:
+                        "7px",
+                    }}
+                  >
+                    CLAUSE {number}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: "24px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {score !== null
+                      ? `${score}%`
+                      : "—"}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      marginTop: "6px",
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {
+                      CLAUSE_TITLES[
+                        number
+                      ]
+                    }
+                  </div>
+
+                  {weight && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        marginTop: "8px",
+                        opacity: 0.7,
+                      }}
+                    >
+                      Weight: {weight}%
+                    </div>
+                  )}
+                </a>
+              );
+            }
+          )}
+        </div>
+
+        {/* Current clause */}
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: "14px",
+            padding: "22px 24px",
+            marginBottom: "24px",
+            border:
+              "1px solid #dfe6ee",
             display: "flex",
             justifyContent:
               "space-between",
@@ -327,338 +632,439 @@ export default async function AssessmentSummaryPage({
           <div>
             <div
               style={{
+                color: "#1459D9",
                 fontSize: "12px",
-                opacity: 0.75,
-                letterSpacing: "1px",
-                marginBottom: "8px",
+                fontWeight: 700,
+                marginBottom: "6px",
               }}
             >
-              BUSINESS ASSURANCE
-              SCORE
+              CLAUSE {clause}
             </div>
 
             <strong
               style={{
-                fontSize: "24px",
+                color: "#071A33",
+                fontSize: "18px",
               }}
             >
-              {maturityLevel}
+              {clauseTitle}
             </strong>
-
-            <p
-              style={{
-                opacity: 0.75,
-                marginBottom: 0,
-              }}
-            >
-              {scoringProfile
-                ? `${scoringProfile.profile_name} ${scoringProfile.version_label ?? ""}`
-                : assessment.standard}
-            </p>
           </div>
 
           <div
             style={{
-              fontSize: "54px",
+              color: "#071A33",
+              fontSize: "32px",
               fontWeight: 800,
             }}
           >
-            {overallScore !== null
-              ? `${overallScore}%`
+            {currentClauseScore !==
+            null
+              ? `${currentClauseScore}%`
               : "—"}
           </div>
-        </section>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "16px",
-            marginBottom: "24px",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: "22px",
-              borderRadius: "14px",
-              border:
-                "1px solid #dfe6ee",
-            }}
-          >
-            <div
-              style={{
-                color: "#617087",
-                fontSize: "13px",
-              }}
-            >
-              Assessment Progress
-            </div>
-
-            <div
-              style={{
-                color: "#071A33",
-                fontSize: "30px",
-                fontWeight: 800,
-                marginTop: "8px",
-              }}
-            >
-              {progress.percentage}%
-            </div>
-
-            <div
-              style={{
-                color: "#617087",
-                marginTop: "5px",
-              }}
-            >
-              {progress.answered} of{" "}
-              {progress.total} questions
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: "white",
-              padding: "22px",
-              borderRadius: "14px",
-              border:
-                "1px solid #dfe6ee",
-            }}
-          >
-            <div
-              style={{
-                color: "#617087",
-                fontSize: "13px",
-              }}
-            >
-              Strongest Clause
-            </div>
-
-            <div
-              style={{
-                color: "#071A33",
-                fontSize: "30px",
-                fontWeight: 800,
-                marginTop: "8px",
-              }}
-            >
-              {strongestClause
-                ? `${strongestClause.score}%`
-                : "—"}
-            </div>
-
-            <div
-              style={{
-                color: "#617087",
-                marginTop: "5px",
-              }}
-            >
-              {strongestClause
-                ? `Clause ${strongestClause.number} — ${strongestClause.title}`
-                : "Not assessed"}
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: "white",
-              padding: "22px",
-              borderRadius: "14px",
-              border:
-                "1px solid #dfe6ee",
-            }}
-          >
-            <div
-              style={{
-                color: "#617087",
-                fontSize: "13px",
-              }}
-            >
-              Weakest Clause
-            </div>
-
-            <div
-              style={{
-                color: "#071A33",
-                fontSize: "30px",
-                fontWeight: 800,
-                marginTop: "8px",
-              }}
-            >
-              {weakestClause
-                ? `${weakestClause.score}%`
-                : "—"}
-            </div>
-
-            <div
-              style={{
-                color: "#617087",
-                marginTop: "5px",
-              }}
-            >
-              {weakestClause
-                ? `Clause ${weakestClause.number} — ${weakestClause.title}`
-                : "Not assessed"}
-            </div>
-          </div>
         </div>
 
-        <section
-          style={{
-            background: "white",
-            borderRadius: "14px",
-            padding: "28px",
-            border:
-              "1px solid #dfe6ee",
-            marginBottom: "24px",
-          }}
+        {/* Assessment form */}
+        <form
+          action={
+            saveAssessmentAnswers
+          }
         >
-          <h2
-            style={{
-              color: "#071A33",
-              marginTop: 0,
-            }}
-          >
-            Clause Results
-          </h2>
+          <input
+            type="hidden"
+            name="assessment_id"
+            value={assessment.id}
+          />
 
-          <div
+          <input
+            type="hidden"
+            name="current_clause"
+            value={clause}
+          />
+
+          {nextClause && (
+            <input
+              type="hidden"
+              name="next_clause"
+              value={nextClause}
+            />
+          )}
+
+          <section
             style={{
-              display: "grid",
-              gap: "12px",
+              background: "white",
+              padding: "30px",
+              borderRadius: "14px",
+              boxShadow:
+                "0 10px 30px rgba(7, 26, 51, 0.06)",
             }}
           >
-            {clauseResults.map(
-              (result) => (
-                <a
-                  key={result.number}
-                  href={`/portal/assessments/${assessment.id}?clause=${result.number}`}
+            <div
+              style={{
+                marginBottom: "28px",
+                paddingBottom: "18px",
+                borderBottom:
+                  "1px solid #e6ebf1",
+              }}
+            >
+              <p
+                style={{
+                  color: "#1459D9",
+                  fontWeight: 700,
+                  marginBottom: "8px",
+                }}
+              >
+                CLAUSE {clause}
+              </p>
+
+              <h2
+                style={{
+                  color: "#071A33",
+                  margin: 0,
+                }}
+              >
+                {clauseTitle}
+              </h2>
+
+              <p
+                style={{
+                  color: "#617087",
+                  marginTop: "10px",
+                  lineHeight: 1.6,
+                }}
+              >
+                Complete each question
+                and record the evidence
+                supporting your
+                assessment.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: "30px",
+              }}
+            >
+              {questions.length ? (
+                questions.map(
+                  (
+                    question,
+                    index
+                  ) => {
+                    const savedAnswer =
+                      answersByClause[
+                        question
+                          .question_number
+                      ] ?? null;
+
+                    const fieldKey =
+                      question.question_number.replaceAll(
+                        ".",
+                        "_"
+                      );
+
+                    return (
+                      <div
+                        key={question.id}
+                        style={{
+                          borderTop:
+                            index === 0
+                              ? "none"
+                              : "1px solid #e6ebf1",
+                          paddingTop:
+                            index === 0
+                              ? "0"
+                              : "26px",
+                        }}
+                      >
+                        <h3
+                          style={{
+                            color:
+                              "#071A33",
+                            marginBottom:
+                              "10px",
+                          }}
+                        >
+                          {
+                            question.question_number
+                          }
+                        </h3>
+
+                        <p
+                          style={{
+                            color:
+                              "#071A33",
+                            lineHeight: 1.6,
+                            fontWeight: 600,
+                            marginBottom:
+                              "10px",
+                          }}
+                        >
+                          {
+                            question.question
+                          }
+                        </p>
+
+                        {question.guidance && (
+                          <div
+                            style={{
+                              background:
+                                "#f5f8fc",
+                              borderLeft:
+                                "4px solid #1459D9",
+                              padding:
+                                "12px 14px",
+                              borderRadius:
+                                "6px",
+                              color:
+                                "#617087",
+                              lineHeight: 1.55,
+                              marginBottom:
+                                "16px",
+                              fontSize: "14px",
+                            }}
+                          >
+                            <strong
+                              style={{
+                                color:
+                                  "#071A33",
+                              }}
+                            >
+                              Guidance:
+                            </strong>{" "}
+                            {
+                              question.guidance
+                            }
+                          </div>
+                        )}
+
+                        <label
+                          style={{
+                            display:
+                              "block",
+                            fontWeight: 700,
+                            color:
+                              "#071A33",
+                            marginBottom:
+                              "7px",
+                          }}
+                        >
+                          Assessment score
+                        </label>
+
+                        <select
+                          name={`score_${fieldKey}`}
+                          required
+                          defaultValue={
+                            savedAnswer
+                              ?.score !==
+                              null &&
+                            savedAnswer
+                              ?.score !==
+                              undefined
+                              ? String(
+                                  savedAnswer.score
+                                )
+                              : ""
+                          }
+                          style={{
+                            width: "100%",
+                            maxWidth:
+                              "360px",
+                            padding: "12px",
+                            borderRadius:
+                              "8px",
+                            border:
+                              "1px solid #d8e0ea",
+                            background:
+                              "#fff",
+                          }}
+                        >
+                          <option
+                            value=""
+                            disabled
+                          >
+                            Select score
+                          </option>
+
+                          <option value="0">
+                            0 — Not addressed
+                          </option>
+
+                          <option value="1">
+                            1 — Initial
+                          </option>
+
+                          <option value="2">
+                            2 — Partially implemented
+                          </option>
+
+                          <option value="3">
+                            3 — Implemented
+                          </option>
+
+                          <option value="4">
+                            4 — Effective
+                          </option>
+
+                          <option value="5">
+                            5 — Best practice
+                          </option>
+                        </select>
+
+                        <label
+                          style={{
+                            display:
+                              "block",
+                            fontWeight: 700,
+                            color:
+                              "#071A33",
+                            marginTop:
+                              "18px",
+                            marginBottom:
+                              "7px",
+                          }}
+                        >
+                          Evidence / notes
+                        </label>
+
+                        <textarea
+                          name={`evidence_${fieldKey}`}
+                          placeholder="Describe supporting evidence, documents, records, observations or gaps..."
+                          rows="4"
+                          defaultValue={
+                            savedAnswer
+                              ?.evidence ??
+                            ""
+                          }
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            borderRadius:
+                              "8px",
+                            border:
+                              "1px solid #d8e0ea",
+                            resize:
+                              "vertical",
+                            boxSizing:
+                              "border-box",
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                )
+              ) : (
+                <div
                   style={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                    alignItems:
-                      "center",
-                    gap: "18px",
-                    padding:
-                      "16px 18px",
-                    borderRadius:
-                      "10px",
+                    padding: "20px",
                     background:
-                      "#f7f9fc",
-                    textDecoration:
-                      "none",
-                    color:
-                      "#071A33",
+                      "#fff8e8",
+                    borderRadius: "8px",
+                    color: "#735c17",
                   }}
                 >
-                  <div>
-                    <strong>
-                      Clause{" "}
-                      {result.number}
-                    </strong>
+                  No questions are
+                  currently configured
+                  for Clause {clause}.
+                </div>
+              )}
+            </div>
 
-                    <div
-                      style={{
-                        color:
-                          "#617087",
-                        fontSize:
-                          "13px",
-                        marginTop:
-                          "4px",
-                      }}
-                    >
-                      {result.title}
+            {/* Navigation */}
+            <div
+              style={{
+                marginTop: "32px",
+                paddingTop: "22px",
+                borderTop:
+                  "1px solid #e6ebf1",
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                gap: "12px",
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <a
+                  href="/portal"
+                  style={{
+                    padding:
+                      "12px 18px",
+                    borderRadius:
+                      "8px",
+                    border:
+                      "1px solid #d8e0ea",
+                    color:
+                      "#071A33",
+                    textDecoration:
+                      "none",
+                    fontWeight: 700,
+                  }}
+                >
+                  Dashboard
+                </a>
 
-                      {result.weight
-                        ? ` · Weight ${result.weight}%`
-                        : ""}
-                    </div>
-                  </div>
-
-                  <strong
+                {previousClause && (
+                  <a
+                    href={`/portal/assessments/${assessment.id}?clause=${previousClause}`}
                     style={{
-                      fontSize:
-                        "22px",
+                      padding:
+                        "12px 18px",
+                      borderRadius:
+                        "8px",
+                      border:
+                        "1px solid #d8e0ea",
+                      color:
+                        "#071A33",
+                      textDecoration:
+                        "none",
+                      fontWeight: 700,
                     }}
                   >
-                    {result.score !==
-                    null
-                      ? `${result.score}%`
-                      : "—"}
-                  </strong>
-                </a>
-              )
-            )}
-          </div>
-        </section>
+                    ← Clause{" "}
+                    {previousClause}
+                  </a>
+                )}
+              </div>
 
-        {progress.percentage <
-          100 && (
-          <div
-            style={{
-              background:
-                "#fff8e8",
-              color: "#735c17",
-              padding: "18px",
-              borderRadius:
-                "10px",
-              marginBottom:
-                "24px",
-            }}
-          >
-            This assessment is not
-            yet complete.{" "}
-            {progress.total -
-              progress.answered}{" "}
-            question(s) still need
-            an answer.
-          </div>
-        )}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
-          <a
-            href={`/portal/assessments/${assessment.id}?clause=10`}
-            style={{
-              padding:
-                "12px 18px",
-              borderRadius: "8px",
-              border:
-                "1px solid #d8e0ea",
-              color: "#071A33",
-              textDecoration:
-                "none",
-              fontWeight: 700,
-            }}
-          >
-            ← Return to Assessment
-          </a>
-
-          <a
-            href="/portal"
-            style={{
-              padding:
-                "12px 18px",
-              borderRadius: "8px",
-              background:
-                "#1459D9",
-              color: "white",
-              textDecoration:
-                "none",
-              fontWeight: 700,
-            }}
-          >
-            Dashboard
-          </a>
-        </div>
+              <button
+                type="submit"
+                disabled={
+                  !questions.length
+                }
+                style={{
+                  padding:
+                    "12px 20px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background:
+                    questions.length
+                      ? "#1459D9"
+                      : "#c8d2df",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  cursor:
+                    questions.length
+                      ? "pointer"
+                      : "not-allowed",
+                }}
+              >
+                {nextClause
+                  ? `Save & Continue → Clause ${nextClause}`
+                  : "Save Progress"}
+              </button>
+            </div>
+          </section>
+        </form>
       </div>
     </main>
   );
