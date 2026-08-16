@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import { saveAssessmentAnswers } from "./actions";
+import {
+  calculateClauseScore,
+  calculateWeightedOverallScore,
+  calculateProgress,
+} from "./scoring";
 
 export default async function AssessmentPage({
   params,
@@ -67,7 +72,39 @@ export default async function AssessmentPage({
 
     allSavedAnswers = data ?? [];
   }
+const { data: scoringProfile } = await supabase
+  .from("scoring_profiles")
+  .select("id")
+  .eq("standard", assessment.standard)
+  .eq("active", true)
+  .order("created_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
+let weights = {};
+
+if (scoringProfile) {
+  const { data: clauseWeights, error: clauseWeightsError } = await supabase
+    .from("scoring_profile_clauses")
+    .select("clause, weight")
+    .eq("scoring_profile_id", scoringProfile.id);
+
+  if (clauseWeightsError) {
+    throw new Error(clauseWeightsError.message);
+  }
+
+  weights = Object.fromEntries(
+    (clauseWeights ?? []).map((row) => [
+      row.clause,
+      Number(row.weight),
+    ])
+  );
+}
+
+// EXISTING CODE CONTINUES HERE
+
+const answersByClause = {};
+  
   // Lookup table for saved answers
   const answersByClause = {};
 
