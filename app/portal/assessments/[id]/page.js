@@ -34,7 +34,6 @@ export default async function AssessmentPage({
   searchParams,
 }) {
   const { id } = await params;
-
   const resolvedSearchParams = await searchParams;
 
   const requestedClause = Array.isArray(
@@ -49,20 +48,37 @@ export default async function AssessmentPage({
     ? requestedClause
     : "4";
 
-  const supabase = await createClient();
+  const currentClauseIndex =
+    CLAUSE_NUMBERS.indexOf(clause);
+
+  const previousClause =
+    currentClauseIndex > 0
+      ? CLAUSE_NUMBERS[
+          currentClauseIndex - 1
+        ]
+      : null;
+
+  const nextClause =
+    currentClauseIndex <
+    CLAUSE_NUMBERS.length - 1
+      ? CLAUSE_NUMBERS[
+          currentClauseIndex + 1
+        ]
+      : null;
+
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (!user) {
     redirect("/portal/login");
   }
 
-  // --------------------------------------------------
-  // LOAD ASSESSMENT
-  // --------------------------------------------------
-
+  // Load assessment
   const {
     data: assessment,
     error: assessmentError,
@@ -73,21 +89,24 @@ export default async function AssessmentPage({
     .eq("owner_id", user.id)
     .single();
 
-  if (assessmentError || !assessment) {
+  if (
+    assessmentError ||
+    !assessment
+  ) {
     redirect("/portal");
   }
 
-  // --------------------------------------------------
-  // LOAD QUESTION BANK
-  // --------------------------------------------------
-
+  // Load all questions
   const {
     data: allQuestions,
     error: allQuestionsError,
   } = await supabase
     .from("assessment_questions")
     .select("*")
-    .eq("standard", assessment.standard)
+    .eq(
+      "standard",
+      assessment.standard
+    )
     .eq("active", true)
     .order("display_order", {
       ascending: true,
@@ -113,13 +132,12 @@ export default async function AssessmentPage({
       question.question_number
   );
 
-  // --------------------------------------------------
-  // LOAD SAVED ANSWERS
-  // --------------------------------------------------
-
+  // Load all saved answers
   let allSavedAnswers = [];
 
-  if (allQuestionNumbers.length > 0) {
+  if (
+    allQuestionNumbers.length > 0
+  ) {
     const {
       data,
       error,
@@ -146,10 +164,7 @@ export default async function AssessmentPage({
       data ?? [];
   }
 
-  // --------------------------------------------------
-  // LOAD RPG SCORING PROFILE
-  // --------------------------------------------------
-
+  // Load active scoring profile
   const {
     data: scoringProfile,
     error: scoringProfileError,
@@ -185,7 +200,9 @@ export default async function AssessmentPage({
       .from(
         "scoring_profile_clauses"
       )
-      .select("clause, weight")
+      .select(
+        "clause, weight"
+      )
       .eq(
         "scoring_profile_id",
         scoringProfile.id
@@ -197,20 +214,18 @@ export default async function AssessmentPage({
       );
     }
 
-    weights = Object.fromEntries(
-      (clauseWeights ?? []).map(
-        (row) => [
+    weights =
+      Object.fromEntries(
+        (
+          clauseWeights ?? []
+        ).map((row) => [
           row.clause,
           Number(row.weight),
-        ]
-      )
-    );
+        ])
+      );
   }
 
-  // --------------------------------------------------
-  // ANSWER LOOKUP
-  // --------------------------------------------------
-
+  // Saved answer lookup
   const answersByClause = {};
 
   for (
@@ -221,22 +236,17 @@ export default async function AssessmentPage({
     ] = answer;
   }
 
-  // --------------------------------------------------
-  // CALCULATE PROGRESS
-  // --------------------------------------------------
-
+  // Progress
   const progress =
     calculateProgress(
       allQuestions,
       allSavedAnswers
     );
 
-  // --------------------------------------------------
-  // CALCULATE OVERALL SCORE
-  // --------------------------------------------------
-
+  // Overall weighted score
   const hasWeightedProfile =
-    Object.keys(weights).length > 0;
+    Object.keys(weights).length >
+    0;
 
   const overallScore =
     hasWeightedProfile
@@ -255,10 +265,7 @@ export default async function AssessmentPage({
           allSavedAnswers
         );
 
-  // --------------------------------------------------
-  // CURRENT CLAUSE SCORE
-  // --------------------------------------------------
-
+  // Current clause score
   const currentClauseScore =
     calculateClauseScore(
       clause,
@@ -272,16 +279,11 @@ export default async function AssessmentPage({
     ] ??
     `Clause ${clause}`;
 
-  // --------------------------------------------------
-  // MATURITY LEVEL
-  // --------------------------------------------------
-
+  // Maturity
   let maturityLevel =
     "Not assessed";
 
-  if (
-    overallScore !== null
-  ) {
+  if (overallScore !== null) {
     if (overallScore <= 20) {
       maturityLevel =
         "Initial";
@@ -322,8 +324,6 @@ export default async function AssessmentPage({
           margin: "0 auto",
         }}
       >
-        {/* HEADER */}
-
         <p
           style={{
             color: "#1459D9",
@@ -356,12 +356,10 @@ export default async function AssessmentPage({
           </strong>
         </p>
 
-        {/* OVERALL READINESS */}
-
+        {/* Weighted score */}
         <section
           style={{
-            background:
-              "#071A33",
+            background: "#071A33",
             color: "#ffffff",
             borderRadius: "16px",
             padding: "28px",
@@ -424,8 +422,7 @@ export default async function AssessmentPage({
                 style={{
                   fontSize: "13px",
                   fontWeight: 700,
-                  color:
-                    "#D6A539",
+                  color: "#D6A539",
                 }}
               >
                 {maturityLevel}
@@ -438,16 +435,14 @@ export default async function AssessmentPage({
                 fontWeight: 800,
               }}
             >
-              {overallScore !==
-              null
+              {overallScore !== null
                 ? `${overallScore}%`
                 : "—"}
             </div>
           </div>
         </section>
 
-        {/* PROGRESS */}
-
+        {/* Progress */}
         <section
           style={{
             background: "#ffffff",
@@ -466,7 +461,6 @@ export default async function AssessmentPage({
               alignItems: "center",
               gap: "16px",
               marginBottom: "12px",
-              flexWrap: "wrap",
             }}
           >
             <strong
@@ -482,10 +476,7 @@ export default async function AssessmentPage({
                 color: "#1459D9",
               }}
             >
-              {
-                progress.percentage
-              }
-              %
+              {progress.percentage}%
             </strong>
           </div>
 
@@ -503,10 +494,8 @@ export default async function AssessmentPage({
                 width: `${
                   progress.percentage
                 }%`,
-                background:
-                  "#1459D9",
-                borderRadius:
-                  "999px",
+                background: "#1459D9",
+                borderRadius: "999px",
               }}
             />
           </div>
@@ -520,13 +509,12 @@ export default async function AssessmentPage({
             }}
           >
             {progress.answered} of{" "}
-            {progress.total}{" "}
-            questions answered
+            {progress.total} questions
+            answered
           </p>
         </section>
 
-        {/* CLAUSE SCORE CARDS */}
-
+        {/* Clause navigation */}
         <div
           style={{
             display: "grid",
@@ -546,9 +534,7 @@ export default async function AssessmentPage({
                 );
 
               const weight =
-                weights[
-                  number
-                ];
+                weights[number];
 
               return (
                 <a
@@ -563,8 +549,7 @@ export default async function AssessmentPage({
                       clause === number
                         ? "#ffffff"
                         : "#071A33",
-                    borderRadius:
-                      "12px",
+                    borderRadius: "12px",
                     padding: "16px",
                     border:
                       clause === number
@@ -576,8 +561,7 @@ export default async function AssessmentPage({
                 >
                   <div
                     style={{
-                      fontSize:
-                        "12px",
+                      fontSize: "12px",
                       opacity: 0.75,
                       marginBottom:
                         "7px",
@@ -588,8 +572,7 @@ export default async function AssessmentPage({
 
                   <div
                     style={{
-                      fontSize:
-                        "24px",
+                      fontSize: "24px",
                       fontWeight: 800,
                     }}
                   >
@@ -600,12 +583,9 @@ export default async function AssessmentPage({
 
                   <div
                     style={{
-                      fontSize:
-                        "12px",
-                      marginTop:
-                        "6px",
-                      lineHeight:
-                        1.35,
+                      fontSize: "12px",
+                      marginTop: "6px",
+                      lineHeight: 1.35,
                     }}
                   >
                     {
@@ -618,16 +598,12 @@ export default async function AssessmentPage({
                   {weight && (
                     <div
                       style={{
-                        fontSize:
-                          "10px",
-                        marginTop:
-                          "8px",
-                        opacity:
-                          0.7,
+                        fontSize: "10px",
+                        marginTop: "8px",
+                        opacity: 0.7,
                       }}
                     >
-                      Weight:{" "}
-                      {weight}%
+                      Weight: {weight}%
                     </div>
                   )}
                 </a>
@@ -636,14 +612,12 @@ export default async function AssessmentPage({
           )}
         </div>
 
-        {/* CURRENT CLAUSE */}
-
+        {/* Current clause */}
         <div
           style={{
             background: "#ffffff",
             borderRadius: "14px",
-            padding:
-              "22px 24px",
+            padding: "22px 24px",
             marginBottom: "24px",
             border:
               "1px solid #dfe6ee",
@@ -691,8 +665,7 @@ export default async function AssessmentPage({
           </div>
         </div>
 
-        {/* ASSESSMENT FORM */}
-
+        {/* Assessment form */}
         <form
           action={
             saveAssessmentAnswers
@@ -701,10 +674,22 @@ export default async function AssessmentPage({
           <input
             type="hidden"
             name="assessment_id"
-            value={
-              assessment.id
-            }
+            value={assessment.id}
           />
+
+          <input
+            type="hidden"
+            name="current_clause"
+            value={clause}
+          />
+
+          {nextClause && (
+            <input
+              type="hidden"
+              name="next_clause"
+              value={nextClause}
+            />
+          )}
 
           <section
             style={{
@@ -749,9 +734,8 @@ export default async function AssessmentPage({
                   lineHeight: 1.6,
                 }}
               >
-                Complete each
-                question and record
-                the evidence
+                Complete each question
+                and record the evidence
                 supporting your
                 assessment.
               </p>
@@ -783,18 +767,14 @@ export default async function AssessmentPage({
 
                     return (
                       <div
-                        key={
-                          question.id
-                        }
+                        key={question.id}
                         style={{
                           borderTop:
-                            index ===
-                            0
+                            index === 0
                               ? "none"
                               : "1px solid #e6ebf1",
                           paddingTop:
-                            index ===
-                            0
+                            index === 0
                               ? "0"
                               : "26px",
                         }}
@@ -816,10 +796,8 @@ export default async function AssessmentPage({
                           style={{
                             color:
                               "#071A33",
-                            lineHeight:
-                              1.6,
-                            fontWeight:
-                              600,
+                            lineHeight: 1.6,
+                            fontWeight: 600,
                             marginBottom:
                               "10px",
                           }}
@@ -842,12 +820,10 @@ export default async function AssessmentPage({
                                 "6px",
                               color:
                                 "#617087",
-                              lineHeight:
-                                1.55,
+                              lineHeight: 1.55,
                               marginBottom:
                                 "16px",
-                              fontSize:
-                                "14px",
+                              fontSize: "14px",
                             }}
                           >
                             <strong
@@ -868,16 +844,14 @@ export default async function AssessmentPage({
                           style={{
                             display:
                               "block",
-                            fontWeight:
-                              700,
+                            fontWeight: 700,
                             color:
                               "#071A33",
                             marginBottom:
                               "7px",
                           }}
                         >
-                          Assessment
-                          score
+                          Assessment score
                         </label>
 
                         <select
@@ -896,12 +870,10 @@ export default async function AssessmentPage({
                               : ""
                           }
                           style={{
-                            width:
-                              "100%",
+                            width: "100%",
                             maxWidth:
                               "360px",
-                            padding:
-                              "12px",
+                            padding: "12px",
                             borderRadius:
                               "8px",
                             border:
@@ -918,8 +890,7 @@ export default async function AssessmentPage({
                           </option>
 
                           <option value="0">
-                            0 — Not
-                            addressed
+                            0 — Not addressed
                           </option>
 
                           <option value="1">
@@ -927,13 +898,11 @@ export default async function AssessmentPage({
                           </option>
 
                           <option value="2">
-                            2 — Partially
-                            implemented
+                            2 — Partially implemented
                           </option>
 
                           <option value="3">
-                            3 —
-                            Implemented
+                            3 — Implemented
                           </option>
 
                           <option value="4">
@@ -941,8 +910,7 @@ export default async function AssessmentPage({
                           </option>
 
                           <option value="5">
-                            5 — Best
-                            practice
+                            5 — Best practice
                           </option>
                         </select>
 
@@ -950,8 +918,7 @@ export default async function AssessmentPage({
                           style={{
                             display:
                               "block",
-                            fontWeight:
-                              700,
+                            fontWeight: 700,
                             color:
                               "#071A33",
                             marginTop:
@@ -960,8 +927,7 @@ export default async function AssessmentPage({
                               "7px",
                           }}
                         >
-                          Evidence /
-                          notes
+                          Evidence / notes
                         </label>
 
                         <textarea
@@ -974,10 +940,8 @@ export default async function AssessmentPage({
                             ""
                           }
                           style={{
-                            width:
-                              "100%",
-                            padding:
-                              "12px",
+                            width: "100%",
+                            padding: "12px",
                             borderRadius:
                               "8px",
                             border:
@@ -998,20 +962,18 @@ export default async function AssessmentPage({
                     padding: "20px",
                     background:
                       "#fff8e8",
-                    borderRadius:
-                      "8px",
-                    color:
-                      "#735c17",
+                    borderRadius: "8px",
+                    color: "#735c17",
                   }}
                 >
                   No questions are
-                  currently
-                  configured for
-                  Clause {clause}.
+                  currently configured
+                  for Clause {clause}.
                 </div>
               )}
             </div>
 
+            {/* Navigation */}
             <div
               style={{
                 marginTop: "32px",
@@ -1025,24 +987,54 @@ export default async function AssessmentPage({
                 flexWrap: "wrap",
               }}
             >
-              <a
-                href="/portal"
+              <div
                 style={{
-                  padding:
-                    "12px 18px",
-                  borderRadius:
-                    "8px",
-                  border:
-                    "1px solid #d8e0ea",
-                  color:
-                    "#071A33",
-                  textDecoration:
-                    "none",
-                  fontWeight: 700,
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
                 }}
               >
-                Back to Dashboard
-              </a>
+                <a
+                  href="/portal"
+                  style={{
+                    padding:
+                      "12px 18px",
+                    borderRadius:
+                      "8px",
+                    border:
+                      "1px solid #d8e0ea",
+                    color:
+                      "#071A33",
+                    textDecoration:
+                      "none",
+                    fontWeight: 700,
+                  }}
+                >
+                  Dashboard
+                </a>
+
+                {previousClause && (
+                  <a
+                    href={`/portal/assessments/${assessment.id}?clause=${previousClause}`}
+                    style={{
+                      padding:
+                        "12px 18px",
+                      borderRadius:
+                        "8px",
+                      border:
+                        "1px solid #d8e0ea",
+                      color:
+                        "#071A33",
+                      textDecoration:
+                        "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ← Clause{" "}
+                    {previousClause}
+                  </a>
+                )}
+              </div>
 
               <button
                 type="submit"
@@ -1051,16 +1043,14 @@ export default async function AssessmentPage({
                 }
                 style={{
                   padding:
-                    "12px 18px",
-                  borderRadius:
-                    "8px",
+                    "12px 20px",
+                  borderRadius: "8px",
                   border: "none",
                   background:
                     questions.length
                       ? "#1459D9"
                       : "#c8d2df",
-                  color:
-                    "#ffffff",
+                  color: "#ffffff",
                   fontWeight: 700,
                   cursor:
                     questions.length
@@ -1068,7 +1058,9 @@ export default async function AssessmentPage({
                       : "not-allowed",
                 }}
               >
-                Save Answers
+                {nextClause
+                  ? `Save & Continue → Clause ${nextClause}`
+                  : "Save Progress"}
               </button>
             </div>
           </section>
