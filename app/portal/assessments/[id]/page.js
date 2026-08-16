@@ -2,11 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import { saveAssessmentAnswers } from "./actions";
 import {
-  calculateClauseScore,
   calculateWeightedOverallScore,
   calculateProgress,
 } from "./scoring";
-
 export default async function AssessmentPage({
   params,
   searchParams,
