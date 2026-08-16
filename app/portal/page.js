@@ -8,13 +8,21 @@ export const metadata = {
 export default async function PortalPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/portal/login");
-  }
+if (!user) {
+  redirect("/portal/login");
+}
+
+const { data: organizations } = await supabase
+  .from("organizations")
+  .select("*")
+  .eq("owner_id", user.id)
+  .order("created_at", { ascending: true });
+
+const organization = organizations?.[0] ?? null;
 
   return (
     <main
