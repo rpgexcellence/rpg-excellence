@@ -40,6 +40,19 @@ export default async function AssessmentPage({ params }) {
   const answer42 =
     savedAnswers?.find((answer) => answer.clause === "4.2") ?? null;
 
+  const availableScores = [answer41?.score, answer42?.score].filter(
+    (score) => score !== null && score !== undefined
+  );
+
+  const clause4Score =
+    availableScores.length > 0
+      ? Math.round(
+          (availableScores.reduce((sum, score) => sum + Number(score), 0) /
+            (availableScores.length * 5)) *
+            100
+        )
+      : null;
+
   return (
     <main
       style={{
@@ -77,11 +90,55 @@ export default async function AssessmentPage({ params }) {
         <p
           style={{
             color: "#617087",
-            marginBottom: "30px",
+            marginBottom: "24px",
           }}
         >
           Status: <strong>{assessment.status}</strong>
         </p>
+
+        <div
+          style={{
+            background: "#071A33",
+            color: "white",
+            borderRadius: "14px",
+            padding: "24px",
+            marginBottom: "24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "20px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "13px",
+                opacity: 0.8,
+                marginBottom: "6px",
+              }}
+            >
+              CLAUSE 4 SCORE
+            </div>
+
+            <strong
+              style={{
+                fontSize: "18px",
+              }}
+            >
+              Context of the Organization
+            </strong>
+          </div>
+
+          <div
+            style={{
+              fontSize: "36px",
+              fontWeight: 800,
+            }}
+          >
+            {clause4Score !== null ? `${clause4Score}%` : "—"}
+          </div>
+        </div>
 
         <form action={saveClause4}>
           <input
