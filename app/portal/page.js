@@ -33,6 +33,32 @@ export default async function PortalPage() {
       >
         <h2>RPG Intelligence</h2>
         <p>{user.email}</p>
+<form action="/auth/signout" method="post">
+  <button
+    type="submit"
+    style={{
+      marginTop: "15px",
+      padding: "10px 18px",
+      background: "#d32f2f",
+      color: "white",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer"
+    }}
+  >
+    Sign Out
+  </button>
+</form>
+
+
+
+
+
+
+
+
+
+        
       </header>
 
       <section
