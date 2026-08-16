@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
-
+import { createOrganization } from "./actions";
 export const metadata = {
   title: "RPG Intelligence Dashboard",
 };
