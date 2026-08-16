@@ -775,43 +775,54 @@ export default async function AssessmentSummaryPage({
         {/* NAVIGATION */}
 
         <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
-          <a
-            href={`/portal/assessments/${assessment.id}?clause=10`}
-            style={{
-              padding: "12px 18px",
-              borderRadius: "8px",
-              border:
-                "1px solid #d8e0ea",
-              color: "#071A33",
-              textDecoration: "none",
-              fontWeight: 700,
-              background:
-                "#ffffff",
-            }}
-          >
-            ← Return to Assessment
-          </a>
+           style={{
+    display: "flex",
+    gap: "12px",
+    flexWrap: "wrap",
+  }}
+>
+  <a
+    href={`/portal/assessments/${assessment.id}?clause=10`}
+    style={{
+      padding: "12px 18px",
+      borderRadius: "8px",
+      border: "1px solid #d8e0ea",
+      color: "#071A33",
+      textDecoration: "none",
+      fontWeight: 700,
+      background: "#ffffff",
+    }}
+  >
+    ← Return to Assessment
+  </a>
 
-          <a
-            href="/portal"
-            style={{
-              padding: "12px 18px",
-              borderRadius: "8px",
-              border: "none",
-              background: "#1459D9",
-              color: "#ffffff",
-              textDecoration: "none",
-              fontWeight: 700,
-            }}
-          >
-            Dashboard
-          </a>
+  <a
+    href={`/portal/assessments/${assessment.id}/report`}
+    style={{
+      padding: "12px 18px",
+      borderRadius: "8px",
+      background: "#071A33",
+      color: "#ffffff",
+      textDecoration: "none",
+      fontWeight: 700,
+    }}
+  >
+    Download PDF Report
+  </a>
+
+  <a
+    href="/portal"
+    style={{
+      padding: "12px 18px",
+      borderRadius: "8px",
+      background: "#1459D9",
+      color: "#ffffff",
+      textDecoration: "none",
+      fontWeight: 700,
+    }}
+  >
+    Dashboard
+  </a>
         </div>
       </div>
     </main>
