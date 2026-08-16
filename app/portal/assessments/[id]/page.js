@@ -1060,7 +1060,7 @@ export default async function AssessmentPage({
               >
                 {nextClause
                   ? `Save & Continue → Clause ${nextClause}`
-                  : "Save Progress"}
+                  : "Complete Assessment →"}
               </button>
             </div>
           </section>
