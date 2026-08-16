@@ -22,11 +22,23 @@ export default function Header({ locale, nav }) {
       </nav>
 
 <div className="headerActions">
-  <LanguageSwitcher current={locale} />
+ <LanguageSwitcher current={locale} />
+
+  <a
+    href="/portal/login"
+    className="button buttonSmall"
+    style={{
+      background: "transparent",
+      color: "#071A33",
+      border: "1px solid #d8e0ea"
+    }}
+  >
+    Sign in
+  </a>
 
   <a
     className="button buttonSmall"
-    href="https://outlook.office.com/bookwithme/user/3e31957cbcf643eb8e7e828a5eac6aaa@rpgexcellence.com/meetingtype/EUQpnH6tqUOohgd_4L5-8w2?anonymous&ismsaljsauthenabled&ep=mlink"
+    href="YOUR_BOOKING_URL"
     target="_blank"
     rel="noopener noreferrer"
   >
