@@ -26,6 +26,20 @@ export default async function AssessmentPage({ params }) {
     redirect("/portal");
   }
 
+  const { data: savedAnswers } = await supabase
+    .from("assessment_answers")
+    .select("*")
+    .eq("assessment_id", assessment.id)
+    .eq("owner_id", user.id)
+    .in("clause", ["4.1", "4.2"])
+    .order("created_at", { ascending: false });
+
+  const answer41 =
+    savedAnswers?.find((answer) => answer.clause === "4.1") ?? null;
+
+  const answer42 =
+    savedAnswers?.find((answer) => answer.clause === "4.2") ?? null;
+
   return (
     <main
       style={{
@@ -134,14 +148,19 @@ export default async function AssessmentPage({ params }) {
                     marginBottom: "14px",
                   }}
                 >
-                  Has the organization determined the internal and external issues
-                  relevant to its purpose and strategic direction?
+                  Has the organization determined the internal and external
+                  issues relevant to its purpose and strategic direction?
                 </p>
 
                 <select
                   name="score_4_1"
                   required
-                  defaultValue=""
+                  defaultValue={
+                    answer41?.score !== null &&
+                    answer41?.score !== undefined
+                      ? String(answer41.score)
+                      : ""
+                  }
                   style={{
                     width: "100%",
                     maxWidth: "360px",
@@ -166,6 +185,7 @@ export default async function AssessmentPage({ params }) {
                   name="evidence_4_1"
                   placeholder="Evidence or notes"
                   rows="4"
+                  defaultValue={answer41?.evidence ?? ""}
                   style={{
                     width: "100%",
                     marginTop: "14px",
@@ -200,14 +220,19 @@ export default async function AssessmentPage({ params }) {
                     marginBottom: "14px",
                   }}
                 >
-                  Has the organization identified relevant interested parties and
-                  their applicable requirements?
+                  Has the organization identified relevant interested parties
+                  and their applicable requirements?
                 </p>
 
                 <select
                   name="score_4_2"
                   required
-                  defaultValue=""
+                  defaultValue={
+                    answer42?.score !== null &&
+                    answer42?.score !== undefined
+                      ? String(answer42.score)
+                      : ""
+                  }
                   style={{
                     width: "100%",
                     maxWidth: "360px",
@@ -232,6 +257,7 @@ export default async function AssessmentPage({ params }) {
                   name="evidence_4_2"
                   placeholder="Evidence or notes"
                   rows="4"
+                  defaultValue={answer42?.evidence ?? ""}
                   style={{
                     width: "100%",
                     marginTop: "14px",
