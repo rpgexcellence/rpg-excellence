@@ -138,8 +138,7 @@ export async function saveAssessmentAnswers(formData) {
     );
   }
 
-  // If a valid next clause was supplied,
-  // automatically continue there.
+  // Continue to the next clause when one exists.
   if (
     typeof nextClause === "string" &&
     VALID_CLAUSES.includes(nextClause)
@@ -149,7 +148,34 @@ export async function saveAssessmentAnswers(formData) {
     );
   }
 
-  // Otherwise return to the clause just saved.
+  // Clause 10 is the final clause.
+  // Mark the assessment as completed and open the Executive Summary.
+  if (currentClause === "10") {
+    const {
+      error: completionError,
+    } = await supabase
+      .from("assessments")
+      .update({
+        status: "completed",
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", assessmentId)
+      .eq("owner_id", user.id);
+
+    if (completionError) {
+      throw new Error(
+        completionError.message
+      );
+    }
+
+    redirect(
+      `/portal/assessments/${assessmentId}/summary`
+    );
+  }
+
+  // If no next clause was provided,
+  // return to the current valid clause.
   if (
     typeof currentClause === "string" &&
     VALID_CLAUSES.includes(currentClause)
