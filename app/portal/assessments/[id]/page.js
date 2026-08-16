@@ -2,8 +2,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import { saveAssessmentAnswers } from "./actions";
 
-export default async function AssessmentPage({ params }) {
+export default async function AssessmentPage({
+  params,
+  searchParams,
+}) {
   const { id } = await params;
+  const clause = searchParams?.clause ?? "4";
 
   const supabase = await createClient();
 
@@ -27,12 +31,12 @@ export default async function AssessmentPage({ params }) {
     redirect("/portal");
   }
 
-  // Load Clause 4 questions dynamically
+  // Load questions for the selected clause
   const { data: questions, error: questionsError } = await supabase
     .from("assessment_questions")
     .select("*")
     .eq("standard", assessment.standard)
-    .eq("clause", "4")
+    .eq("clause", clause)
     .eq("active", true)
     .order("display_order", { ascending: true });
 
@@ -43,7 +47,7 @@ export default async function AssessmentPage({ params }) {
   const questionNumbers =
     questions?.map((question) => question.question_number) ?? [];
 
-  // Load saved answers
+  // Load saved answers for the selected clause
   let savedAnswers = [];
 
   if (questionNumbers.length > 0) {
@@ -68,7 +72,7 @@ export default async function AssessmentPage({ params }) {
     answersByClause[answer.clause] = answer;
   }
 
-  // Calculate Clause 4 score
+  // Calculate score for the selected clause
   const availableScores = savedAnswers
     .map((answer) => answer.score)
     .filter(
@@ -77,7 +81,7 @@ export default async function AssessmentPage({ params }) {
         score !== undefined
     );
 
-  const clause4Score =
+  const selectedClauseScore =
     availableScores.length > 0
       ? Math.round(
           (availableScores.reduce(
@@ -88,6 +92,19 @@ export default async function AssessmentPage({ params }) {
             100
         )
       : null;
+
+  const clauseTitles = {
+    "4": "Context of the Organization",
+    "5": "Leadership",
+    "6": "Planning",
+    "7": "Support",
+    "8": "Operation",
+    "9": "Performance Evaluation",
+    "10": "Improvement",
+  };
+
+  const clauseTitle =
+    clauseTitles[clause] ?? `Clause ${clause}`;
 
   return (
     <main
@@ -134,6 +151,51 @@ export default async function AssessmentPage({ params }) {
 
         <div
           style={{
+            display: "flex",
+            gap: "10px",
+            flexWrap: "wrap",
+            marginBottom: "24px",
+          }}
+        >
+          {[
+            ["4", "Context"],
+            ["5", "Leadership"],
+            ["6", "Planning"],
+            ["7", "Support"],
+            ["8", "Operation"],
+            ["9", "Performance"],
+            ["10", "Improvement"],
+          ].map(([number, label]) => (
+            <a
+              key={number}
+              href={`/portal/assessments/${assessment.id}?clause=${number}`}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "8px",
+                textDecoration: "none",
+                fontWeight: 700,
+                fontSize: "14px",
+                background:
+                  clause === number
+                    ? "#1459D9"
+                    : "#ffffff",
+                color:
+                  clause === number
+                    ? "#ffffff"
+                    : "#071A33",
+                border:
+                  clause === number
+                    ? "1px solid #1459D9"
+                    : "1px solid #d8e0ea",
+              }}
+            >
+              {number} {label}
+            </a>
+          ))}
+        </div>
+
+        <div
+          style={{
             background: "#071A33",
             color: "white",
             borderRadius: "14px",
@@ -154,7 +216,7 @@ export default async function AssessmentPage({ params }) {
                 marginBottom: "6px",
               }}
             >
-              CLAUSE 4 SCORE
+              {`CLAUSE ${clause} SCORE`}
             </div>
 
             <strong
@@ -162,7 +224,7 @@ export default async function AssessmentPage({ params }) {
                 fontSize: "18px",
               }}
             >
-              Context of the Organization
+              {clauseTitle}
             </strong>
           </div>
 
@@ -172,8 +234,8 @@ export default async function AssessmentPage({ params }) {
               fontWeight: 800,
             }}
           >
-            {clause4Score !== null
-              ? `${clause4Score}%`
+            {selectedClauseScore !== null
+              ? `${selectedClauseScore}%`
               : "—"}
           </div>
         </div>
@@ -208,7 +270,7 @@ export default async function AssessmentPage({ params }) {
                   marginBottom: "8px",
                 }}
               >
-                CLAUSE 4
+                {`CLAUSE ${clause}`}
               </p>
 
               <h2
@@ -217,7 +279,7 @@ export default async function AssessmentPage({ params }) {
                   margin: 0,
                 }}
               >
-                Context of the Organization
+                {clauseTitle}
               </h2>
 
               <p
@@ -409,7 +471,7 @@ export default async function AssessmentPage({ params }) {
                   }}
                 >
                   No questions are currently configured
-                  for this clause.
+                  for Clause {clause}.
                 </div>
               )}
             </div>
