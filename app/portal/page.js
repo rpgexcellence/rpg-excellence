@@ -354,305 +354,122 @@ const recentAssessments =
   );
 
 return (
-    <main
+  <main
+    style={{
+      minHeight: "100vh",
+      background: "#f3f6f9",
+      fontFamily: "Arial, sans-serif",
+    }}
+  >
+    {/* HEADER */}
+
+    <header
       style={{
-        minHeight: "100vh",
-        background: "#f3f6f9",
-        fontFamily:
-          "Arial, sans-serif",
+        background: "#071A33",
+        color: "#ffffff",
+        padding: "20px 30px",
       }}
     >
-      {/* HEADER */}
-
-      <header
+      <div
         style={{
-          background: "#071A33",
-          color: "#ffffff",
-          padding:
-            "20px 30px",
+          maxWidth: "1200px",
+          margin: "0 auto",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "20px",
+          flexWrap: "wrap",
         }}
       >
+        <div>
+          <h2
+            style={{
+              margin: 0,
+            }}
+          >
+            RPG Intelligence
+          </h2>
+
+          <p
+            style={{
+              marginTop: "6px",
+              marginBottom: 0,
+              opacity: 0.75,
+            }}
+          >
+            {user.email}
+          </p>
+        </div>
+
         <div
           style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
             display: "flex",
-            justifyContent:
-              "space-between",
+            gap: "10px",
             alignItems: "center",
-            gap: "20px",
             flexWrap: "wrap",
           }}
         >
-          <div>
-            <h2
-              style={{
-                margin: 0,
-              }}
-            >
-              RPG Intelligence
-            </h2>
-
-            <p
-              style={{
-                marginTop: "6px",
-                marginBottom: 0,
-                opacity: 0.75,
-              }}
-            >
-              {user.email}
-            </p>
-          </div>
-
-          <div
+          <Link
+            href="/portal"
             style={{
-              display: "flex",
-              gap: "10px",
-              alignItems:
-                "center",
-              flexWrap: "wrap",
+              padding: "10px 14px",
+              color: "#ffffff",
+              textDecoration: "none",
+              fontWeight: 700,
             }}
           >
-            <Link
-              href="/portal"
-              style={{
-                padding:
-                  "10px 14px",
-                color:
-                  "#ffffff",
-                textDecoration:
-                  "none",
-                fontWeight: 700,
-              }}
-            >
-              Dashboard
-            </Link>
+            Dashboard
+          </Link>
 
-            <Link
-              href="/portal/history"
-              style={{
-                padding:
-                  "10px 14px",
-                color:
-                  "#ffffff",
-                textDecoration:
-                  "none",
-                fontWeight: 700,
-              }}
-            >
-              History
-            </Link>
-<Link
-  href="/portal/history"
-  style={{
-    padding: "10px 14px",
-    color: "#ffffff",
-    textDecoration: "none",
-    fontWeight: 700,
-  }}
->
-  History
-</Link>
-            <Link
-              href="/portal/reports"
-              style={{
-                padding:
-                  "10px 14px",
-                color:
-                  "#ffffff",
-                textDecoration:
-                  "none",
-                fontWeight: 700,
-              }}
-            >
-<Link
-  href="/portal/history"
-  style={{
-    background: "#ffffff",
-    padding: "22px",
-    borderRadius: "14px",
-    border: "1px solid #dfe6ee",
-    textDecoration: "none",
-  }}
->
-  <div
-    style={{
-      color: "#617087",
-      fontSize: "13px",
-      fontWeight: 700,
-    }}
-  >
-    HISTORY
-  </div>
-
-  <div
-    style={{
-      color: "#071A33",
-      fontSize: "34px",
-      fontWeight: 800,
-      marginTop: "8px",
-    }}
-  >
-    {allAssessments.length}
-  </div>
-</Link>
-              Reports
-            </Link>
-
-            <form
-              action="/auth/signout"
-              method="post"
-              style={{
-                margin: 0,
-              }}
-            >
-              <button
-                type="submit"
-                style={{
-                  padding:
-                    "10px 16px",
-                  background:
-                    "#d32f2f",
-                  color:
-                    "#ffffff",
-                  border: "none",
-                  borderRadius:
-                    "8px",
-                  cursor:
-                    "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                Sign Out
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-      0,
-      5
-    );
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f3f6f9",
-        fontFamily:
-          "Arial, sans-serif",
-      }}
-    >
-      {/* HEADER */}
-
-      <header
-        style={{
-          background: "#071A33",
-          color: "#ffffff",
-          padding:
-            "20px 30px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            display: "flex",
-            justifyContent:
-              "space-between",
-            alignItems: "center",
-            gap: "20px",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <h2
-              style={{
-                margin: 0,
-              }}
-            >
-              RPG Intelligence
-            </h2>
-
-            <p
-              style={{
-                marginTop: "6px",
-                marginBottom: 0,
-                opacity: 0.75,
-              }}
-            >
-              {user.email}
-            </p>
-          </div>
-
-          <div
+          <Link
+            href="/portal/history"
             style={{
-              display: "flex",
-              gap: "10px",
-              alignItems:
-                "center",
-              flexWrap: "wrap",
+              padding: "10px 14px",
+              color: "#ffffff",
+              textDecoration: "none",
+              fontWeight: 700,
             }}
           >
-            <Link
-              href="/portal"
+            History
+          </Link>
+
+          <Link
+            href="/portal/reports"
+            style={{
+              padding: "10px 14px",
+              color: "#ffffff",
+              textDecoration: "none",
+              fontWeight: 700,
+            }}
+          >
+            Reports
+          </Link>
+
+          <form
+            action="/auth/signout"
+            method="post"
+            style={{
+              margin: 0,
+            }}
+          >
+            <button
+              type="submit"
               style={{
-                padding:
-                  "10px 14px",
-                color:
-                  "#ffffff",
-                textDecoration:
-                  "none",
+                padding: "10px 16px",
+                background: "#d32f2f",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
                 fontWeight: 700,
               }}
             >
-              Dashboard
-            </Link>
-
-            <Link
-              href="/portal/reports"
-              style={{
-                padding:
-                  "10px 14px",
-                color:
-                  "#ffffff",
-                textDecoration:
-                  "none",
-                fontWeight: 700,
-              }}
-            >
-              Reports
-            </Link>
-
-            <form
-              action="/auth/signout"
-              method="post"
-              style={{
-                margin: 0,
-              }}
-            >
-              <button
-                type="submit"
-                style={{
-                  padding:
-                    "10px 16px",
-                  background:
-                    "#d32f2f",
-                  color:
-                    "#ffffff",
-                  border: "none",
-                  borderRadius:
-                    "8px",
-                  cursor:
-                    "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                Sign Out
-              </button>
-            </form>
-          </div>
+              Sign Out
+            </button>
+          </form>
         </div>
-      </header>
-
+      </div>
+    </header>
       <section
         style={{
           maxWidth: "1200px",
