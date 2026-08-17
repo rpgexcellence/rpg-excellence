@@ -342,19 +342,18 @@ export default async function PortalPage() {
         )
       : null;
 
-  const portfolioMaturity =
-    getMaturityLevel(
-      businessAssuranceScore
-    );
+ const portfolioMaturity =
+  getMaturityLevel(
+    businessAssuranceScore
+  );
 
-  const recentAssessments =
-    assessmentResults.slice(
-    assessmentResults.slice(
-      0,
-      5
-    );
+const recentAssessments =
+  assessmentResults.slice(
+    0,
+    5
+  );
 
-  return (
+return (
     <main
       style={{
         minHeight: "100vh",
