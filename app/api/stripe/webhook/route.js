@@ -1,19 +1,8 @@
 import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "../../../../lib/supabase/admin";
 
 const stripe = new Stripe(
   process.env.STRIPE_SECRET_KEY
-);
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
 );
 
 function fromUnix(value) {
@@ -27,6 +16,7 @@ function fromUnix(value) {
 }
 
 async function saveSubscription(
+  supabase,
   subscription
 ) {
   const ownerId =
@@ -106,14 +96,13 @@ async function saveSubscription(
       new Date().toISOString(),
   };
 
-  const {
-    error,
-  } = await supabaseAdmin
-    .from("subscriptions")
-    .upsert(row, {
-      onConflict:
-        "stripe_subscription_id",
-    });
+  const { error } =
+    await supabase
+      .from("subscriptions")
+      .upsert(row, {
+        onConflict:
+          "stripe_subscription_id",
+      });
 
   if (error) {
     console.error(
@@ -182,21 +171,30 @@ export async function POST(request) {
   }
 
   try {
+    const supabase =
+      createAdminClient();
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session =
           event.data.object;
 
-        if (session.subscription) {
+        if (
+          session.subscription
+        ) {
+          const subscriptionId =
+            typeof session.subscription ===
+            "string"
+              ? session.subscription
+              : session.subscription.id;
+
           const subscription =
             await stripe.subscriptions.retrieve(
-              typeof session.subscription ===
-                "string"
-                ? session.subscription
-                : session.subscription.id
+              subscriptionId
             );
 
           await saveSubscription(
+            supabase,
             subscription
           );
         }
@@ -207,8 +205,12 @@ export async function POST(request) {
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
+        const subscription =
+          event.data.object;
+
         await saveSubscription(
-          event.data.object
+          supabase,
+          subscription
         );
 
         break;
