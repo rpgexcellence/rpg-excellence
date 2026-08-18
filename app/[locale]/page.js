@@ -99,7 +99,7 @@ const benefits = [
 const pricing = [
   {
     name: "Starter",
-    price: "£29",
+    price: "£20.99",
     period: "/month",
     description: "For small organisations beginning their assurance journey.",
     features: [
@@ -111,7 +111,7 @@ const pricing = [
   },
   {
     name: "Professional",
-    price: "£79",
+    price: "£59",
     period: "/month",
     description: "For organisations actively managing certification readiness.",
     features: [
@@ -125,7 +125,7 @@ const pricing = [
   },
   {
     name: "Consultant",
-    price: "£199",
+    price: "£159",
     period: "/month",
     description: "For consultants managing assurance across multiple clients.",
     features: [
@@ -568,8 +568,8 @@ export default async function Home({ params }) {
           </div>
 
           <p>
-            Choose the level that matches your organisation. Plans can be
-            refined as RPG Intelligence expands.
+            Choose the level that matches your organisation. Every plan
+            includes a 7-day free trial, with no charge until the trial ends.
           </p>
         </div>
 
@@ -636,9 +636,9 @@ export default async function Home({ params }) {
 
               <Link
                 className="button"
-                href="/portal"
+                href={`/${locale}/pricing`}
               >
-                Start Assessment
+                Start 7-Day Free Trial
               </Link>
             </div>
           ))}
@@ -650,6 +650,15 @@ export default async function Home({ params }) {
             marginTop: "24px",
           }}
         >
+          <p
+            style={{
+              color: "#617087",
+              marginBottom: "16px",
+            }}
+          >
+            7-day free trial on every plan. No charge until your trial ends.
+          </p>
+
           <Link
             href={`/${locale}/pricing`}
             className="button buttonGhost"
