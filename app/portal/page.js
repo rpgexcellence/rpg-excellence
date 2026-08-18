@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 
 import Link from "next/link";
 
-import ManageSubscriptionButton from "../../components/ManageSubscriptionButton";
-
  
 
 import { createClient } from "../../lib/supabase/server";
@@ -13,6 +11,8 @@ import {
   getUserSubscription,
 
   getPlanLabel,
+
+  hasActiveSubscription,
 
 } from "../../lib/subscription";
 
@@ -174,7 +174,15 @@ export default async function PortalPage() {
 
  
 
-  // --------------------------------------------------
+  
+  const canUsePaidFeatures =
+
+    hasActiveSubscription(
+
+      subscription
+
+    );
+// --------------------------------------------------
 
   // ORGANISATION
 
@@ -1340,7 +1348,31 @@ return (
 
             {subscription ? (
 
-              <ManageSubscriptionButton />
+              <Link
+
+                href="/portal/billing"
+
+                style={{
+
+                  padding: "12px 18px",
+
+                  borderRadius: "8px",
+
+                  background: "#071A33",
+
+                  color: "#ffffff",
+
+                  textDecoration: "none",
+
+                  fontWeight: 700,
+
+                }}
+
+              >
+
+                Manage Subscription
+
+              </Link>
 
             ) : (
 
@@ -2266,179 +2298,247 @@ return (
 
  
 
-                <form
+                {canUsePaidFeatures ? (
 
-                  action={
+                  <form
 
-                    createAssessment
+                    action={
 
-                  }
-
-                  style={{
-
-                    display: "flex",
-
-                    gap: "10px",
-
-                    flexWrap:
-
-                      "wrap",
-
-                  }}
-
-                >
-
-                  <input
-
-                    type="hidden"
-
-                    name="organization_id"
-
-                    value={
-
-                      organization.id
+                      createAssessment
 
                     }
 
-                  />
-
- 
-
-                  <select
-
-                    name="standard"
-
-                    required
-
-                    defaultValue=""
-
                     style={{
 
-                      minWidth:
+                      display: "flex",
 
-                        "210px",
+                      gap: "10px",
 
-                      padding:
+                      flexWrap:
 
-                        "12px",
-
-                      borderRadius:
-
-                        "8px",
-
-                      border:
-
-                        "1px solid #d8e0ea",
-
-                      background:
-
-                        "#ffffff",
+                        "wrap",
 
                     }}
 
                   >
 
-                    <option
+                    <input
 
-                      value=""
+                      type="hidden"
 
-                      disabled
+                      name="organization_id"
+
+                      value={
+
+                        organization.id
+
+                      }
+
+                    />
+
+
+
+                    <select
+
+                      name="standard"
+
+                      required
+
+                      defaultValue=""
+
+                      style={{
+
+                        minWidth:
+
+                          "210px",
+
+                        padding:
+
+                          "12px",
+
+                        borderRadius:
+
+                          "8px",
+
+                        border:
+
+                          "1px solid #d8e0ea",
+
+                        background:
+
+                          "#ffffff",
+
+                      }}
 
                     >
 
-                      Select ISO
+                      <option
 
-                      standard
+                        value=""
 
-                    </option>
+                        disabled
 
- 
+                      >
 
-                    <option value="ISO 9001">
+                        Select ISO
 
-                      ISO 9001
+                        standard
 
-                    </option>
+                      </option>
 
- 
 
-                    <option value="ISO 14001">
 
-                      ISO 14001
+                      <option value="ISO 9001">
 
-                    </option>
+                        ISO 9001
 
- 
+                      </option>
 
-                    <option value="ISO 45001">
 
-                      ISO 45001
 
-                    </option>
+                      <option value="ISO 14001">
 
- 
+                        ISO 14001
 
-                    <option value="ISO 22301">
+                      </option>
 
-                      ISO 22301
 
-                    </option>
 
- 
+                      <option value="ISO 45001">
 
-                    <option value="ISO 27001">
+                        ISO 45001
 
-                      ISO 27001
+                      </option>
 
-                    </option>
 
-                  </select>
 
- 
+                      <option value="ISO 22301">
 
-                  <button
+                        ISO 22301
 
-                    type="submit"
+                      </option>
+
+
+
+                      <option value="ISO 27001">
+
+                        ISO 27001
+
+                      </option>
+
+                    </select>
+
+
+
+                    <button
+
+                      type="submit"
+
+                      style={{
+
+                        padding:
+
+                          "12px 18px",
+
+                        background:
+
+                          "#1459D9",
+
+                        color:
+
+                          "#ffffff",
+
+                        border:
+
+                          "none",
+
+                        borderRadius:
+
+                          "8px",
+
+                        cursor:
+
+                          "pointer",
+
+                        fontWeight:
+
+                          700,
+
+                      }}
+
+                    >
+
+                      Start Assessment
+
+                    </button>
+
+                  </form>
+
+                ) : (
+
+                  <div
 
                     style={{
 
-                      padding:
+                      display: "flex",
 
-                        "12px 18px",
+                      alignItems: "center",
 
-                      background:
+                      gap: "12px",
 
-                        "#1459D9",
-
-                      color:
-
-                        "#ffffff",
-
-                      border:
-
-                        "none",
-
-                      borderRadius:
-
-                        "8px",
-
-                      cursor:
-
-                        "pointer",
-
-                      fontWeight:
-
-                        700,
+                      flexWrap: "wrap",
 
                     }}
 
                   >
 
-                    Start Assessment
+                    <span
 
-                  </button>
+                      style={{
 
-                </form>
+                        color: "#617087",
+
+                        fontSize: "14px",
+
+                      }}
+
+                    >
+
+                      An active subscription is required to start a new assessment.
+
+                    </span>
+
+
+
+                    <Link
+
+                      href="/en/pricing"
+
+                      style={{
+
+                        padding: "12px 18px",
+
+                        borderRadius: "8px",
+
+                        background: "#1459D9",
+
+                        color: "#ffffff",
+
+                        textDecoration: "none",
+
+                        fontWeight: 700,
+
+                      }}
+
+                    >
+
+                      Choose a Plan
+
+                    </Link>
+
+                  </div>
+
+                )}
 
               </div>
 
