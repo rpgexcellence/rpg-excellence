@@ -1,8 +1,19 @@
 import Stripe from "stripe";
-import { createClient } from "../../../../lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 const stripe = new Stripe(
   process.env.STRIPE_SECRET_KEY
+);
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
 );
 
 function fromUnix(value) {
@@ -16,7 +27,6 @@ function fromUnix(value) {
 }
 
 async function saveSubscription(
-  supabase,
   subscription
 ) {
   const ownerId =
@@ -46,6 +56,7 @@ async function saveSubscription(
 
   const row = {
     owner_id: ownerId,
+
     organization_id:
       organizationId || null,
 
@@ -95,19 +106,31 @@ async function saveSubscription(
       new Date().toISOString(),
   };
 
-  const { error } =
-    await supabase
-      .from("subscriptions")
-      .upsert(row, {
-        onConflict:
-          "stripe_subscription_id",
-      });
+  const {
+    error,
+  } = await supabaseAdmin
+    .from("subscriptions")
+    .upsert(row, {
+      onConflict:
+        "stripe_subscription_id",
+    });
 
   if (error) {
+    console.error(
+      "Supabase subscription save error:",
+      error
+    );
+
     throw new Error(
       `Unable to save subscription: ${error.message}`
     );
   }
+
+  console.log(
+    "Subscription saved:",
+    subscription.id,
+    subscription.status
+  );
 }
 
 export async function POST(request) {
@@ -159,24 +182,21 @@ export async function POST(request) {
   }
 
   try {
-    const supabase =
-      await createClient();
-
     switch (event.type) {
       case "checkout.session.completed": {
         const session =
           event.data.object;
 
-        if (
-          session.subscription
-        ) {
+        if (session.subscription) {
           const subscription =
             await stripe.subscriptions.retrieve(
-              session.subscription
+              typeof session.subscription ===
+                "string"
+                ? session.subscription
+                : session.subscription.id
             );
 
           await saveSubscription(
-            supabase,
             subscription
           );
         }
@@ -187,12 +207,8 @@ export async function POST(request) {
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        const subscription =
-          event.data.object;
-
         await saveSubscription(
-          supabase,
-          subscription
+          event.data.object
         );
 
         break;
@@ -216,10 +232,11 @@ export async function POST(request) {
         break;
       }
 
-      default:
+      default: {
         console.log(
           `Unhandled Stripe event: ${event.type}`
         );
+      }
     }
 
     return Response.json({
