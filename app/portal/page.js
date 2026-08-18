@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import Link from "next/link";
 
+import ManageSubscriptionButton from "../../components/ManageSubscriptionButton";
+
  
 
 import { createClient } from "../../lib/supabase/server";
@@ -1338,31 +1340,7 @@ return (
 
             {subscription ? (
 
-              <Link
-
-                href="/portal/billing"
-
-                style={{
-
-                  padding: "12px 18px",
-
-                  borderRadius: "8px",
-
-                  background: "#071A33",
-
-                  color: "#ffffff",
-
-                  textDecoration: "none",
-
-                  fontWeight: 700,
-
-                }}
-
-              >
-
-                Manage Subscription
-
-              </Link>
+              <ManageSubscriptionButton />
 
             ) : (
 
