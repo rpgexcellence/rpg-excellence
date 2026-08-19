@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import NewsletterSignup from "../../components/NewsletterSignup";
 import { copy, locales } from "../../lib/i18n";
 
 const standards = [
@@ -665,6 +666,48 @@ export default async function Home({ params }) {
           >
             View Full Pricing
           </Link>
+        </div>
+      </section>
+
+      {/* RPG INSIGHTS NEWSLETTER */}
+
+      <section className="section">
+        <div
+          className="assuranceCard"
+          style={{
+            maxWidth: "980px",
+            margin: "0 auto",
+            padding: "36px",
+          }}
+        >
+          <span className="kicker">
+            RPG Insights
+          </span>
+
+          <h2
+            style={{
+              marginTop: "12px",
+              marginBottom: "14px",
+            }}
+          >
+            Stay ahead of standards, assurance and compliance changes.
+          </h2>
+
+          <p
+            className="lead"
+            style={{
+              maxWidth: "760px",
+              marginBottom: "24px",
+            }}
+          >
+            Receive practical ISO guidance, standards updates, RPG Intelligence
+            releases and business assurance insights from RPG Excellence.
+          </p>
+
+          <NewsletterSignup
+            locale={locale}
+            source="homepage"
+          />
         </div>
       </section>
 
