@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../lib/supabase/admin";
 import { saveAssessmentAnswers } from "./actions";
 
 import {
@@ -69,6 +70,9 @@ export default async function AssessmentPage({
   const supabase =
     await createClient();
 
+  const admin =
+    createAdminClient();
+
   const {
     data: { user },
   } =
@@ -124,6 +128,100 @@ export default async function AssessmentPage({
     (question) =>
       question.clause === clause
   );
+
+  // Load formal ISO 14001:2026 findings and corrective actions.
+  let assessmentFindings = [];
+  let correctiveActions = [];
+
+  if (
+    assessment.standard ===
+    "ISO 14001:2026"
+  ) {
+    const {
+      data: findingsData,
+      error: findingsError,
+    } = await admin
+      .from("assessment_findings")
+      .select("*")
+      .eq(
+        "assessment_id",
+        assessment.id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      )
+      .order("created_at", {
+        ascending: true,
+      });
+
+    if (findingsError) {
+      throw new Error(
+        findingsError.message
+      );
+    }
+
+    assessmentFindings =
+      findingsData ?? [];
+
+    const findingIds =
+      assessmentFindings.map(
+        (finding) => finding.id
+      );
+
+    if (findingIds.length > 0) {
+      const {
+        data: actionsData,
+        error: actionsError,
+      } = await admin
+        .from("corrective_actions")
+        .select("*")
+        .eq(
+          "assessment_id",
+          assessment.id
+        )
+        .eq(
+          "owner_id",
+          user.id
+        )
+        .in(
+          "finding_id",
+          findingIds
+        )
+        .order("created_at", {
+          ascending: true,
+        });
+
+      if (actionsError) {
+        throw new Error(
+          actionsError.message
+        );
+      }
+
+      correctiveActions =
+        actionsData ?? [];
+    }
+  }
+
+  const findingsByQuestion =
+    Object.fromEntries(
+      assessmentFindings.map(
+        (finding) => [
+          finding.question_number,
+          finding,
+        ]
+      )
+    );
+
+  const actionsByFindingId =
+    Object.fromEntries(
+      correctiveActions.map(
+        (action) => [
+          action.finding_id,
+          action,
+        ]
+      )
+    );
 
   const allQuestionNumbers = (
     allQuestions ?? []
@@ -764,10 +862,27 @@ export default async function AssessmentPage({
                       ] ?? null;
 
                     const fieldKey =
-                      question.question_number.replaceAll(
-                        ".",
-                        "_"
-                      );
+                      question.question_number
+                        .replaceAll(
+                          ".",
+                          "_"
+                        )
+                        .replaceAll(
+                          "-",
+                          "_"
+                        );
+
+                    const savedFinding =
+                      findingsByQuestion[
+                        question.question_number
+                      ] ?? null;
+
+                    const savedAction =
+                      savedFinding
+                        ? actionsByFindingId[
+                            savedFinding.id
+                          ] ?? null
+                        : null;
 
                     return (
                       <div
@@ -1239,6 +1354,501 @@ export default async function AssessmentPage({
                               "border-box",
                           }}
                         />
+
+                        {isIso14001_2026 && (
+                          <details
+                            open={Boolean(
+                              savedFinding &&
+                                savedFinding.finding_type !==
+                                  "conformity"
+                            )}
+                            style={{
+                              marginTop: "20px",
+                              border:
+                                "1px solid #dfe6ee",
+                              borderRadius:
+                                "10px",
+                              background:
+                                "#fbfcfe",
+                              overflow:
+                                "hidden",
+                            }}
+                          >
+                            <summary
+                              style={{
+                                cursor:
+                                  "pointer",
+                                padding:
+                                  "14px 16px",
+                                color:
+                                  "#071A33",
+                                fontWeight:
+                                  800,
+                                background:
+                                  "#f5f8fc",
+                              }}
+                            >
+                              Assessor conclusion / Raise finding
+                            </summary>
+
+                            <div
+                              style={{
+                                padding:
+                                  "18px 16px",
+                                display:
+                                  "grid",
+                                gap: "16px",
+                              }}
+                            >
+                              <div>
+                                <label
+                                  style={{
+                                    display:
+                                      "block",
+                                    fontWeight:
+                                      700,
+                                    color:
+                                      "#071A33",
+                                    marginBottom:
+                                      "7px",
+                                  }}
+                                >
+                                  Finding classification
+                                </label>
+
+                                <select
+                                  name={`finding_type_${fieldKey}`}
+                                  defaultValue={
+                                    savedFinding
+                                      ?.finding_type ??
+                                    "conformity"
+                                  }
+                                  style={{
+                                    width:
+                                      "100%",
+                                    maxWidth:
+                                      "420px",
+                                    padding:
+                                      "12px",
+                                    borderRadius:
+                                      "8px",
+                                    border:
+                                      "1px solid #d8e0ea",
+                                    background:
+                                      "#ffffff",
+                                  }}
+                                >
+                                  <option value="conformity">
+                                    Conformity
+                                  </option>
+                                  <option value="observation">
+                                    Observation
+                                  </option>
+                                  <option value="ofi">
+                                    Opportunity for Improvement (OFI)
+                                  </option>
+                                  <option value="minor_nc">
+                                    Minor Nonconformity
+                                  </option>
+                                  <option value="major_nc">
+                                    Major Nonconformity
+                                  </option>
+                                </select>
+
+                                <p
+                                  style={{
+                                    margin:
+                                      "7px 0 0",
+                                    color:
+                                      "#617087",
+                                    fontSize:
+                                      "12px",
+                                    lineHeight:
+                                      1.45,
+                                  }}
+                                >
+                                  Use professional judgement.
+                                  Major/minor guidance above supports
+                                  classification but does not replace
+                                  assessor judgement.
+                                </p>
+                              </div>
+
+                              <div>
+                                <label
+                                  style={{
+                                    display:
+                                      "block",
+                                    fontWeight:
+                                      700,
+                                    color:
+                                      "#071A33",
+                                    marginBottom:
+                                      "7px",
+                                  }}
+                                >
+                                  Objective evidence supporting the finding
+                                </label>
+
+                                <textarea
+                                  name={`finding_evidence_${fieldKey}`}
+                                  rows="3"
+                                  defaultValue={
+                                    savedFinding
+                                      ?.objective_evidence ??
+                                    savedAnswer
+                                      ?.evidence ??
+                                    ""
+                                  }
+                                  placeholder="Record the specific sampled evidence that supports the conclusion..."
+                                  style={{
+                                    width:
+                                      "100%",
+                                    padding:
+                                      "12px",
+                                    borderRadius:
+                                      "8px",
+                                    border:
+                                      "1px solid #d8e0ea",
+                                    resize:
+                                      "vertical",
+                                    boxSizing:
+                                      "border-box",
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <label
+                                  style={{
+                                    display:
+                                      "block",
+                                    fontWeight:
+                                      700,
+                                    color:
+                                      "#071A33",
+                                    marginBottom:
+                                      "7px",
+                                  }}
+                                >
+                                  Finding statement
+                                </label>
+
+                                <textarea
+                                  name={`finding_statement_${fieldKey}`}
+                                  rows="3"
+                                  defaultValue={
+                                    savedFinding
+                                      ?.finding_statement ??
+                                    ""
+                                  }
+                                  placeholder="State the observed gap clearly and factually. Required for Minor or Major NC."
+                                  style={{
+                                    width:
+                                      "100%",
+                                    padding:
+                                      "12px",
+                                    borderRadius:
+                                      "8px",
+                                    border:
+                                      "1px solid #d8e0ea",
+                                    resize:
+                                      "vertical",
+                                    boxSizing:
+                                      "border-box",
+                                  }}
+                                />
+                              </div>
+
+                              <div
+                                style={{
+                                  display:
+                                    "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit, minmax(260px, 1fr))",
+                                  gap: "12px",
+                                }}
+                              >
+                                <div>
+                                  <label
+                                    style={{
+                                      display:
+                                        "block",
+                                      fontWeight:
+                                        700,
+                                      color:
+                                        "#071A33",
+                                      marginBottom:
+                                        "7px",
+                                    }}
+                                  >
+                                    Risk / significance
+                                  </label>
+
+                                  <textarea
+                                    name={`finding_risk_${fieldKey}`}
+                                    rows="3"
+                                    defaultValue={
+                                      savedFinding
+                                        ?.risk_impact ??
+                                      ""
+                                    }
+                                    placeholder="Describe environmental, compliance, operational or management-system significance..."
+                                    style={{
+                                      width:
+                                        "100%",
+                                      padding:
+                                        "12px",
+                                      borderRadius:
+                                        "8px",
+                                      border:
+                                        "1px solid #d8e0ea",
+                                      resize:
+                                        "vertical",
+                                      boxSizing:
+                                        "border-box",
+                                    }}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label
+                                    style={{
+                                      display:
+                                        "block",
+                                      fontWeight:
+                                        700,
+                                      color:
+                                        "#071A33",
+                                      marginBottom:
+                                        "7px",
+                                    }}
+                                  >
+                                    Assessor rationale
+                                  </label>
+
+                                  <textarea
+                                    name={`finding_rationale_${fieldKey}`}
+                                    rows="3"
+                                    defaultValue={
+                                      savedFinding
+                                        ?.assessor_rationale ??
+                                      ""
+                                    }
+                                    placeholder="Explain the reasoning for the conclusion and classification..."
+                                    style={{
+                                      width:
+                                        "100%",
+                                      padding:
+                                        "12px",
+                                      borderRadius:
+                                        "8px",
+                                      border:
+                                        "1px solid #d8e0ea",
+                                      resize:
+                                        "vertical",
+                                      boxSizing:
+                                        "border-box",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div
+                                style={{
+                                  borderTop:
+                                    "1px solid #e6ebf1",
+                                  paddingTop:
+                                    "16px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                    display:
+                                      "block",
+                                    marginBottom:
+                                      "10px",
+                                  }}
+                                >
+                                  Corrective action details
+                                </strong>
+
+                                <p
+                                  style={{
+                                    color:
+                                      "#617087",
+                                    fontSize:
+                                      "13px",
+                                    marginTop:
+                                      0,
+                                  }}
+                                >
+                                  Complete these fields when a
+                                  Minor or Major Nonconformity is
+                                  raised. They may also be completed
+                                  later.
+                                </p>
+
+                                <div
+                                  style={{
+                                    display:
+                                      "grid",
+                                    gap: "12px",
+                                  }}
+                                >
+                                  <textarea
+                                    name={`correction_${fieldKey}`}
+                                    rows="2"
+                                    defaultValue={
+                                      savedAction
+                                        ?.correction ??
+                                      ""
+                                    }
+                                    placeholder="Immediate correction..."
+                                    style={{
+                                      width:
+                                        "100%",
+                                      padding:
+                                        "12px",
+                                      borderRadius:
+                                        "8px",
+                                      border:
+                                        "1px solid #d8e0ea",
+                                      resize:
+                                        "vertical",
+                                      boxSizing:
+                                        "border-box",
+                                    }}
+                                  />
+
+                                  <textarea
+                                    name={`containment_${fieldKey}`}
+                                    rows="2"
+                                    defaultValue={
+                                      savedAction
+                                        ?.containment_action ??
+                                      ""
+                                    }
+                                    placeholder="Containment action..."
+                                    style={{
+                                      width:
+                                        "100%",
+                                      padding:
+                                        "12px",
+                                      borderRadius:
+                                        "8px",
+                                      border:
+                                        "1px solid #d8e0ea",
+                                      resize:
+                                        "vertical",
+                                      boxSizing:
+                                        "border-box",
+                                    }}
+                                  />
+
+                                  <textarea
+                                    name={`root_cause_${fieldKey}`}
+                                    rows="3"
+                                    defaultValue={
+                                      savedAction
+                                        ?.root_cause ??
+                                      ""
+                                    }
+                                    placeholder="Root cause..."
+                                    style={{
+                                      width:
+                                        "100%",
+                                      padding:
+                                        "12px",
+                                      borderRadius:
+                                        "8px",
+                                      border:
+                                        "1px solid #d8e0ea",
+                                      resize:
+                                        "vertical",
+                                      boxSizing:
+                                        "border-box",
+                                    }}
+                                  />
+
+                                  <textarea
+                                    name={`corrective_action_${fieldKey}`}
+                                    rows="3"
+                                    defaultValue={
+                                      savedAction
+                                        ?.corrective_action ??
+                                      ""
+                                    }
+                                    placeholder="Corrective action..."
+                                    style={{
+                                      width:
+                                        "100%",
+                                      padding:
+                                        "12px",
+                                      borderRadius:
+                                        "8px",
+                                      border:
+                                        "1px solid #d8e0ea",
+                                      resize:
+                                        "vertical",
+                                      boxSizing:
+                                        "border-box",
+                                    }}
+                                  />
+
+                                  <div
+                                    style={{
+                                      display:
+                                        "grid",
+                                      gridTemplateColumns:
+                                        "repeat(auto-fit, minmax(220px, 1fr))",
+                                      gap: "12px",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      name={`action_owner_${fieldKey}`}
+                                      defaultValue={
+                                        savedAction
+                                          ?.action_owner ??
+                                        ""
+                                      }
+                                      placeholder="Action owner"
+                                      style={{
+                                        padding:
+                                          "12px",
+                                        borderRadius:
+                                          "8px",
+                                        border:
+                                          "1px solid #d8e0ea",
+                                      }}
+                                    />
+
+                                    <input
+                                      type="date"
+                                      name={`target_date_${fieldKey}`}
+                                      defaultValue={
+                                        savedAction
+                                          ?.target_date ??
+                                        ""
+                                      }
+                                      style={{
+                                        padding:
+                                          "12px",
+                                        borderRadius:
+                                          "8px",
+                                        border:
+                                          "1px solid #d8e0ea",
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </details>
+                        )}
                       </div>
                     );
                   }
