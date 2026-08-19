@@ -150,7 +150,11 @@ export default async function FindingsPage({
   }
 
   const findings =
-    findingsData ?? [];
+    (findingsData ?? []).filter(
+      (finding) =>
+        finding.finding_type !==
+        "conformity"
+    );
 
   const findingIds =
     findings.map(
@@ -457,9 +461,10 @@ export default async function FindingsPage({
               color: "#617087",
             }}
           >
-            No findings have been
-            raised for this assessment
-            yet.
+            No nonconformities,
+            observations or opportunities
+            for improvement have been
+            raised for this assessment.
           </section>
         ) : (
           <div
