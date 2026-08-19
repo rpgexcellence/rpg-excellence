@@ -279,6 +279,10 @@ export default async function AssessmentPage({
     ] ??
     `Clause ${clause}`;
 
+  const isIso14001_2026 =
+    assessment.standard ===
+    "ISO 14001:2026";
+
   // Maturity
   let maturityLevel =
     "Not assessed";
@@ -807,37 +811,314 @@ export default async function AssessmentPage({
                           }
                         </p>
 
-                        {question.guidance && (
+                        {isIso14001_2026 ? (
                           <div
                             style={{
-                              background:
-                                "#f5f8fc",
-                              borderLeft:
-                                "4px solid #1459D9",
-                              padding:
-                                "12px 14px",
-                              borderRadius:
-                                "6px",
-                              color:
-                                "#617087",
-                              lineHeight: 1.55,
+                              display: "grid",
+                              gap: "12px",
                               marginBottom:
-                                "16px",
-                              fontSize: "14px",
+                                "18px",
                             }}
                           >
-                            <strong
+                            {question.requirement_summary && (
+                              <div
+                                style={{
+                                  background:
+                                    "#eef4ff",
+                                  borderLeft:
+                                    "4px solid #1459D9",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "6px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Requirement summary:
+                                </strong>{" "}
+                                {question.requirement_summary}
+                              </div>
+                            )}
+
+                            {question.assessor_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f5f8fc",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Assessor guidance:
+                                </strong>{" "}
+                                {question.assessor_guidance}
+                              </div>
+                            )}
+
+                            {question.interview_questions && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f8fafc",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Interview questions
+                                </strong>
+                                <ul
+                                  style={{
+                                    margin:
+                                      "8px 0 0 18px",
+                                    padding: 0,
+                                  }}
+                                >
+                                  {String(
+                                    question.interview_questions
+                                  )
+                                    .split("|")
+                                    .map((item) => item.trim())
+                                    .filter(Boolean)
+                                    .map((item, itemIndex) => (
+                                      <li
+                                        key={itemIndex}
+                                        style={{
+                                          marginBottom:
+                                            "5px",
+                                        }}
+                                      >
+                                        {item}
+                                      </li>
+                                    ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {question.objective_evidence && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f3fbf8",
+                                  borderLeft:
+                                    "4px solid #167C80",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "6px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Objective evidence to seek:
+                                </strong>{" "}
+                                {question.objective_evidence}
+                              </div>
+                            )}
+
+                            {question.sampling_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#fff8e8",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#735c17",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong>
+                                  Sampling guidance:
+                                </strong>{" "}
+                                {question.sampling_guidance}
+                              </div>
+                            )}
+
+                            {question.conformity_criteria && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f6f8fb",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Conformity criteria:
+                                </strong>{" "}
+                                {question.conformity_criteria}
+                              </div>
+                            )}
+
+                            {(question.minor_nc_guidance ||
+                              question.major_nc_guidance) && (
+                              <div
+                                style={{
+                                  display:
+                                    "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit, minmax(260px, 1fr))",
+                                  gap: "10px",
+                                }}
+                              >
+                                {question.minor_nc_guidance && (
+                                  <div
+                                    style={{
+                                      background:
+                                        "#fffaf0",
+                                      padding:
+                                        "12px 14px",
+                                      borderRadius:
+                                        "8px",
+                                      color:
+                                        "#735c17",
+                                      lineHeight:
+                                        1.55,
+                                      fontSize:
+                                        "14px",
+                                    }}
+                                  >
+                                    <strong>
+                                      Minor NC guidance:
+                                    </strong>{" "}
+                                    {question.minor_nc_guidance}
+                                  </div>
+                                )}
+
+                                {question.major_nc_guidance && (
+                                  <div
+                                    style={{
+                                      background:
+                                        "#fff4f2",
+                                      padding:
+                                        "12px 14px",
+                                      borderRadius:
+                                        "8px",
+                                      color:
+                                        "#8a2c20",
+                                      lineHeight:
+                                        1.55,
+                                      fontSize:
+                                        "14px",
+                                    }}
+                                  >
+                                    <strong>
+                                      Major NC guidance:
+                                    </strong>{" "}
+                                    {question.major_nc_guidance}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {question.management_focus && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f7f5ff",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#5d4a86",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong>
+                                  Management focus:
+                                </strong>{" "}
+                                {question.management_focus}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          question.guidance && (
+                            <div
                               style={{
+                                background:
+                                  "#f5f8fc",
+                                borderLeft:
+                                  "4px solid #1459D9",
+                                padding:
+                                  "12px 14px",
+                                borderRadius:
+                                  "6px",
                                 color:
-                                  "#071A33",
+                                  "#617087",
+                                lineHeight: 1.55,
+                                marginBottom:
+                                  "16px",
+                                fontSize: "14px",
                               }}
                             >
-                              Guidance:
-                            </strong>{" "}
-                            {
-                              question.guidance
-                            }
-                          </div>
+                              <strong
+                                style={{
+                                  color:
+                                    "#071A33",
+                                }}
+                              >
+                                Guidance:
+                              </strong>{" "}
+                              {question.guidance}
+                            </div>
+                          )
                         )}
 
                         <label
@@ -927,12 +1208,18 @@ export default async function AssessmentPage({
                               "7px",
                           }}
                         >
-                          Evidence / notes
+                          {isIso14001_2026
+                            ? "Objective evidence / assessor notes"
+                            : "Evidence / notes"}
                         </label>
 
                         <textarea
                           name={`evidence_${fieldKey}`}
-                          placeholder="Describe supporting evidence, documents, records, observations or gaps..."
+                          placeholder={
+                            isIso14001_2026
+                              ? "Record sampled documents, records, interviews, observations, data, references and any identified gaps..."
+                              : "Describe supporting evidence, documents, records, observations or gaps..."
+                          }
                           rows="4"
                           defaultValue={
                             savedAnswer
