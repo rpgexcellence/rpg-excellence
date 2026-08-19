@@ -45,9 +45,7 @@ function cleanDate(value) {
   return value.trim();
 }
 
-function getFieldKey(
-  questionNumber
-) {
+function getFieldKey(questionNumber) {
   return questionNumber
     .replaceAll(".", "_")
     .replaceAll("-", "_");
@@ -79,8 +77,7 @@ async function saveFinding({
   }
 
   const findingType =
-    typeof findingTypeRaw ===
-      "string"
+    typeof findingTypeRaw === "string"
       ? findingTypeRaw.trim()
       : "";
 
@@ -92,6 +89,81 @@ async function saveFinding({
     throw new Error(
       `Invalid finding type for ${question.question_number}`
     );
+  }
+
+  // Check whether this assessment control
+  // already has a historical finding.
+  const {
+    data: existingFinding,
+    error: existingFindingError,
+  } = await admin
+    .from("assessment_findings")
+    .select("id, finding_type, status")
+    .eq(
+      "assessment_id",
+      assessment.id
+    )
+    .eq(
+      "owner_id",
+      user.id
+    )
+    .eq(
+      "question_number",
+      question.question_number
+    )
+    .order("created_at", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingFindingError) {
+    throw new Error(
+      existingFindingError.message
+    );
+  }
+
+  // Conformity is an assessment conclusion,
+  // not a finding.
+  //
+  // If no historical finding exists, do
+  // nothing. If a previous NC / observation /
+  // OFI existed and the assessor now concludes
+  // conformity, retain that historical record
+  // but close it rather than creating a green
+  // "conformity finding".
+  if (findingType === "conformity") {
+    if (
+      existingFinding &&
+      existingFinding.finding_type !==
+        "conformity"
+    ) {
+      const {
+        error: closeError,
+      } = await admin
+        .from("assessment_findings")
+        .update({
+          status: "closed",
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq(
+          "id",
+          existingFinding.id
+        )
+        .eq(
+          "owner_id",
+          user.id
+        );
+
+      if (closeError) {
+        throw new Error(
+          closeError.message
+        );
+      }
+    }
+
+    return;
   }
 
   const objectiveEvidence =
@@ -134,37 +206,6 @@ async function saveFinding({
     );
   }
 
-  const {
-    data: existingFinding,
-    error:
-      existingFindingError,
-  } = await admin
-    .from("assessment_findings")
-    .select("id")
-    .eq(
-      "assessment_id",
-      assessment.id
-    )
-    .eq(
-      "owner_id",
-      user.id
-    )
-    .eq(
-      "question_number",
-      question.question_number
-    )
-    .order("created_at", {
-      ascending: false,
-    })
-    .limit(1)
-    .maybeSingle();
-
-  if (existingFindingError) {
-    throw new Error(
-      existingFindingError.message
-    );
-  }
-
   const findingPayload = {
     assessment_id:
       assessment.id,
@@ -201,10 +242,11 @@ async function saveFinding({
       assessorRationale,
 
     status:
-      findingType ===
-      "conformity"
-        ? "closed"
-        : "open",
+      existingFinding?.status ===
+      "closed"
+        ? "open"
+        : existingFinding?.status ??
+          "open",
 
     updated_at:
       new Date().toISOString(),
@@ -262,9 +304,8 @@ async function saveFinding({
       createdFinding.id;
   }
 
-  // Corrective-action fields are
-  // optional. They will be rendered
-  // for NCs in the next UI update.
+  // Corrective-action fields are optional.
+  // They are relevant primarily to formal NCs.
   if (
     findingType !== "minor_nc" &&
     findingType !== "major_nc"
@@ -314,9 +355,6 @@ async function saveFinding({
       )
     );
 
-  // Do not create an empty corrective
-  // action record merely because an NC
-  // has been raised.
   const hasCorrectiveActionData =
     Boolean(
       correction ||
@@ -335,10 +373,8 @@ async function saveFinding({
   }
 
   const {
-    data:
-      existingCorrectiveAction,
-    error:
-      existingActionError,
+    data: existingCorrectiveAction,
+    error: existingActionError,
   } = await admin
     .from("corrective_actions")
     .select("id")
@@ -685,8 +721,7 @@ export async function saveAssessmentAnswers(
     currentClause === "10"
   ) {
     const {
-      error:
-        completionError,
+      error: completionError,
     } = await supabase
       .from(
         "assessments"
