@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import PageShell from "../../../../components/PageShell";
-import { locales } from "../../../../lib/i18n";
+import PageShell from "../../../components/PageShell";
+import { locales } from "../../../lib/i18n";
 
 export const metadata = {
   title: "RPG Insights",
