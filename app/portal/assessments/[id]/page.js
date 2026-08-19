@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
@@ -457,6 +458,30 @@ export default async function AssessmentPage({
             {assessment.status}
           </strong>
         </p>
+
+        {isIso14001_2026 && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginBottom: "18px",
+            }}
+          >
+            <Link
+              href={`/portal/assessments/${assessment.id}/findings`}
+              style={{
+                padding: "11px 16px",
+                borderRadius: "8px",
+                background: "#071A33",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              Findings & Corrective Actions
+            </Link>
+          </div>
+        )}
 
         {/* Weighted score */}
         <section
