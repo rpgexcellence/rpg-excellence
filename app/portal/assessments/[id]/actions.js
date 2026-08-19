@@ -1,7 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+
 import { createClient } from "../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../lib/supabase/admin";
 
 const VALID_CLAUSES = [
   "4",
@@ -13,52 +15,538 @@ const VALID_CLAUSES = [
   "10",
 ];
 
-export async function saveAssessmentAnswers(formData) {
-  const supabase = await createClient();
+const VALID_FINDING_TYPES = [
+  "conformity",
+  "observation",
+  "ofi",
+  "minor_nc",
+  "major_nc",
+];
+
+function cleanText(value) {
+  if (
+    typeof value !== "string" ||
+    value.trim() === ""
+  ) {
+    return null;
+  }
+
+  return value.trim();
+}
+
+function cleanDate(value) {
+  if (
+    typeof value !== "string" ||
+    value.trim() === ""
+  ) {
+    return null;
+  }
+
+  return value.trim();
+}
+
+function getFieldKey(
+  questionNumber
+) {
+  return questionNumber
+    .replaceAll(".", "_")
+    .replaceAll("-", "_");
+}
+
+async function saveFinding({
+  admin,
+  assessment,
+  user,
+  question,
+  formData,
+}) {
+  const fieldKey =
+    getFieldKey(
+      question.question_number
+    );
+
+  const findingTypeRaw =
+    formData.get(
+      `finding_type_${fieldKey}`
+    );
+
+  // Finding controls are optional.
+  // If the field was not rendered on
+  // this page, leave existing findings
+  // untouched.
+  if (findingTypeRaw === null) {
+    return;
+  }
+
+  const findingType =
+    typeof findingTypeRaw ===
+      "string"
+      ? findingTypeRaw.trim()
+      : "";
+
+  if (
+    !VALID_FINDING_TYPES.includes(
+      findingType
+    )
+  ) {
+    throw new Error(
+      `Invalid finding type for ${question.question_number}`
+    );
+  }
+
+  const objectiveEvidence =
+    cleanText(
+      formData.get(
+        `finding_evidence_${fieldKey}`
+      )
+    );
+
+  const findingStatement =
+    cleanText(
+      formData.get(
+        `finding_statement_${fieldKey}`
+      )
+    );
+
+  const riskImpact =
+    cleanText(
+      formData.get(
+        `finding_risk_${fieldKey}`
+      )
+    );
+
+  const assessorRationale =
+    cleanText(
+      formData.get(
+        `finding_rationale_${fieldKey}`
+      )
+    );
+
+  if (
+    (
+      findingType === "minor_nc" ||
+      findingType === "major_nc"
+    ) &&
+    !findingStatement
+  ) {
+    throw new Error(
+      `A finding statement is required for ${question.question_number}`
+    );
+  }
+
+  const {
+    data: existingFinding,
+    error:
+      existingFindingError,
+  } = await admin
+    .from("assessment_findings")
+    .select("id")
+    .eq(
+      "assessment_id",
+      assessment.id
+    )
+    .eq(
+      "owner_id",
+      user.id
+    )
+    .eq(
+      "question_number",
+      question.question_number
+    )
+    .order("created_at", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingFindingError) {
+    throw new Error(
+      existingFindingError.message
+    );
+  }
+
+  const findingPayload = {
+    assessment_id:
+      assessment.id,
+
+    owner_id:
+      user.id,
+
+    standard:
+      assessment.standard,
+
+    clause:
+      question.clause,
+
+    question_number:
+      question.question_number,
+
+    finding_type:
+      findingType,
+
+    requirement_summary:
+      question.requirement_summary ??
+      question.question,
+
+    objective_evidence:
+      objectiveEvidence,
+
+    finding_statement:
+      findingStatement,
+
+    risk_impact:
+      riskImpact,
+
+    assessor_rationale:
+      assessorRationale,
+
+    status:
+      findingType ===
+      "conformity"
+        ? "closed"
+        : "open",
+
+    updated_at:
+      new Date().toISOString(),
+  };
+
+  let findingId =
+    existingFinding?.id ??
+    null;
+
+  if (existingFinding) {
+    const {
+      error: updateError,
+    } = await admin
+      .from(
+        "assessment_findings"
+      )
+      .update(
+        findingPayload
+      )
+      .eq(
+        "id",
+        existingFinding.id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
+
+    if (updateError) {
+      throw new Error(
+        updateError.message
+      );
+    }
+  } else {
+    const {
+      data: createdFinding,
+      error: insertError,
+    } = await admin
+      .from(
+        "assessment_findings"
+      )
+      .insert(
+        findingPayload
+      )
+      .select("id")
+      .single();
+
+    if (insertError) {
+      throw new Error(
+        insertError.message
+      );
+    }
+
+    findingId =
+      createdFinding.id;
+  }
+
+  // Corrective-action fields are
+  // optional. They will be rendered
+  // for NCs in the next UI update.
+  if (
+    findingType !== "minor_nc" &&
+    findingType !== "major_nc"
+  ) {
+    return;
+  }
+
+  const correction =
+    cleanText(
+      formData.get(
+        `correction_${fieldKey}`
+      )
+    );
+
+  const containmentAction =
+    cleanText(
+      formData.get(
+        `containment_${fieldKey}`
+      )
+    );
+
+  const rootCause =
+    cleanText(
+      formData.get(
+        `root_cause_${fieldKey}`
+      )
+    );
+
+  const correctiveAction =
+    cleanText(
+      formData.get(
+        `corrective_action_${fieldKey}`
+      )
+    );
+
+  const actionOwner =
+    cleanText(
+      formData.get(
+        `action_owner_${fieldKey}`
+      )
+    );
+
+  const targetDate =
+    cleanDate(
+      formData.get(
+        `target_date_${fieldKey}`
+      )
+    );
+
+  // Do not create an empty corrective
+  // action record merely because an NC
+  // has been raised.
+  const hasCorrectiveActionData =
+    Boolean(
+      correction ||
+      containmentAction ||
+      rootCause ||
+      correctiveAction ||
+      actionOwner ||
+      targetDate
+    );
+
+  if (
+    !hasCorrectiveActionData ||
+    !findingId
+  ) {
+    return;
+  }
+
+  const {
+    data:
+      existingCorrectiveAction,
+    error:
+      existingActionError,
+  } = await admin
+    .from("corrective_actions")
+    .select("id")
+    .eq(
+      "assessment_id",
+      assessment.id
+    )
+    .eq(
+      "finding_id",
+      findingId
+    )
+    .eq(
+      "owner_id",
+      user.id
+    )
+    .order("created_at", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingActionError) {
+    throw new Error(
+      existingActionError.message
+    );
+  }
+
+  const actionPayload = {
+    assessment_id:
+      assessment.id,
+
+    finding_id:
+      findingId,
+
+    owner_id:
+      user.id,
+
+    correction,
+
+    containment_action:
+      containmentAction,
+
+    root_cause:
+      rootCause,
+
+    corrective_action:
+      correctiveAction,
+
+    action_owner:
+      actionOwner,
+
+    target_date:
+      targetDate,
+
+    status:
+      correctiveAction
+        ? "in_progress"
+        : "open",
+
+    updated_at:
+      new Date().toISOString(),
+  };
+
+  if (
+    existingCorrectiveAction
+  ) {
+    const {
+      error: actionUpdateError,
+    } = await admin
+      .from(
+        "corrective_actions"
+      )
+      .update(
+        actionPayload
+      )
+      .eq(
+        "id",
+        existingCorrectiveAction.id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
+
+    if (actionUpdateError) {
+      throw new Error(
+        actionUpdateError.message
+      );
+    }
+  } else {
+    const {
+      error: actionInsertError,
+    } = await admin
+      .from(
+        "corrective_actions"
+      )
+      .insert(
+        actionPayload
+      );
+
+    if (actionInsertError) {
+      throw new Error(
+        actionInsertError.message
+      );
+    }
+  }
+}
+
+export async function saveAssessmentAnswers(
+  formData
+) {
+  const supabase =
+    await createClient();
+
+  const admin =
+    createAdminClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/portal/login");
+    redirect(
+      "/portal/login"
+    );
   }
 
-  const assessmentId = formData.get("assessment_id");
-  const currentClause = formData.get("current_clause");
-  const nextClause = formData.get("next_clause");
+  const assessmentId =
+    formData.get(
+      "assessment_id"
+    );
+
+  const currentClause =
+    formData.get(
+      "current_clause"
+    );
+
+  const nextClause =
+    formData.get(
+      "next_clause"
+    );
 
   if (!assessmentId) {
-    throw new Error("Missing assessment ID");
+    throw new Error(
+      "Missing assessment ID"
+    );
   }
 
-  // Verify that this assessment belongs to the signed-in user.
+  // Verify ownership using the
+  // authenticated user session before
+  // any service-role write occurs.
   const {
     data: assessment,
     error: assessmentError,
   } = await supabase
     .from("assessments")
-    .select("id, standard")
-    .eq("id", assessmentId)
-    .eq("owner_id", user.id)
+    .select(
+      "id, standard"
+    )
+    .eq(
+      "id",
+      assessmentId
+    )
+    .eq(
+      "owner_id",
+      user.id
+    )
     .single();
 
-  if (assessmentError || !assessment) {
-    throw new Error("Assessment not found");
+  if (
+    assessmentError ||
+    !assessment
+  ) {
+    throw new Error(
+      "Assessment not found"
+    );
   }
 
-  // Load the question bank for this standard.
   const {
     data: questions,
     error: questionsError,
   } = await supabase
-    .from("assessment_questions")
-    .select("question_number, question")
-    .eq("standard", assessment.standard)
-    .eq("active", true)
-    .order("display_order", {
-      ascending: true,
-    });
+    .from(
+      "assessment_questions"
+    )
+    .select(
+      `
+        question_number,
+        clause,
+        question,
+        requirement_summary
+      `
+    )
+    .eq(
+      "standard",
+      assessment.standard
+    )
+    .eq(
+      "active",
+      true
+    )
+    .order(
+      "display_order",
+      {
+        ascending: true,
+      }
+    );
 
   if (questionsError) {
     throw new Error(
@@ -68,28 +556,33 @@ export async function saveAssessmentAnswers(formData) {
 
   const answers = [];
 
-  for (const question of questions ?? []) {
+  for (
+    const question of
+      questions ?? []
+  ) {
     const fieldKey =
-      question.question_number.replaceAll(
-        ".",
-        "_"
+      getFieldKey(
+        question.question_number
       );
 
-    const scoreRaw = formData.get(
-      `score_${fieldKey}`
-    );
+    const scoreRaw =
+      formData.get(
+        `score_${fieldKey}`
+      );
 
-    const evidenceRaw = formData.get(
-      `evidence_${fieldKey}`
-    );
+    const evidenceRaw =
+      formData.get(
+        `evidence_${fieldKey}`
+      );
 
-    // If the question was not on the submitted page,
-    // leave its existing answer untouched.
+    // The question was not on this
+    // submitted clause page.
     if (scoreRaw === null) {
       continue;
     }
 
-    const score = Number(scoreRaw);
+    const score =
+      Number(scoreRaw);
 
     if (
       !Number.isInteger(score) ||
@@ -102,35 +595,73 @@ export async function saveAssessmentAnswers(formData) {
     }
 
     answers.push({
-      assessment_id: assessmentId,
-      owner_id: user.id,
-      clause: question.question_number,
-      question: question.question,
+      assessment_id:
+        assessmentId,
+
+      owner_id:
+        user.id,
+
+      clause:
+        question.question_number,
+
+      question:
+        question.question,
+
       score,
+
       evidence:
-        typeof evidenceRaw === "string" &&
-        evidenceRaw.trim() !== ""
-          ? evidenceRaw.trim()
-          : null,
-      notes: null,
-      ai_feedback: null,
-      updated_at: new Date().toISOString(),
+        cleanText(
+          evidenceRaw
+        ),
+
+      notes:
+        null,
+
+      ai_feedback:
+        null,
+
+      updated_at:
+        new Date().toISOString(),
     });
+
+    // ISO 14001:2026 currently has the
+    // formal findings workspace.
+    if (
+      assessment.standard ===
+      "ISO 14001:2026"
+    ) {
+      await saveFinding({
+        admin,
+        assessment,
+        user,
+        question,
+        formData,
+      });
+    }
   }
 
-  if (answers.length === 0) {
+  if (
+    answers.length === 0
+  ) {
     throw new Error(
       "No assessment answers were submitted."
     );
   }
 
-  const { error: saveError } =
+  const {
+    error: saveError,
+  } =
     await supabase
-      .from("assessment_answers")
-      .upsert(answers, {
-        onConflict:
-          "assessment_id,owner_id,clause",
-      });
+      .from(
+        "assessment_answers"
+      )
+      .upsert(
+        answers,
+        {
+          onConflict:
+            "assessment_id,owner_id,clause",
+        }
+      );
 
   if (saveError) {
     throw new Error(
@@ -138,32 +669,47 @@ export async function saveAssessmentAnswers(formData) {
     );
   }
 
-  // Continue to the next clause when one exists.
   if (
-    typeof nextClause === "string" &&
-    VALID_CLAUSES.includes(nextClause)
+    typeof nextClause ===
+      "string" &&
+    VALID_CLAUSES.includes(
+      nextClause
+    )
   ) {
     redirect(
       `/portal/assessments/${assessmentId}?clause=${nextClause}`
     );
   }
 
-  // Clause 10 is the final clause.
-  // Mark the assessment as completed and open the Executive Summary.
-  if (currentClause === "10") {
+  if (
+    currentClause === "10"
+  ) {
     const {
-      error: completionError,
+      error:
+        completionError,
     } = await supabase
-      .from("assessments")
+      .from(
+        "assessments"
+      )
       .update({
-        status: "completed",
+        status:
+          "completed",
+
         updated_at:
           new Date().toISOString(),
       })
-      .eq("id", assessmentId)
-      .eq("owner_id", user.id);
+      .eq(
+        "id",
+        assessmentId
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
 
-    if (completionError) {
+    if (
+      completionError
+    ) {
       throw new Error(
         completionError.message
       );
@@ -174,11 +720,12 @@ export async function saveAssessmentAnswers(formData) {
     );
   }
 
-  // If no next clause was provided,
-  // return to the current valid clause.
   if (
-    typeof currentClause === "string" &&
-    VALID_CLAUSES.includes(currentClause)
+    typeof currentClause ===
+      "string" &&
+    VALID_CLAUSES.includes(
+      currentClause
+    )
   ) {
     redirect(
       `/portal/assessments/${assessmentId}?clause=${currentClause}`
