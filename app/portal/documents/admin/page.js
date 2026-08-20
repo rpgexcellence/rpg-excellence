@@ -63,6 +63,27 @@ export default async function DocumentAdminPage() {
     createAdminClient();
 
   const {
+    data: adminAccess,
+    error: adminAccessError,
+  } = await admin
+    .from("portal_admins")
+    .select("role, active")
+    .eq("user_id", user.id)
+    .eq("active", true)
+    .in("role", [
+      "admin",
+      "document_controller",
+    ])
+    .maybeSingle();
+
+  if (
+    adminAccessError ||
+    !adminAccess
+  ) {
+    redirect("/portal/documents");
+  }
+
+  const {
     data: documentsData,
     error: documentsError,
   } = await admin
@@ -183,6 +204,23 @@ export default async function DocumentAdminPage() {
               metadata, revisions, status,
               audience and private storage.
             </p>
+
+            <div
+              style={{
+                marginTop: "9px",
+                display: "inline-block",
+                padding: "6px 10px",
+                borderRadius: "999px",
+                background: "#eef4ff",
+                color: "#1459D9",
+                fontWeight: 800,
+                fontSize: "12px",
+              }}
+            >
+              {adminAccess.role === "admin"
+                ? "RPG Administrator"
+                : "Document Controller"}
+            </div>
           </div>
 
           <div
