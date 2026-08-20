@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
+
 import { updateManagementAction } from "./actions";
 
 const priorityFor = (type) =>
@@ -29,7 +31,9 @@ const labelFor = (type) =>
     ofi: "OFI",
   }[type] ?? type);
 
-export default async function ManagementActionPlanPage({ params }) {
+export default async function ManagementActionPlanPage({
+  params,
+}) {
   const { id } = await params;
 
   const supabase = await createClient();
@@ -67,14 +71,23 @@ export default async function ManagementActionPlanPage({ params }) {
     .eq("assessment_id", id)
     .eq("owner_id", user.id)
     .neq("finding_type", "conformity")
-    .order("created_at", { ascending: true });
+    .order("created_at", {
+      ascending: true,
+    });
 
   if (findingsError) {
-    throw new Error(findingsError.message);
+    throw new Error(
+      findingsError.message
+    );
   }
 
-  const findings = findingsData ?? [];
-  const findingIds = findings.map((x) => x.id);
+  const findings =
+    findingsData ?? [];
+
+  const findingIds =
+    findings.map(
+      (finding) => finding.id
+    );
 
   let correctiveActions = [];
 
@@ -85,117 +98,187 @@ export default async function ManagementActionPlanPage({ params }) {
     } = await admin
       .from("corrective_actions")
       .select("*")
-      .eq("assessment_id", id)
-      .eq("owner_id", user.id)
-      .in("finding_id", findingIds);
+      .eq(
+        "assessment_id",
+        id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      )
+      .in(
+        "finding_id",
+        findingIds
+      );
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(
+        error.message
+      );
     }
 
-    correctiveActions = data ?? [];
+    correctiveActions =
+      data ?? [];
   }
 
-  const correctiveByFinding = Object.fromEntries(
-    correctiveActions.map((x) => [
-      x.finding_id,
-      x,
-    ])
-  );
+  const correctiveByFinding =
+    Object.fromEntries(
+      correctiveActions.map(
+        (action) => [
+          action.finding_id,
+          action,
+        ]
+      )
+    );
 
   const {
     data: planData,
     error: planError,
   } = await admin
-    .from("management_action_plan")
+    .from(
+      "management_action_plan"
+    )
     .select("*")
-    .eq("assessment_id", id)
-    .eq("owner_id", user.id);
+    .eq(
+      "assessment_id",
+      id
+    )
+    .eq(
+      "owner_id",
+      user.id
+    );
 
   if (planError) {
-    throw new Error(planError.message);
+    throw new Error(
+      planError.message
+    );
   }
 
   /*
-   * management_action_plan uses related_finding_id.
+   * Canonical finding relationship for the
+   * management action plan.
    */
-  const planByFinding = Object.fromEntries(
-    (planData ?? [])
-      .filter((x) => x.related_finding_id)
-      .map((x) => [
-        x.related_finding_id,
-        x,
-      ])
-  );
+  const planByFinding =
+    Object.fromEntries(
+      (planData ?? [])
+        .filter(
+          (row) =>
+            row.related_finding_id
+        )
+        .map(
+          (row) => [
+            row.related_finding_id,
+            row,
+          ]
+        )
+    );
 
   /*
-   * Major and Minor NCs automatically appear.
-   * Observations and OFIs only appear if they
-   * already have a management action plan row.
+   * Major and Minor NCs enter the management
+   * plan automatically.
+   *
+   * Observation / OFI only appear here if a
+   * management action row already exists.
    */
-  const planFindings = findings.filter(
-    (x) =>
-      ["major_nc", "minor_nc"].includes(
-        x.finding_type
-      ) ||
-      Boolean(planByFinding[x.id])
-  );
+  const planFindings =
+    findings.filter(
+      (finding) =>
+        [
+          "major_nc",
+          "minor_nc",
+        ].includes(
+          finding.finding_type
+        ) ||
+        Boolean(
+          planByFinding[
+            finding.id
+          ]
+        )
+    );
 
-  const today = new Date();
+  const today =
+    new Date();
 
-  const openCritical = planFindings.filter(
-    (x) =>
-      x.finding_type === "major_nc" &&
-      x.status !== "closed"
-  ).length;
+  const openCritical =
+    planFindings.filter(
+      (finding) =>
+        finding.finding_type ===
+          "major_nc" &&
+        finding.status !==
+          "closed"
+    ).length;
 
-  const openHigh = planFindings.filter(
-    (x) =>
-      x.finding_type === "minor_nc" &&
-      x.status !== "closed"
-  ).length;
+  const openHigh =
+    planFindings.filter(
+      (finding) =>
+        finding.finding_type ===
+          "minor_nc" &&
+        finding.status !==
+          "closed"
+    ).length;
 
-  const completed = planFindings.filter(
-    (x) =>
-      planByFinding[x.id]?.status ===
-        "completed" ||
-      x.status === "closed"
-  ).length;
+  const completed =
+    planFindings.filter(
+      (finding) => {
+        const plan =
+          planByFinding[
+            finding.id
+          ];
 
-  const overdue = planFindings.filter(
-    (x) => {
-      const p =
-        planByFinding[x.id];
+        return (
+          plan?.status ===
+            "completed" ||
+          plan?.status ===
+            "verified" ||
+          finding.status ===
+            "closed"
+        );
+      }
+    ).length;
 
-      const c =
-        correctiveByFinding[x.id];
+  const overdue =
+    planFindings.filter(
+      (finding) => {
+        const plan =
+          planByFinding[
+            finding.id
+          ];
 
-      const date =
-        p?.target_date ??
-        c?.target_date;
+        const corrective =
+          correctiveByFinding[
+            finding.id
+          ];
 
-      const status =
-        p?.status ??
-        c?.status ??
-        x.status;
+        const targetDate =
+          plan?.target_date ??
+          corrective?.target_date;
 
-      return (
-        date &&
-        ![
-          "closed",
-          "effective",
-          "completed",
-        ].includes(status) &&
-        new Date(
-          `${date}T23:59:59`
-        ) < today
-      );
-    }
-  ).length;
+        const status =
+          plan?.status ??
+          corrective?.status ??
+          finding.status;
+
+        return Boolean(
+          targetDate &&
+            ![
+              "completed",
+              "verified",
+              "closed",
+              "effective",
+            ].includes(
+              status
+            ) &&
+            new Date(
+              `${targetDate}T23:59:59`
+            ) < today
+        );
+      }
+    ).length;
 
   const box = {
     background: "#fff",
-    border: "1px solid #dfe6ee",
+    border:
+      "1px solid #dfe6ee",
     borderRadius: "12px",
     padding: "18px",
   };
@@ -203,16 +286,20 @@ export default async function ManagementActionPlanPage({ params }) {
   const input = {
     padding: "12px",
     borderRadius: "8px",
-    border: "1px solid #d8e0ea",
-    boxSizing: "border-box",
+    border:
+      "1px solid #d8e0ea",
+    boxSizing:
+      "border-box",
     width: "100%",
   };
 
   return (
     <main
       style={{
-        minHeight: "100vh",
-        background: "#f3f6f9",
+        minHeight:
+          "100vh",
+        background:
+          "#f3f6f9",
         padding: "40px",
         fontFamily:
           "Arial, sans-serif",
@@ -220,26 +307,34 @@ export default async function ManagementActionPlanPage({ params }) {
     >
       <div
         style={{
-          maxWidth: "1180px",
-          margin: "0 auto",
+          maxWidth:
+            "1180px",
+          margin:
+            "0 auto",
         }}
       >
         <div
           style={{
-            display: "flex",
+            display:
+              "flex",
             justifyContent:
               "space-between",
             gap: "20px",
-            flexWrap: "wrap",
-            marginBottom: "24px",
+            flexWrap:
+              "wrap",
+            marginBottom:
+              "24px",
           }}
         >
           <div>
             <div
               style={{
-                color: "#1459D9",
-                fontWeight: 800,
-                fontSize: "12px",
+                color:
+                  "#1459D9",
+                fontWeight:
+                  800,
+                fontSize:
+                  "12px",
                 letterSpacing:
                   ".8px",
               }}
@@ -249,30 +344,37 @@ export default async function ManagementActionPlanPage({ params }) {
 
             <h1
               style={{
-                color: "#071A33",
+                color:
+                  "#071A33",
                 marginBottom:
                   "6px",
               }}
             >
-              Management Action Plan
+              Management Action
+              Plan
             </h1>
 
             <p
               style={{
-                color: "#617087",
+                color:
+                  "#617087",
                 margin: 0,
               }}
             >
-              {assessment.standard}{" "}
+              {
+                assessment.standard
+              }{" "}
               Assessment
             </p>
           </div>
 
           <div
             style={{
-              display: "flex",
+              display:
+                "flex",
               gap: "10px",
-              flexWrap: "wrap",
+              flexWrap:
+                "wrap",
             }}
           >
             <Link
@@ -280,11 +382,14 @@ export default async function ManagementActionPlanPage({ params }) {
               style={{
                 ...input,
                 width: "auto",
-                background: "#fff",
-                color: "#071A33",
+                background:
+                  "#fff",
+                color:
+                  "#071A33",
                 textDecoration:
                   "none",
-                fontWeight: 700,
+                fontWeight:
+                  700,
               }}
             >
               ← Findings Register
@@ -300,7 +405,8 @@ export default async function ManagementActionPlanPage({ params }) {
                 color: "#fff",
                 textDecoration:
                   "none",
-                fontWeight: 700,
+                fontWeight:
+                  700,
               }}
             >
               Executive Summary
@@ -310,11 +416,13 @@ export default async function ManagementActionPlanPage({ params }) {
 
         <section
           style={{
-            display: "grid",
+            display:
+              "grid",
             gridTemplateColumns:
               "repeat(auto-fit,minmax(180px,1fr))",
             gap: "14px",
-            marginBottom: "24px",
+            marginBottom:
+              "24px",
           }}
         >
           {[
@@ -334,48 +442,63 @@ export default async function ManagementActionPlanPage({ params }) {
               "COMPLETED",
               completed,
             ],
-          ].map(([k, v]) => (
-            <div
-              key={k}
-              style={box}
-            >
+          ].map(
+            ([
+              label,
+              value,
+            ]) => (
               <div
-                style={{
-                  color:
-                    "#617087",
-                  fontSize:
-                    "11px",
-                  fontWeight:
-                    800,
-                }}
+                key={
+                  label
+                }
+                style={
+                  box
+                }
               >
-                {k}
-              </div>
+                <div
+                  style={{
+                    color:
+                      "#617087",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      800,
+                  }}
+                >
+                  {label}
+                </div>
 
-              <strong
-                style={{
-                  color:
-                    "#071A33",
-                  fontSize:
-                    "28px",
-                }}
-              >
-                {v}
-              </strong>
-            </div>
-          ))}
+                <strong
+                  style={{
+                    color:
+                      "#071A33",
+                    fontSize:
+                      "28px",
+                  }}
+                >
+                  {value}
+                </strong>
+              </div>
+            )
+          )}
         </section>
 
         <div
           style={{
-            background: "#eef4ff",
+            background:
+              "#eef4ff",
             border:
               "1px solid #d6e4ff",
-            color: "#405574",
-            padding: "16px 18px",
-            borderRadius: "10px",
-            lineHeight: 1.55,
-            marginBottom: "24px",
+            color:
+              "#405574",
+            padding:
+              "16px 18px",
+            borderRadius:
+              "10px",
+            lineHeight:
+              1.55,
+            marginBottom:
+              "24px",
           }}
         >
           Major and Minor
@@ -391,60 +514,64 @@ export default async function ManagementActionPlanPage({ params }) {
 
         {planFindings.length ===
         0 ? (
-          <section style={box}>
-            There are currently no
-            mandatory management
-            actions arising from this
+          <section
+            style={box}
+          >
+            There are currently
+            no mandatory
+            management actions
+            arising from this
             assessment.
           </section>
         ) : (
           <div
             style={{
-              display: "grid",
+              display:
+                "grid",
               gap: "18px",
             }}
           >
             {planFindings.map(
               (finding) => {
-                const c =
+                const corrective =
                   correctiveByFinding[
                     finding.id
                   ] ?? {};
 
-                const p =
+                const plan =
                   planByFinding[
                     finding.id
                   ] ?? {};
 
                 const priority =
-                  p.priority ??
+                  plan.priority ??
                   priorityFor(
                     finding.finding_type
                   );
 
                 const target =
-                  p.target_date ??
-                  c.target_date ??
+                  plan.target_date ??
+                  corrective.target_date ??
                   "";
 
                 const status =
-                  p.status ??
-                  (finding.status ===
-                  "closed"
-                    ? "completed"
-                    : "open");
+                  plan.status ??
+                  "open";
 
                 const isOverdue =
-                  target &&
-                  ![
-                    "completed",
-                    "closed",
-                  ].includes(
-                    status
-                  ) &&
-                  new Date(
-                    `${target}T23:59:59`
-                  ) < today;
+                  Boolean(
+                    target &&
+                      ![
+                        "completed",
+                        "verified",
+                      ].includes(
+                        status
+                      ) &&
+                      new Date(
+                        `${target}T23:59:59`
+                      ) <
+                        today
+                  );
 
                 return (
                   <section
@@ -466,7 +593,8 @@ export default async function ManagementActionPlanPage({ params }) {
                           "flex",
                         justifyContent:
                           "space-between",
-                        gap: "12px",
+                        gap:
+                          "12px",
                         flexWrap:
                           "wrap",
                         marginBottom:
@@ -534,7 +662,8 @@ export default async function ManagementActionPlanPage({ params }) {
                       style={{
                         display:
                           "grid",
-                        gap: "12px",
+                        gap:
+                          "12px",
                       }}
                     >
                       <input
@@ -543,14 +672,6 @@ export default async function ManagementActionPlanPage({ params }) {
                         value={id}
                       />
 
-                      {/*
-                       * The form field is called finding_id
-                       * because it identifies the finding
-                       * being edited.
-                       *
-                       * actions.js must save this as
-                       * management_action_plan.related_finding_id.
-                       */}
                       <input
                         type="hidden"
                         name="finding_id"
@@ -565,7 +686,8 @@ export default async function ManagementActionPlanPage({ params }) {
                             "grid",
                           gridTemplateColumns:
                             "repeat(auto-fit,minmax(190px,1fr))",
-                          gap: "12px",
+                          gap:
+                            "12px",
                         }}
                       >
                         <select
@@ -618,8 +740,8 @@ export default async function ManagementActionPlanPage({ params }) {
                         <input
                           name="action_owner"
                           defaultValue={
-                            p.action_owner ??
-                            c.action_owner ??
+                            plan.action_owner ??
+                            corrective.action_owner ??
                             ""
                           }
                           placeholder="Management owner"
@@ -657,20 +779,15 @@ export default async function ManagementActionPlanPage({ params }) {
                           </option>
 
                           <option value="in_progress">
-                            In
-                            progress
-                          </option>
-
-                          <option value="at_risk">
-                            At risk
-                          </option>
-
-                          <option value="verification">
-                            Verification
+                            In progress
                           </option>
 
                           <option value="completed">
                             Completed
+                          </option>
+
+                          <option value="verified">
+                            Verified
                           </option>
                         </select>
                       </div>
@@ -694,8 +811,8 @@ export default async function ManagementActionPlanPage({ params }) {
                         name="action_required"
                         rows="3"
                         defaultValue={
-                          p.action_description ??
-                          c.corrective_action ??
+                          plan.action_description ??
+                          corrective.corrective_action ??
                           ""
                         }
                         placeholder="Management action required"
@@ -708,7 +825,7 @@ export default async function ManagementActionPlanPage({ params }) {
                         name="resource_decision"
                         rows="2"
                         defaultValue={
-                          p.resource_decision ??
+                          plan.resource_decision ??
                           ""
                         }
                         placeholder="Resource / investment / management decision required"
@@ -721,7 +838,7 @@ export default async function ManagementActionPlanPage({ params }) {
                         name="management_commentary"
                         rows="3"
                         defaultValue={
-                          p.management_commentary ??
+                          plan.management_commentary ??
                           ""
                         }
                         placeholder="Management commentary / progress"
@@ -734,8 +851,8 @@ export default async function ManagementActionPlanPage({ params }) {
                         name="verification_evidence"
                         rows="3"
                         defaultValue={
-                          p.verification_evidence ??
-                          c.verification_evidence ??
+                          plan.verification_evidence ??
+                          corrective.verification_evidence ??
                           ""
                         }
                         placeholder="Verification / effectiveness evidence"
@@ -751,7 +868,8 @@ export default async function ManagementActionPlanPage({ params }) {
                             "start",
                           padding:
                             "11px 17px",
-                          border: 0,
+                          border:
+                            0,
                           borderRadius:
                             "8px",
                           background:
