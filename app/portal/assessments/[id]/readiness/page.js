@@ -20,6 +20,33 @@ const CLAUSE_NUMBERS = [
   "10",
 ];
 
+
+function managementReadinessValue(rating) {
+  switch (rating) {
+    case "Not Ready":
+      return 25;
+    case "Developing":
+      return 50;
+    case "Established":
+      return 75;
+    case "Ready":
+      return 100;
+    default:
+      return null;
+  }
+}
+
+function managementReadinessLabel(score, completed) {
+  if (completed < 9 || score === null) {
+    return "Not assessed";
+  }
+
+  if (score < 40) return "Not Ready";
+  if (score < 65) return "Developing";
+  if (score < 85) return "Established";
+  return "Ready";
+}
+
 function decisionStyle(decision) {
   if (decision === "Potentially ready") {
     return {
@@ -394,6 +421,60 @@ export default async function CertificationReadinessPage({
         ])
     );
 
+  const {
+    data: managementReadinessRows,
+    error: managementReadinessError,
+  } = await supabase
+    .from("management_readiness")
+    .select(
+      "dimension_key, readiness_rating, evidence_confidence"
+    )
+    .eq("assessment_id", assessment.id)
+    .eq("owner_id", user.id)
+    .order("display_order", { ascending: true });
+
+  if (managementReadinessError) {
+    throw new Error(
+      managementReadinessError.message
+    );
+  }
+
+  const managementRows =
+    managementReadinessRows ?? [];
+
+  const managementValues =
+    managementRows
+      .map((row) =>
+        managementReadinessValue(
+          row.readiness_rating
+        )
+      )
+      .filter(
+        (value) =>
+          value !== null
+      );
+
+  const managementDimensionsCompleted =
+    managementValues.length;
+
+  const managementReadinessScore =
+    managementValues.length > 0
+      ? Math.round(
+          managementValues.reduce(
+            (total, value) =>
+              total + value,
+            0
+          ) /
+            managementValues.length
+        )
+      : null;
+
+  const managementReadiness =
+    managementReadinessLabel(
+      managementReadinessScore,
+      managementDimensionsCompleted
+    );
+
   const today =
     new Date();
 
@@ -463,11 +544,20 @@ export default async function CertificationReadinessPage({
     100
   ) {
     if (
+      managementDimensionsCompleted < 9
+    ) {
+      decision =
+        "Management readiness incomplete";
+    } else if (
+      managementReadiness ===
+        "Not Ready" ||
       openMajor.length > 0
     ) {
       decision =
         "Not ready";
     } else if (
+      managementReadiness ===
+        "Developing" ||
       highRisk.length > 0 ||
       overdueActions.length > 0
     ) {
@@ -476,11 +566,15 @@ export default async function CertificationReadinessPage({
     } else if (
       openMinor.length > 0 ||
       openMandatoryActions.length >
-        0
+        0 ||
+      managementReadiness ===
+        "Established"
     ) {
       decision =
         "Readiness review recommended";
     } else if (
+      managementReadiness ===
+        "Ready" &&
       overallScore !== null &&
       overallScore >= 80
     ) {
@@ -504,6 +598,18 @@ export default async function CertificationReadinessPage({
     );
 
   const checks = [
+    {
+      label:
+        "Management readiness completed",
+      pass:
+        managementDimensionsCompleted === 9,
+      detail:
+        `${managementDimensionsCompleted} of 9 dimensions assessed${
+          managementReadinessScore !== null
+            ? ` — ${managementReadiness} (${managementReadinessScore}%)`
+            : ""
+        }`,
+    },
     {
       label:
         "Assessment completed",
@@ -647,6 +753,27 @@ export default async function CertificationReadinessPage({
             </Link>
 
             <Link
+              href={`/portal/assessments/${assessment.id}/management-readiness`}
+              style={{
+                padding:
+                  "11px 16px",
+                borderRadius:
+                  "8px",
+                border:
+                  "1px solid #1459D9",
+                background:
+                  "#ffffff",
+                color:
+                  "#1459D9",
+                textDecoration:
+                  "none",
+                fontWeight: 700,
+              }}
+            >
+              Management Readiness
+            </Link>
+
+            <Link
               href={`/portal/assessments/${assessment.id}/actions-plan`}
               style={{
                 padding:
@@ -731,6 +858,12 @@ export default async function CertificationReadinessPage({
               "READINESS SCORE",
               overallScore !== null
                 ? `${overallScore}%`
+                : "—",
+            ],
+            [
+              "MANAGEMENT READINESS",
+              managementReadinessScore !== null
+                ? `${managementReadinessScore}%`
                 : "—",
             ],
             [
@@ -925,6 +1058,10 @@ export default async function CertificationReadinessPage({
             }}
           >
             {[
+              [
+                "Management readiness incomplete",
+                "The clause assessment is complete, but all nine management-readiness dimensions have not yet been assessed.",
+              ],
               [
                 "Not ready",
                 "Open Major NC or other systemic barrier prevents progression.",
