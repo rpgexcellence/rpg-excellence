@@ -352,6 +352,25 @@ export default async function FindingsPage({
             </Link>
 
             <Link
+              href={`/portal/assessments/${assessment.id}/actions-plan`}
+              style={{
+                padding:
+                  "11px 16px",
+                borderRadius:
+                  "8px",
+                background:
+                  "#1459D9",
+                color:
+                  "#ffffff",
+                textDecoration:
+                  "none",
+                fontWeight: 700,
+              }}
+            >
+              Management Action Plan
+            </Link>
+
+            <Link
               href="/portal"
               style={{
                 padding:
