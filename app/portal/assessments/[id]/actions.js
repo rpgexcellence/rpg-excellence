@@ -23,6 +23,12 @@ const VALID_FINDING_TYPES = [
   "major_nc",
 ];
 
+const VALID_RISK_LEVELS = [
+  "High",
+  "Medium",
+  "Low",
+];
+
 function cleanText(value) {
   if (
     typeof value !== "string" ||
@@ -180,12 +186,26 @@ async function saveFinding({
       )
     );
 
-  const riskImpact =
-    cleanText(
-      formData.get(
-        `finding_risk_${fieldKey}`
-      )
+  const riskImpactRaw =
+    formData.get(
+      `finding_risk_${fieldKey}`
     );
+
+  const riskImpact =
+    typeof riskImpactRaw ===
+      "string"
+      ? riskImpactRaw.trim()
+      : "";
+
+  if (
+    !VALID_RISK_LEVELS.includes(
+      riskImpact
+    )
+  ) {
+    throw new Error(
+      `Select High, Medium or Low risk for ${question.question_number}`
+    );
+  }
 
   const assessorRationale =
     cleanText(
