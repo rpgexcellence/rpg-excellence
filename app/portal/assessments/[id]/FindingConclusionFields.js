@@ -298,6 +298,7 @@ export default function FindingConclusionFields({
               <textarea
                 name={`finding_statement_${fieldKey}`}
                 rows="3"
+                required={isNonconformity}
                 defaultValue={
                   savedFinding
                     ?.finding_statement ??
@@ -312,6 +313,19 @@ export default function FindingConclusionFields({
                   textareaStyle
                 }
               />
+
+              {isNonconformity && (
+                <p
+                  style={{
+                    margin: "7px 0 0",
+                    color: "#617087",
+                    fontSize: "12px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Required before this Minor or Major Nonconformity can be saved.
+                </p>
+              )}
             </div>
 
             <div
@@ -342,6 +356,7 @@ export default function FindingConclusionFields({
 
                 <select
                   name={`finding_risk_${fieldKey}`}
+                  required={isFinding}
                   defaultValue={
                     savedFinding
                       ?.risk_impact ??
