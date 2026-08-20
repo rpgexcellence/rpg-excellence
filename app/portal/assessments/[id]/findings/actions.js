@@ -1,10 +1,20 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import {
+  revalidatePath,
+} from "next/cache";
 
-import { createClient } from "../../../../../lib/supabase/server";
-import { createAdminClient } from "../../../../../lib/supabase/admin";
+import {
+  redirect,
+} from "next/navigation";
+
+import {
+  createClient,
+} from "../../../../../lib/supabase/server";
+
+import {
+  createAdminClient,
+} from "../../../../../lib/supabase/admin";
 
 const FINDING_STATUSES = [
   "open",
@@ -56,8 +66,14 @@ async function getOwnedAssessment({
   } = await supabase
     .from("assessments")
     .select("id, standard")
-    .eq("id", assessmentId)
-    .eq("owner_id", userId)
+    .eq(
+      "id",
+      assessmentId
+    )
+    .eq(
+      "owner_id",
+      userId
+    )
     .single();
 
   if (
@@ -80,10 +96,13 @@ export async function updateFindingStatus(
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/portal/login");
+    redirect(
+      "/portal/login"
+    );
   }
 
   const assessmentId =
@@ -97,7 +116,9 @@ export async function updateFindingStatus(
     );
 
   const status =
-    formData.get("status");
+    formData.get(
+      "status"
+    );
 
   if (
     typeof assessmentId !==
@@ -123,21 +144,120 @@ export async function updateFindingStatus(
   const admin =
     createAdminClient();
 
+  /*
+   * Formal finding closure is controlled.
+   *
+   * A finding may only be closed when the
+   * latest corrective action:
+   *
+   * 1. is marked effective;
+   * 2. contains verification evidence; and
+   * 3. contains an effectiveness review.
+   */
+  if (status === "closed") {
+    const {
+      data: correctiveAction,
+      error: correctiveError,
+    } = await admin
+      .from(
+        "corrective_actions"
+      )
+      .select(
+        `
+          id,
+          status,
+          verification_evidence,
+          effectiveness_review
+        `
+      )
+      .eq(
+        "assessment_id",
+        assessmentId
+      )
+      .eq(
+        "finding_id",
+        findingId
+      )
+      .eq(
+        "owner_id",
+        user.id
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (correctiveError) {
+      throw new Error(
+        correctiveError.message
+      );
+    }
+
+    if (!correctiveAction) {
+      throw new Error(
+        "A corrective action is required before this finding can be closed."
+      );
+    }
+
+    if (
+      correctiveAction.status !==
+      "effective"
+    ) {
+      throw new Error(
+        "Corrective action effectiveness must be confirmed before the finding can be closed."
+      );
+    }
+
+    if (
+      !cleanText(
+        correctiveAction
+          .verification_evidence
+      )
+    ) {
+      throw new Error(
+        "Verification evidence is required before the finding can be closed."
+      );
+    }
+
+    if (
+      !cleanText(
+        correctiveAction
+          .effectiveness_review
+      )
+    ) {
+      throw new Error(
+        "An effectiveness review is required before the finding can be closed."
+      );
+    }
+  }
+
   const {
     error,
   } = await admin
-    .from("assessment_findings")
+    .from(
+      "assessment_findings"
+    )
     .update({
       status,
       updated_at:
         new Date().toISOString(),
     })
-    .eq("id", findingId)
+    .eq(
+      "id",
+      findingId
+    )
     .eq(
       "assessment_id",
       assessmentId
     )
-    .eq("owner_id", user.id);
+    .eq(
+      "owner_id",
+      user.id
+    );
 
   if (error) {
     throw new Error(
@@ -147,6 +267,18 @@ export async function updateFindingStatus(
 
   revalidatePath(
     `/portal/assessments/${assessmentId}/findings`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/actions-plan`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/summary`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/readiness`
   );
 }
 
@@ -158,10 +290,13 @@ export async function updateCorrectiveAction(
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/portal/login");
+    redirect(
+      "/portal/login"
+    );
   }
 
   const assessmentId =
@@ -175,7 +310,9 @@ export async function updateCorrectiveAction(
     );
 
   const status =
-    formData.get("status");
+    formData.get(
+      "status"
+    );
 
   if (
     typeof assessmentId !==
@@ -205,14 +342,24 @@ export async function updateCorrectiveAction(
     data: finding,
     error: findingError,
   } = await admin
-    .from("assessment_findings")
-    .select("id")
-    .eq("id", findingId)
+    .from(
+      "assessment_findings"
+    )
+    .select(
+      "id, status"
+    )
+    .eq(
+      "id",
+      findingId
+    )
     .eq(
       "assessment_id",
       assessmentId
     )
-    .eq("owner_id", user.id)
+    .eq(
+      "owner_id",
+      user.id
+    )
     .single();
 
   if (
@@ -223,6 +370,60 @@ export async function updateCorrectiveAction(
       "Finding not found."
     );
   }
+
+  const verificationEvidence =
+    cleanText(
+      formData.get(
+        "verification_evidence"
+      )
+    );
+
+  const effectivenessReview =
+    cleanText(
+      formData.get(
+        "effectiveness_review"
+      )
+    );
+
+  /*
+   * "effective" means the corrective action
+   * has passed effectiveness review.
+   *
+   * It does NOT automatically close the
+   * formal finding.
+   */
+  if (
+    status === "effective"
+  ) {
+    if (
+      !verificationEvidence
+    ) {
+      throw new Error(
+        "Verification evidence is required before a corrective action can be marked effective."
+      );
+    }
+
+    if (
+      !effectivenessReview
+    ) {
+      throw new Error(
+        "An effectiveness review is required before a corrective action can be marked effective."
+      );
+    }
+  }
+
+  /*
+   * Do not use corrective-action status
+   * "closed" to bypass formal finding closure.
+   *
+   * Treat it as verification/effectiveness
+   * complete; formal closure still occurs
+   * through updateFindingStatus().
+   */
+  const controlledActionStatus =
+    status === "closed"
+      ? "effective"
+      : status;
 
   const payload = {
     assessment_id:
@@ -277,20 +478,13 @@ export async function updateCorrectiveAction(
       ),
 
     verification_evidence:
-      cleanText(
-        formData.get(
-          "verification_evidence"
-        )
-      ),
+      verificationEvidence,
 
     effectiveness_review:
-      cleanText(
-        formData.get(
-          "effectiveness_review"
-        )
-      ),
+      effectivenessReview,
 
-    status,
+    status:
+      controlledActionStatus,
 
     updated_at:
       new Date().toISOString(),
@@ -300,7 +494,9 @@ export async function updateCorrectiveAction(
     data: existing,
     error: existingError,
   } = await admin
-    .from("corrective_actions")
+    .from(
+      "corrective_actions"
+    )
     .select("id")
     .eq(
       "assessment_id",
@@ -310,10 +506,16 @@ export async function updateCorrectiveAction(
       "finding_id",
       findingId
     )
-    .eq("owner_id", user.id)
-    .order("created_at", {
-      ascending: false,
-    })
+    .eq(
+      "owner_id",
+      user.id
+    )
+    .order(
+      "created_at",
+      {
+        ascending: false,
+      }
+    )
     .limit(1)
     .maybeSingle();
 
@@ -327,10 +529,18 @@ export async function updateCorrectiveAction(
     const {
       error: updateError,
     } = await admin
-      .from("corrective_actions")
+      .from(
+        "corrective_actions"
+      )
       .update(payload)
-      .eq("id", existing.id)
-      .eq("owner_id", user.id);
+      .eq(
+        "id",
+        existing.id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
 
     if (updateError) {
       throw new Error(
@@ -341,7 +551,9 @@ export async function updateCorrectiveAction(
     const {
       error: insertError,
     } = await admin
-      .from("corrective_actions")
+      .from(
+        "corrective_actions"
+      )
       .insert(payload);
 
     if (insertError) {
@@ -351,43 +563,89 @@ export async function updateCorrectiveAction(
     }
   }
 
+  /*
+   * Corrective-action progress updates the
+   * formal finding status, but cannot formally
+   * close it.
+   */
+  let findingStatus =
+    "open";
+
   if (
-    status ===
-      "in_progress" ||
-    status ===
-      "awaiting_verification"
+    controlledActionStatus ===
+      "in_progress"
   ) {
-    await admin
-      .from("assessment_findings")
-      .update({
-        status:
-          status ===
-          "awaiting_verification"
-            ? "verification"
-            : "action_in_progress",
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq("id", findingId)
-      .eq("owner_id", user.id);
+    findingStatus =
+      "action_in_progress";
   }
 
   if (
-    status === "closed" ||
-    status === "effective"
+    [
+      "awaiting_verification",
+      "effective",
+    ].includes(
+      controlledActionStatus
+    )
   ) {
-    await admin
-      .from("assessment_findings")
+    findingStatus =
+      "verification";
+  }
+
+  /*
+   * Never reopen an already formally closed
+   * finding when editing historical corrective
+   * action information.
+   */
+  if (
+    finding.status !==
+    "closed"
+  ) {
+    const {
+      error: syncError,
+    } = await admin
+      .from(
+        "assessment_findings"
+      )
       .update({
-        status: "closed",
+        status:
+          findingStatus,
+
         updated_at:
           new Date().toISOString(),
       })
-      .eq("id", findingId)
-      .eq("owner_id", user.id);
+      .eq(
+        "id",
+        findingId
+      )
+      .eq(
+        "assessment_id",
+        assessmentId
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
+
+    if (syncError) {
+      throw new Error(
+        syncError.message
+      );
+    }
   }
 
   revalidatePath(
     `/portal/assessments/${assessmentId}/findings`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/actions-plan`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/summary`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/readiness`
   );
 }
