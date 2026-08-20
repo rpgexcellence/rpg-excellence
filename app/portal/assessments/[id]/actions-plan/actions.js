@@ -26,9 +26,8 @@ const PRIORITIES = [
 const STATUSES = [
   "open",
   "in_progress",
-  "at_risk",
-  "verification",
   "completed",
+  "verified",
 ];
 
 const clean = (value) =>
@@ -40,26 +39,30 @@ const clean = (value) =>
 function labelFor(type) {
   return (
     {
-      major_nc: "Major NC",
-      minor_nc: "Minor NC",
-      observation: "Observation",
-      ofi: "OFI",
-    }[type] ?? "Finding"
+      major_nc:
+        "Major NC",
+      minor_nc:
+        "Minor NC",
+      observation:
+        "Observation",
+      ofi:
+        "OFI",
+    }[type] ??
+    "Finding"
   );
 }
 
-function progressFor(status) {
+function progressFor(
+  status
+) {
   switch (status) {
-    case "completed":
+    case "verified":
       return 100;
 
-    case "verification":
+    case "completed":
       return 90;
 
     case "in_progress":
-      return 50;
-
-    case "at_risk":
       return 50;
 
     default:
@@ -79,7 +82,9 @@ export async function updateManagementAction(
     await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/portal/login");
+    redirect(
+      "/portal/login"
+    );
   }
 
   const assessmentId =
@@ -98,7 +103,8 @@ export async function updateManagementAction(
     );
 
   const priority =
-    typeof rawPriority === "string"
+    typeof rawPriority ===
+      "string"
       ? rawPriority.toLowerCase()
       : rawPriority;
 
@@ -132,7 +138,9 @@ export async function updateManagementAction(
     data: assessment,
     error: assessmentError,
   } = await supabase
-    .from("assessments")
+    .from(
+      "assessments"
+    )
     .select(
       "id, standard"
     )
@@ -172,7 +180,8 @@ export async function updateManagementAction(
         question_number,
         clause,
         finding_statement,
-        requirement_summary
+        requirement_summary,
+        status
       `
     )
     .eq(
@@ -208,13 +217,22 @@ export async function updateManagementAction(
     );
 
   const actionTitle =
-    `${finding.question_number ?? "Finding"} - ${labelFor(
+    `${
+      finding.question_number ??
+      "Finding"
+    } - ${labelFor(
       finding.finding_type
     )}`;
 
   const now =
     new Date().toISOString();
 
+  /*
+   * Canonical Management Action Plan fields.
+   *
+   * related_finding_id is the relationship
+   * used by this module.
+   */
   const payload = {
     assessment_id:
       assessmentId,
@@ -239,12 +257,6 @@ export async function updateManagementAction(
 
     related_finding_id:
       findingId,
-
-    finding_id:
-      findingId,
-
-    action_required:
-      actionRequired,
 
     action_owner:
       clean(
@@ -299,7 +311,9 @@ export async function updateManagementAction(
     .from(
       "management_action_plan"
     )
-    .select("id")
+    .select(
+      "id"
+    )
     .eq(
       "assessment_id",
       assessmentId
@@ -328,7 +342,9 @@ export async function updateManagementAction(
       .from(
         "management_action_plan"
       )
-      .update(payload)
+      .update(
+        payload
+      )
       .eq(
         "id",
         existing.id
@@ -350,7 +366,9 @@ export async function updateManagementAction(
       .from(
         "management_action_plan"
       )
-      .insert(payload);
+      .insert(
+        payload
+      );
 
     if (error) {
       throw new Error(
@@ -360,71 +378,78 @@ export async function updateManagementAction(
   }
 
   /*
-   * IMPORTANT:
+   * Management Action status does not
+   * formally close a Major / Minor NC.
    *
-   * Management action completion does NOT
-   * automatically close the formal finding.
+   * Management lifecycle:
    *
-   * A completed management action moves the
-   * finding into verification so effectiveness
-   * can be independently confirmed before the
-   * NC is formally closed.
+   * open
+   *   -> in_progress
+   *   -> completed
+   *   -> verified
    *
-   * Workflow:
+   * Finding lifecycle:
    *
    * open
    *   -> action_in_progress
    *   -> verification
-   *   -> closed
+   *   -> explicit controlled closure
    *
-   * Formal closure should be performed through
-   * the Findings Register verification process.
+   * Both "completed" and "verified"
+   * therefore leave the formal finding
+   * in Verification.
    */
   const findingStatus =
-    status === "completed"
+    status ===
+      "completed" ||
+    status ===
+      "verified"
       ? "verification"
       : status ===
-          "verification"
-        ? "verification"
-        : [
-            "in_progress",
-            "at_risk",
-          ].includes(
-            status
-          )
-          ? "action_in_progress"
-          : "open";
+          "in_progress"
+        ? "action_in_progress"
+        : "open";
 
-  const {
-    error: syncError,
-  } = await admin
-    .from(
-      "assessment_findings"
-    )
-    .update({
-      status:
-        findingStatus,
+  /*
+   * Do not reopen an already formally
+   * closed finding if someone later edits
+   * its historical management action.
+   */
+  if (
+    finding.status !==
+    "closed"
+  ) {
+    const {
+      error: syncError,
+    } = await admin
+      .from(
+        "assessment_findings"
+      )
+      .update({
+        status:
+          findingStatus,
 
-      updated_at:
-        now,
-    })
-    .eq(
-      "id",
-      findingId
-    )
-    .eq(
-      "assessment_id",
-      assessmentId
-    )
-    .eq(
-      "owner_id",
-      user.id
-    );
+        updated_at:
+          now,
+      })
+      .eq(
+        "id",
+        findingId
+      )
+      .eq(
+        "assessment_id",
+        assessmentId
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
 
-  if (syncError) {
-    throw new Error(
-      syncError.message
-    );
+    if (syncError) {
+      throw new Error(
+        syncError.message
+      );
+    }
   }
 
   revalidatePath(
