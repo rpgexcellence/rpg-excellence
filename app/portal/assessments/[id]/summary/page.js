@@ -591,71 +591,6 @@ export default async function AssessmentSummaryPage({
       }
     ).length;
 
-  const managementClauseScores =
-    clauseResults
-      .filter(
-        (result) =>
-          ["5", "9", "10"].includes(
-            result.number
-          ) &&
-          result.score !== null
-      )
-      .map(
-        (result) =>
-          result.score
-      );
-
-  const managementIndicator =
-    managementClauseScores.length >
-    0
-      ? Math.round(
-          managementClauseScores.reduce(
-            (
-              total,
-              score
-            ) =>
-              total + score,
-            0
-          ) /
-            managementClauseScores.length
-        )
-      : null;
-
-  let managementReadiness =
-    "Not assessed";
-
-  if (
-    managementIndicator !==
-    null
-  ) {
-    if (
-      openMajorCount > 0
-    ) {
-      managementReadiness =
-        "Not ready";
-    } else if (
-      highRiskCount > 0 ||
-      overdueActionCount > 0
-    ) {
-      managementReadiness =
-        "Management action required";
-    } else if (
-      managementIndicator >= 80 &&
-      openMinorCount === 0
-    ) {
-      managementReadiness =
-        "Strong";
-    } else if (
-      managementIndicator >= 60
-    ) {
-      managementReadiness =
-        "Progressing";
-    } else {
-      managementReadiness =
-        "Needs improvement";
-    }
-  }
-
   const {
     data: managementReadinessRows,
     error: managementReadinessError,
@@ -1226,12 +1161,11 @@ export default async function AssessmentSummaryPage({
                         "6px",
                     }}
                   >
-                    RPG indicator based on
-                    Clauses 5, 9 and 10:
+                    Stored 9-dimension management assessment:
                     {" "}
-                    {managementIndicator !==
+                    {managementReadinessScore !==
                     null
-                      ? `${managementIndicator}%`
+                      ? `${managementReadinessScore}%`
                       : "—"}
                   </div>
                 </div>
