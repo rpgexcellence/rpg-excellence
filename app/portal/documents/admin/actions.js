@@ -63,7 +63,7 @@ function safeFileName(name) {
     .replace(/[^A-Za-z0-9._-]/g, "_");
 }
 
-async function requireUser() {
+async function requireDocumentAdmin() {
   const supabase =
     await createClient();
 
@@ -76,9 +76,35 @@ async function requireUser() {
     redirect("/portal/login");
   }
 
+  const admin =
+    createAdminClient();
+
+  const {
+    data: adminAccess,
+    error: adminAccessError,
+  } = await admin
+    .from("portal_admins")
+    .select("role, active")
+    .eq("user_id", user.id)
+    .eq("active", true)
+    .in("role", [
+      "admin",
+      "document_controller",
+    ])
+    .maybeSingle();
+
+  if (
+    adminAccessError ||
+    !adminAccess
+  ) {
+    redirect("/portal/documents");
+  }
+
   return {
     supabase,
     user,
+    admin,
+    adminAccess,
   };
 }
 
@@ -123,11 +149,9 @@ export async function createControlledDocument(
 ) {
   const {
     user,
+    admin,
   } =
-    await requireUser();
-
-  const admin =
-    createAdminClient();
+    await requireDocumentAdmin();
 
   const documentNumber =
     cleanText(
@@ -319,10 +343,10 @@ export async function createControlledDocument(
 export async function updateControlledDocument(
   formData
 ) {
-  await requireUser();
-
-  const admin =
-    createAdminClient();
+  const {
+    admin,
+  } =
+    await requireDocumentAdmin();
 
   const documentId =
     cleanText(
@@ -559,10 +583,10 @@ export async function updateControlledDocument(
 export async function supersedeControlledDocument(
   formData
 ) {
-  await requireUser();
-
-  const admin =
-    createAdminClient();
+  const {
+    admin,
+  } =
+    await requireDocumentAdmin();
 
   const documentId =
     cleanText(
@@ -621,10 +645,10 @@ export async function supersedeControlledDocument(
 export async function withdrawControlledDocument(
   formData
 ) {
-  await requireUser();
-
-  const admin =
-    createAdminClient();
+  const {
+    admin,
+  } =
+    await requireDocumentAdmin();
 
   const documentId =
     cleanText(
