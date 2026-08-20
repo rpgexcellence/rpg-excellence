@@ -11,6 +11,7 @@ import {
 import {
   createClient,
 } from "../../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../../lib/supabase/admin";
 
 const EVIDENCE_TYPES = [
   "Document",
@@ -26,6 +27,19 @@ const CONFIDENCE_LEVELS = [
   "Low",
   "Medium",
   "High",
+];
+
+const FINDING_TYPES = [
+  "observation",
+  "ofi",
+  "minor_nc",
+  "major_nc",
+];
+
+const RISK_LEVELS = [
+  "High",
+  "Medium",
+  "Low",
 ];
 
 function cleanText(value) {
@@ -518,5 +532,343 @@ export async function deleteEvidenceSample(
 
   redirect(
     `/portal/assessments/${assessmentId}/evidence`
+  );
+}
+
+
+export async function raiseFindingFromEvidenceSample(
+  formData
+) {
+  const supabase =
+    await createClient();
+
+  const {
+    data: { user },
+  } =
+    await supabase.auth.getUser();
+
+  if (!user) {
+    redirect(
+      "/portal/login"
+    );
+  }
+
+  const assessmentId =
+    formData.get(
+      "assessment_id"
+    );
+
+  const sampleId =
+    formData.get(
+      "sample_id"
+    );
+
+  const findingType =
+    cleanText(
+      formData.get(
+        "finding_type"
+      )
+    );
+
+  const riskLevel =
+    cleanText(
+      formData.get(
+        "risk_level"
+      )
+    );
+
+  const findingStatement =
+    cleanText(
+      formData.get(
+        "finding_statement"
+      )
+    );
+
+  const assessorRationale =
+    cleanText(
+      formData.get(
+        "assessor_rationale"
+      )
+    );
+
+  if (
+    typeof assessmentId !==
+      "string" ||
+    typeof sampleId !==
+      "string" ||
+    assessmentId.trim() ===
+      "" ||
+    sampleId.trim() ===
+      ""
+  ) {
+    throw new Error(
+      "Invalid evidence sample."
+    );
+  }
+
+  if (
+    !findingType ||
+    !FINDING_TYPES.includes(
+      findingType
+    )
+  ) {
+    throw new Error(
+      "Select a valid finding classification."
+    );
+  }
+
+  if (
+    !riskLevel ||
+    !RISK_LEVELS.includes(
+      riskLevel
+    )
+  ) {
+    throw new Error(
+      "Select High, Medium or Low risk."
+    );
+  }
+
+  if (
+    (
+      findingType ===
+        "minor_nc" ||
+      findingType ===
+        "major_nc"
+    ) &&
+    !findingStatement
+  ) {
+    throw new Error(
+      "A finding statement is required for Minor or Major Nonconformity."
+    );
+  }
+
+  const assessment =
+    await getOwnedAssessment({
+      supabase,
+      assessmentId,
+      userId: user.id,
+    });
+
+  const {
+    data: sample,
+    error: sampleError,
+  } = await supabase
+    .from(
+      "assessment_evidence_samples"
+    )
+    .select("*")
+    .eq(
+      "id",
+      sampleId
+    )
+    .eq(
+      "assessment_id",
+      assessmentId
+    )
+    .eq(
+      "owner_id",
+      user.id
+    )
+    .single();
+
+  if (
+    sampleError ||
+    !sample
+  ) {
+    throw new Error(
+      "Evidence sample not found."
+    );
+  }
+
+  if (sample.finding_id) {
+    throw new Error(
+      "This evidence sample is already linked to a finding."
+    );
+  }
+
+  let requirementSummary =
+    null;
+
+  if (
+    sample.question_number
+  ) {
+    const {
+      data: question,
+      error: questionError,
+    } = await supabase
+      .from(
+        "assessment_questions"
+      )
+      .select(
+        "question_number, question, requirement_summary"
+      )
+      .eq(
+        "standard",
+        assessment.standard
+      )
+      .eq(
+        "question_number",
+        sample.question_number
+      )
+      .eq(
+        "active",
+        true
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (questionError) {
+      throw new Error(
+        questionError.message
+      );
+    }
+
+    requirementSummary =
+      question
+        ?.requirement_summary ??
+      question?.question ??
+      null;
+  }
+
+  const evidenceParts = [
+    sample.evidence_type
+      ? `Type: ${sample.evidence_type}`
+      : null,
+    sample.evidence_reference
+      ? `Reference: ${sample.evidence_reference}`
+      : null,
+    sample.evidence_period
+      ? `Period: ${sample.evidence_period}`
+      : null,
+    sample.sample_size
+      ? `Sample size: ${sample.sample_size}`
+      : null,
+    sample.sample_result
+      ? `Result: ${sample.sample_result}`
+      : null,
+    sample.exception_gap
+      ? `Exception / gap: ${sample.exception_gap}`
+      : null,
+    sample.assessor_notes
+      ? `Assessor notes: ${sample.assessor_notes}`
+      : null,
+  ].filter(Boolean);
+
+  const objectiveEvidence =
+    evidenceParts.length > 0
+      ? evidenceParts.join(
+          "\n"
+        )
+      : null;
+
+  const admin =
+    createAdminClient();
+
+  const {
+    data: createdFinding,
+    error: findingError,
+  } = await admin
+    .from(
+      "assessment_findings"
+    )
+    .insert({
+      assessment_id:
+        assessmentId,
+
+      owner_id:
+        user.id,
+
+      standard:
+        assessment.standard,
+
+      clause:
+        sample.clause,
+
+      question_number:
+        sample.question_number,
+
+      finding_type:
+        findingType,
+
+      requirement_summary:
+        requirementSummary,
+
+      objective_evidence:
+        objectiveEvidence,
+
+      finding_statement:
+        findingStatement,
+
+      risk_impact:
+        riskLevel,
+
+      assessor_rationale:
+        assessorRationale,
+
+      status:
+        "open",
+
+      updated_at:
+        new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (findingError) {
+    throw new Error(
+      findingError.message
+    );
+  }
+
+  const {
+    error: linkError,
+  } = await supabase
+    .from(
+      "assessment_evidence_samples"
+    )
+    .update({
+      finding_id:
+        createdFinding.id,
+
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      "id",
+      sampleId
+    )
+    .eq(
+      "assessment_id",
+      assessmentId
+    )
+    .eq(
+      "owner_id",
+      user.id
+    );
+
+  if (linkError) {
+    throw new Error(
+      linkError.message
+    );
+  }
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/evidence`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/findings`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/summary`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/readiness`
+  );
+
+  redirect(
+    `/portal/assessments/${assessmentId}/findings`
   );
 }
