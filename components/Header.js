@@ -8,11 +8,28 @@ export default function Header({ locale, nav }) {
         href={`/${locale}`}
         className="brand"
         aria-label="RPG Excellence home"
+        style={{
+          width: "230px",
+          height: "70px",
+          display: "flex",
+          alignItems: "center",
+          flexShrink: 0,
+          overflow: "hidden",
+          textDecoration: "none",
+        }}
       >
         <img
           src="/rpg-excellence-logo.png"
           alt="RPG Excellence"
-          className="brandLogo"
+          style={{
+            display: "block",
+            width: "230px",
+            maxWidth: "230px",
+            height: "70px",
+            maxHeight: "70px",
+            objectFit: "contain",
+            objectPosition: "left center",
+          }}
         />
       </Link>
 
