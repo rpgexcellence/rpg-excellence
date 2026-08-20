@@ -918,6 +918,18 @@ return (
 
           </Link>
 
+          <Link
+            href="/portal/documents"
+            style={{
+              padding: "10px 14px",
+              color: "#ffffff",
+              textDecoration: "none",
+              fontWeight: 700,
+            }}
+          >
+            Document Register
+          </Link>
+
  
 
           <form
