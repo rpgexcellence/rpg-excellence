@@ -37,6 +37,36 @@ const clean = (value) =>
     ? value.trim()
     : null;
 
+function labelFor(type) {
+  return (
+    {
+      major_nc: "Major NC",
+      minor_nc: "Minor NC",
+      observation: "Observation",
+      ofi: "OFI",
+    }[type] ?? "Finding"
+  );
+}
+
+function progressFor(status) {
+  switch (status) {
+    case "completed":
+      return 100;
+
+    case "verification":
+      return 90;
+
+    case "in_progress":
+      return 50;
+
+    case "at_risk":
+      return 50;
+
+    default:
+      return 0;
+  }
+}
+
 export async function updateManagementAction(
   formData
 ) {
@@ -98,7 +128,9 @@ export async function updateManagementAction(
     error: assessmentError,
   } = await supabase
     .from("assessments")
-    .select("id")
+    .select(
+      "id, standard"
+    )
     .eq(
       "id",
       assessmentId
@@ -129,7 +161,14 @@ export async function updateManagementAction(
       "assessment_findings"
     )
     .select(
-      "id, finding_type"
+      `
+        id,
+        finding_type,
+        question_number,
+        clause,
+        finding_statement,
+        requirement_summary
+      `
     )
     .eq(
       "id",
@@ -156,30 +195,56 @@ export async function updateManagementAction(
     );
   }
 
-  /*
-   * The form field is called finding_id,
-   * but the database column on
-   * management_action_plan is
-   * related_finding_id.
-   */
+  const actionRequired =
+    clean(
+      formData.get(
+        "action_required"
+      )
+    );
+
+  const actionTitle =
+    `${finding.question_number ?? "Finding"} - ${labelFor(
+      finding.finding_type
+    )}`;
+
+  const now =
+    new Date().toISOString();
+
   const payload = {
     assessment_id:
       assessmentId,
 
-    related_finding_id:
-      findingId,
-
     owner_id:
       user.id,
 
+    standard:
+      assessment.standard,
+
     priority,
 
+    action_title:
+      actionTitle,
+
+    action_description:
+      actionRequired,
+
+    related_clause:
+      finding.clause ??
+      null,
+
+    related_finding_id:
+      findingId,
+
+    /*
+     * Temporary compatibility with the
+     * finding_id column added during our
+     * schema-alignment work.
+     */
+    finding_id:
+      findingId,
+
     action_required:
-      clean(
-        formData.get(
-          "action_required"
-        )
-      ),
+      actionRequired,
 
     action_owner:
       clean(
@@ -193,6 +258,11 @@ export async function updateManagementAction(
         formData.get(
           "target_date"
         )
+      ),
+
+    progress:
+      progressFor(
+        status
       ),
 
     resource_decision:
@@ -219,7 +289,7 @@ export async function updateManagementAction(
     status,
 
     updated_at:
-      new Date().toISOString(),
+      now,
   };
 
   const {
@@ -289,10 +359,6 @@ export async function updateManagementAction(
     }
   }
 
-  /*
-   * Keep the underlying formal finding
-   * synchronised with management progress.
-   */
   const findingStatus =
     status === "completed"
       ? "closed"
@@ -319,7 +385,7 @@ export async function updateManagementAction(
         findingStatus,
 
       updated_at:
-        new Date().toISOString(),
+        now,
     })
     .eq(
       "id",
