@@ -2,48 +2,103 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "../../../lib/supabase/server";
+import { createAdminClient } from "../../../lib/supabase/admin";
 
 export const metadata = {
   title: "Document Register | RPG Intelligence",
 };
 
-function formatDate(value) {
-  if (!value) return "—";
+const STORAGE_BUCKET =
+  "controlled-documents";
 
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+function formatDate(value) {
+  if (!value) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-GB",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }
+  ).format(
+    new Date(value)
+  );
 }
 
 export default async function DocumentRegisterPage() {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/portal/login");
+    redirect(
+      "/portal/login"
+    );
   }
 
   const {
     data: documentsData,
     error: documentsError,
   } = await supabase
-    .from("controlled_documents")
-    .select("*")
-    .order("standard", {
-      ascending: true,
-      nullsFirst: false,
-    })
-    .order("document_number", {
-      ascending: true,
-    })
-    .order("revision", {
-      ascending: false,
-    });
+    .from(
+      "controlled_documents"
+    )
+    .select(
+      `
+        id,
+        document_number,
+        title,
+        document_type,
+        standard,
+        revision,
+        status,
+        audience,
+        issue_date,
+        review_date,
+        description,
+        file_name,
+        file_path,
+        approved_by,
+        approved_at
+      `
+    )
+    .eq(
+      "status",
+      "Current"
+    )
+    .in(
+      "audience",
+      [
+        "Customer",
+        "Both",
+      ]
+    )
+    .order(
+      "standard",
+      {
+        ascending: true,
+        nullsFirst: false,
+      }
+    )
+    .order(
+      "document_number",
+      {
+        ascending: true,
+      }
+    )
+    .order(
+      "revision",
+      {
+        ascending: false,
+      }
+    );
 
   if (documentsError) {
     throw new Error(
@@ -54,20 +109,66 @@ export default async function DocumentRegisterPage() {
   const documents =
     documentsData ?? [];
 
-  const currentDocuments =
-    documents.filter(
-      (document) =>
-        document.status === "Current" &&
-        (
-          document.audience === "Customer" ||
-          document.audience === "Both"
-        )
+  const admin =
+    createAdminClient();
+
+  const documentsWithAccess =
+    await Promise.all(
+      documents.map(
+        async (document) => {
+          if (
+            !document.file_path
+          ) {
+            return {
+              ...document,
+              signed_url: null,
+            };
+          }
+
+          const {
+            data,
+            error,
+          } =
+            await admin.storage
+              .from(
+                STORAGE_BUCKET
+              )
+              .createSignedUrl(
+                document.file_path,
+                60 * 10,
+                {
+                  download:
+                    document.file_name ||
+                    true,
+                }
+              );
+
+          if (error) {
+            console.error(
+              `Unable to create signed URL for ${document.document_number}:`,
+              error.message
+            );
+
+            return {
+              ...document,
+              signed_url: null,
+            };
+          }
+
+          return {
+            ...document,
+            signed_url:
+              data?.signedUrl ??
+              null,
+          };
+        }
+      )
     );
 
   const standards =
     Array.from(
       new Set(
-        currentDocuments.map(
+        documentsWithAccess.map(
           (document) =>
             document.standard ||
             "RPG General"
@@ -76,15 +177,16 @@ export default async function DocumentRegisterPage() {
     );
 
   const withFiles =
-    currentDocuments.filter(
+    documentsWithAccess.filter(
       (document) =>
-        document.file_url ||
-        document.file_path
+        Boolean(
+          document.signed_url
+        )
     ).length;
 
   const documentTypes =
     new Set(
-      currentDocuments.map(
+      documentsWithAccess.map(
         (document) =>
           document.document_type
       )
@@ -93,40 +195,59 @@ export default async function DocumentRegisterPage() {
   return (
     <main
       style={{
-        minHeight: "100vh",
-        background: "#f3f6f9",
+        minHeight:
+          "100vh",
+        background:
+          "#f3f6f9",
         fontFamily:
           "Arial, sans-serif",
       }}
     >
       <header
         style={{
-          background: "#071A33",
-          color: "#ffffff",
-          padding: "20px 30px",
+          background:
+            "#071A33",
+          color:
+            "#ffffff",
+          padding:
+            "20px 30px",
         }}
       >
         <div
           style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            display: "flex",
+            maxWidth:
+              "1200px",
+            margin:
+              "0 auto",
+            display:
+              "flex",
             justifyContent:
               "space-between",
-            alignItems: "center",
-            gap: "20px",
-            flexWrap: "wrap",
+            alignItems:
+              "center",
+            gap:
+              "20px",
+            flexWrap:
+              "wrap",
           }}
         >
           <div>
-            <h2 style={{ margin: 0 }}>
+            <h2
+              style={{
+                margin: 0,
+              }}
+            >
               RPG Intelligence
             </h2>
+
             <p
               style={{
-                marginTop: "6px",
-                marginBottom: 0,
-                opacity: 0.75,
+                marginTop:
+                  "6px",
+                marginBottom:
+                  0,
+                opacity:
+                  0.75,
               }}
             >
               Controlled Document Register
@@ -135,18 +256,27 @@ export default async function DocumentRegisterPage() {
 
           <div
             style={{
-              display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
+              display:
+                "flex",
+              gap:
+                "10px",
+              alignItems:
+                "center",
+              flexWrap:
+                "wrap",
             }}
           >
             <Link
               href="/portal"
               style={{
-                padding: "10px 14px",
-                color: "#ffffff",
-                textDecoration: "none",
-                fontWeight: 700,
+                padding:
+                  "10px 14px",
+                color:
+                  "#ffffff",
+                textDecoration:
+                  "none",
+                fontWeight:
+                  700,
               }}
             >
               Dashboard
@@ -155,10 +285,14 @@ export default async function DocumentRegisterPage() {
             <Link
               href="/portal/history"
               style={{
-                padding: "10px 14px",
-                color: "#ffffff",
-                textDecoration: "none",
-                fontWeight: 700,
+                padding:
+                  "10px 14px",
+                color:
+                  "#ffffff",
+                textDecoration:
+                  "none",
+                fontWeight:
+                  700,
               }}
             >
               History
@@ -167,43 +301,70 @@ export default async function DocumentRegisterPage() {
             <Link
               href="/portal/reports"
               style={{
-                padding: "10px 14px",
-                color: "#ffffff",
-                textDecoration: "none",
-                fontWeight: 700,
+                padding:
+                  "10px 14px",
+                color:
+                  "#ffffff",
+                textDecoration:
+                  "none",
+                fontWeight:
+                  700,
               }}
             >
               Reports
             </Link>
+
+            <span
+              style={{
+                padding:
+                  "10px 14px",
+                color:
+                  "#8eb7ff",
+                fontWeight:
+                  800,
+              }}
+            >
+              Document Register
+            </span>
           </div>
         </div>
       </header>
 
       <section
         style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "40px",
+          maxWidth:
+            "1200px",
+          margin:
+            "0 auto",
+          padding:
+            "40px",
         }}
       >
         <div
           style={{
-            display: "flex",
+            display:
+              "flex",
             justifyContent:
               "space-between",
             alignItems:
               "flex-start",
-            gap: "20px",
-            flexWrap: "wrap",
-            marginBottom: "28px",
+            gap:
+              "20px",
+            flexWrap:
+              "wrap",
+            marginBottom:
+              "28px",
           }}
         >
           <div>
             <p
               style={{
-                color: "#1459D9",
-                fontWeight: 700,
-                marginBottom: "8px",
+                color:
+                  "#1459D9",
+                fontWeight:
+                  700,
+                marginBottom:
+                  "8px",
               }}
             >
               CONTROLLED DOCUMENTS
@@ -211,10 +372,14 @@ export default async function DocumentRegisterPage() {
 
             <h1
               style={{
-                color: "#071A33",
-                fontSize: "38px",
-                marginTop: 0,
-                marginBottom: "8px",
+                color:
+                  "#071A33",
+                fontSize:
+                  "38px",
+                marginTop:
+                  0,
+                marginBottom:
+                  "8px",
               }}
             >
               Document Register
@@ -222,10 +387,14 @@ export default async function DocumentRegisterPage() {
 
             <p
               style={{
-                color: "#617087",
-                maxWidth: "760px",
-                lineHeight: 1.6,
-                marginTop: 0,
+                color:
+                  "#617087",
+                maxWidth:
+                  "760px",
+                lineHeight:
+                  1.6,
+                marginTop:
+                  0,
               }}
             >
               Access current RPG Excellence
@@ -239,12 +408,18 @@ export default async function DocumentRegisterPage() {
           <Link
             href="/portal"
             style={{
-              padding: "12px 18px",
-              borderRadius: "8px",
-              background: "#071A33",
-              color: "#ffffff",
-              textDecoration: "none",
-              fontWeight: 700,
+              padding:
+                "12px 18px",
+              borderRadius:
+                "8px",
+              background:
+                "#071A33",
+              color:
+                "#ffffff",
+              textDecoration:
+                "none",
+              fontWeight:
+                700,
             }}
           >
             ← Dashboard
@@ -253,37 +428,46 @@ export default async function DocumentRegisterPage() {
 
         <div
           style={{
-            background: "#eef4ff",
+            background:
+              "#eef4ff",
             border:
               "1px solid #d6e4ff",
-            color: "#405574",
-            borderRadius: "10px",
-            padding: "16px 18px",
-            lineHeight: 1.55,
-            marginBottom: "24px",
+            color:
+              "#405574",
+            borderRadius:
+              "10px",
+            padding:
+              "16px 18px",
+            lineHeight:
+              1.55,
+            marginBottom:
+              "24px",
           }}
         >
           Only current controlled documents
           approved for Customer or Both
-          audiences appear in this register.
-          Draft, superseded, withdrawn and
-          internal-only documents remain
-          controlled internally.
+          audiences appear here. Download
+          links are temporary secure links
+          generated for signed-in users and
+          expire automatically.
         </div>
 
         <section
           style={{
-            display: "grid",
+            display:
+              "grid",
             gridTemplateColumns:
               "repeat(auto-fit, minmax(190px, 1fr))",
-            gap: "14px",
-            marginBottom: "28px",
+            gap:
+              "14px",
+            marginBottom:
+              "28px",
           }}
         >
           {[
             [
               "CURRENT DOCUMENTS",
-              currentDocuments.length,
+              documentsWithAccess.length,
             ],
             [
               "STANDARDS / FAMILIES",
@@ -300,21 +484,30 @@ export default async function DocumentRegisterPage() {
           ].map(
             ([label, value]) => (
               <div
-                key={label}
+                key={
+                  label
+                }
                 style={{
-                  background: "#ffffff",
+                  background:
+                    "#ffffff",
                   border:
                     "1px solid #dfe6ee",
-                  borderRadius: "12px",
-                  padding: "18px",
+                  borderRadius:
+                    "12px",
+                  padding:
+                    "18px",
                 }}
               >
                 <div
                   style={{
-                    color: "#617087",
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    marginBottom: "7px",
+                    color:
+                      "#617087",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      800,
+                    marginBottom:
+                      "7px",
                   }}
                 >
                   {label}
@@ -322,8 +515,10 @@ export default async function DocumentRegisterPage() {
 
                 <strong
                   style={{
-                    color: "#071A33",
-                    fontSize: "28px",
+                    color:
+                      "#071A33",
+                    fontSize:
+                      "28px",
                   }}
                 >
                   {value}
@@ -333,15 +528,20 @@ export default async function DocumentRegisterPage() {
           )}
         </section>
 
-        {currentDocuments.length === 0 ? (
+        {documentsWithAccess.length ===
+        0 ? (
           <section
             style={{
-              background: "#ffffff",
+              background:
+                "#ffffff",
               border:
                 "1px solid #dfe6ee",
-              borderRadius: "14px",
-              padding: "28px",
-              color: "#617087",
+              borderRadius:
+                "14px",
+              padding:
+                "28px",
+              color:
+                "#617087",
             }}
           >
             No customer documents are
@@ -351,23 +551,31 @@ export default async function DocumentRegisterPage() {
         ) : (
           <div
             style={{
-              display: "grid",
-              gap: "26px",
+              display:
+                "grid",
+              gap:
+                "26px",
             }}
           >
             {standards.map(
               (standard) => {
                 const standardDocuments =
-                  currentDocuments.filter(
-                    (document) =>
-                      (document.standard ||
-                        "RPG General") ===
+                  documentsWithAccess.filter(
+                    (
+                      document
+                    ) =>
+                      (
+                        document.standard ||
+                        "RPG General"
+                      ) ===
                       standard
                   );
 
                 return (
                   <section
-                    key={standard}
+                    key={
+                      standard
+                    }
                     style={{
                       background:
                         "#ffffff",
@@ -385,12 +593,14 @@ export default async function DocumentRegisterPage() {
                           "22px 24px",
                         borderBottom:
                           "1px solid #e6ebf1",
-                        display: "flex",
+                        display:
+                          "flex",
                         justifyContent:
                           "space-between",
                         alignItems:
                           "center",
-                        gap: "12px",
+                        gap:
+                          "12px",
                         flexWrap:
                           "wrap",
                       }}
@@ -415,10 +625,13 @@ export default async function DocumentRegisterPage() {
                           style={{
                             color:
                               "#071A33",
-                            margin: 0,
+                            margin:
+                              0,
                           }}
                         >
-                          {standard}
+                          {
+                            standard
+                          }
                         </h2>
                       </div>
 
@@ -439,15 +652,18 @@ export default async function DocumentRegisterPage() {
 
                     <div
                       style={{
-                        overflowX: "auto",
+                        overflowX:
+                          "auto",
                       }}
                     >
                       <table
                         style={{
-                          width: "100%",
+                          width:
+                            "100%",
                           borderCollapse:
                             "collapse",
-                          minWidth: "980px",
+                          minWidth:
+                            "980px",
                         }}
                       >
                         <thead>
@@ -467,7 +683,9 @@ export default async function DocumentRegisterPage() {
                               "Status",
                               "Access",
                             ].map(
-                              (heading) => (
+                              (
+                                heading
+                              ) => (
                                 <th
                                   key={
                                     heading
@@ -487,7 +705,9 @@ export default async function DocumentRegisterPage() {
                                       "nowrap",
                                   }}
                                 >
-                                  {heading}
+                                  {
+                                    heading
+                                  }
                                 </th>
                               )
                             )}
@@ -496,224 +716,218 @@ export default async function DocumentRegisterPage() {
 
                         <tbody>
                           {standardDocuments.map(
-                            (document) => {
-                              const accessUrl =
-                                document.file_url ||
-                                document.file_path;
-
-                              return (
-                                <tr
-                                  key={
-                                    document.id
-                                  }
+                            (
+                              document
+                            ) => (
+                              <tr
+                                key={
+                                  document.id
+                                }
+                              >
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                    color:
+                                      "#071A33",
+                                    fontWeight:
+                                      700,
+                                    whiteSpace:
+                                      "nowrap",
+                                  }}
                                 >
-                                  <td
-                                    style={{
-                                      padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
-                                      color:
-                                        "#071A33",
-                                      fontWeight:
-                                        700,
-                                      whiteSpace:
-                                        "nowrap",
-                                    }}
-                                  >
-                                    {
-                                      document.document_number
-                                    }
-                                  </td>
+                                  {
+                                    document.document_number
+                                  }
+                                </td>
 
-                                  <td
-                                    style={{
-                                      padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
-                                      color:
-                                        "#071A33",
-                                      minWidth:
-                                        "260px",
-                                    }}
-                                  >
-                                    <strong>
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                    color:
+                                      "#071A33",
+                                    minWidth:
+                                      "260px",
+                                  }}
+                                >
+                                  <strong>
+                                    {
+                                      document.title
+                                    }
+                                  </strong>
+
+                                  {document.description && (
+                                    <div
+                                      style={{
+                                        color:
+                                          "#617087",
+                                        fontSize:
+                                          "12px",
+                                        lineHeight:
+                                          1.5,
+                                        marginTop:
+                                          "5px",
+                                      }}
+                                    >
                                       {
-                                        document.title
+                                        document.description
                                       }
-                                    </strong>
+                                    </div>
+                                  )}
+                                </td>
 
-                                    {document.description && (
-                                      <div
-                                        style={{
-                                          color:
-                                            "#617087",
-                                          fontSize:
-                                            "12px",
-                                          lineHeight:
-                                            1.5,
-                                          marginTop:
-                                            "5px",
-                                        }}
-                                      >
-                                        {
-                                          document.description
-                                        }
-                                      </div>
-                                    )}
-                                  </td>
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                    color:
+                                      "#617087",
+                                  }}
+                                >
+                                  {
+                                    document.document_type
+                                  }
+                                </td>
 
-                                  <td
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                    color:
+                                      "#071A33",
+                                    fontWeight:
+                                      700,
+                                  }}
+                                >
+                                  {
+                                    document.revision
+                                  }
+                                </td>
+
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                    color:
+                                      "#617087",
+                                    whiteSpace:
+                                      "nowrap",
+                                  }}
+                                >
+                                  {formatDate(
+                                    document.issue_date
+                                  )}
+                                </td>
+
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                    color:
+                                      "#617087",
+                                    whiteSpace:
+                                      "nowrap",
+                                  }}
+                                >
+                                  {formatDate(
+                                    document.review_date
+                                  )}
+                                </td>
+
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                  }}
+                                >
+                                  <span
                                     style={{
+                                      display:
+                                        "inline-block",
                                       padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
+                                        "6px 10px",
+                                      borderRadius:
+                                        "999px",
+                                      background:
+                                        "#edf8f3",
                                       color:
-                                        "#617087",
-                                    }}
-                                  >
-                                    {
-                                      document.document_type
-                                    }
-                                  </td>
-
-                                  <td
-                                    style={{
-                                      padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
-                                      color:
-                                        "#071A33",
+                                        "#16794b",
                                       fontWeight:
-                                        700,
+                                        800,
+                                      fontSize:
+                                        "12px",
                                     }}
                                   >
                                     {
-                                      document.revision
+                                      document.status
                                     }
-                                  </td>
+                                  </span>
+                                </td>
 
-                                  <td
-                                    style={{
-                                      padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
-                                      color:
-                                        "#617087",
-                                      whiteSpace:
-                                        "nowrap",
-                                    }}
-                                  >
-                                    {formatDate(
-                                      document.issue_date
-                                    )}
-                                  </td>
-
-                                  <td
-                                    style={{
-                                      padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
-                                      color:
-                                        "#617087",
-                                      whiteSpace:
-                                        "nowrap",
-                                    }}
-                                  >
-                                    {formatDate(
-                                      document.review_date
-                                    )}
-                                  </td>
-
-                                  <td
-                                    style={{
-                                      padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
-                                    }}
-                                  >
-                                    <span
+                                <td
+                                  style={{
+                                    padding:
+                                      "15px 16px",
+                                    borderBottom:
+                                      "1px solid #eef1f5",
+                                  }}
+                                >
+                                  {document.signed_url ? (
+                                    <a
+                                      href={
+                                        document.signed_url
+                                      }
                                       style={{
                                         display:
                                           "inline-block",
                                         padding:
-                                          "6px 10px",
+                                          "9px 13px",
                                         borderRadius:
-                                          "999px",
+                                          "8px",
                                         background:
-                                          "#edf8f3",
+                                          "#1459D9",
                                         color:
-                                          "#16794b",
+                                          "#ffffff",
+                                        textDecoration:
+                                          "none",
                                         fontWeight:
-                                          800,
+                                          700,
                                         fontSize:
-                                          "12px",
+                                          "13px",
                                       }}
                                     >
-                                      {
-                                        document.status
-                                      }
+                                      View / Download
+                                    </a>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        color:
+                                          "#98a2b3",
+                                        fontSize:
+                                          "13px",
+                                      }}
+                                    >
+                                      File unavailable
                                     </span>
-                                  </td>
-
-                                  <td
-                                    style={{
-                                      padding:
-                                        "15px 16px",
-                                      borderBottom:
-                                        "1px solid #eef1f5",
-                                    }}
-                                  >
-                                    {accessUrl ? (
-                                      <a
-                                        href={
-                                          accessUrl
-                                        }
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{
-                                          display:
-                                            "inline-block",
-                                          padding:
-                                            "9px 13px",
-                                          borderRadius:
-                                            "8px",
-                                          background:
-                                            "#1459D9",
-                                          color:
-                                            "#ffffff",
-                                          textDecoration:
-                                            "none",
-                                          fontWeight:
-                                            700,
-                                          fontSize:
-                                            "13px",
-                                        }}
-                                      >
-                                        View / Download
-                                      </a>
-                                    ) : (
-                                      <span
-                                        style={{
-                                          color:
-                                            "#98a2b3",
-                                          fontSize:
-                                            "13px",
-                                        }}
-                                      >
-                                        File pending
-                                      </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            }
+                                  )}
+                                </td>
+                              </tr>
+                            )
                           )}
                         </tbody>
                       </table>
