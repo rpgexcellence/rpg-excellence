@@ -7,6 +7,7 @@ import {
   createEvidenceSample,
   updateEvidenceSample,
   deleteEvidenceSample,
+  raiseFindingFromEvidenceSample,
 } from "./actions";
 
 const EVIDENCE_TYPES = [
@@ -23,6 +24,34 @@ const CONFIDENCE_LEVELS = [
   "Low",
   "Medium",
   "High",
+];
+
+const FINDING_OPTIONS = [
+  {
+    value: "observation",
+    label: "Observation",
+  },
+  {
+    value: "ofi",
+    label:
+      "Opportunity for Improvement (OFI)",
+  },
+  {
+    value: "minor_nc",
+    label:
+      "Minor Nonconformity",
+  },
+  {
+    value: "major_nc",
+    label:
+      "Major Nonconformity",
+  },
+];
+
+const RISK_LEVELS = [
+  "High",
+  "Medium",
+  "Low",
 ];
 
 function formatDate(value) {
@@ -1188,6 +1217,251 @@ export default async function EvidenceSamplingPage({
                       Delete Sample
                     </button>
                   </form>
+
+
+                  {sample.finding_id ? (
+                    <div
+                      style={{
+                        marginTop:
+                          "18px",
+                        padding:
+                          "14px 16px",
+                        borderRadius:
+                          "9px",
+                        background:
+                          "#edf8f3",
+                        border:
+                          "1px solid #c8e8d8",
+                        color:
+                          "#205c43",
+                      }}
+                    >
+                      This evidence sample is
+                      already linked to a
+                      formal finding.
+                      {" "}
+                      <Link
+                        href={`/portal/assessments/${assessment.id}/findings`}
+                        style={{
+                          color:
+                            "#1459D9",
+                          fontWeight:
+                            700,
+                        }}
+                      >
+                        Open Findings Register
+                      </Link>
+                    </div>
+                  ) : (
+                    <details
+                      style={{
+                        marginTop:
+                          "18px",
+                        border:
+                          "1px solid #dfe6ee",
+                        borderRadius:
+                          "10px",
+                        overflow:
+                          "hidden",
+                      }}
+                    >
+                      <summary
+                        style={{
+                          cursor:
+                            "pointer",
+                          padding:
+                            "14px 16px",
+                          background:
+                            "#f5f8fc",
+                          color:
+                            "#071A33",
+                          fontWeight:
+                            800,
+                        }}
+                      >
+                        Raise Finding from
+                        this Evidence Sample
+                      </summary>
+
+                      <form
+                        action={
+                          raiseFindingFromEvidenceSample
+                        }
+                        style={{
+                          padding:
+                            "16px",
+                          display:
+                            "grid",
+                          gap: "12px",
+                        }}
+                      >
+                        <input
+                          type="hidden"
+                          name="assessment_id"
+                          value={
+                            assessment.id
+                          }
+                        />
+
+                        <input
+                          type="hidden"
+                          name="sample_id"
+                          value={
+                            sample.id
+                          }
+                        />
+
+                        <div
+                          style={{
+                            display:
+                              "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(220px, 1fr))",
+                            gap: "12px",
+                          }}
+                        >
+                          <select
+                            name="finding_type"
+                            required
+                            defaultValue=""
+                            style={
+                              inputStyle
+                            }
+                          >
+                            <option
+                              value=""
+                              disabled
+                            >
+                              Select finding
+                              classification
+                            </option>
+
+                            {FINDING_OPTIONS.map(
+                              (option) => (
+                                <option
+                                  key={
+                                    option.value
+                                  }
+                                  value={
+                                    option.value
+                                  }
+                                >
+                                  {
+                                    option.label
+                                  }
+                                </option>
+                              )
+                            )}
+                          </select>
+
+                          <select
+                            name="risk_level"
+                            required
+                            defaultValue=""
+                            style={
+                              inputStyle
+                            }
+                          >
+                            <option
+                              value=""
+                              disabled
+                            >
+                              Select risk
+                              level
+                            </option>
+
+                            {RISK_LEVELS.map(
+                              (level) => (
+                                <option
+                                  key={
+                                    level
+                                  }
+                                  value={
+                                    level
+                                  }
+                                >
+                                  {
+                                    level
+                                  }
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </div>
+
+                        <textarea
+                          name="finding_statement"
+                          rows="3"
+                          placeholder="Finding statement. Required for Minor or Major NC."
+                          style={
+                            inputStyle
+                          }
+                        />
+
+                        <textarea
+                          name="assessor_rationale"
+                          rows="3"
+                          placeholder="Assessor rationale / classification reasoning"
+                          style={
+                            inputStyle
+                          }
+                        />
+
+                        <div
+                          style={{
+                            background:
+                              "#eef4ff",
+                            border:
+                              "1px solid #d6e4ff",
+                            color:
+                              "#405574",
+                            borderRadius:
+                              "8px",
+                            padding:
+                              "12px 14px",
+                            lineHeight:
+                              1.5,
+                            fontSize:
+                              "13px",
+                          }}
+                        >
+                          The evidence type,
+                          reference, period,
+                          sample size, result,
+                          exception / gap and
+                          assessor notes from
+                          this sample will be
+                          copied automatically
+                          into the new finding.
+                        </div>
+
+                        <button
+                          type="submit"
+                          style={{
+                            justifySelf:
+                              "start",
+                            padding:
+                              "10px 15px",
+                            border:
+                              "none",
+                            borderRadius:
+                              "8px",
+                            background:
+                              "#071A33",
+                            color:
+                              "#ffffff",
+                            fontWeight:
+                              700,
+                            cursor:
+                              "pointer",
+                          }}
+                        >
+                          Raise Finding &
+                          Open Register
+                        </button>
+                      </form>
+                    </details>
+                  )}
                 </section>
               )
             )}
