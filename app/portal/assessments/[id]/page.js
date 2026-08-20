@@ -1610,15 +1610,14 @@ export default async function AssessmentPage({
                                     Risk / significance
                                   </label>
 
-                                  <textarea
+                                  <select
                                     name={`finding_risk_${fieldKey}`}
-                                    rows="3"
+                                    required
                                     defaultValue={
                                       savedFinding
                                         ?.risk_impact ??
                                       ""
                                     }
-                                    placeholder="Describe environmental, compliance, operational or management-system significance..."
                                     style={{
                                       width:
                                         "100%",
@@ -1628,12 +1627,42 @@ export default async function AssessmentPage({
                                         "8px",
                                       border:
                                         "1px solid #d8e0ea",
-                                      resize:
-                                        "vertical",
-                                      boxSizing:
-                                        "border-box",
+                                      background:
+                                        "#ffffff",
                                     }}
-                                  />
+                                  >
+                                    <option
+                                      value=""
+                                      disabled
+                                    >
+                                      Select risk level
+                                    </option>
+                                    <option value="High">
+                                      High
+                                    </option>
+                                    <option value="Medium">
+                                      Medium
+                                    </option>
+                                    <option value="Low">
+                                      Low
+                                    </option>
+                                  </select>
+
+                                  <p
+                                    style={{
+                                      margin:
+                                        "7px 0 0",
+                                      color:
+                                        "#617087",
+                                      fontSize:
+                                        "12px",
+                                      lineHeight:
+                                        1.45,
+                                    }}
+                                  >
+                                    Select one controlled
+                                    risk level only.
+                                  </p>
                                 </div>
 
                                 <div>
