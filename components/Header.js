@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function Header({ locale, nav }) {
@@ -7,25 +6,13 @@ export default function Header({ locale, nav }) {
     <header className="header">
       <Link
         href={`/${locale}`}
+        className="brand"
         aria-label="RPG Excellence home"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          textDecoration: "none",
-          flexShrink: 0,
-        }}
       >
-        <Image
+        <img
           src="/rpg-excellence-logo.png"
           alt="RPG Excellence"
-          width={320}
-          height={90}
-          priority
-          style={{
-            width: "220px",
-            height: "auto",
-            objectFit: "contain",
-          }}
+          className="brandLogo"
         />
       </Link>
 
