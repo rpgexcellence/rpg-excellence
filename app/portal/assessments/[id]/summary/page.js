@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../../lib/supabase/admin";
 
 import {
   calculateClauseScore,
@@ -334,6 +335,402 @@ export default async function AssessmentSummaryPage({
         )
       : null;
 
+
+  // --------------------------------------------------
+  // ISO 14001:2026 FINDINGS / MANAGEMENT ACTIONS
+  // --------------------------------------------------
+
+  const isIso14001_2026 =
+    assessment.standard ===
+    "ISO 14001:2026";
+
+  const admin =
+    createAdminClient();
+
+  let findings = [];
+  let correctiveActions = [];
+  let managementActions = [];
+
+  if (isIso14001_2026) {
+    const {
+      data: findingsData,
+      error: findingsError,
+    } = await admin
+      .from("assessment_findings")
+      .select("*")
+      .eq(
+        "assessment_id",
+        assessment.id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      )
+      .neq(
+        "finding_type",
+        "conformity"
+      )
+      .order("created_at", {
+        ascending: true,
+      });
+
+    if (findingsError) {
+      throw new Error(
+        findingsError.message
+      );
+    }
+
+    findings =
+      findingsData ?? [];
+
+    const findingIds =
+      findings.map(
+        (finding) => finding.id
+      );
+
+    if (
+      findingIds.length > 0
+    ) {
+      const {
+        data: correctiveData,
+        error: correctiveError,
+      } = await admin
+        .from(
+          "corrective_actions"
+        )
+        .select("*")
+        .eq(
+          "assessment_id",
+          assessment.id
+        )
+        .eq(
+          "owner_id",
+          user.id
+        )
+        .in(
+          "finding_id",
+          findingIds
+        );
+
+      if (correctiveError) {
+        throw new Error(
+          correctiveError.message
+        );
+      }
+
+      correctiveActions =
+        correctiveData ?? [];
+    }
+
+    const {
+      data: managementData,
+      error: managementError,
+    } = await admin
+      .from(
+        "management_action_plan"
+      )
+      .select("*")
+      .eq(
+        "assessment_id",
+        assessment.id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
+
+    if (managementError) {
+      throw new Error(
+        managementError.message
+      );
+    }
+
+    managementActions =
+      managementData ?? [];
+  }
+
+  const openFindings =
+    findings.filter(
+      (finding) =>
+        finding.status !==
+        "closed"
+    );
+
+  const openMajorCount =
+    openFindings.filter(
+      (finding) =>
+        finding.finding_type ===
+        "major_nc"
+    ).length;
+
+  const openMinorCount =
+    openFindings.filter(
+      (finding) =>
+        finding.finding_type ===
+        "minor_nc"
+    ).length;
+
+  const highRiskCount =
+    openFindings.filter(
+      (finding) =>
+        finding.risk_impact ===
+        "High"
+    ).length;
+
+  const mediumRiskCount =
+    openFindings.filter(
+      (finding) =>
+        finding.risk_impact ===
+        "Medium"
+    ).length;
+
+  const lowRiskCount =
+    openFindings.filter(
+      (finding) =>
+        finding.risk_impact ===
+        "Low"
+    ).length;
+
+  const correctiveByFindingId =
+    Object.fromEntries(
+      correctiveActions.map(
+        (action) => [
+          action.finding_id,
+          action,
+        ]
+      )
+    );
+
+  const managementByFindingId =
+    Object.fromEntries(
+      managementActions
+        .filter(
+          (action) =>
+            action.finding_id
+        )
+        .map((action) => [
+          action.finding_id,
+          action,
+        ])
+    );
+
+  const today =
+    new Date();
+
+  const overdueActionCount =
+    openFindings.filter(
+      (finding) => {
+        const managementAction =
+          managementByFindingId[
+            finding.id
+          ];
+
+        const correctiveAction =
+          correctiveByFindingId[
+            finding.id
+          ];
+
+        const targetDate =
+          managementAction
+            ?.target_date ??
+          correctiveAction
+            ?.target_date;
+
+        const actionStatus =
+          managementAction
+            ?.status ??
+          correctiveAction
+            ?.status ??
+          finding.status;
+
+        if (
+          !targetDate ||
+          [
+            "closed",
+            "completed",
+            "effective",
+          ].includes(
+            actionStatus
+          )
+        ) {
+          return false;
+        }
+
+        return (
+          new Date(
+            `${targetDate}T23:59:59`
+          ) < today
+        );
+      }
+    ).length;
+
+  const managementClauseScores =
+    clauseResults
+      .filter(
+        (result) =>
+          ["5", "9", "10"].includes(
+            result.number
+          ) &&
+          result.score !== null
+      )
+      .map(
+        (result) =>
+          result.score
+      );
+
+  const managementIndicator =
+    managementClauseScores.length >
+    0
+      ? Math.round(
+          managementClauseScores.reduce(
+            (
+              total,
+              score
+            ) =>
+              total + score,
+            0
+          ) /
+            managementClauseScores.length
+        )
+      : null;
+
+  let managementReadiness =
+    "Not assessed";
+
+  if (
+    managementIndicator !==
+    null
+  ) {
+    if (
+      openMajorCount > 0
+    ) {
+      managementReadiness =
+        "Not ready";
+    } else if (
+      highRiskCount > 0 ||
+      overdueActionCount > 0
+    ) {
+      managementReadiness =
+        "Management action required";
+    } else if (
+      managementIndicator >= 80 &&
+      openMinorCount === 0
+    ) {
+      managementReadiness =
+        "Strong";
+    } else if (
+      managementIndicator >= 60
+    ) {
+      managementReadiness =
+        "Progressing";
+    } else {
+      managementReadiness =
+        "Needs improvement";
+    }
+  }
+
+  let readinessDecision =
+    "Assessment incomplete";
+
+  if (
+    progress.percentage ===
+    100
+  ) {
+    if (
+      openMajorCount > 0
+    ) {
+      readinessDecision =
+        "Not ready";
+    } else if (
+      highRiskCount > 0 ||
+      overdueActionCount > 0
+    ) {
+      readinessDecision =
+        "Significant improvement required";
+    } else if (
+      openMinorCount > 0
+    ) {
+      readinessDecision =
+        "Readiness review recommended";
+    } else if (
+      overallScore !== null &&
+      overallScore >= 80
+    ) {
+      readinessDecision =
+        "Potentially ready";
+    } else if (
+      overallScore !== null &&
+      overallScore >= 60
+    ) {
+      readinessDecision =
+        "Progressing";
+    } else {
+      readinessDecision =
+        "Significant improvement required";
+    }
+  }
+
+  const priorityActionItems =
+    openFindings
+      .map((finding) => {
+        const managementAction =
+          managementByFindingId[
+            finding.id
+          ];
+
+        const correctiveAction =
+          correctiveByFindingId[
+            finding.id
+          ];
+
+        return {
+          id: finding.id,
+          questionNumber:
+            finding.question_number,
+          findingType:
+            finding.finding_type,
+          risk:
+            finding.risk_impact ??
+            "—",
+          statement:
+            finding.finding_statement ??
+            finding.requirement_summary ??
+            "—",
+          action:
+            managementAction
+              ?.action_required ??
+            correctiveAction
+              ?.corrective_action ??
+            "Action not yet defined",
+          owner:
+            managementAction
+              ?.action_owner ??
+            correctiveAction
+              ?.action_owner ??
+            "Unassigned",
+          targetDate:
+            managementAction
+              ?.target_date ??
+            correctiveAction
+              ?.target_date ??
+            null,
+        };
+      })
+      .sort((a, b) => {
+        const riskOrder = {
+          High: 0,
+          Medium: 1,
+          Low: 2,
+          "—": 3,
+        };
+
+        return (
+          riskOrder[a.risk] -
+          riskOrder[b.risk]
+        );
+      })
+      .slice(0, 5);
+
   return (
     <main
       style={{
@@ -622,6 +1019,463 @@ export default async function AssessmentSummaryPage({
           </div>
         </div>
 
+        {isIso14001_2026 && (
+          <>
+            {/* READINESS DECISION */}
+
+            <section
+              style={{
+                background:
+                  "#ffffff",
+                border:
+                  "1px solid #dfe6ee",
+                borderRadius:
+                  "14px",
+                padding: "26px",
+                marginBottom:
+                  "24px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent:
+                    "space-between",
+                  alignItems:
+                    "flex-start",
+                  gap: "20px",
+                  flexWrap: "wrap",
+                  marginBottom:
+                    "22px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      color:
+                        "#1459D9",
+                      fontWeight:
+                        800,
+                      fontSize:
+                        "12px",
+                      marginBottom:
+                        "7px",
+                    }}
+                  >
+                    MANAGEMENT & CERTIFICATION READINESS
+                  </div>
+
+                  <h2
+                    style={{
+                      color:
+                        "#071A33",
+                      margin: 0,
+                    }}
+                  >
+                    {readinessDecision}
+                  </h2>
+
+                  <p
+                    style={{
+                      color:
+                        "#617087",
+                      maxWidth:
+                        "720px",
+                      lineHeight:
+                        1.6,
+                      marginBottom:
+                        0,
+                    }}
+                  >
+                    The readiness decision
+                    considers the assessment
+                    score together with open
+                    nonconformities, controlled
+                    High / Medium / Low risk,
+                    overdue actions and
+                    management-system evidence.
+                    A percentage score does not
+                    override significant open
+                    findings.
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    minWidth:
+                      "220px",
+                    padding:
+                      "16px",
+                    borderRadius:
+                      "10px",
+                    background:
+                      "#f5f8fc",
+                  }}
+                >
+                  <div
+                    style={{
+                      color:
+                        "#617087",
+                      fontSize:
+                        "11px",
+                      fontWeight:
+                        800,
+                      marginBottom:
+                        "6px",
+                    }}
+                  >
+                    MANAGEMENT READINESS
+                  </div>
+
+                  <strong
+                    style={{
+                      color:
+                        "#071A33",
+                      fontSize:
+                        "20px",
+                    }}
+                  >
+                    {managementReadiness}
+                  </strong>
+
+                  <div
+                    style={{
+                      color:
+                        "#617087",
+                      fontSize:
+                        "12px",
+                      marginTop:
+                        "6px",
+                    }}
+                  >
+                    RPG indicator based on
+                    Clauses 5, 9 and 10:
+                    {" "}
+                    {managementIndicator !==
+                    null
+                      ? `${managementIndicator}%`
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(150px, 1fr))",
+                  gap: "12px",
+                }}
+              >
+                {[
+                  [
+                    "OPEN MAJOR NC",
+                    openMajorCount,
+                  ],
+                  [
+                    "OPEN MINOR NC",
+                    openMinorCount,
+                  ],
+                  [
+                    "HIGH RISK",
+                    highRiskCount,
+                  ],
+                  [
+                    "MEDIUM RISK",
+                    mediumRiskCount,
+                  ],
+                  [
+                    "LOW RISK",
+                    lowRiskCount,
+                  ],
+                  [
+                    "OVERDUE ACTIONS",
+                    overdueActionCount,
+                  ],
+                ].map(
+                  ([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        background:
+                          "#f7f9fc",
+                        borderRadius:
+                          "10px",
+                        padding:
+                          "15px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          color:
+                            "#617087",
+                          fontSize:
+                            "10px",
+                          fontWeight:
+                            800,
+                          marginBottom:
+                            "6px",
+                        }}
+                      >
+                        {label}
+                      </div>
+
+                      <strong
+                        style={{
+                          color:
+                            "#071A33",
+                          fontSize:
+                            "25px",
+                        }}
+                      >
+                        {value}
+                      </strong>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  marginTop:
+                    "18px",
+                }}
+              >
+                <a
+                  href={`/portal/assessments/${assessment.id}/findings`}
+                  style={{
+                    padding:
+                      "11px 15px",
+                    borderRadius:
+                      "8px",
+                    background:
+                      "#071A33",
+                    color:
+                      "#ffffff",
+                    textDecoration:
+                      "none",
+                    fontWeight:
+                      700,
+                  }}
+                >
+                  Findings & Corrective Actions
+                </a>
+
+                <a
+                  href={`/portal/assessments/${assessment.id}/actions-plan`}
+                  style={{
+                    padding:
+                      "11px 15px",
+                    borderRadius:
+                      "8px",
+                    background:
+                      "#1459D9",
+                    color:
+                      "#ffffff",
+                    textDecoration:
+                      "none",
+                    fontWeight:
+                      700,
+                  }}
+                >
+                  Management Action Plan
+                </a>
+              </div>
+            </section>
+
+            {/* PRIORITY MANAGEMENT ACTIONS */}
+
+            <section
+              style={{
+                background:
+                  "#ffffff",
+                border:
+                  "1px solid #dfe6ee",
+                borderRadius:
+                  "14px",
+                padding: "26px",
+                marginBottom:
+                  "24px",
+              }}
+            >
+              <h2
+                style={{
+                  color:
+                    "#071A33",
+                  marginTop: 0,
+                  marginBottom:
+                    "6px",
+                }}
+              >
+                Priority Management Actions
+              </h2>
+
+              <p
+                style={{
+                  color:
+                    "#617087",
+                  marginTop: 0,
+                  lineHeight:
+                    1.55,
+                }}
+              >
+                Highest-priority open
+                findings are shown first,
+                using the controlled
+                High / Medium / Low risk
+                assessment.
+              </p>
+
+              {priorityActionItems.length ===
+              0 ? (
+                <div
+                  style={{
+                    background:
+                      "#edf8f3",
+                    border:
+                      "1px solid #c8e8d8",
+                    color:
+                      "#205c43",
+                    padding:
+                      "16px",
+                    borderRadius:
+                      "9px",
+                  }}
+                >
+                  No open findings currently
+                  require management action.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display:
+                      "grid",
+                    gap: "10px",
+                  }}
+                >
+                  {priorityActionItems.map(
+                    (item) => (
+                      <div
+                        key={
+                          item.id
+                        }
+                        style={{
+                          background:
+                            "#f7f9fc",
+                          borderRadius:
+                            "10px",
+                          padding:
+                            "16px",
+                          display:
+                            "grid",
+                          gridTemplateColumns:
+                            "minmax(100px, .4fr) minmax(110px, .5fr) minmax(220px, 1.5fr) minmax(180px, 1fr)",
+                          gap: "14px",
+                          alignItems:
+                            "start",
+                        }}
+                      >
+                        <div>
+                          <strong
+                            style={{
+                              color:
+                                "#071A33",
+                            }}
+                          >
+                            {
+                              item.questionNumber
+                            }
+                          </strong>
+                        </div>
+
+                        <div
+                          style={{
+                            fontWeight:
+                              800,
+                            color:
+                              item.risk ===
+                              "High"
+                                ? "#b42318"
+                                : item.risk ===
+                                  "Medium"
+                                ? "#8a6116"
+                                : "#475467",
+                          }}
+                        >
+                          {item.risk}
+                        </div>
+
+                        <div
+                          style={{
+                            color:
+                              "#617087",
+                            lineHeight:
+                              1.5,
+                          }}
+                        >
+                          {
+                            item.action
+                          }
+                        </div>
+
+                        <div
+                          style={{
+                            color:
+                              "#617087",
+                            fontSize:
+                              "13px",
+                            lineHeight:
+                              1.5,
+                          }}
+                        >
+                          <strong
+                            style={{
+                              color:
+                                "#071A33",
+                            }}
+                          >
+                            Owner:
+                          </strong>{" "}
+                          {item.owner}
+                          <br />
+                          <strong
+                            style={{
+                              color:
+                                "#071A33",
+                            }}
+                          >
+                            Target:
+                          </strong>{" "}
+                          {item.targetDate
+                            ? new Intl.DateTimeFormat(
+                                "en-GB",
+                                {
+                                  day:
+                                    "2-digit",
+                                  month:
+                                    "short",
+                                  year:
+                                    "numeric",
+                                }
+                              ).format(
+                                new Date(
+                                  item.targetDate
+                                )
+                              )
+                            : "—"}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+
         {/* CLAUSE RESULTS */}
 
         <section
@@ -795,6 +1649,39 @@ export default async function AssessmentSummaryPage({
   >
     ← Return to Assessment
   </a>
+
+  {isIso14001_2026 && (
+    <>
+      <a
+        href={`/portal/assessments/${assessment.id}/findings`}
+        style={{
+          padding: "12px 18px",
+          borderRadius: "8px",
+          background: "#ffffff",
+          border: "1px solid #d8e0ea",
+          color: "#071A33",
+          textDecoration: "none",
+          fontWeight: 700,
+        }}
+      >
+        Findings
+      </a>
+
+      <a
+        href={`/portal/assessments/${assessment.id}/actions-plan`}
+        style={{
+          padding: "12px 18px",
+          borderRadius: "8px",
+          background: "#1459D9",
+          color: "#ffffff",
+          textDecoration: "none",
+          fontWeight: 700,
+        }}
+      >
+        Management Action Plan
+      </a>
+    </>
+  )}
 
   <a
     href={`/portal/assessments/${assessment.id}/report`}
