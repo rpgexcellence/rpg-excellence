@@ -1612,7 +1612,6 @@ export default async function AssessmentPage({
 
                                   <select
                                     name={`finding_risk_${fieldKey}`}
-                                    required
                                     defaultValue={
                                       savedFinding
                                         ?.risk_impact ??
