@@ -468,6 +468,20 @@ export default async function AssessmentPage({
             }}
           >
             <Link
+              href={`/portal/assessments/${assessment.id}/evidence`}
+              style={{
+                padding: "11px 16px",
+                borderRadius: "8px",
+                background: "#1459D9",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              Evidence Sampling
+            </Link>
+
+            <Link
               href={`/portal/assessments/${assessment.id}/findings`}
               style={{
                 padding: "11px 16px",
