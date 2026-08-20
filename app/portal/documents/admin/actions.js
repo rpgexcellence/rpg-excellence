@@ -63,6 +63,82 @@ function safeFileName(name) {
     .replace(/[^A-Za-z0-9._-]/g, "_");
 }
 
+
+function safePathSegment(value) {
+  return (
+    cleanText(value)
+      ?.replace(/\s+/g, "-")
+      .replace(/[^A-Za-z0-9._-]/g, "-") ||
+    "unknown"
+  );
+}
+
+function revisionStoragePath({
+  standard,
+  documentNumber,
+  revision,
+  fileName,
+}) {
+  const family =
+    safeFolderName(standard);
+
+  const number =
+    safePathSegment(
+      documentNumber
+    );
+
+  const revisionFolder =
+    `rev-${safePathSegment(revision)}`;
+
+  return `${family}/${number}/${revisionFolder}/${fileName}`;
+}
+
+async function supersedeOtherCurrentRevisions({
+  admin,
+  documentNumber,
+  exceptDocumentId,
+}) {
+  const now =
+    new Date().toISOString();
+
+  let query =
+    admin
+      .from(
+        "controlled_documents"
+      )
+      .update({
+        status: "Superseded",
+        superseded_at: now,
+        updated_at: now,
+      })
+      .eq(
+        "document_number",
+        documentNumber
+      )
+      .eq(
+        "status",
+        "Current"
+      );
+
+  if (exceptDocumentId) {
+    query =
+      query.neq(
+        "id",
+        exceptDocumentId
+      );
+  }
+
+  const {
+    error,
+  } = await query;
+
+  if (error) {
+    throw new Error(
+      error.message
+    );
+  }
+}
+
 async function requireDocumentAdmin() {
   const supabase =
     await createClient();
@@ -233,7 +309,12 @@ export async function createControlledDocument(
     );
 
   const filePath =
-    `${folder}/${fileName}`;
+    revisionStoragePath({
+      standard,
+      documentNumber,
+      revision,
+      fileName,
+    });
 
   const {
     error: uploadError,
@@ -325,6 +406,41 @@ export async function createControlledDocument(
     throw new Error(
       insertError.message
     );
+  }
+
+  if (status === "Current") {
+    const {
+      data: createdDocument,
+      error: createdLookupError,
+    } = await admin
+      .from("controlled_documents")
+      .select("id")
+      .eq(
+        "document_number",
+        documentNumber
+      )
+      .eq(
+        "revision",
+        revision
+      )
+      .single();
+
+    if (
+      createdLookupError ||
+      !createdDocument
+    ) {
+      throw new Error(
+        createdLookupError?.message ||
+        "Unable to identify created document."
+      );
+    }
+
+    await supersedeOtherCurrentRevisions({
+      admin,
+      documentNumber,
+      exceptDocumentId:
+        createdDocument.id,
+    });
   }
 
   revalidatePath(
@@ -434,18 +550,20 @@ export async function updateControlledDocument(
       "string" &&
     replacementFile.size > 0
   ) {
-    const folder =
-      safeFolderName(
-        standard
-      );
-
     fileName =
       safeFileName(
         replacementFile.name
       );
 
     filePath =
-      `${folder}/${fileName}`;
+      revisionStoragePath({
+        standard,
+        documentNumber:
+          existing.document_number,
+        revision:
+          existing.revision,
+        fileName,
+      });
 
     const {
       error: uploadError,
@@ -487,6 +605,16 @@ export async function updateControlledDocument(
 
   const now =
     new Date().toISOString();
+
+  if (status === "Current") {
+    await supersedeOtherCurrentRevisions({
+      admin,
+      documentNumber:
+        existing.document_number,
+      exceptDocumentId:
+        documentId,
+    });
+  }
 
   const {
     error: updateError,
@@ -689,6 +817,304 @@ export async function withdrawControlledDocument(
     throw new Error(
       error.message
     );
+  }
+
+  revalidatePath(
+    "/portal/documents"
+  );
+
+  revalidatePath(
+    "/portal/documents/admin"
+  );
+
+  redirect(
+    "/portal/documents/admin"
+  );
+}
+
+
+export async function createDocumentRevision(
+  formData
+) {
+  const {
+    user,
+    admin,
+  } =
+    await requireDocumentAdmin();
+
+  const sourceDocumentId =
+    cleanText(
+      formData.get(
+        "source_document_id"
+      )
+    );
+
+  const newRevision =
+    cleanText(
+      formData.get(
+        "new_revision"
+      )
+    );
+
+  const newStatus =
+    cleanText(
+      formData.get(
+        "new_status"
+      )
+    ) || "Draft";
+
+  const newAudience =
+    cleanText(
+      formData.get(
+        "new_audience"
+      )
+    );
+
+  if (
+    !sourceDocumentId ||
+    !newRevision
+  ) {
+    throw new Error(
+      "Source document and new revision are required."
+    );
+  }
+
+  if (
+    ![
+      "Draft",
+      "Current",
+    ].includes(
+      newStatus
+    )
+  ) {
+    throw new Error(
+      "New revisions may be created as Draft or Current only."
+    );
+  }
+
+  if (
+    !AUDIENCES.includes(
+      newAudience
+    )
+  ) {
+    throw new Error(
+      "Invalid document audience."
+    );
+  }
+
+  const {
+    data: source,
+    error: sourceError,
+  } = await admin
+    .from(
+      "controlled_documents"
+    )
+    .select("*")
+    .eq(
+      "id",
+      sourceDocumentId
+    )
+    .single();
+
+  if (
+    sourceError ||
+    !source
+  ) {
+    throw new Error(
+      "Source document not found."
+    );
+  }
+
+  const {
+    data: existingRevision,
+    error: existingRevisionError,
+  } = await admin
+    .from(
+      "controlled_documents"
+    )
+    .select("id")
+    .eq(
+      "document_number",
+      source.document_number
+    )
+    .eq(
+      "revision",
+      newRevision
+    )
+    .maybeSingle();
+
+  if (existingRevisionError) {
+    throw new Error(
+      existingRevisionError.message
+    );
+  }
+
+  if (existingRevision) {
+    throw new Error(
+      `Revision ${newRevision} already exists for ${source.document_number}.`
+    );
+  }
+
+  const file =
+    formData.get(
+      "revision_file"
+    );
+
+  if (
+    !file ||
+    typeof file === "string" ||
+    file.size === 0
+  ) {
+    throw new Error(
+      "A file is required for the new revision."
+    );
+  }
+
+  const fileName =
+    safeFileName(
+      file.name
+    );
+
+  const filePath =
+    revisionStoragePath({
+      standard:
+        source.standard,
+      documentNumber:
+        source.document_number,
+      revision:
+        newRevision,
+      fileName,
+    });
+
+  const {
+    error: uploadError,
+  } =
+    await admin.storage
+      .from(
+        source.storage_bucket ||
+        BUCKET
+      )
+      .upload(
+        filePath,
+        file,
+        {
+          upsert: false,
+          contentType:
+            file.type ||
+            undefined,
+        }
+      );
+
+  if (uploadError) {
+    throw new Error(
+      uploadError.message
+    );
+  }
+
+  const now =
+    new Date().toISOString();
+
+  const {
+    data: createdRevision,
+    error: insertError,
+  } = await admin
+    .from(
+      "controlled_documents"
+    )
+    .insert({
+      document_number:
+        source.document_number,
+      title:
+        source.title,
+      document_type:
+        source.document_type,
+      standard:
+        source.standard,
+      revision:
+        newRevision,
+      status:
+        newStatus,
+      audience:
+        newAudience,
+      issue_date:
+        cleanText(
+          formData.get(
+            "new_issue_date"
+          )
+        ),
+      review_date:
+        cleanText(
+          formData.get(
+            "new_review_date"
+          )
+        ),
+      description:
+        cleanText(
+          formData.get(
+            "new_description"
+          )
+        ) ??
+        source.description,
+      notes:
+        cleanText(
+          formData.get(
+            "revision_notes"
+          )
+        ),
+      file_name:
+        fileName,
+      file_path:
+        filePath,
+      storage_bucket:
+        source.storage_bucket ||
+        BUCKET,
+      supersedes_document_id:
+        source.id,
+      created_by:
+        user.id,
+      approved_by:
+        cleanText(
+          formData.get(
+            "new_approved_by"
+          )
+        ),
+      approved_at:
+        newStatus ===
+        "Current"
+          ? now
+          : null,
+      updated_at:
+        now,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) {
+    await admin.storage
+      .from(
+        source.storage_bucket ||
+        BUCKET
+      )
+      .remove([
+        filePath,
+      ]);
+
+    throw new Error(
+      insertError.message
+    );
+  }
+
+  if (
+    newStatus ===
+    "Current"
+  ) {
+    await supersedeOtherCurrentRevisions({
+      admin,
+      documentNumber:
+        source.document_number,
+      exceptDocumentId:
+        createdRevision.id,
+    });
   }
 
   revalidatePath(
