@@ -5,39 +5,63 @@ import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { updateManagementAction } from "./actions";
 
 const priorityFor = (type) =>
-  type === "major_nc" ? "Critical" :
-  type === "minor_nc" ? "High" :
-  type === "observation" ? "Medium" : "Low";
+  type === "major_nc"
+    ? "critical"
+    : type === "minor_nc"
+      ? "high"
+      : type === "observation"
+        ? "medium"
+        : "low";
 
-const labelFor = (type) => ({
-  major_nc: "Major NC",
-  minor_nc: "Minor NC",
-  observation: "Observation",
-  ofi: "OFI",
-}[type] ?? type);
+const priorityLabel = (priority) =>
+  ({
+    critical: "Critical",
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+  }[priority] ?? priority);
+
+const labelFor = (type) =>
+  ({
+    major_nc: "Major NC",
+    minor_nc: "Minor NC",
+    observation: "Observation",
+    ofi: "OFI",
+  }[type] ?? type);
 
 export default async function ManagementActionPlanPage({ params }) {
   const { id } = await params;
 
   const supabase = await createClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/portal/login");
+  if (!user) {
+    redirect("/portal/login");
+  }
 
-  const { data: assessment, error: assessmentError } = await supabase
+  const {
+    data: assessment,
+    error: assessmentError,
+  } = await supabase
     .from("assessments")
     .select("id, standard, status")
     .eq("id", id)
     .eq("owner_id", user.id)
     .single();
 
-  if (assessmentError || !assessment) redirect("/portal");
+  if (assessmentError || !assessment) {
+    redirect("/portal");
+  }
 
   const admin = createAdminClient();
 
-  const { data: findingsData, error: findingsError } = await admin
+  const {
+    data: findingsData,
+    error: findingsError,
+  } = await admin
     .from("assessment_findings")
     .select("*")
     .eq("assessment_id", id)
@@ -45,7 +69,9 @@ export default async function ManagementActionPlanPage({ params }) {
     .neq("finding_type", "conformity")
     .order("created_at", { ascending: true });
 
-  if (findingsError) throw new Error(findingsError.message);
+  if (findingsError) {
+    throw new Error(findingsError.message);
+  }
 
   const findings = findingsData ?? [];
   const findingIds = findings.map((x) => x.id);
@@ -53,76 +79,119 @@ export default async function ManagementActionPlanPage({ params }) {
   let correctiveActions = [];
 
   if (findingIds.length) {
-    const { data, error } = await admin
+    const {
+      data,
+      error,
+    } = await admin
       .from("corrective_actions")
       .select("*")
       .eq("assessment_id", id)
       .eq("owner_id", user.id)
       .in("finding_id", findingIds);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      throw new Error(error.message);
+    }
 
     correctiveActions = data ?? [];
   }
 
   const correctiveByFinding = Object.fromEntries(
-    correctiveActions.map((x) => [x.finding_id, x])
+    correctiveActions.map((x) => [
+      x.finding_id,
+      x,
+    ])
   );
 
-  const { data: planData, error: planError } = await admin
+  const {
+    data: planData,
+    error: planError,
+  } = await admin
     .from("management_action_plan")
     .select("*")
     .eq("assessment_id", id)
     .eq("owner_id", user.id);
 
-  if (planError) throw new Error(planError.message);
+  if (planError) {
+    throw new Error(planError.message);
+  }
 
   /*
    * management_action_plan uses related_finding_id.
-   * Do not use finding_id here because that column does not exist
-   * on management_action_plan.
    */
   const planByFinding = Object.fromEntries(
     (planData ?? [])
       .filter((x) => x.related_finding_id)
-      .map((x) => [x.related_finding_id, x])
+      .map((x) => [
+        x.related_finding_id,
+        x,
+      ])
   );
 
+  /*
+   * Major and Minor NCs automatically appear.
+   * Observations and OFIs only appear if they
+   * already have a management action plan row.
+   */
   const planFindings = findings.filter(
     (x) =>
-      ["major_nc", "minor_nc"].includes(x.finding_type) ||
+      ["major_nc", "minor_nc"].includes(
+        x.finding_type
+      ) ||
       Boolean(planByFinding[x.id])
   );
 
   const today = new Date();
 
   const openCritical = planFindings.filter(
-    (x) => x.finding_type === "major_nc" && x.status !== "closed"
+    (x) =>
+      x.finding_type === "major_nc" &&
+      x.status !== "closed"
   ).length;
 
   const openHigh = planFindings.filter(
-    (x) => x.finding_type === "minor_nc" && x.status !== "closed"
+    (x) =>
+      x.finding_type === "minor_nc" &&
+      x.status !== "closed"
   ).length;
 
   const completed = planFindings.filter(
     (x) =>
-      planByFinding[x.id]?.status === "completed" ||
+      planByFinding[x.id]?.status ===
+        "completed" ||
       x.status === "closed"
   ).length;
 
-  const overdue = planFindings.filter((x) => {
-    const p = planByFinding[x.id];
-    const c = correctiveByFinding[x.id];
+  const overdue = planFindings.filter(
+    (x) => {
+      const p =
+        planByFinding[x.id];
 
-    const date = p?.target_date ?? c?.target_date;
-    const status = p?.status ?? c?.status ?? x.status;
+      const c =
+        correctiveByFinding[x.id];
 
-    return (
-      date &&
-      !["closed", "effective", "completed"].includes(status) &&
-      new Date(`${date}T23:59:59`) < today
-    );
-  }).length;
+      const date =
+        p?.target_date ??
+        c?.target_date;
+
+      const status =
+        p?.status ??
+        c?.status ??
+        x.status;
+
+      return (
+        date &&
+        ![
+          "closed",
+          "effective",
+          "completed",
+        ].includes(status) &&
+        new Date(
+          `${date}T23:59:59`
+        ) < today
+      );
+    }
+  ).length;
 
   const box = {
     background: "#fff",
@@ -145,14 +214,21 @@ export default async function ManagementActionPlanPage({ params }) {
         minHeight: "100vh",
         background: "#f3f6f9",
         padding: "40px",
-        fontFamily: "Arial, sans-serif",
+        fontFamily:
+          "Arial, sans-serif",
       }}
     >
-      <div style={{ maxWidth: "1180px", margin: "0 auto" }}>
+      <div
+        style={{
+          maxWidth: "1180px",
+          margin: "0 auto",
+        }}
+      >
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent:
+              "space-between",
             gap: "20px",
             flexWrap: "wrap",
             marginBottom: "24px",
@@ -164,18 +240,31 @@ export default async function ManagementActionPlanPage({ params }) {
                 color: "#1459D9",
                 fontWeight: 800,
                 fontSize: "12px",
-                letterSpacing: ".8px",
+                letterSpacing:
+                  ".8px",
               }}
             >
               RPG INTELLIGENCE
             </div>
 
-            <h1 style={{ color: "#071A33", marginBottom: "6px" }}>
+            <h1
+              style={{
+                color: "#071A33",
+                marginBottom:
+                  "6px",
+              }}
+            >
               Management Action Plan
             </h1>
 
-            <p style={{ color: "#617087", margin: 0 }}>
-              {assessment.standard} Assessment
+            <p
+              style={{
+                color: "#617087",
+                margin: 0,
+              }}
+            >
+              {assessment.standard}{" "}
+              Assessment
             </p>
           </div>
 
@@ -193,7 +282,8 @@ export default async function ManagementActionPlanPage({ params }) {
                 width: "auto",
                 background: "#fff",
                 color: "#071A33",
-                textDecoration: "none",
+                textDecoration:
+                  "none",
                 fontWeight: 700,
               }}
             >
@@ -205,9 +295,11 @@ export default async function ManagementActionPlanPage({ params }) {
               style={{
                 ...input,
                 width: "auto",
-                background: "#071A33",
+                background:
+                  "#071A33",
                 color: "#fff",
-                textDecoration: "none",
+                textDecoration:
+                  "none",
                 fontWeight: 700,
               }}
             >
@@ -219,23 +311,42 @@ export default async function ManagementActionPlanPage({ params }) {
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+            gridTemplateColumns:
+              "repeat(auto-fit,minmax(180px,1fr))",
             gap: "14px",
             marginBottom: "24px",
           }}
         >
           {[
-            ["CRITICAL OPEN", openCritical],
-            ["HIGH OPEN", openHigh],
-            ["OVERDUE", overdue],
-            ["COMPLETED", completed],
+            [
+              "CRITICAL OPEN",
+              openCritical,
+            ],
+            [
+              "HIGH OPEN",
+              openHigh,
+            ],
+            [
+              "OVERDUE",
+              overdue,
+            ],
+            [
+              "COMPLETED",
+              completed,
+            ],
           ].map(([k, v]) => (
-            <div key={k} style={box}>
+            <div
+              key={k}
+              style={box}
+            >
               <div
                 style={{
-                  color: "#617087",
-                  fontSize: "11px",
-                  fontWeight: 800,
+                  color:
+                    "#617087",
+                  fontSize:
+                    "11px",
+                  fontWeight:
+                    800,
                 }}
               >
                 {k}
@@ -243,8 +354,10 @@ export default async function ManagementActionPlanPage({ params }) {
 
               <strong
                 style={{
-                  color: "#071A33",
-                  fontSize: "28px",
+                  color:
+                    "#071A33",
+                  fontSize:
+                    "28px",
                 }}
               >
                 {v}
@@ -256,7 +369,8 @@ export default async function ManagementActionPlanPage({ params }) {
         <div
           style={{
             background: "#eef4ff",
-            border: "1px solid #d6e4ff",
+            border:
+              "1px solid #d6e4ff",
             color: "#405574",
             padding: "16px 18px",
             borderRadius: "10px",
@@ -264,256 +378,400 @@ export default async function ManagementActionPlanPage({ params }) {
             marginBottom: "24px",
           }}
         >
-          Major and Minor Nonconformities automatically enter this management
-          plan. Observations and OFIs remain in the Findings Register unless
-          management chooses to promote them later.
+          Major and Minor
+          Nonconformities
+          automatically enter this
+          management plan.
+          Observations and OFIs
+          remain in the Findings
+          Register unless management
+          chooses to promote them
+          later.
         </div>
 
-        {planFindings.length === 0 ? (
+        {planFindings.length ===
+        0 ? (
           <section style={box}>
-            There are currently no mandatory management actions arising from
-            this assessment.
+            There are currently no
+            mandatory management
+            actions arising from this
+            assessment.
           </section>
         ) : (
-          <div style={{ display: "grid", gap: "18px" }}>
-            {planFindings.map((finding) => {
-              const c = correctiveByFinding[finding.id] ?? {};
-              const p = planByFinding[finding.id] ?? {};
+          <div
+            style={{
+              display: "grid",
+              gap: "18px",
+            }}
+          >
+            {planFindings.map(
+              (finding) => {
+                const c =
+                  correctiveByFinding[
+                    finding.id
+                  ] ?? {};
 
-              const priority =
-                p.priority ?? priorityFor(finding.finding_type);
+                const p =
+                  planByFinding[
+                    finding.id
+                  ] ?? {};
 
-              const target =
-                p.target_date ??
-                c.target_date ??
-                "";
+                const priority =
+                  p.priority ??
+                  priorityFor(
+                    finding.finding_type
+                  );
 
-              const status =
-                p.status ??
-                (finding.status === "closed" ? "completed" : "open");
+                const target =
+                  p.target_date ??
+                  c.target_date ??
+                  "";
 
-              const isOverdue =
-                target &&
-                !["completed", "closed"].includes(status) &&
-                new Date(`${target}T23:59:59`) < today;
+                const status =
+                  p.status ??
+                  (finding.status ===
+                  "closed"
+                    ? "completed"
+                    : "open");
 
-              return (
-                <section
-                  key={finding.id}
-                  style={{
-                    ...box,
-                    border:
-                      priority === "Critical"
-                        ? "2px solid #efb4ae"
-                        : box.border,
-                  }}
-                >
-                  <div
+                const isOverdue =
+                  target &&
+                  ![
+                    "completed",
+                    "closed",
+                  ].includes(
+                    status
+                  ) &&
+                  new Date(
+                    `${target}T23:59:59`
+                  ) < today;
+
+                return (
+                  <section
+                    key={
+                      finding.id
+                    }
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "12px",
-                      flexWrap: "wrap",
-                      marginBottom: "18px",
+                      ...box,
+                      border:
+                        priority ===
+                        "critical"
+                          ? "2px solid #efb4ae"
+                          : box.border,
                     }}
                   >
-                    <strong style={{ color: "#071A33" }}>
-                      {finding.question_number} ·{" "}
-                      {labelFor(finding.finding_type)}
-                    </strong>
-
-                    <span
-                      style={{
-                        fontWeight: 800,
-                        color:
-                          priority === "Critical"
-                            ? "#b42318"
-                            : "#8a6116",
-                      }}
-                    >
-                      {priority}
-                    </span>
-                  </div>
-
-                  <p
-                    style={{
-                      color: "#617087",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <strong style={{ color: "#071A33" }}>
-                      Finding:{" "}
-                    </strong>
-
-                    {finding.finding_statement ||
-                      finding.requirement_summary ||
-                      "—"}
-                  </p>
-
-                  <form
-                    action={updateManagementAction}
-                    style={{
-                      display: "grid",
-                      gap: "12px",
-                    }}
-                  >
-                    <input
-                      type="hidden"
-                      name="assessment_id"
-                      value={id}
-                    />
-
-                    {/*
-                      This is intentionally called finding_id in the form.
-
-                      actions.js should translate this value to
-                      management_action_plan.related_finding_id
-                      when saving to Supabase.
-                    */}
-                    <input
-                      type="hidden"
-                      name="finding_id"
-                      value={finding.id}
-                    />
-
                     <div
                       style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit,minmax(190px,1fr))",
+                        display:
+                          "flex",
+                        justifyContent:
+                          "space-between",
+                        gap: "12px",
+                        flexWrap:
+                          "wrap",
+                        marginBottom:
+                          "18px",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          color:
+                            "#071A33",
+                        }}
+                      >
+                        {
+                          finding.question_number
+                        }{" "}
+                        ·{" "}
+                        {labelFor(
+                          finding.finding_type
+                        )}
+                      </strong>
+
+                      <span
+                        style={{
+                          fontWeight:
+                            800,
+                          color:
+                            priority ===
+                            "critical"
+                              ? "#b42318"
+                              : "#8a6116",
+                        }}
+                      >
+                        {priorityLabel(
+                          priority
+                        )}
+                      </span>
+                    </div>
+
+                    <p
+                      style={{
+                        color:
+                          "#617087",
+                        lineHeight:
+                          1.6,
+                      }}
+                    >
+                      <strong
+                        style={{
+                          color:
+                            "#071A33",
+                        }}
+                      >
+                        Finding:{" "}
+                      </strong>
+
+                      {finding.finding_statement ||
+                        finding.requirement_summary ||
+                        "—"}
+                    </p>
+
+                    <form
+                      action={
+                        updateManagementAction
+                      }
+                      style={{
+                        display:
+                          "grid",
                         gap: "12px",
                       }}
                     >
-                      <select
-                        name="priority"
-                        defaultValue={priority}
-                        style={input}
-                      >
-                        {["Critical", "High", "Medium", "Low"].map(
-                          (x) => (
-                            <option key={x} value={x}>
-                              {x}
-                            </option>
-                          )
-                        )}
-                      </select>
-
                       <input
-                        name="action_owner"
-                        defaultValue={
-                          p.action_owner ??
-                          c.action_owner ??
-                          ""
+                        type="hidden"
+                        name="assessment_id"
+                        value={id}
+                      />
+
+                      {/*
+                       * The form field is called finding_id
+                       * because it identifies the finding
+                       * being edited.
+                       *
+                       * actions.js must save this as
+                       * management_action_plan.related_finding_id.
+                       */}
+                      <input
+                        type="hidden"
+                        name="finding_id"
+                        value={
+                          finding.id
                         }
-                        placeholder="Management owner"
-                        style={input}
                       />
 
-                      <input
-                        name="target_date"
-                        type="date"
-                        defaultValue={target}
-                        style={{
-                          ...input,
-                          border: isOverdue
-                            ? "1px solid #b42318"
-                            : input.border,
-                        }}
-                      />
-
-                      <select
-                        name="status"
-                        defaultValue={status}
-                        style={input}
-                      >
-                        <option value="open">Open</option>
-                        <option value="in_progress">
-                          In progress
-                        </option>
-                        <option value="at_risk">At risk</option>
-                        <option value="verification">
-                          Verification
-                        </option>
-                        <option value="completed">
-                          Completed
-                        </option>
-                      </select>
-                    </div>
-
-                    {isOverdue && (
                       <div
                         style={{
-                          color: "#b42318",
-                          fontWeight: 700,
+                          display:
+                            "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit,minmax(190px,1fr))",
+                          gap: "12px",
                         }}
                       >
-                        Management action is overdue.
+                        <select
+                          name="priority"
+                          defaultValue={
+                            priority
+                          }
+                          style={
+                            input
+                          }
+                        >
+                          {[
+                            [
+                              "critical",
+                              "Critical",
+                            ],
+                            [
+                              "high",
+                              "High",
+                            ],
+                            [
+                              "medium",
+                              "Medium",
+                            ],
+                            [
+                              "low",
+                              "Low",
+                            ],
+                          ].map(
+                            ([
+                              value,
+                              label,
+                            ]) => (
+                              <option
+                                key={
+                                  value
+                                }
+                                value={
+                                  value
+                                }
+                              >
+                                {
+                                  label
+                                }
+                              </option>
+                            )
+                          )}
+                        </select>
+
+                        <input
+                          name="action_owner"
+                          defaultValue={
+                            p.action_owner ??
+                            c.action_owner ??
+                            ""
+                          }
+                          placeholder="Management owner"
+                          style={
+                            input
+                          }
+                        />
+
+                        <input
+                          name="target_date"
+                          type="date"
+                          defaultValue={
+                            target
+                          }
+                          style={{
+                            ...input,
+                            border:
+                              isOverdue
+                                ? "1px solid #b42318"
+                                : input.border,
+                          }}
+                        />
+
+                        <select
+                          name="status"
+                          defaultValue={
+                            status
+                          }
+                          style={
+                            input
+                          }
+                        >
+                          <option value="open">
+                            Open
+                          </option>
+
+                          <option value="in_progress">
+                            In
+                            progress
+                          </option>
+
+                          <option value="at_risk">
+                            At risk
+                          </option>
+
+                          <option value="verification">
+                            Verification
+                          </option>
+
+                          <option value="completed">
+                            Completed
+                          </option>
+                        </select>
                       </div>
-                    )}
 
-                    <textarea
-                      name="action_required"
-                      rows="3"
-                      defaultValue={
-                        p.action_required ??
-                        c.corrective_action ??
-                        ""
-                      }
-                      placeholder="Management action required"
-                      style={input}
-                    />
+                      {isOverdue && (
+                        <div
+                          style={{
+                            color:
+                              "#b42318",
+                            fontWeight:
+                              700,
+                          }}
+                        >
+                          Management
+                          action is
+                          overdue.
+                        </div>
+                      )}
 
-                    <textarea
-                      name="resource_decision"
-                      rows="2"
-                      defaultValue={
-                        p.resource_decision ?? ""
-                      }
-                      placeholder="Resource / investment / management decision required"
-                      style={input}
-                    />
+                      <textarea
+                        name="action_required"
+                        rows="3"
+                        defaultValue={
+                          p.action_description ??
+                          c.corrective_action ??
+                          ""
+                        }
+                        placeholder="Management action required"
+                        style={
+                          input
+                        }
+                      />
 
-                    <textarea
-                      name="management_commentary"
-                      rows="3"
-                      defaultValue={
-                        p.management_commentary ?? ""
-                      }
-                      placeholder="Management commentary / progress"
-                      style={input}
-                    />
+                      <textarea
+                        name="resource_decision"
+                        rows="2"
+                        defaultValue={
+                          p.resource_decision ??
+                          ""
+                        }
+                        placeholder="Resource / investment / management decision required"
+                        style={
+                          input
+                        }
+                      />
 
-                    <textarea
-                      name="verification_evidence"
-                      rows="3"
-                      defaultValue={
-                        p.verification_evidence ??
-                        c.verification_evidence ??
-                        ""
-                      }
-                      placeholder="Verification / effectiveness evidence"
-                      style={input}
-                    />
+                      <textarea
+                        name="management_commentary"
+                        rows="3"
+                        defaultValue={
+                          p.management_commentary ??
+                          ""
+                        }
+                        placeholder="Management commentary / progress"
+                        style={
+                          input
+                        }
+                      />
 
-                    <button
-                      type="submit"
-                      style={{
-                        justifySelf: "start",
-                        padding: "11px 17px",
-                        border: 0,
-                        borderRadius: "8px",
-                        background: "#1459D9",
-                        color: "#fff",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Save Management Action
-                    </button>
-                  </form>
-                </section>
-              );
-            })}
+                      <textarea
+                        name="verification_evidence"
+                        rows="3"
+                        defaultValue={
+                          p.verification_evidence ??
+                          c.verification_evidence ??
+                          ""
+                        }
+                        placeholder="Verification / effectiveness evidence"
+                        style={
+                          input
+                        }
+                      />
+
+                      <button
+                        type="submit"
+                        style={{
+                          justifySelf:
+                            "start",
+                          padding:
+                            "11px 17px",
+                          border: 0,
+                          borderRadius:
+                            "8px",
+                          background:
+                            "#1459D9",
+                          color:
+                            "#fff",
+                          fontWeight:
+                            700,
+                          cursor:
+                            "pointer",
+                        }}
+                      >
+                        Save Management
+                        Action
+                      </button>
+                    </form>
+                  </section>
+                );
+              }
+            )}
           </div>
         )}
       </div>
