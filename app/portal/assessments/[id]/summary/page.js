@@ -1283,6 +1283,26 @@ export default async function AssessmentSummaryPage({
                 >
                   Management Action Plan
                 </a>
+
+                <a
+                  href={`/portal/assessments/${assessment.id}/readiness`}
+                  style={{
+                    padding:
+                      "11px 15px",
+                    borderRadius:
+                      "8px",
+                    background:
+                      "#167C80",
+                    color:
+                      "#ffffff",
+                    textDecoration:
+                      "none",
+                    fontWeight:
+                      700,
+                  }}
+                >
+                  Certification Readiness Decision
+                </a>
               </div>
             </section>
 
