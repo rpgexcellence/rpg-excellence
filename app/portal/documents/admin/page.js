@@ -5,6 +5,7 @@ import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
 import {
   createControlledDocument,
+  createDocumentRevision,
   updateControlledDocument,
   supersedeControlledDocument,
   withdrawControlledDocument,
@@ -131,6 +132,40 @@ export default async function DocumentAdminPage() {
       (document) =>
         document.status ===
         "Withdrawn"
+    ).length;
+
+
+  const revisionFamilies =
+    Object.values(
+      documents.reduce(
+        (groups, document) => {
+          const key =
+            document.document_number;
+
+          if (!groups[key]) {
+            groups[key] = {
+              documentNumber:
+                key,
+              title:
+                document.title,
+              revisions: [],
+            };
+          }
+
+          groups[key].revisions.push(
+            document
+          );
+
+          return groups;
+        },
+        {}
+      )
+    );
+
+  const multiRevisionFamilies =
+    revisionFamilies.filter(
+      (family) =>
+        family.revisions.length > 1
     ).length;
 
   const inputStyle = {
@@ -276,6 +311,10 @@ export default async function DocumentAdminPage() {
             ["DRAFT", draftCount],
             ["SUPERSEDED", supersededCount],
             ["WITHDRAWN", withdrawnCount],
+            [
+              "REVISION HISTORIES",
+              multiRevisionFamilies,
+            ],
           ].map(
             ([label, value]) => (
               <div
@@ -756,6 +795,20 @@ export default async function DocumentAdminPage() {
                     )}
                   </div>
 
+                  {document.supersedes_document_id && (
+                    <div
+                      style={{
+                        color: "#617087",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Revision history:
+                      this revision supersedes
+                      an earlier controlled
+                      revision.
+                    </div>
+                  )}
+
                   <button
                     type="submit"
                     style={{
@@ -772,6 +825,181 @@ export default async function DocumentAdminPage() {
                     Save Document Changes
                   </button>
                 </form>
+
+                {document.status === "Current" && (
+                  <details
+                    style={{
+                      marginTop: "16px",
+                      border:
+                        "1px solid #dfe6ee",
+                      borderRadius: "10px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <summary
+                      style={{
+                        cursor: "pointer",
+                        padding: "13px 15px",
+                        background: "#f5f8fc",
+                        color: "#071A33",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Create New Revision
+                    </summary>
+
+                    <form
+                      action={
+                        createDocumentRevision
+                      }
+                      encType="multipart/form-data"
+                      style={{
+                        display: "grid",
+                        gap: "12px",
+                        padding: "16px",
+                      }}
+                    >
+                      <input
+                        type="hidden"
+                        name="source_document_id"
+                        value={document.id}
+                      />
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(210px, 1fr))",
+                          gap: "12px",
+                        }}
+                      >
+                        <input
+                          name="new_revision"
+                          required
+                          placeholder="New revision, e.g. 1.1 or 2.0"
+                          style={inputStyle}
+                        />
+
+                        <select
+                          name="new_status"
+                          defaultValue="Draft"
+                          style={inputStyle}
+                        >
+                          <option value="Draft">
+                            Draft
+                          </option>
+                          <option value="Current">
+                            Current
+                          </option>
+                        </select>
+
+                        <select
+                          name="new_audience"
+                          defaultValue={
+                            document.audience
+                          }
+                          style={inputStyle}
+                        >
+                          {AUDIENCES.map(
+                            (audience) => (
+                              <option
+                                key={audience}
+                                value={audience}
+                              >
+                                {audience}
+                              </option>
+                            )
+                          )}
+                        </select>
+
+                        <input
+                          name="new_issue_date"
+                          type="date"
+                          style={inputStyle}
+                        />
+
+                        <input
+                          name="new_review_date"
+                          type="date"
+                          style={inputStyle}
+                        />
+
+                        <input
+                          name="new_approved_by"
+                          defaultValue={
+                            document.approved_by ??
+                            ""
+                          }
+                          placeholder="Approved by"
+                          style={inputStyle}
+                        />
+                      </div>
+
+                      <textarea
+                        name="new_description"
+                        rows="3"
+                        defaultValue={
+                          document.description ??
+                          ""
+                        }
+                        placeholder="Description"
+                        style={inputStyle}
+                      />
+
+                      <textarea
+                        name="revision_notes"
+                        rows="2"
+                        placeholder="Revision summary / reason for change"
+                        style={inputStyle}
+                      />
+
+                      <input
+                        name="revision_file"
+                        type="file"
+                        required
+                        style={inputStyle}
+                      />
+
+                      <div
+                        style={{
+                          background: "#eef4ff",
+                          border:
+                            "1px solid #d6e4ff",
+                          color: "#405574",
+                          borderRadius: "8px",
+                          padding: "12px 14px",
+                          lineHeight: 1.5,
+                          fontSize: "13px",
+                        }}
+                      >
+                        Creating a Draft keeps
+                        Rev {document.revision}
+                        current. Creating the new
+                        revision as Current will
+                        automatically supersede
+                        the existing current
+                        revision while preserving
+                        its file and history.
+                      </div>
+
+                      <button
+                        type="submit"
+                        style={{
+                          justifySelf: "start",
+                          padding: "10px 15px",
+                          border: "none",
+                          borderRadius: "8px",
+                          background: "#1459D9",
+                          color: "#ffffff",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Create New Revision
+                      </button>
+                    </form>
+                  </details>
+                )}
 
                 {document.status === "Current" && (
                   <form
