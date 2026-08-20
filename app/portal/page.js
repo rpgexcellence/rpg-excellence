@@ -2416,9 +2416,9 @@ return (
 
 
 
-                      <option value="ISO 45001">
+                      <option value="ISO 45001:2018">
 
-                        ISO 45001
+                        ISO 45001:2018
 
                       </option>
 
