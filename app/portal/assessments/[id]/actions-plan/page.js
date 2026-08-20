@@ -31,6 +31,10 @@ const labelFor = (type) =>
     ofi: "OFI",
   }[type] ?? type);
 
+const isCompletedManagementStatus = (status) =>
+  status === "completed" ||
+  status === "verified";
+
 export default async function ManagementActionPlanPage({
   params,
 }) {
@@ -154,13 +158,16 @@ export default async function ManagementActionPlanPage({
     );
   }
 
+  const managementPlans =
+    planData ?? [];
+
   /*
    * Canonical finding relationship for the
    * management action plan.
    */
   const planByFinding =
     Object.fromEntries(
-      (planData ?? [])
+      managementPlans
         .filter(
           (row) =>
             row.related_finding_id
@@ -199,41 +206,94 @@ export default async function ManagementActionPlanPage({
   const today =
     new Date();
 
+  /*
+   * CRITICAL OPEN
+   *
+   * If a management action exists, its status
+   * is authoritative for the Management Action
+   * Plan.
+   *
+   * If no management action exists yet, an
+   * unclosed Major NC still needs management
+   * attention and therefore remains open.
+   */
   const openCritical =
     planFindings.filter(
-      (finding) =>
-        finding.finding_type ===
-          "major_nc" &&
-        finding.status !==
-          "closed"
-    ).length;
-
-  const openHigh =
-    planFindings.filter(
-      (finding) =>
-        finding.finding_type ===
-          "minor_nc" &&
-        finding.status !==
-          "closed"
-    ).length;
-
-  const completed =
-    planFindings.filter(
       (finding) => {
+        if (
+          finding.finding_type !==
+          "major_nc"
+        ) {
+          return false;
+        }
+
         const plan =
           planByFinding[
             finding.id
           ];
 
+        if (plan) {
+          return !isCompletedManagementStatus(
+            plan.status
+          );
+        }
+
         return (
-          plan?.status ===
-            "completed" ||
-          plan?.status ===
-            "verified" ||
-          finding.status ===
-            "closed"
+          finding.status !==
+          "closed"
         );
       }
+    ).length;
+
+  /*
+   * HIGH OPEN
+   *
+   * Same rule for Minor NCs.
+   */
+  const openHigh =
+    planFindings.filter(
+      (finding) => {
+        if (
+          finding.finding_type !==
+          "minor_nc"
+        ) {
+          return false;
+        }
+
+        const plan =
+          planByFinding[
+            finding.id
+          ];
+
+        if (plan) {
+          return !isCompletedManagementStatus(
+            plan.status
+          );
+        }
+
+        return (
+          finding.status !==
+          "closed"
+        );
+      }
+    ).length;
+
+  /*
+   * COMPLETED
+   *
+   * This metric represents completed /
+   * verified Management Action Plan records.
+   *
+   * A formally closed finding is NOT counted
+   * here unless its management action itself
+   * is completed or verified.
+   */
+  const completed =
+    managementPlans.filter(
+      (plan) =>
+        isCompletedManagementStatus(
+          plan.status
+        )
     ).length;
 
   const overdue =
@@ -350,8 +410,7 @@ export default async function ManagementActionPlanPage({
                   "6px",
               }}
             >
-              Management Action
-              Plan
+              Management Action Plan
             </h1>
 
             <p
