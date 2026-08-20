@@ -383,6 +383,21 @@ export default async function AssessmentPage({
     assessment.standard ===
     "ISO 14001:2026";
 
+  async function saveCurrentClause(
+    formData
+  ) {
+    "use server";
+
+    formData.set(
+      "next_clause",
+      clause
+    );
+
+    await saveAssessmentAnswers(
+      formData
+    );
+  }
+
   // Maturity
   let maturityLevel =
     "Not assessed";
@@ -1491,6 +1506,41 @@ export default async function AssessmentPage({
                 )}
               </div>
 
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="submit"
+                  formAction={
+                    saveCurrentClause
+                  }
+                  disabled={
+                    !questions.length
+                  }
+                  style={{
+                    padding:
+                      "12px 20px",
+                    borderRadius: "8px",
+                    border:
+                      "1px solid #1459D9",
+                    background:
+                      "#ffffff",
+                    color:
+                      "#1459D9",
+                    fontWeight: 700,
+                    cursor:
+                      questions.length
+                        ? "pointer"
+                        : "not-allowed",
+                  }}
+                >
+                  Save Answers
+                </button>
+
               <button
                 type="submit"
                 disabled={
@@ -1517,6 +1567,7 @@ export default async function AssessmentPage({
                   ? `Save & Continue → Clause ${nextClause}`
                   : "Complete Assessment →"}
               </button>
+              </div>
             </div>
           </section>
         </form>
