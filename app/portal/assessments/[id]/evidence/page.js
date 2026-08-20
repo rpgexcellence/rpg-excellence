@@ -183,7 +183,7 @@ export default async function EvidenceSamplingPage({
   } = await admin
     .from("assessment_findings")
     .select(
-      "id, question_number, finding_type, finding_statement, status"
+      "id, question_number, finding_type, finding_statement, status, risk_impact"
     )
     .eq(
       "assessment_id",
@@ -209,6 +209,16 @@ export default async function EvidenceSamplingPage({
 
   const findings =
     findingsData ?? [];
+
+  const findingsById =
+    Object.fromEntries(
+      findings.map(
+        (finding) => [
+          finding.id,
+          finding,
+        ]
+      )
+    );
 
   const highConfidence =
     samples.filter(
@@ -778,7 +788,15 @@ export default async function EvidenceSamplingPage({
             }}
           >
             {samples.map(
-              (sample) => (
+              (sample) => {
+                const linkedFinding =
+                  sample.finding_id
+                    ? findingsById[
+                        sample.finding_id
+                      ] ?? null
+                    : null;
+
+                return (
                 <section
                   key={
                     sample.id
@@ -1225,9 +1243,9 @@ export default async function EvidenceSamplingPage({
                         marginTop:
                           "18px",
                         padding:
-                          "14px 16px",
+                          "16px",
                         borderRadius:
-                          "9px",
+                          "10px",
                         background:
                           "#edf8f3",
                         border:
@@ -1236,21 +1254,172 @@ export default async function EvidenceSamplingPage({
                           "#205c43",
                       }}
                     >
-                      This evidence sample is
-                      already linked to a
-                      formal finding.
-                      {" "}
-                      <Link
-                        href={`/portal/assessments/${assessment.id}/findings`}
+                      <div
                         style={{
-                          color:
-                            "#1459D9",
-                          fontWeight:
-                            700,
+                          display:
+                            "flex",
+                          justifyContent:
+                            "space-between",
+                          gap: "14px",
+                          alignItems:
+                            "flex-start",
+                          flexWrap:
+                            "wrap",
                         }}
                       >
-                        Open Findings Register
-                      </Link>
+                        <div>
+                          <div
+                            style={{
+                              fontSize:
+                                "11px",
+                              fontWeight:
+                                800,
+                              letterSpacing:
+                                "0.5px",
+                              marginBottom:
+                                "6px",
+                            }}
+                          >
+                            LINKED FORMAL FINDING
+                          </div>
+
+                          <strong
+                            style={{
+                              color:
+                                "#071A33",
+                              fontSize:
+                                "16px",
+                            }}
+                          >
+                            {linkedFinding
+                              ? `${findingLabel(
+                                  linkedFinding.finding_type
+                                )} · Control ${
+                                  linkedFinding.question_number ??
+                                  sample.question_number ??
+                                  "—"
+                                }`
+                              : `Linked finding · Control ${
+                                  sample.question_number ??
+                                  "—"
+                                }`}
+                          </strong>
+
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              gap: "8px",
+                              flexWrap:
+                                "wrap",
+                              marginTop:
+                                "9px",
+                            }}
+                          >
+                            {linkedFinding
+                              ?.risk_impact && (
+                              <span
+                                style={{
+                                  padding:
+                                    "5px 9px",
+                                  borderRadius:
+                                    "999px",
+                                  background:
+                                    linkedFinding.risk_impact ===
+                                    "High"
+                                      ? "#fff1f0"
+                                      : linkedFinding.risk_impact ===
+                                        "Medium"
+                                      ? "#fff8e8"
+                                      : "#f3f6f9",
+                                  color:
+                                    linkedFinding.risk_impact ===
+                                    "High"
+                                      ? "#b42318"
+                                      : linkedFinding.risk_impact ===
+                                        "Medium"
+                                      ? "#8a6116"
+                                      : "#475467",
+                                  fontSize:
+                                    "12px",
+                                  fontWeight:
+                                    800,
+                                }}
+                              >
+                                {linkedFinding.risk_impact} Risk
+                              </span>
+                            )}
+
+                            <span
+                              style={{
+                                padding:
+                                  "5px 9px",
+                                borderRadius:
+                                  "999px",
+                                background:
+                                  linkedFinding?.status ===
+                                  "closed"
+                                    ? "#e9f7ef"
+                                    : "#eef4ff",
+                                color:
+                                  linkedFinding?.status ===
+                                  "closed"
+                                    ? "#16794b"
+                                    : "#1459D9",
+                                fontSize:
+                                  "12px",
+                                fontWeight:
+                                  800,
+                              }}
+                            >
+                              {linkedFinding?.status
+                                ? linkedFinding.status
+                                    .replaceAll("_", " ")
+                                : "Linked"}
+                            </span>
+                          </div>
+
+                          {linkedFinding
+                            ?.finding_statement && (
+                            <p
+                              style={{
+                                margin:
+                                  "10px 0 0",
+                                color:
+                                  "#617087",
+                                lineHeight:
+                                  1.5,
+                                maxWidth:
+                                  "760px",
+                              }}
+                            >
+                              {linkedFinding.finding_statement}
+                            </p>
+                          )}
+                        </div>
+
+                        <Link
+                          href={`/portal/assessments/${assessment.id}/findings`}
+                          style={{
+                            padding:
+                              "9px 13px",
+                            borderRadius:
+                              "8px",
+                            background:
+                              "#071A33",
+                            color:
+                              "#ffffff",
+                            textDecoration:
+                              "none",
+                            fontWeight:
+                              700,
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
+                          Open Finding
+                        </Link>
+                      </div>
                     </div>
                   ) : (
                     <details
@@ -1463,7 +1632,8 @@ export default async function EvidenceSamplingPage({
                     </details>
                   )}
                 </section>
-              )
+                );
+              }
             )}
           </div>
         )}
