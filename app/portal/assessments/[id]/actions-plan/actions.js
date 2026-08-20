@@ -17,10 +17,10 @@ import {
 } from "../../../../../lib/supabase/admin";
 
 const PRIORITIES = [
-  "Critical",
-  "High",
-  "Medium",
-  "Low",
+  "critical",
+  "high",
+  "medium",
+  "low",
 ];
 
 const STATUSES = [
@@ -92,10 +92,15 @@ export async function updateManagementAction(
       "finding_id"
     );
 
-  const priority =
+  const rawPriority =
     formData.get(
       "priority"
     );
+
+  const priority =
+    typeof rawPriority === "string"
+      ? rawPriority.toLowerCase()
+      : rawPriority;
 
   const status =
     formData.get(
@@ -235,11 +240,6 @@ export async function updateManagementAction(
     related_finding_id:
       findingId,
 
-    /*
-     * Temporary compatibility with the
-     * finding_id column added during our
-     * schema-alignment work.
-     */
     finding_id:
       findingId,
 
