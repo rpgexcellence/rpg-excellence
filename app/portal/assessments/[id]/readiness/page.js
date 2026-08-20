@@ -20,7 +20,6 @@ const CLAUSE_NUMBERS = [
   "10",
 ];
 
-
 function managementReadinessValue(rating) {
   switch (rating) {
     case "Not Ready":
@@ -58,8 +57,7 @@ function decisionStyle(decision) {
 
   if (
     decision === "Not ready" ||
-    decision ===
-      "Significant improvement required"
+    decision === "Significant improvement required"
   ) {
     return {
       background: "#fff1f0",
@@ -68,10 +66,7 @@ function decisionStyle(decision) {
     };
   }
 
-  if (
-    decision ===
-    "Readiness review recommended"
-  ) {
+  if (decision === "Readiness review recommended") {
     return {
       background: "#fff8e8",
       border: "#f1dfad",
@@ -91,8 +86,7 @@ export default async function CertificationReadinessPage({
 }) {
   const { id } = await params;
 
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
@@ -112,10 +106,7 @@ export default async function CertificationReadinessPage({
     .eq("owner_id", user.id)
     .single();
 
-  if (
-    assessmentError ||
-    !assessment
-  ) {
+  if (assessmentError || !assessment) {
     redirect("/portal");
   }
 
@@ -125,56 +116,34 @@ export default async function CertificationReadinessPage({
   } = await supabase
     .from("assessment_questions")
     .select("*")
-    .eq(
-      "standard",
-      assessment.standard
-    )
+    .eq("standard", assessment.standard)
     .eq("active", true)
     .order("display_order", {
       ascending: true,
     });
 
   if (questionsError) {
-    throw new Error(
-      questionsError.message
-    );
+    throw new Error(questionsError.message);
   }
 
-  const questions =
-    questionsData ?? [];
+  const questions = questionsData ?? [];
 
-  const questionNumbers =
-    questions.map(
-      (question) =>
-        question.question_number
-    );
+  const questionNumbers = questions.map(
+    (question) => question.question_number
+  );
 
   let answers = [];
 
   if (questionNumbers.length) {
-    const {
-      data,
-      error,
-    } = await supabase
+    const { data, error } = await supabase
       .from("assessment_answers")
       .select("*")
-      .eq(
-        "assessment_id",
-        assessment.id
-      )
-      .eq(
-        "owner_id",
-        user.id
-      )
-      .in(
-        "clause",
-        questionNumbers
-      );
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id)
+      .in("clause", questionNumbers);
 
     if (error) {
-      throw new Error(
-        error.message
-      );
+      throw new Error(error.message);
     }
 
     answers = data ?? [];
@@ -185,13 +154,8 @@ export default async function CertificationReadinessPage({
     error: scoringProfileError,
   } = await supabase
     .from("scoring_profiles")
-    .select(
-      "id, profile_name, version_label"
-    )
-    .eq(
-      "standard",
-      assessment.standard
-    )
+    .select("id, profile_name, version_label")
+    .eq("standard", assessment.standard)
     .eq("active", true)
     .order("created_at", {
       ascending: false,
@@ -200,9 +164,7 @@ export default async function CertificationReadinessPage({
     .maybeSingle();
 
   if (scoringProfileError) {
-    throw new Error(
-      scoringProfileError.message
-    );
+    throw new Error(scoringProfileError.message);
   }
 
   let weights = {};
@@ -212,57 +174,37 @@ export default async function CertificationReadinessPage({
       data: clauseWeights,
       error: clauseWeightsError,
     } = await supabase
-      .from(
-        "scoring_profile_clauses"
-      )
-      .select(
-        "clause, weight"
-      )
-      .eq(
-        "scoring_profile_id",
-        scoringProfile.id
-      );
+      .from("scoring_profile_clauses")
+      .select("clause, weight")
+      .eq("scoring_profile_id", scoringProfile.id);
 
     if (clauseWeightsError) {
-      throw new Error(
-        clauseWeightsError.message
-      );
+      throw new Error(clauseWeightsError.message);
     }
 
-    weights =
-      Object.fromEntries(
-        (
-          clauseWeights ?? []
-        ).map((row) => [
-          row.clause,
-          Number(row.weight),
-        ])
-      );
+    weights = Object.fromEntries(
+      (clauseWeights ?? []).map((row) => [
+        row.clause,
+        Number(row.weight),
+      ])
+    );
   }
 
-  const progress =
-    calculateProgress(
-      questions,
-      answers
-    );
+  const progress = calculateProgress(
+    questions,
+    answers
+  );
 
-  const overallScore =
-    Object.keys(weights).length
-      ? calculateWeightedOverallScore(
-          {
-            clauseNumbers:
-              CLAUSE_NUMBERS,
-            questions,
-            answers,
-            weights,
-          }
-        )
-      : calculateSimpleOverallScore(
-          answers
-        );
+  const overallScore = Object.keys(weights).length
+    ? calculateWeightedOverallScore({
+        clauseNumbers: CLAUSE_NUMBERS,
+        questions,
+        answers,
+        weights,
+      })
+    : calculateSimpleOverallScore(answers);
 
-  const admin =
-    createAdminClient();
+  const admin = createAdminClient();
 
   const {
     data: findingsData,
@@ -270,150 +212,95 @@ export default async function CertificationReadinessPage({
   } = await admin
     .from("assessment_findings")
     .select("*")
-    .eq(
-      "assessment_id",
-      assessment.id
-    )
-    .eq(
-      "owner_id",
-      user.id
-    )
-    .neq(
-      "finding_type",
-      "conformity"
-    );
+    .eq("assessment_id", assessment.id)
+    .eq("owner_id", user.id)
+    .neq("finding_type", "conformity");
 
   if (findingsError) {
-    throw new Error(
-      findingsError.message
-    );
+    throw new Error(findingsError.message);
   }
 
-  const findings =
-    findingsData ?? [];
+  const findings = findingsData ?? [];
 
-  const openFindings =
-    findings.filter(
-      (finding) =>
-        finding.status !==
-        "closed"
-    );
+  const openFindings = findings.filter(
+    (finding) => finding.status !== "closed"
+  );
 
-  const openMajor =
-    openFindings.filter(
-      (finding) =>
-        finding.finding_type ===
-        "major_nc"
-    );
+  const openMajor = openFindings.filter(
+    (finding) =>
+      finding.finding_type === "major_nc"
+  );
 
-  const openMinor =
-    openFindings.filter(
-      (finding) =>
-        finding.finding_type ===
-        "minor_nc"
-    );
+  const openMinor = openFindings.filter(
+    (finding) =>
+      finding.finding_type === "minor_nc"
+  );
 
-  const highRisk =
-    openFindings.filter(
-      (finding) =>
-        finding.risk_impact ===
-        "High"
-    );
+  const highRisk = openFindings.filter(
+    (finding) =>
+      finding.risk_impact === "High"
+  );
 
-  const mediumRisk =
-    openFindings.filter(
-      (finding) =>
-        finding.risk_impact ===
-        "Medium"
-    );
+  const mediumRisk = openFindings.filter(
+    (finding) =>
+      finding.risk_impact === "Medium"
+  );
 
-  const lowRisk =
-    openFindings.filter(
-      (finding) =>
-        finding.risk_impact ===
-        "Low"
-    );
+  const lowRisk = openFindings.filter(
+    (finding) =>
+      finding.risk_impact === "Low"
+  );
 
-  const findingIds =
-    findings.map(
-      (finding) => finding.id
-    );
+  const findingIds = findings.map(
+    (finding) => finding.id
+  );
 
   let correctiveActions = [];
   let managementActions = [];
 
   if (findingIds.length) {
-    const {
-      data,
-      error,
-    } = await admin
+    const { data, error } = await admin
       .from("corrective_actions")
       .select("*")
-      .eq(
-        "assessment_id",
-        assessment.id
-      )
-      .eq(
-        "owner_id",
-        user.id
-      )
-      .in(
-        "finding_id",
-        findingIds
-      );
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id)
+      .in("finding_id", findingIds);
 
     if (error) {
-      throw new Error(
-        error.message
-      );
+      throw new Error(error.message);
     }
 
-    correctiveActions =
-      data ?? [];
+    correctiveActions = data ?? [];
   }
 
   const {
     data: managementData,
     error: managementError,
   } = await admin
-    .from(
-      "management_action_plan"
-    )
+    .from("management_action_plan")
     .select("*")
-    .eq(
-      "assessment_id",
-      assessment.id
-    )
-    .eq(
-      "owner_id",
-      user.id
-    );
+    .eq("assessment_id", assessment.id)
+    .eq("owner_id", user.id);
 
   if (managementError) {
-    throw new Error(
-      managementError.message
-    );
+    throw new Error(managementError.message);
   }
 
-  managementActions =
-    managementData ?? [];
+  managementActions = managementData ?? [];
 
   const correctiveByFinding =
     Object.fromEntries(
-      correctiveActions.map(
-        (action) => [
-          action.finding_id,
-          action,
-        ]
-      )
+      correctiveActions.map((action) => [
+        action.finding_id,
+        action,
+      ])
     );
 
   const managementByFinding =
     Object.fromEntries(
       managementActions
         .filter(
-          (action) =>
-            action.finding_id
+          (action) => action.finding_id
         )
         .map((action) => [
           action.finding_id,
@@ -431,7 +318,9 @@ export default async function CertificationReadinessPage({
     )
     .eq("assessment_id", assessment.id)
     .eq("owner_id", user.id)
-    .order("display_order", { ascending: true });
+    .order("display_order", {
+      ascending: true,
+    });
 
   if (managementReadinessError) {
     throw new Error(
@@ -442,17 +331,15 @@ export default async function CertificationReadinessPage({
   const managementRows =
     managementReadinessRows ?? [];
 
-  const managementValues =
-    managementRows
-      .map((row) =>
-        managementReadinessValue(
-          row.readiness_rating
-        )
+  const managementValues = managementRows
+    .map((row) =>
+      managementReadinessValue(
+        row.readiness_rating
       )
-      .filter(
-        (value) =>
-          value !== null
-      );
+    )
+    .filter(
+      (value) => value !== null
+    );
 
   const managementDimensionsCompleted =
     managementValues.length;
@@ -464,8 +351,7 @@ export default async function CertificationReadinessPage({
             (total, value) =>
               total + value,
             0
-          ) /
-            managementValues.length
+          ) / managementValues.length
         )
       : null;
 
@@ -475,37 +361,27 @@ export default async function CertificationReadinessPage({
       managementDimensionsCompleted
     );
 
-  const today =
-    new Date();
+  const today = new Date();
 
-  const overdueActions =
-    openFindings.filter(
-      (finding) => {
-        const managementAction =
-          managementByFinding[
-            finding.id
-          ];
+  const overdueActions = openFindings.filter(
+    (finding) => {
+      const managementAction =
+        managementByFinding[finding.id];
 
-        const correctiveAction =
-          correctiveByFinding[
-            finding.id
-          ];
+      const correctiveAction =
+        correctiveByFinding[finding.id];
 
-        const targetDate =
-          managementAction
-            ?.target_date ??
-          correctiveAction
-            ?.target_date;
+      const targetDate =
+        managementAction?.target_date ??
+        correctiveAction?.target_date;
 
-        const status =
-          managementAction
-            ?.status ??
-          correctiveAction
-            ?.status ??
-          finding.status;
+      const status =
+        managementAction?.status ??
+        correctiveAction?.status ??
+        finding.status;
 
-        return Boolean(
-          targetDate &&
+      return Boolean(
+        targetDate &&
           ![
             "closed",
             "completed",
@@ -514,50 +390,36 @@ export default async function CertificationReadinessPage({
           new Date(
             `${targetDate}T23:59:59`
           ) < today
-        );
-      }
-    );
+      );
+    }
+  );
 
   const completedActions =
     managementActions.filter(
       (action) =>
-        action.status ===
-        "completed"
+        action.status === "completed"
     ).length;
 
   const openMandatoryActions =
-    openFindings.filter(
-      (finding) =>
-        [
-          "major_nc",
-          "minor_nc",
-        ].includes(
-          finding.finding_type
-        )
+    openFindings.filter((finding) =>
+      ["major_nc", "minor_nc"].includes(
+        finding.finding_type
+      )
     );
 
-  let decision =
-    "Assessment incomplete";
+  let decision = "Assessment incomplete";
 
-  if (
-    progress.percentage ===
-    100
-  ) {
-    if (
-      managementDimensionsCompleted < 9
-    ) {
+  if (progress.percentage === 100) {
+    if (managementDimensionsCompleted < 9) {
       decision =
         "Management readiness incomplete";
     } else if (
-      managementReadiness ===
-        "Not Ready" ||
+      managementReadiness === "Not Ready" ||
       openMajor.length > 0
     ) {
-      decision =
-        "Not ready";
+      decision = "Not ready";
     } else if (
-      managementReadiness ===
-        "Developing" ||
+      managementReadiness === "Developing" ||
       highRisk.length > 0 ||
       overdueActions.length > 0
     ) {
@@ -565,42 +427,33 @@ export default async function CertificationReadinessPage({
         "Significant improvement required";
     } else if (
       openMinor.length > 0 ||
-      openMandatoryActions.length >
-        0 ||
-      managementReadiness ===
-        "Established"
+      openMandatoryActions.length > 0 ||
+      managementReadiness === "Established"
     ) {
       decision =
         "Readiness review recommended";
     } else if (
-      managementReadiness ===
-        "Ready" &&
+      managementReadiness === "Ready" &&
       overallScore !== null &&
       overallScore >= 80
     ) {
-      decision =
-        "Potentially ready";
+      decision = "Potentially ready";
     } else if (
       overallScore !== null &&
       overallScore >= 60
     ) {
-      decision =
-        "Progressing";
+      decision = "Progressing";
     } else {
       decision =
         "Significant improvement required";
     }
   }
 
-  const style =
-    decisionStyle(
-      decision
-    );
+  const style = decisionStyle(decision);
 
   const checks = [
     {
-      label:
-        "Management readiness completed",
+      label: "Management readiness completed",
       pass:
         managementDimensionsCompleted === 9,
       detail:
@@ -611,57 +464,75 @@ export default async function CertificationReadinessPage({
         }`,
     },
     {
-      label:
-        "Assessment completed",
-      pass:
-        progress.percentage ===
-        100,
+      label: "Assessment completed",
+      pass: progress.percentage === 100,
       detail:
         `${progress.answered} of ${progress.total} controls answered`,
     },
     {
-      label:
-        "No open Major NC",
-      pass:
-        openMajor.length === 0,
+      label: "No open Major NC",
+      pass: openMajor.length === 0,
       detail:
         `${openMajor.length} open Major NC`,
     },
     {
-      label:
-        "No open High-risk finding",
-      pass:
-        highRisk.length === 0,
+      label: "No open High-risk finding",
+      pass: highRisk.length === 0,
       detail:
         `${highRisk.length} open High-risk finding(s)`,
     },
     {
-      label:
-        "No overdue action",
-      pass:
-        overdueActions.length ===
-        0,
+      label: "No overdue action",
+      pass: overdueActions.length === 0,
       detail:
         `${overdueActions.length} overdue action(s)`,
     },
     {
-      label:
-        "Minor NC position controlled",
-      pass:
-        openMinor.length === 0,
+      label: "Minor NC position controlled",
+      pass: openMinor.length === 0,
       detail:
         `${openMinor.length} open Minor NC`,
     },
     {
-      label:
-        "Readiness score established",
-      pass:
-        overallScore !== null,
+      label: "Readiness score calculated",
+      pass: overallScore !== null,
       detail:
         overallScore !== null
-          ? `${overallScore}%`
-          : "Not yet established",
+          ? `${overallScore}% — assessment score calculated`
+          : "Score not yet available",
+      successLabel: "COMPLETE",
     },
+  ];
+
+  const decisionGuide = [
+    ...(managementDimensionsCompleted < 9
+      ? [
+          [
+            "Management readiness incomplete",
+            "The clause assessment is complete, but all nine management-readiness dimensions have not yet been assessed.",
+          ],
+        ]
+      : []),
+    [
+      "Not ready",
+      "Open Major NC or another systemic barrier prevents progression.",
+    ],
+    [
+      "Significant improvement required",
+      "High-risk findings, overdue material actions or a materially weak readiness position require further improvement.",
+    ],
+    [
+      "Progressing",
+      "The EMS is established and developing, but further evidence or implementation is required.",
+    ],
+    [
+      "Readiness review recommended",
+      "No Major NC remains, but open Minor NC or other conditions should be verified before progression.",
+    ],
+    [
+      "Potentially ready",
+      "The assessment is complete, no significant open barrier is known, and the readiness position is sufficiently strong.",
+    ],
   ];
 
   return (
@@ -670,8 +541,7 @@ export default async function CertificationReadinessPage({
         minHeight: "100vh",
         background: "#f3f6f9",
         padding: "40px",
-        fontFamily:
-          "Arial, sans-serif",
+        fontFamily: "Arial, sans-serif",
       }}
     >
       <div
@@ -696,8 +566,7 @@ export default async function CertificationReadinessPage({
                 color: "#1459D9",
                 fontWeight: 800,
                 fontSize: "12px",
-                letterSpacing:
-                  ".8px",
+                letterSpacing: ".8px",
               }}
             >
               RPG INTELLIGENCE
@@ -734,18 +603,13 @@ export default async function CertificationReadinessPage({
             <Link
               href={`/portal/assessments/${assessment.id}/summary`}
               style={{
-                padding:
-                  "11px 16px",
-                borderRadius:
-                  "8px",
+                padding: "11px 16px",
+                borderRadius: "8px",
                 border:
                   "1px solid #d8e0ea",
-                background:
-                  "#ffffff",
-                color:
-                  "#071A33",
-                textDecoration:
-                  "none",
+                background: "#ffffff",
+                color: "#071A33",
+                textDecoration: "none",
                 fontWeight: 700,
               }}
             >
@@ -755,18 +619,13 @@ export default async function CertificationReadinessPage({
             <Link
               href={`/portal/assessments/${assessment.id}/management-readiness`}
               style={{
-                padding:
-                  "11px 16px",
-                borderRadius:
-                  "8px",
+                padding: "11px 16px",
+                borderRadius: "8px",
                 border:
                   "1px solid #1459D9",
-                background:
-                  "#ffffff",
-                color:
-                  "#1459D9",
-                textDecoration:
-                  "none",
+                background: "#ffffff",
+                color: "#1459D9",
+                textDecoration: "none",
                 fontWeight: 700,
               }}
             >
@@ -776,16 +635,11 @@ export default async function CertificationReadinessPage({
             <Link
               href={`/portal/assessments/${assessment.id}/actions-plan`}
               style={{
-                padding:
-                  "11px 16px",
-                borderRadius:
-                  "8px",
-                background:
-                  "#1459D9",
-                color:
-                  "#ffffff",
-                textDecoration:
-                  "none",
+                padding: "11px 16px",
+                borderRadius: "8px",
+                background: "#1459D9",
+                color: "#ffffff",
+                textDecoration: "none",
                 fontWeight: 700,
               }}
             >
@@ -800,13 +654,10 @@ export default async function CertificationReadinessPage({
               style.background,
             border:
               `1px solid ${style.border}`,
-            color:
-              style.color,
-            borderRadius:
-              "14px",
+            color: style.color,
+            borderRadius: "14px",
             padding: "26px",
-            marginBottom:
-              "24px",
+            marginBottom: "24px",
           }}
         >
           <div
@@ -849,8 +700,7 @@ export default async function CertificationReadinessPage({
             gridTemplateColumns:
               "repeat(auto-fit, minmax(160px, 1fr))",
             gap: "12px",
-            marginBottom:
-              "24px",
+            marginBottom: "24px",
           }}
         >
           {[
@@ -894,62 +744,48 @@ export default async function CertificationReadinessPage({
               "COMPLETED ACTIONS",
               completedActions,
             ],
-          ].map(
-            ([label, value]) => (
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              style={{
+                background: "#ffffff",
+                border:
+                  "1px solid #dfe6ee",
+                borderRadius: "10px",
+                padding: "16px",
+              }}
+            >
               <div
-                key={label}
                 style={{
-                  background:
-                    "#ffffff",
-                  border:
-                    "1px solid #dfe6ee",
-                  borderRadius:
-                    "10px",
-                  padding:
-                    "16px",
+                  color: "#617087",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  marginBottom: "6px",
                 }}
               >
-                <div
-                  style={{
-                    color:
-                      "#617087",
-                    fontSize:
-                      "10px",
-                    fontWeight:
-                      800,
-                    marginBottom:
-                      "6px",
-                  }}
-                >
-                  {label}
-                </div>
-
-                <strong
-                  style={{
-                    color:
-                      "#071A33",
-                    fontSize:
-                      "24px",
-                  }}
-                >
-                  {value}
-                </strong>
+                {label}
               </div>
-            )
-          )}
+
+              <strong
+                style={{
+                  color: "#071A33",
+                  fontSize: "24px",
+                }}
+              >
+                {value}
+              </strong>
+            </div>
+          ))}
         </section>
 
         <section
           style={{
-            background:
-              "#ffffff",
+            background: "#ffffff",
             border:
               "1px solid #dfe6ee",
-            borderRadius:
-              "14px",
+            borderRadius: "14px",
             padding: "26px",
-            marginBottom:
-              "24px",
+            marginBottom: "24px",
           }}
         >
           <h2
@@ -967,78 +803,63 @@ export default async function CertificationReadinessPage({
               gap: "10px",
             }}
           >
-            {checks.map(
-              (check) => (
-                <div
-                  key={
-                    check.label
-                  }
-                  style={{
-                    display:
-                      "flex",
-                    justifyContent:
-                      "space-between",
-                    gap: "18px",
-                    alignItems:
-                      "center",
-                    padding:
-                      "14px 16px",
-                    borderRadius:
-                      "9px",
-                    background:
-                      "#f7f9fc",
-                  }}
-                >
-                  <div>
-                    <strong
-                      style={{
-                        color:
-                          "#071A33",
-                      }}
-                    >
-                      {check.label}
-                    </strong>
-
-                    <div
-                      style={{
-                        color:
-                          "#617087",
-                        fontSize:
-                          "13px",
-                        marginTop:
-                          "4px",
-                      }}
-                    >
-                      {check.detail}
-                    </div>
-                  </div>
-
+            {checks.map((check) => (
+              <div
+                key={check.label}
+                style={{
+                  display: "flex",
+                  justifyContent:
+                    "space-between",
+                  gap: "18px",
+                  alignItems: "center",
+                  padding: "14px 16px",
+                  borderRadius: "9px",
+                  background: "#f7f9fc",
+                }}
+              >
+                <div>
                   <strong
                     style={{
-                      color:
-                        check.pass
-                          ? "#16794b"
-                          : "#b42318",
+                      color: "#071A33",
                     }}
                   >
-                    {check.pass
-                      ? "PASS"
-                      : "OPEN"}
+                    {check.label}
                   </strong>
+
+                  <div
+                    style={{
+                      color: "#617087",
+                      fontSize: "13px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {check.detail}
+                  </div>
                 </div>
-              )
-            )}
+
+                <strong
+                  style={{
+                    color: check.pass
+                      ? "#16794b"
+                      : "#b42318",
+                  }}
+                >
+                  {check.pass
+                    ? check.successLabel ??
+                      "PASS"
+                    : "OPEN"}
+                </strong>
+              </div>
+            ))}
           </div>
         </section>
 
         <section
           style={{
-            background:
-              "#ffffff",
+            background: "#ffffff",
             border:
               "1px solid #dfe6ee",
-            borderRadius:
-              "14px",
+            borderRadius: "14px",
             padding: "26px",
           }}
         >
@@ -1057,75 +878,81 @@ export default async function CertificationReadinessPage({
               gap: "10px",
             }}
           >
-            {[
-              [
-                "Management readiness incomplete",
-                "The clause assessment is complete, but all nine management-readiness dimensions have not yet been assessed.",
-              ],
-              [
-                "Not ready",
-                "Open Major NC or other systemic barrier prevents progression.",
-              ],
-              [
-                "Significant improvement required",
-                "High-risk or overdue material actions remain, or the overall readiness position is materially weak.",
-              ],
-              [
-                "Progressing",
-                "The EMS is established and developing, but further evidence or implementation is required.",
-              ],
-              [
-                "Readiness review recommended",
-                "No Major NC remains, but open Minor NC or other conditions should be verified before progression.",
-              ],
-              [
-                "Potentially ready",
-                "The assessment is complete, no significant open barrier is known, and the readiness score is sufficiently strong.",
-              ],
-            ].map(
-              ([level, meaning]) => (
-                <div
-                  key={level}
-                  style={{
-                    padding:
-                      "14px 16px",
-                    borderRadius:
-                      "9px",
-                    background:
-                      level ===
-                      decision
-                        ? "#eef4ff"
-                        : "#f7f9fc",
-                    border:
-                      level ===
-                      decision
-                        ? "1px solid #b7cffc"
-                        : "1px solid transparent",
-                  }}
-                >
-                  <strong
-                    style={{
-                      color:
-                        "#071A33",
-                    }}
-                  >
-                    {level}
-                  </strong>
+            {decisionGuide.map(
+              ([level, meaning]) => {
+                const isCurrent =
+                  level === decision;
 
+                return (
                   <div
+                    key={level}
                     style={{
-                      color:
-                        "#617087",
-                      lineHeight:
-                        1.55,
-                      marginTop:
-                        "5px",
+                      padding:
+                        "14px 16px",
+                      borderRadius:
+                        "9px",
+                      background:
+                        isCurrent
+                          ? style.background
+                          : "#f7f9fc",
+                      border:
+                        isCurrent
+                          ? `1px solid ${style.border}`
+                          : "1px solid transparent",
                     }}
                   >
-                    {meaning}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent:
+                          "space-between",
+                        alignItems:
+                          "center",
+                        gap: "16px",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          color:
+                            isCurrent
+                              ? style.color
+                              : "#071A33",
+                        }}
+                      >
+                        {level}
+                      </strong>
+
+                      {isCurrent && (
+                        <span
+                          style={{
+                            fontSize:
+                              "11px",
+                            fontWeight:
+                              800,
+                            letterSpacing:
+                              ".5px",
+                            color:
+                              style.color,
+                          }}
+                        >
+                          CURRENT
+                          RECOMMENDATION
+                        </span>
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        color: "#617087",
+                        lineHeight: 1.55,
+                        marginTop: "5px",
+                      }}
+                    >
+                      {meaning}
+                    </div>
                   </div>
-                </div>
-              )
+                );
+              }
             )}
           </div>
         </section>
