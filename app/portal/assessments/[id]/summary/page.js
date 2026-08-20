@@ -29,6 +29,33 @@ const CLAUSE_TITLES = {
   "10": "Improvement",
 };
 
+
+function managementReadinessValue(rating) {
+  switch (rating) {
+    case "Not Ready":
+      return 25;
+    case "Developing":
+      return 50;
+    case "Established":
+      return 75;
+    case "Ready":
+      return 100;
+    default:
+      return null;
+  }
+}
+
+function managementReadinessLabel(score, completed) {
+  if (completed < 9 || score === null) {
+    return "Not assessed";
+  }
+
+  if (score < 40) return "Not Ready";
+  if (score < 65) return "Developing";
+  if (score < 85) return "Established";
+  return "Ready";
+}
+
 export default async function AssessmentSummaryPage({
   params,
 }) {
@@ -628,6 +655,57 @@ export default async function AssessmentSummaryPage({
         "Needs improvement";
     }
   }
+
+  const {
+    data: managementReadinessRows,
+    error: managementReadinessError,
+  } = await supabase
+    .from("management_readiness")
+    .select(
+      "dimension_key, readiness_rating, evidence_confidence, management_action, target_date"
+    )
+    .eq("assessment_id", assessment.id)
+    .eq("owner_id", user.id)
+    .order("display_order", { ascending: true });
+
+  if (managementReadinessError) {
+    throw new Error(managementReadinessError.message);
+  }
+
+  const managementRows =
+    managementReadinessRows ?? [];
+
+  const managementValues =
+    managementRows
+      .map((row) =>
+        managementReadinessValue(
+          row.readiness_rating
+        )
+      )
+      .filter(
+        (value) => value !== null
+      );
+
+  const managementDimensionsCompleted =
+    managementValues.length;
+
+  const managementReadinessScore =
+    managementValues.length > 0
+      ? Math.round(
+          managementValues.reduce(
+            (total, value) =>
+              total + value,
+            0
+          ) /
+            managementValues.length
+        )
+      : null;
+
+  const managementReadiness =
+    managementReadinessLabel(
+      managementReadinessScore,
+      managementDimensionsCompleted
+    );
 
   let readinessDecision =
     "Assessment incomplete";
@@ -1282,6 +1360,28 @@ export default async function AssessmentSummaryPage({
                   }}
                 >
                   Management Action Plan
+                </a>
+
+                <a
+                  href={`/portal/assessments/${assessment.id}/management-readiness`}
+                  style={{
+                    padding:
+                      "11px 15px",
+                    borderRadius:
+                      "8px",
+                    background:
+                      "#ffffff",
+                    color:
+                      "#1459D9",
+                    border:
+                      "1px solid #1459D9",
+                    textDecoration:
+                      "none",
+                    fontWeight:
+                      700,
+                  }}
+                >
+                  Management Readiness
                 </a>
 
                 <a
