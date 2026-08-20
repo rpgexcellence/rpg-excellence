@@ -377,6 +377,7 @@ export default async function AssessmentSummaryPage({
   let findings = [];
   let correctiveActions = [];
   let managementActions = [];
+  let evidenceSamples = [];
 
   if (isIso14001_2026) {
     const {
@@ -474,6 +475,32 @@ export default async function AssessmentSummaryPage({
 
     managementActions =
       managementData ?? [];
+
+    const {
+      data: evidenceSamplesData,
+      error: evidenceSamplesError,
+    } = await supabase
+      .from("assessment_evidence_samples")
+      .select(
+        "id, question_number, evidence_confidence, exception_gap, finding_id"
+      )
+      .eq(
+        "assessment_id",
+        assessment.id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      );
+
+    if (evidenceSamplesError) {
+      throw new Error(
+        evidenceSamplesError.message
+      );
+    }
+
+    evidenceSamples =
+      evidenceSamplesData ?? [];
   }
 
   const openFindings =
@@ -590,6 +617,41 @@ export default async function AssessmentSummaryPage({
         );
       }
     ).length;
+
+  const totalEvidenceSamples =
+    evidenceSamples.length;
+
+  const evidenceSamplesWithExceptions =
+    evidenceSamples.filter(
+      (sample) =>
+        typeof sample.exception_gap ===
+          "string" &&
+        sample.exception_gap.trim() !==
+          ""
+    ).length;
+
+  const highConfidenceEvidenceSamples =
+    evidenceSamples.filter(
+      (sample) =>
+        sample.evidence_confidence ===
+        "High"
+    ).length;
+
+  const evidenceSamplesLinkedToFindings =
+    evidenceSamples.filter(
+      (sample) =>
+        Boolean(sample.finding_id)
+    ).length;
+
+  const evidenceTraceabilityPercentage =
+    totalEvidenceSamples > 0
+      ? Math.round(
+          (
+            evidenceSamplesLinkedToFindings /
+            totalEvidenceSamples
+          ) * 100
+        )
+      : null;
 
   const {
     data: managementReadinessRows,
@@ -1337,6 +1399,211 @@ export default async function AssessmentSummaryPage({
                 >
                   Certification Readiness Decision
                 </a>
+              </div>
+            </section>
+
+            {/* EVIDENCE ASSURANCE */}
+
+            <section
+              style={{
+                background:
+                  "#ffffff",
+                border:
+                  "1px solid #dfe6ee",
+                borderRadius:
+                  "14px",
+                padding: "26px",
+                marginBottom:
+                  "24px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent:
+                    "space-between",
+                  alignItems:
+                    "flex-start",
+                  gap: "20px",
+                  flexWrap: "wrap",
+                  marginBottom:
+                    "20px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      color:
+                        "#1459D9",
+                      fontWeight:
+                        800,
+                      fontSize:
+                        "12px",
+                      marginBottom:
+                        "7px",
+                    }}
+                  >
+                    EVIDENCE ASSURANCE
+                  </div>
+
+                  <h2
+                    style={{
+                      color:
+                        "#071A33",
+                      margin:
+                        "0 0 6px",
+                    }}
+                  >
+                    Assessment Evidence Traceability
+                  </h2>
+
+                  <p
+                    style={{
+                      color:
+                        "#617087",
+                      maxWidth:
+                        "760px",
+                      lineHeight:
+                        1.6,
+                      margin:
+                        0,
+                    }}
+                  >
+                    Evidence sampling provides
+                    traceability between the
+                    assessment conclusion,
+                    identified exceptions and
+                    formal findings. The counts
+                    below reflect the live
+                    Evidence Sampling workspace.
+                  </p>
+                </div>
+
+                <a
+                  href={`/portal/assessments/${assessment.id}/evidence`}
+                  style={{
+                    padding:
+                      "10px 14px",
+                    borderRadius:
+                      "8px",
+                    background:
+                      "#1459D9",
+                    color:
+                      "#ffffff",
+                    textDecoration:
+                      "none",
+                    fontWeight:
+                      700,
+                    whiteSpace:
+                      "nowrap",
+                  }}
+                >
+                  Open Evidence Sampling
+                </a>
+              </div>
+
+              <div
+                style={{
+                  display:
+                    "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(160px, 1fr))",
+                  gap:
+                    "12px",
+                }}
+              >
+                {[
+                  [
+                    "EVIDENCE SAMPLES",
+                    totalEvidenceSamples,
+                  ],
+                  [
+                    "EXCEPTIONS / GAPS",
+                    evidenceSamplesWithExceptions,
+                  ],
+                  [
+                    "HIGH CONFIDENCE",
+                    highConfidenceEvidenceSamples,
+                  ],
+                  [
+                    "LINKED TO FINDINGS",
+                    evidenceSamplesLinkedToFindings,
+                  ],
+                ].map(
+                  ([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        background:
+                          "#f7f9fc",
+                        borderRadius:
+                          "10px",
+                        padding:
+                          "15px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          color:
+                            "#617087",
+                          fontSize:
+                            "10px",
+                          fontWeight:
+                            800,
+                          marginBottom:
+                            "6px",
+                        }}
+                      >
+                        {label}
+                      </div>
+
+                      <strong
+                        style={{
+                          color:
+                            "#071A33",
+                          fontSize:
+                            "25px",
+                        }}
+                      >
+                        {value}
+                      </strong>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div
+                style={{
+                  marginTop:
+                    "14px",
+                  padding:
+                    "13px 15px",
+                  borderRadius:
+                    "9px",
+                  background:
+                    totalEvidenceSamples > 0
+                      ? "#eef4ff"
+                      : "#fff8e8",
+                  border:
+                    totalEvidenceSamples > 0
+                      ? "1px solid #d6e4ff"
+                      : "1px solid #f1dfad",
+                  color:
+                    totalEvidenceSamples > 0
+                      ? "#405574"
+                      : "#735c17",
+                  lineHeight:
+                    1.5,
+                  fontSize:
+                    "13px",
+                }}
+              >
+                {totalEvidenceSamples > 0
+                  ? `Evidence-to-finding traceability: ${
+                      evidenceTraceabilityPercentage ??
+                      0
+                    }% of recorded samples are linked to formal findings where applicable.`
+                  : "No detailed evidence samples have been recorded yet. Assessment conclusions should be supported by traceable sampled evidence before the final readiness decision."}
               </div>
             </section>
 
