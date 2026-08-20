@@ -197,7 +197,10 @@ async function saveFinding({
       ? riskImpactRaw.trim()
       : "";
 
+  // Risk is required only when an actual finding is raised.
+  // Conformity does not require a High / Medium / Low risk rating.
   if (
+    findingType !== "conformity" &&
     !VALID_RISK_LEVELS.includes(
       riskImpact
     )
