@@ -172,8 +172,7 @@ export async function updateManagementAction(
         question_number,
         clause,
         finding_statement,
-        requirement_summary,
-        status
+        requirement_summary
       `
     )
     .eq(
@@ -209,10 +208,7 @@ export async function updateManagementAction(
     );
 
   const actionTitle =
-    `${
-      finding.question_number ??
-      "Finding"
-    } - ${labelFor(
+    `${finding.question_number ?? "Finding"} - ${labelFor(
       finding.finding_type
     )}`;
 
@@ -244,10 +240,6 @@ export async function updateManagementAction(
     related_finding_id:
       findingId,
 
-    /*
-     * Compatibility column added during
-     * schema alignment.
-     */
     finding_id:
       findingId,
 
@@ -368,78 +360,71 @@ export async function updateManagementAction(
   }
 
   /*
-   * Management progress is reflected in
-   * the formal finding, but completion of
-   * the management action does NOT
-   * automatically close the finding.
+   * IMPORTANT:
    *
-   * Formal closure should occur only
-   * after verification / effectiveness
-   * confirmation in the Findings workflow.
+   * Management action completion does NOT
+   * automatically close the formal finding.
+   *
+   * A completed management action moves the
+   * finding into verification so effectiveness
+   * can be independently confirmed before the
+   * NC is formally closed.
+   *
+   * Workflow:
+   *
+   * open
+   *   -> action_in_progress
+   *   -> verification
+   *   -> closed
+   *
+   * Formal closure should be performed through
+   * the Findings Register verification process.
    */
-  let findingStatus =
-    "open";
+  const findingStatus =
+    status === "completed"
+      ? "verification"
+      : status ===
+          "verification"
+        ? "verification"
+        : [
+            "in_progress",
+            "at_risk",
+          ].includes(
+            status
+          )
+          ? "action_in_progress"
+          : "open";
 
-  if (
-    status ===
-      "in_progress" ||
-    status ===
-      "at_risk"
-  ) {
-    findingStatus =
-      "action_in_progress";
-  }
+  const {
+    error: syncError,
+  } = await admin
+    .from(
+      "assessment_findings"
+    )
+    .update({
+      status:
+        findingStatus,
 
-  if (
-    status ===
-      "verification" ||
-    status ===
-      "completed"
-  ) {
-    findingStatus =
-      "verification";
-  }
+      updated_at:
+        now,
+    })
+    .eq(
+      "id",
+      findingId
+    )
+    .eq(
+      "assessment_id",
+      assessmentId
+    )
+    .eq(
+      "owner_id",
+      user.id
+    );
 
-  /*
-   * Do not reopen an already formally
-   * closed finding just because its
-   * management action record is edited.
-   */
-  if (
-    finding.status !==
-    "closed"
-  ) {
-    const {
-      error: syncError,
-    } = await admin
-      .from(
-        "assessment_findings"
-      )
-      .update({
-        status:
-          findingStatus,
-
-        updated_at:
-          now,
-      })
-      .eq(
-        "id",
-        findingId
-      )
-      .eq(
-        "assessment_id",
-        assessmentId
-      )
-      .eq(
-        "owner_id",
-        user.id
-      );
-
-    if (syncError) {
-      throw new Error(
-        syncError.message
-      );
-    }
+  if (syncError) {
+    throw new Error(
+      syncError.message
+    );
   }
 
   revalidatePath(
