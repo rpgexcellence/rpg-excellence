@@ -12,6 +12,11 @@ import {
   calculateProgress,
 } from "./scoring";
 
+const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO 14001:2026",
+  "ISO 45001:2018",
+];
+
 const CLAUSE_NUMBERS = [
   "4",
   "5",
@@ -136,8 +141,9 @@ export default async function AssessmentPage({
   let correctiveActions = [];
 
   if (
-    assessment.standard ===
-    "ISO 14001:2026"
+    ADVANCED_ASSESSMENT_STANDARDS.includes(
+      assessment.standard
+    )
   ) {
     const {
       data: findingsData,
@@ -379,9 +385,10 @@ export default async function AssessmentPage({
     ] ??
     `Clause ${clause}`;
 
-  const isIso14001_2026 =
-    assessment.standard ===
-    "ISO 14001:2026";
+  const isAdvancedAssessment =
+    ADVANCED_ASSESSMENT_STANDARDS.includes(
+      assessment.standard
+    );
 
   async function saveCurrentClause(
     formData
@@ -475,7 +482,7 @@ export default async function AssessmentPage({
           </strong>
         </p>
 
-        {isIso14001_2026 && (
+        {isAdvancedAssessment && (
           <div
             style={{
               display: "flex",
@@ -981,7 +988,7 @@ export default async function AssessmentPage({
                           }
                         </p>
 
-                        {isIso14001_2026 ? (
+                        {isAdvancedAssessment ? (
                           <div
                             style={{
                               display: "grid",
@@ -1378,7 +1385,7 @@ export default async function AssessmentPage({
                               "7px",
                           }}
                         >
-                          {isIso14001_2026
+                          {isAdvancedAssessment
                             ? "Objective evidence / assessor notes"
                             : "Evidence / notes"}
                         </label>
@@ -1386,7 +1393,7 @@ export default async function AssessmentPage({
                         <textarea
                           name={`evidence_${fieldKey}`}
                           placeholder={
-                            isIso14001_2026
+                            isAdvancedAssessment
                               ? "Record sampled documents, records, interviews, observations, data, references and any identified gaps..."
                               : "Describe supporting evidence, documents, records, observations or gaps..."
                           }
@@ -1410,7 +1417,7 @@ export default async function AssessmentPage({
                           }}
                         />
 
-                        {isIso14001_2026 && (
+                        {isAdvancedAssessment && (
                           <FindingConclusionFields
                             fieldKey={fieldKey}
                             savedFinding={savedFinding}
