@@ -102,7 +102,8 @@ const pricing = [
     name: "Starter",
     price: "£20.99",
     period: "/month",
-    description: "For small organisations beginning their assurance journey.",
+    description:
+      "For small organisations beginning their assurance journey.",
     features: [
       "ISO assessments",
       "Business Assurance Score",
@@ -114,7 +115,8 @@ const pricing = [
     name: "Professional",
     price: "£59",
     period: "/month",
-    description: "For organisations actively managing certification readiness.",
+    description:
+      "For organisations actively managing certification readiness.",
     features: [
       "Everything in Starter",
       "Unlimited assessments",
@@ -128,7 +130,8 @@ const pricing = [
     name: "Consultant",
     price: "£159",
     period: "/month",
-    description: "For consultants managing assurance across multiple clients.",
+    description:
+      "For consultants managing assurance across multiple clients.",
     features: [
       "Everything in Professional",
       "Consultant workflow",
@@ -711,7 +714,42 @@ export default async function Home({ params }) {
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* FINAL CTA */}
+
+      <section className="contactBand">
+        <div>
+          <span className="kicker light">
+            RPG Intelligence
+          </span>
+
+          <h2>
+            Ready to measure your management system readiness?
+          </h2>
+
+          <p>
+            Start an assessment, understand your Business Assurance Score
+            and turn management system data into actionable insight.
+          </p>
+        </div>
+
+        <div className="ctaRow">
+          <Link
+            className="button buttonLight"
+            href="/portal"
+          >
+            Start Assessment
+          </Link>
+
+          <Link
+            className="button buttonLight"
+            href={`/${locale}/contact`}
+          >
+            Book a Demo
+          </Link>
+        </div>
+      </section>
+
+      {/* FAQ — LAST CONTENT SECTION BEFORE FOOTER */}
 
       <section className="section">
         <div className="sectionHead">
@@ -755,41 +793,6 @@ export default async function Home({ params }) {
               </p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* FINAL CTA */}
-
-      <section className="contactBand">
-        <div>
-          <span className="kicker light">
-            RPG Intelligence
-          </span>
-
-          <h2>
-            Ready to measure your management system readiness?
-          </h2>
-
-          <p>
-            Start an assessment, understand your Business Assurance Score
-            and turn management system data into actionable insight.
-          </p>
-        </div>
-
-        <div className="ctaRow">
-          <Link
-            className="button buttonLight"
-            href="/portal"
-          >
-            Start Assessment
-          </Link>
-
-          <Link
-            className="button buttonLight"
-            href={`/${locale}/contact`}
-          >
-            Book a Demo
-          </Link>
         </div>
       </section>
 
