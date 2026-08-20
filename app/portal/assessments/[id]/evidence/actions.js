@@ -11,7 +11,10 @@ import {
 import {
   createClient,
 } from "../../../../../lib/supabase/server";
-import { createAdminClient } from "../../../../../lib/supabase/admin";
+
+import {
+  createAdminClient,
+} from "../../../../../lib/supabase/admin";
 
 const EVIDENCE_TYPES = [
   "Document",
@@ -44,8 +47,7 @@ const RISK_LEVELS = [
 
 function cleanText(value) {
   if (
-    typeof value !==
-      "string" ||
+    typeof value !== "string" ||
     value.trim() === ""
   ) {
     return null;
@@ -176,15 +178,29 @@ async function buildPayload({
       )
     );
 
+  /*
+   * The assessment has already been ownership-validated.
+   *
+   * Use the admin client to validate the finding because
+   * assessment_findings may be protected by RLS.
+   *
+   * The assessment_id condition prevents a finding belonging
+   * to another assessment from being linked.
+   */
   if (findingId) {
+    const admin =
+      createAdminClient();
+
     const {
       data: finding,
       error: findingError,
-    } = await supabase
+    } = await admin
       .from(
         "assessment_findings"
       )
-      .select("id")
+      .select(
+        "id, assessment_id"
+      )
       .eq(
         "id",
         findingId
@@ -193,18 +209,17 @@ async function buildPayload({
         "assessment_id",
         assessmentId
       )
-      .eq(
-        "owner_id",
-        userId
-      )
       .maybeSingle();
 
-    if (
-      findingError ||
-      !finding
-    ) {
+    if (findingError) {
       throw new Error(
-        "Linked finding not found."
+        findingError.message
+      );
+    }
+
+    if (!finding) {
+      throw new Error(
+        "Linked finding not found for this assessment."
       );
     }
   }
@@ -447,6 +462,14 @@ export async function updateEvidenceSample(
     `/portal/assessments/${assessmentId}/evidence`
   );
 
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/summary`
+  );
+
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/findings`
+  );
+
   redirect(
     `/portal/assessments/${assessmentId}/evidence`
   );
@@ -530,11 +553,14 @@ export async function deleteEvidenceSample(
     `/portal/assessments/${assessmentId}/evidence`
   );
 
+  revalidatePath(
+    `/portal/assessments/${assessmentId}/summary`
+  );
+
   redirect(
     `/portal/assessments/${assessmentId}/evidence`
   );
 }
-
 
 export async function raiseFindingFromEvidenceSample(
   formData
@@ -734,21 +760,27 @@ export async function raiseFindingFromEvidenceSample(
     sample.evidence_type
       ? `Type: ${sample.evidence_type}`
       : null,
+
     sample.evidence_reference
       ? `Reference: ${sample.evidence_reference}`
       : null,
+
     sample.evidence_period
       ? `Period: ${sample.evidence_period}`
       : null,
+
     sample.sample_size
       ? `Sample size: ${sample.sample_size}`
       : null,
+
     sample.sample_result
       ? `Result: ${sample.sample_result}`
       : null,
+
     sample.exception_gap
       ? `Exception / gap: ${sample.exception_gap}`
       : null,
+
     sample.assessor_notes
       ? `Assessor notes: ${sample.assessor_notes}`
       : null,
