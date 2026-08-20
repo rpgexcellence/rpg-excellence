@@ -26,9 +26,6 @@ export default function Footer({ locale }) {
           RPG Insights
         </Link>
 
-        <Link href={`/${locale}/faq`}>
-          FAQ
-        </Link>
 
         <Link href={`/${locale}/terms`}>
           Terms
