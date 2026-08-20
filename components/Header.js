@@ -9,7 +9,7 @@ export default function Header({ locale, nav }) {
         className="brand"
         aria-label="RPG Excellence home"
         style={{
-          width: "230px",
+          width: "260px",
           height: "70px",
           display: "flex",
           alignItems: "center",
@@ -23,8 +23,8 @@ export default function Header({ locale, nav }) {
           alt="RPG Excellence"
           style={{
             display: "block",
-            width: "230px",
-            maxWidth: "230px",
+            width: "260px",
+            maxWidth: "260px",
             height: "70px",
             maxHeight: "70px",
             objectFit: "contain",
