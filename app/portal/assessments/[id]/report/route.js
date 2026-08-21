@@ -1068,7 +1068,17 @@ export async function GET(request, { params }) {
     );
 
     drawText(
-      `Open Major NC: ${openMajorCount} | Open Minor NC: ${openMinorCount} | High risk: ${highRiskCount} | Medium risk: ${mediumRiskCount} | Low risk: ${lowRiskCount} | Overdue actions: ${overdueActionCount}`,
+      `Open Major NC: ${openMajorCount} | Open Minor NC: ${openMinorCount} | High risk: ${highRiskCount}`,
+      {
+        size: 10,
+        color: grey,
+        lineHeight: 14,
+        maxLength: 88,
+      }
+    );
+
+    drawText(
+      `Medium risk: ${mediumRiskCount} | Low risk: ${lowRiskCount} | Overdue actions: ${overdueActionCount}`,
       {
         size: 10,
         color: grey,
@@ -1089,7 +1099,7 @@ export async function GET(request, { params }) {
       }
     );
 
-    y -= 10;
+    y -= 14;
 
     drawText(
       "Evidence Assurance",
@@ -1123,7 +1133,7 @@ export async function GET(request, { params }) {
       }
     );
 
-    y -= 10;
+    y -= 14;
 
     drawText(
       "Priority Findings & Management Actions",
@@ -1204,7 +1214,7 @@ export async function GET(request, { params }) {
       y -= 8;
 
       drawText(
-        "ISO 9001:2015/Amd 1:2024 Climate Action Consideration",
+        "Climate Action Consideration",
         {
           size: 14,
           font: bold,
@@ -1213,7 +1223,17 @@ export async function GET(request, { params }) {
       );
 
       drawText(
-        "The assessment question bank includes explicit consideration of whether climate change is a relevant issue for the QMS and whether relevant interested parties have climate-related requirements. Where climate change is relevant, related risks, opportunities and operational implications should be reflected in the QMS.",
+        "ISO 9001:2015/Amd 1:2024 requires explicit consideration of whether climate change is a relevant issue for the QMS and whether relevant interested parties have climate-related requirements.",
+        {
+          size: 9,
+          color: grey,
+          lineHeight: 13,
+          maxLength: 88,
+        }
+      );
+
+      drawText(
+        "Where climate change is relevant, related risks, opportunities and operational implications should be reflected in the QMS.",
         {
           size: 9,
           color: grey,
