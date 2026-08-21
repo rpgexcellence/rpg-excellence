@@ -30,6 +30,7 @@ const CLAUSE_TITLES = {
 };
 
 const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
 ];
@@ -1980,6 +1981,21 @@ export default async function AssessmentSummaryPage({
   {isAdvancedAssessment && (
     <>
       <a
+        href={`/portal/assessments/${assessment.id}/evidence`}
+        style={{
+          padding: "12px 18px",
+          borderRadius: "8px",
+          background: "#ffffff",
+          border: "1px solid #1459D9",
+          color: "#1459D9",
+          textDecoration: "none",
+          fontWeight: 700,
+        }}
+      >
+        Evidence Sampling
+      </a>
+
+      <a
         href={`/portal/assessments/${assessment.id}/findings`}
         style={{
           padding: "12px 18px",
@@ -1991,7 +2007,7 @@ export default async function AssessmentSummaryPage({
           fontWeight: 700,
         }}
       >
-        Findings
+        Findings & Corrective Actions
       </a>
 
       <a
@@ -2006,6 +2022,35 @@ export default async function AssessmentSummaryPage({
         }}
       >
         Management Action Plan
+      </a>
+
+      <a
+        href={`/portal/assessments/${assessment.id}/management-readiness`}
+        style={{
+          padding: "12px 18px",
+          borderRadius: "8px",
+          background: "#ffffff",
+          border: "1px solid #1459D9",
+          color: "#1459D9",
+          textDecoration: "none",
+          fontWeight: 700,
+        }}
+      >
+        Management Readiness
+      </a>
+
+      <a
+        href={`/portal/assessments/${assessment.id}/readiness`}
+        style={{
+          padding: "12px 18px",
+          borderRadius: "8px",
+          background: "#167C80",
+          color: "#ffffff",
+          textDecoration: "none",
+          fontWeight: 700,
+        }}
+      >
+        Certification Readiness
       </a>
     </>
   )}
