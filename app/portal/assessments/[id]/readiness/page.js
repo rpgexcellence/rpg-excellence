@@ -743,7 +743,9 @@ export default async function CertificationReadinessPage({
 
     [
       "Progressing",
-      "The EMS is established and developing, but further evidence or implementation is required.",
+      assessment.standard === "ISO 45001:2018"
+        ? "The OH&S management system is established and developing, but further evidence or implementation is required."
+        : "The EMS is established and developing, but further evidence or implementation is required.",
     ],
 
     [
