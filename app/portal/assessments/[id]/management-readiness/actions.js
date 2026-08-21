@@ -12,7 +12,7 @@ import {
   createClient,
 } from "../../../../../lib/supabase/server";
 
-const DIMENSIONS = [
+const ISO_14001_DIMENSIONS = [
   {
     key: "leadership",
     name: "Leadership",
@@ -24,52 +24,86 @@ const DIMENSIONS = [
     order: 2,
   },
   {
-    key:
-      "environmental_context",
-    name:
-      "Environmental Context",
+    key: "environmental_context",
+    name: "Environmental Context",
     order: 3,
   },
   {
-    key:
-      "risk_management",
-    name:
-      "Risk Management",
+    key: "risk_management",
+    name: "Risk Management",
     order: 4,
   },
   {
-    key:
-      "operational_control",
-    name:
-      "Operational Control",
+    key: "operational_control",
+    name: "Operational Control",
     order: 5,
   },
   {
-    key:
-      "compliance_assurance",
-    name:
-      "Compliance Assurance",
+    key: "compliance_assurance",
+    name: "Compliance Assurance",
     order: 6,
   },
   {
-    key:
-      "environmental_performance",
-    name:
-      "Environmental Performance",
+    key: "environmental_performance",
+    name: "Environmental Performance",
     order: 7,
   },
   {
-    key:
-      "internal_assurance",
-    name:
-      "Internal Assurance",
+    key: "internal_assurance",
+    name: "Internal Assurance",
     order: 8,
   },
   {
-    key:
-      "improvement_capability",
-    name:
-      "Improvement Capability",
+    key: "improvement_capability",
+    name: "Improvement Capability",
+    order: 9,
+  },
+];
+
+const ISO_45001_DIMENSIONS = [
+  {
+    key: "ohs_leadership_culture",
+    name: "Leadership & OH&S Culture",
+    order: 1,
+  },
+  {
+    key: "ohs_governance",
+    name: "Governance & Accountability",
+    order: 2,
+  },
+  {
+    key: "ohs_context",
+    name: "OH&S Context & Worker Needs",
+    order: 3,
+  },
+  {
+    key: "hazard_risk_management",
+    name: "Hazard & Risk Management",
+    order: 4,
+  },
+  {
+    key: "worker_participation",
+    name: "Worker Consultation & Participation",
+    order: 5,
+  },
+  {
+    key: "ohs_operational_control",
+    name: "Operational & Contractor Control",
+    order: 6,
+  },
+  {
+    key: "ohs_compliance_assurance",
+    name: "Legal & Compliance Assurance",
+    order: 7,
+  },
+  {
+    key: "ohs_performance_assurance",
+    name: "OH&S Performance & Internal Assurance",
+    order: 8,
+  },
+  {
+    key: "ohs_improvement_learning",
+    name: "Improvement & Organisational Learning",
     order: 9,
   },
 ];
@@ -89,8 +123,7 @@ const CONFIDENCE_LEVELS = [
 
 function cleanText(value) {
   if (
-    typeof value !==
-      "string" ||
+    typeof value !== "string" ||
     value.trim() === ""
   ) {
     return null;
@@ -101,14 +134,23 @@ function cleanText(value) {
 
 function cleanDate(value) {
   if (
-    typeof value !==
-      "string" ||
+    typeof value !== "string" ||
     value.trim() === ""
   ) {
     return null;
   }
 
   return value.trim();
+}
+
+function getDimensions(standard) {
+  if (
+    standard === "ISO 45001:2018"
+  ) {
+    return ISO_45001_DIMENSIONS;
+  }
+
+  return ISO_14001_DIMENSIONS;
 }
 
 export async function saveManagementReadiness(
@@ -171,11 +213,16 @@ export async function saveManagementReadiness(
     );
   }
 
+  const dimensions =
+    getDimensions(
+      assessment.standard
+    );
+
   const rows = [];
 
   for (
     const dimension of
-      DIMENSIONS
+      dimensions
   ) {
     const readinessRaw =
       formData.get(
