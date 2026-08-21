@@ -29,7 +29,7 @@ const CLAUSE_NUMBERS = [
   "10",
 ];
 
-const CLAUSE_TITLES = {
+const DEFAULT_CLAUSE_TITLES = {
   "4": "Context of the Organization",
   "5": "Leadership",
   "6": "Planning",
@@ -38,6 +38,26 @@ const CLAUSE_TITLES = {
   "9": "Performance Evaluation",
   "10": "Improvement",
 };
+
+const CLAUSE_TITLES_BY_STANDARD = {
+  "ISO/IEC 17024:2026": {
+    "4": "General Requirements",
+    "5": "Structural Requirements",
+    "6": "Resource Requirements",
+    "7": "Records and Information Requirements",
+    "8": "Certification Schemes",
+    "9": "Certification Process Requirements",
+    "10": "Management System Requirements",
+  },
+};
+
+function getClauseTitle(standard, clauseNumber) {
+  return (
+    CLAUSE_TITLES_BY_STANDARD[standard]?.[clauseNumber] ??
+    DEFAULT_CLAUSE_TITLES[clauseNumber] ??
+    `Clause ${clauseNumber}`
+  );
+}
 
 export default async function AssessmentPage({
   params,
@@ -382,10 +402,10 @@ export default async function AssessmentPage({
     );
 
   const clauseTitle =
-    CLAUSE_TITLES[
+    getClauseTitle(
+      assessment.standard,
       clause
-    ] ??
-    `Clause ${clause}`;
+    );
 
   const isAdvancedAssessment =
     ADVANCED_ASSESSMENT_STANDARDS.includes(
@@ -754,11 +774,10 @@ export default async function AssessmentPage({
                       lineHeight: 1.35,
                     }}
                   >
-                    {
-                      CLAUSE_TITLES[
-                        number
-                      ]
-                    }
+                    {getClauseTitle(
+                      assessment.standard,
+                      number
+                    )}
                   </div>
 
                   {weight && (
