@@ -108,6 +108,54 @@ const ISO_45001_DIMENSIONS = [
   },
 ];
 
+const ISO_9001_DIMENSIONS = [
+  {
+    key: "qms_leadership_culture",
+    name: "Leadership & Quality Culture",
+    order: 1,
+  },
+  {
+    key: "qms_governance",
+    name: "Governance & Accountability",
+    order: 2,
+  },
+  {
+    key: "customer_focus",
+    name: "Customer Focus",
+    order: 3,
+  },
+  {
+    key: "process_management",
+    name: "Process Management",
+    order: 4,
+  },
+  {
+    key: "qms_risk_change",
+    name: "Risk & Change Management",
+    order: 5,
+  },
+  {
+    key: "qms_operational_supplier_control",
+    name: "Operational & Supplier Control",
+    order: 6,
+  },
+  {
+    key: "quality_performance_data",
+    name: "Quality Performance & Data",
+    order: 7,
+  },
+  {
+    key: "qms_internal_assurance",
+    name: "Internal Assurance & Management Review",
+    order: 8,
+  },
+  {
+    key: "qms_improvement_learning",
+    name: "Improvement & Organisational Learning",
+    order: 9,
+  },
+];
+
 const READINESS_RATINGS = [
   "Not Ready",
   "Developing",
@@ -144,6 +192,12 @@ function cleanDate(value) {
 }
 
 function getDimensions(standard) {
+  if (
+    standard === "ISO 9001:2015/Amd 1:2024"
+  ) {
+    return ISO_9001_DIMENSIONS;
+  }
+
   if (
     standard === "ISO 45001:2018"
   ) {
