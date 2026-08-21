@@ -1239,6 +1239,10 @@ export default async function PortalPage() {
                         ISO 45001:2018
                       </option>
 
+                      <option value="ISO/IEC 17024:2026">
+                        ISO/IEC 17024:2026 — Certification of Persons
+                      </option>
+
                       <option value="ISO 22301">
                         ISO 22301
                       </option>
