@@ -33,6 +33,7 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
+  "ISO/IEC 17024:2026",
 ];
 
 function cleanText(value) {
