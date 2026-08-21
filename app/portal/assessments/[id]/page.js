@@ -16,6 +16,7 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
+  "ISO/IEC 17024:2026",
 ];
 
 const CLAUSE_NUMBERS = [
@@ -137,7 +138,7 @@ export default async function AssessmentPage({
       question.clause === clause
   );
 
-  // Load formal ISO 14001:2026 findings and corrective actions.
+  // Load formal findings and corrective actions for advanced assessments.
   let assessmentFindings = [];
   let correctiveActions = [];
 
