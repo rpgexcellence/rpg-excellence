@@ -13,6 +13,7 @@ import {
 } from "./scoring";
 
 const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
 ];
@@ -1262,6 +1263,64 @@ export default async function AssessmentPage({
                                   Management focus:
                                 </strong>{" "}
                                 {question.management_focus}
+                              </div>
+                            )}
+
+                            {question.transition_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#eef8ff",
+                                  borderLeft:
+                                    "4px solid #0284c7",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "6px",
+                                  color:
+                                    "#475569",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Transition / amendment guidance:
+                                </strong>{" "}
+                                {question.transition_guidance}
+                              </div>
+                            )}
+
+                            {question.maturity_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f0fdf4",
+                                  borderLeft:
+                                    "4px solid #16a34a",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "6px",
+                                  color:
+                                    "#475569",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Maturity guidance:
+                                </strong>{" "}
+                                {question.maturity_guidance}
                               </div>
                             )}
                           </div>
