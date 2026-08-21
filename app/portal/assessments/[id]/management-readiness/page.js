@@ -139,6 +139,73 @@ const ISO_45001_DIMENSIONS = [
   },
 ];
 
+
+const ISO_9001_DIMENSIONS = [
+  {
+    key: "qms_leadership_culture",
+    name: "Leadership & Quality Culture",
+    order: 1,
+    guidance:
+      "Assess visible top-management accountability for QMS effectiveness, integration of quality into business decisions, promotion of customer focus, process thinking and a culture of consistent quality performance.",
+  },
+  {
+    key: "qms_governance",
+    name: "Governance & Accountability",
+    order: 2,
+    guidance:
+      "Assess whether QMS roles, responsibilities, authorities, escalation routes and management oversight are clearly defined, understood and effective.",
+  },
+  {
+    key: "customer_focus",
+    name: "Customer Focus",
+    order: 3,
+    guidance:
+      "Assess whether customer, statutory and regulatory requirements are understood and consistently addressed, and whether customer satisfaction, complaints, changes and related risks drive management decisions.",
+  },
+  {
+    key: "process_management",
+    name: "Process Management",
+    order: 4,
+    guidance:
+      "Assess whether the QMS is managed as an effective system of interacting processes with clear inputs, outputs, responsibilities, controls, resources, measures and ownership.",
+  },
+  {
+    key: "qms_risk_change",
+    name: "Risk & Change Management",
+    order: 5,
+    guidance:
+      "Assess whether risks and opportunities are integrated into planning and whether QMS, operational and organisational changes are planned and controlled, including relevant climate-related effects where applicable.",
+  },
+  {
+    key: "qms_operational_supplier_control",
+    name: "Operational & Supplier Control",
+    order: 6,
+    guidance:
+      "Assess operational planning, customer requirements, design where applicable, production or service controls, supplier and outsourced-process control, release, traceability and nonconforming outputs.",
+  },
+  {
+    key: "quality_performance_data",
+    name: "Quality Performance & Data",
+    order: 7,
+    guidance:
+      "Assess whether quality objectives, process measures, customer satisfaction, product or service conformity, supplier performance and trend data are reliable and used for evidence-based decisions.",
+  },
+  {
+    key: "qms_internal_assurance",
+    name: "Internal Assurance & Management Review",
+    order: 8,
+    guidance:
+      "Assess the credibility of internal audits, auditor competence and objectivity, follow-up, management review inputs and outputs, and the quality of assurance information provided to top management.",
+  },
+  {
+    key: "qms_improvement_learning",
+    name: "Improvement & Organisational Learning",
+    order: 9,
+    guidance:
+      "Assess nonconformity control, root-cause analysis, corrective action, effectiveness review, continual improvement, lessons learned and preservation of organisational knowledge.",
+  },
+];
+
 const READINESS_RATINGS = [
   "Not Ready",
   "Developing",
@@ -198,6 +265,13 @@ function getDimensions(
 ) {
   if (
     standard ===
+    "ISO 9001:2015/Amd 1:2024"
+  ) {
+    return ISO_9001_DIMENSIONS;
+  }
+
+  if (
+    standard ===
     "ISO 45001:2018"
   ) {
     return ISO_45001_DIMENSIONS;
@@ -209,6 +283,13 @@ function getDimensions(
 function getReadinessDescription(
   standard
 ) {
+  if (
+    standard ===
+    "ISO 9001:2015/Amd 1:2024"
+  ) {
+    return "Management readiness is separate from clause conformity. It evaluates whether leadership, customer focus, process governance, risk and change control, operational assurance, quality performance information and organisational capability can sustain an effective quality management system.";
+  }
+
   if (
     standard ===
     "ISO 45001:2018"
