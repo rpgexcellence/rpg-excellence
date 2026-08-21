@@ -1,4 +1,5 @@
 import { createClient } from "../../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../../lib/supabase/admin";
 import {
   PDFDocument,
   StandardFonts,
@@ -31,6 +32,38 @@ const CLAUSE_TITLES = {
   "9": "Performance Evaluation",
   "10": "Improvement",
 };
+
+
+const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO 9001:2015/Amd 1:2024",
+  "ISO 14001:2026",
+  "ISO 45001:2018",
+];
+
+function managementReadinessValue(rating) {
+  switch (rating) {
+    case "Not Ready": return 25;
+    case "Developing": return 50;
+    case "Established": return 75;
+    case "Ready": return 100;
+    default: return null;
+  }
+}
+
+function managementReadinessLabel(score, completed) {
+  if (completed < 9 || score === null) return "Not assessed";
+  if (score < 40) return "Not Ready";
+  if (score < 65) return "Developing";
+  if (score < 85) return "Established";
+  return "Ready";
+}
+
+function systemNameFor(standard) {
+  if (standard === "ISO 9001:2015/Amd 1:2024") return "quality management system";
+  if (standard === "ISO 45001:2018") return "OH&S management system";
+  if (standard === "ISO 14001:2026") return "environmental management system";
+  return "management system";
+}
 
 function getMaturityLevel(score) {
   if (score === null) return "Not assessed";
@@ -333,6 +366,222 @@ export async function GET(request, { params }) {
               : worst
         )
       : null;
+
+
+  const isAdvancedAssessment =
+    ADVANCED_ASSESSMENT_STANDARDS.includes(
+      assessment.standard
+    );
+
+  const admin =
+    createAdminClient();
+
+  let findings = [];
+  let correctiveActions = [];
+  let managementActions = [];
+  let evidenceSamples = [];
+  let managementReadinessRows = [];
+
+  if (isAdvancedAssessment) {
+    const { data: findingsData, error: findingsError } = await admin
+      .from("assessment_findings")
+      .select("*")
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id)
+      .neq("finding_type", "conformity")
+      .order("created_at", { ascending: true });
+
+    if (findingsError) {
+      return new Response("Unable to load assessment findings", { status: 500 });
+    }
+
+    findings = findingsData ?? [];
+    const findingIds = findings.map((finding) => finding.id);
+
+    if (findingIds.length > 0) {
+      const { data: correctiveData, error: correctiveError } = await admin
+        .from("corrective_actions")
+        .select("*")
+        .eq("assessment_id", assessment.id)
+        .eq("owner_id", user.id)
+        .in("finding_id", findingIds);
+
+      if (correctiveError) {
+        return new Response("Unable to load corrective actions", { status: 500 });
+      }
+
+      correctiveActions = correctiveData ?? [];
+    }
+
+    const { data: managementData, error: managementError } = await admin
+      .from("management_action_plan")
+      .select("*")
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id);
+
+    if (managementError) {
+      return new Response("Unable to load management action plan", { status: 500 });
+    }
+
+    managementActions = managementData ?? [];
+
+    const { data: evidenceData, error: evidenceError } = await supabase
+      .from("assessment_evidence_samples")
+      .select("id, question_number, evidence_confidence, exception_gap, finding_id")
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id);
+
+    if (evidenceError) {
+      return new Response("Unable to load evidence samples", { status: 500 });
+    }
+
+    evidenceSamples = evidenceData ?? [];
+
+    const { data: readinessData, error: readinessError } = await supabase
+      .from("management_readiness")
+      .select("dimension_key, dimension_name, readiness_rating, evidence_confidence, management_action, action_owner, target_date")
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id)
+      .order("display_order", { ascending: true });
+
+    if (readinessError) {
+      return new Response("Unable to load management readiness", { status: 500 });
+    }
+
+    managementReadinessRows = readinessData ?? [];
+  }
+
+  const openFindings = findings.filter((finding) => finding.status !== "closed");
+  const openMajorCount = openFindings.filter((finding) => finding.finding_type === "major_nc").length;
+  const openMinorCount = openFindings.filter((finding) => finding.finding_type === "minor_nc").length;
+  const highRiskCount = openFindings.filter((finding) => finding.risk_impact === "High").length;
+  const mediumRiskCount = openFindings.filter((finding) => finding.risk_impact === "Medium").length;
+  const lowRiskCount = openFindings.filter((finding) => finding.risk_impact === "Low").length;
+
+  const correctiveByFinding = Object.fromEntries(
+    correctiveActions.map((action) => [action.finding_id, action])
+  );
+
+  const managementByFinding = Object.fromEntries(
+    managementActions
+      .map((action) => [action.related_finding_id ?? action.finding_id, action])
+      .filter(([findingId]) => Boolean(findingId))
+  );
+
+  const today = new Date();
+
+  const overdueActionCount = openFindings.filter((finding) => {
+    const managementAction = managementByFinding[finding.id];
+    const correctiveAction = correctiveByFinding[finding.id];
+    const targetDate = managementAction?.target_date ?? correctiveAction?.target_date;
+    const actionStatus = managementAction?.status ?? correctiveAction?.status ?? finding.status;
+
+    if (!targetDate || ["closed", "completed", "verified", "effective"].includes(actionStatus)) {
+      return false;
+    }
+
+    return new Date(`${targetDate}T23:59:59`) < today;
+  }).length;
+
+  const managementValues = managementReadinessRows
+    .map((row) => managementReadinessValue(row.readiness_rating))
+    .filter((value) => value !== null);
+
+  const managementDimensionsCompleted = managementValues.length;
+
+  const managementReadinessScore =
+    managementValues.length > 0
+      ? Math.round(
+          managementValues.reduce((total, value) => total + value, 0) /
+            managementValues.length
+        )
+      : null;
+
+  const managementReadiness =
+    managementReadinessLabel(
+      managementReadinessScore,
+      managementDimensionsCompleted
+    );
+
+  let readinessDecision = "Assessment incomplete";
+
+  if (progress.percentage === 100) {
+    if (managementDimensionsCompleted < 9) {
+      readinessDecision = "Management readiness incomplete";
+    } else if (managementReadiness === "Not Ready" || openMajorCount > 0) {
+      readinessDecision = "Not ready";
+    } else if (
+      managementReadiness === "Developing" ||
+      highRiskCount > 0 ||
+      overdueActionCount > 0
+    ) {
+      readinessDecision = "Significant improvement required";
+    } else if (openMinorCount > 0 || managementReadiness === "Established") {
+      readinessDecision = "Readiness review recommended";
+    } else if (
+      managementReadiness === "Ready" &&
+      overallScore !== null &&
+      overallScore >= 80
+    ) {
+      readinessDecision = "Potentially ready";
+    } else if (overallScore !== null && overallScore >= 60) {
+      readinessDecision = "Progressing";
+    } else {
+      readinessDecision = "Significant improvement required";
+    }
+  }
+
+  const totalEvidenceSamples = evidenceSamples.length;
+  const evidenceSamplesWithExceptions = evidenceSamples.filter(
+    (sample) =>
+      typeof sample.exception_gap === "string" &&
+      sample.exception_gap.trim() !== ""
+  ).length;
+  const highConfidenceEvidenceSamples = evidenceSamples.filter(
+    (sample) => sample.evidence_confidence === "High"
+  ).length;
+  const evidenceSamplesLinkedToFindings = evidenceSamples.filter(
+    (sample) => Boolean(sample.finding_id)
+  ).length;
+  const evidenceTraceabilityPercentage =
+    totalEvidenceSamples > 0
+      ? Math.round(
+          (evidenceSamplesLinkedToFindings / totalEvidenceSamples) * 100
+        )
+      : null;
+
+  const priorityFindingItems = openFindings
+    .map((finding) => {
+      const managementAction = managementByFinding[finding.id];
+      const correctiveAction = correctiveByFinding[finding.id];
+
+      return {
+        questionNumber: finding.question_number ?? "-",
+        type: finding.finding_type ?? "finding",
+        risk: finding.risk_impact ?? "-",
+        statement:
+          finding.finding_statement ??
+          finding.requirement_summary ??
+          "-",
+        action:
+          managementAction?.action_description ??
+          correctiveAction?.corrective_action ??
+          "Action not yet defined",
+        owner:
+          managementAction?.action_owner ??
+          correctiveAction?.action_owner ??
+          "Unassigned",
+        targetDate:
+          managementAction?.target_date ??
+          correctiveAction?.target_date ??
+          null,
+      };
+    })
+    .sort((a, b) => {
+      const riskOrder = { High: 0, Medium: 1, Low: 2, "-": 3 };
+      return riskOrder[a.risk] - riskOrder[b.risk];
+    })
+    .slice(0, 5);
 
   const pdfDoc =
     await PDFDocument.create();
@@ -778,6 +1027,201 @@ export async function GET(request, { params }) {
         y -= 8;
       }
     );
+  }
+
+
+  if (isAdvancedAssessment) {
+    y -= 10;
+
+    drawText(
+      "Management & Certification Readiness",
+      {
+        size: 18,
+        font: bold,
+      }
+    );
+
+    y -= 4;
+
+    drawText(
+      `Current RPG readiness recommendation: ${readinessDecision}.`,
+      {
+        size: 11,
+        font: bold,
+        color: navy,
+        lineHeight: 15,
+      }
+    );
+
+    drawText(
+      `Management readiness: ${managementReadiness}${
+        managementReadinessScore !== null
+          ? ` (${managementReadinessScore}%)`
+          : ""
+      }. ${managementDimensionsCompleted} of 9 dimensions assessed.`,
+      {
+        size: 10,
+        color: grey,
+        lineHeight: 14,
+        maxLength: 88,
+      }
+    );
+
+    drawText(
+      `Open Major NC: ${openMajorCount} | Open Minor NC: ${openMinorCount} | High risk: ${highRiskCount} | Medium risk: ${mediumRiskCount} | Low risk: ${lowRiskCount} | Overdue actions: ${overdueActionCount}`,
+      {
+        size: 10,
+        color: grey,
+        lineHeight: 14,
+        maxLength: 88,
+      }
+    );
+
+    drawText(
+      `This readiness recommendation considers the assessment score together with management readiness, open findings, risk and action status. A percentage score does not override significant open barriers to an effective ${systemNameFor(
+        assessment.standard
+      )}.`,
+      {
+        size: 10,
+        color: grey,
+        lineHeight: 14,
+        maxLength: 88,
+      }
+    );
+
+    y -= 10;
+
+    drawText(
+      "Evidence Assurance",
+      {
+        size: 18,
+        font: bold,
+      }
+    );
+
+    y -= 4;
+
+    drawText(
+      `Evidence samples recorded: ${totalEvidenceSamples}. Exceptions / gaps: ${evidenceSamplesWithExceptions}. High-confidence samples: ${highConfidenceEvidenceSamples}. Samples linked to findings: ${evidenceSamplesLinkedToFindings}.`,
+      {
+        size: 10,
+        color: grey,
+        lineHeight: 14,
+        maxLength: 88,
+      }
+    );
+
+    drawText(
+      evidenceTraceabilityPercentage !== null
+        ? `Evidence-to-finding traceability: ${evidenceTraceabilityPercentage}%.`
+        : "No detailed evidence samples have been recorded yet.",
+      {
+        size: 10,
+        color: grey,
+        lineHeight: 14,
+        maxLength: 88,
+      }
+    );
+
+    y -= 10;
+
+    drawText(
+      "Priority Findings & Management Actions",
+      {
+        size: 18,
+        font: bold,
+      }
+    );
+
+    y -= 4;
+
+    if (priorityFindingItems.length === 0) {
+      drawText(
+        "No open findings currently require management action.",
+        {
+          size: 10,
+          color: grey,
+          lineHeight: 14,
+        }
+      );
+    } else {
+      priorityFindingItems.forEach((item, index) => {
+        drawText(
+          `${index + 1}. ${item.questionNumber} | ${cleanText(
+            item.type
+          )} | Risk: ${item.risk}`,
+          {
+            size: 10,
+            font: bold,
+            color: navy,
+            lineHeight: 14,
+            maxLength: 88,
+          }
+        );
+
+        drawText(
+          `Finding: ${item.statement}`,
+          {
+            size: 9,
+            color: grey,
+            lineHeight: 13,
+            maxLength: 88,
+          }
+        );
+
+        drawText(
+          `Action: ${item.action}`,
+          {
+            size: 9,
+            color: grey,
+            lineHeight: 13,
+            maxLength: 88,
+          }
+        );
+
+        drawText(
+          `Owner: ${item.owner}${
+            item.targetDate
+              ? ` | Target: ${item.targetDate}`
+              : ""
+          }`,
+          {
+            size: 9,
+            color: grey,
+            lineHeight: 13,
+            maxLength: 88,
+          }
+        );
+
+        y -= 6;
+      });
+    }
+
+    if (
+      assessment.standard ===
+      "ISO 9001:2015/Amd 1:2024"
+    ) {
+      y -= 8;
+
+      drawText(
+        "ISO 9001:2015/Amd 1:2024 Climate Action Consideration",
+        {
+          size: 14,
+          font: bold,
+          color: navy,
+        }
+      );
+
+      drawText(
+        "The assessment question bank includes explicit consideration of whether climate change is a relevant issue for the QMS and whether relevant interested parties have climate-related requirements. Where climate change is relevant, related risks, opportunities and operational implications should be reflected in the QMS.",
+        {
+          size: 9,
+          color: grey,
+          lineHeight: 13,
+          maxLength: 88,
+        }
+      );
+    }
   }
 
   // DISCLAIMER
