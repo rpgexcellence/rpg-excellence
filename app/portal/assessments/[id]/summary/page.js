@@ -29,6 +29,11 @@ const CLAUSE_TITLES = {
   "10": "Improvement",
 };
 
+const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO 14001:2026",
+  "ISO 45001:2018",
+];
+
 
 function managementReadinessValue(rating) {
   switch (rating) {
@@ -364,12 +369,13 @@ export default async function AssessmentSummaryPage({
 
 
   // --------------------------------------------------
-  // ISO 14001:2026 FINDINGS / MANAGEMENT ACTIONS
+  // ADVANCED ASSESSMENT FINDINGS / MANAGEMENT ACTIONS
   // --------------------------------------------------
 
-  const isIso14001_2026 =
-    assessment.standard ===
-    "ISO 14001:2026";
+  const isAdvancedAssessment =
+    ADVANCED_ASSESSMENT_STANDARDS.includes(
+      assessment.standard
+    );
 
   const admin =
     createAdminClient();
@@ -379,7 +385,7 @@ export default async function AssessmentSummaryPage({
   let managementActions = [];
   let evidenceSamples = [];
 
-  if (isIso14001_2026) {
+  if (isAdvancedAssessment) {
     const {
       data: findingsData,
       error: findingsError,
@@ -560,10 +566,10 @@ export default async function AssessmentSummaryPage({
       managementActions
         .filter(
           (action) =>
-            action.finding_id
+            action.related_finding_id
         )
         .map((action) => [
-          action.finding_id,
+          action.related_finding_id,
           action,
         ])
     );
@@ -773,7 +779,7 @@ export default async function AssessmentSummaryPage({
             "—",
           action:
             managementAction
-              ?.action_required ??
+              ?.action_description ??
             correctiveAction
               ?.corrective_action ??
             "Action not yet defined",
@@ -1094,7 +1100,7 @@ export default async function AssessmentSummaryPage({
           </div>
         </div>
 
-        {isIso14001_2026 && (
+        {isAdvancedAssessment && (
           <>
             {/* READINESS DECISION */}
 
@@ -1971,7 +1977,7 @@ export default async function AssessmentSummaryPage({
     ← Return to Assessment
   </a>
 
-  {isIso14001_2026 && (
+  {isAdvancedAssessment && (
     <>
       <a
         href={`/portal/assessments/${assessment.id}/findings`}
