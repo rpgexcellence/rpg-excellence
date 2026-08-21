@@ -59,6 +59,49 @@ export default async function InsightsPage({
               }}
             >
               <span className="kicker">
+                Issue 002
+              </span>
+
+              <h2
+                style={{
+                  marginTop: "10px",
+                  marginBottom: "12px",
+                }}
+              >
+                ISO 9001 Moves Beyond the Checklist
+              </h2>
+
+              <p
+                style={{
+                  color: "#617087",
+                  lineHeight: 1.6,
+                  marginBottom: "20px",
+                }}
+              >
+                RPG Intelligence now supports
+                ISO 9001:2015/Amd 1:2024 as a complete
+                evidence-led business assurance and
+                certification-readiness assessment,
+                combining weighted scoring, findings,
+                evidence assurance, management readiness
+                and climate-action considerations.
+              </p>
+
+              <Link
+                className="button"
+                href={`/${locale}/insights/iso-9001-readiness`}
+              >
+                Read Issue 002
+              </Link>
+            </article>
+
+            <article
+              className="assuranceCard"
+              style={{
+                padding: "28px",
+              }}
+            >
+              <span className="kicker">
                 Issue 001
               </span>
 
