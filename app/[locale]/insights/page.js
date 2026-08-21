@@ -18,6 +18,45 @@ export default async function InsightsPage({
     notFound();
   }
 
+  const issues = [
+    {
+      number: "004",
+      title:
+        "ISO 45001:2018 — From Safety Compliance to Evidence-Led OH&S Assurance",
+      description:
+        "How RPG Intelligence connects OH&S conformity, worker participation, hazard and risk management, evidence sampling, findings, management action and certification-readiness decision support.",
+      href:
+        "iso-45001-readiness",
+    },
+    {
+      number: "003",
+      title:
+        "ISO 14001:2026 — Environmental Management Moves from Compliance to Business Assurance",
+      description:
+        "How RPG Intelligence brings environmental conformity, evidence assurance, compliance obligations, findings, management action and management readiness together in one structured assessment workflow.",
+      href:
+        "iso-14001-readiness",
+    },
+    {
+      number: "002",
+      title:
+        "ISO 9001 Moves Beyond the Checklist",
+      description:
+        "RPG Intelligence now supports ISO 9001:2015/Amd 1:2024 as a complete evidence-led business assurance and certification-readiness assessment, combining weighted scoring, findings, evidence assurance, management readiness and climate-action considerations.",
+      href:
+        "iso-9001-readiness",
+    },
+    {
+      number: "001",
+      title:
+        "A Word from RPG",
+      description:
+        "Why RPG Excellence exists, what RPG Intelligence is being built to do, and how we intend to support organisations with practical assurance, management systems and responsible AI.",
+      href:
+        "a-word-from-rpg",
+    },
+  ];
+
   return (
     <PageShell locale={locale}>
       <main className="simplePage">
@@ -52,89 +91,45 @@ export default async function InsightsPage({
               gap: "20px",
             }}
           >
-            <article
-              className="assuranceCard"
-              style={{
-                padding: "28px",
-              }}
-            >
-              <span className="kicker">
-                Issue 002
-              </span>
-
-              <h2
+            {issues.map((issue) => (
+              <article
+                key={issue.number}
+                className="assuranceCard"
                 style={{
-                  marginTop: "10px",
-                  marginBottom: "12px",
+                  padding: "28px",
                 }}
               >
-                ISO 9001 Moves Beyond the Checklist
-              </h2>
+                <span className="kicker">
+                  Issue {issue.number}
+                </span>
 
-              <p
-                style={{
-                  color: "#617087",
-                  lineHeight: 1.6,
-                  marginBottom: "20px",
-                }}
-              >
-                RPG Intelligence now supports
-                ISO 9001:2015/Amd 1:2024 as a complete
-                evidence-led business assurance and
-                certification-readiness assessment,
-                combining weighted scoring, findings,
-                evidence assurance, management readiness
-                and climate-action considerations.
-              </p>
+                <h2
+                  style={{
+                    marginTop: "10px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {issue.title}
+                </h2>
 
-              <Link
-                className="button"
-                href={`/${locale}/insights/iso-9001-readiness`}
-              >
-                Read Issue 002
-              </Link>
-            </article>
+                <p
+                  style={{
+                    color: "#617087",
+                    lineHeight: 1.6,
+                    marginBottom: "20px",
+                  }}
+                >
+                  {issue.description}
+                </p>
 
-            <article
-              className="assuranceCard"
-              style={{
-                padding: "28px",
-              }}
-            >
-              <span className="kicker">
-                Issue 001
-              </span>
-
-              <h2
-                style={{
-                  marginTop: "10px",
-                  marginBottom: "12px",
-                }}
-              >
-                A Word from RPG
-              </h2>
-
-              <p
-                style={{
-                  color: "#617087",
-                  lineHeight: 1.6,
-                  marginBottom: "20px",
-                }}
-              >
-                Why RPG Excellence exists, what RPG
-                Intelligence is being built to do, and
-                how we intend to support organisations
-                with practical assurance, management
-                systems and responsible AI.
-              </p>
-
-              <Link
-                className="button"
-                href={`/${locale}/insights/a-word-from-rpg`}
-              >
-                Read Issue 001
-              </Link>
-            </article>
+                <Link
+                  className="button"
+                  href={`/${locale}/insights/${issue.href}`}
+                >
+                  Read Issue {issue.number}
+                </Link>
+              </article>
+            ))}
           </section>
         </div>
       </main>
