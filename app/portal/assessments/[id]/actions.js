@@ -29,6 +29,11 @@ const VALID_RISK_LEVELS = [
   "Low",
 ];
 
+const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO 14001:2026",
+  "ISO 45001:2018",
+];
+
 function cleanText(value) {
   if (
     typeof value !== "string" ||
@@ -193,7 +198,7 @@ async function saveFinding({
 
   const riskImpact =
     typeof riskImpactRaw ===
-      "string"
+    "string"
       ? riskImpactRaw.trim()
       : "";
 
@@ -683,11 +688,12 @@ export async function saveAssessmentAnswers(
         new Date().toISOString(),
     });
 
-    // ISO 14001:2026 currently has the
+    // Advanced assessments use the
     // formal findings workspace.
     if (
-      assessment.standard ===
-      "ISO 14001:2026"
+      ADVANCED_ASSESSMENT_STANDARDS.includes(
+        assessment.standard
+      )
     ) {
       await saveFinding({
         admin,
