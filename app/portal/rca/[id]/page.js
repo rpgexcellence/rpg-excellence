@@ -482,6 +482,22 @@ export default async function RcaCasePage({
                     </div>
                   </div>
                 )}
+                {pageError === "cause_validation_required" && (
+                  <div style={validationNoticeStyle}>
+                    <strong>Cause validation is incomplete.</strong>
+                    <div style={{ marginTop: "6px" }}>
+                      Enter both the validation method or test performed and the objective validation result before selecting Human Validate Cause.
+                    </div>
+                  </div>
+                )}
+                {pageError === "node_validation_required" && (
+                  <div style={validationNoticeStyle}>
+                    <strong>Analysis element validation is incomplete.</strong>
+                    <div style={{ marginTop: "6px" }}>
+                      Enter both the validation method or test and its objective result before human validation.
+                    </div>
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",
@@ -970,7 +986,7 @@ function AnalysisWorkbench({ caseId, models, activeModel, nodes, causes }) {
           <p style={{ color: "#607089" }}>
             Complete separate occurrence, escape and systemic chains. Test every final causal statement before validation.
           </p>
-          <CauseCards caseId={caseId} causes={causes} />
+          <CauseCards caseId={caseId} modelId={activeModel.id} causes={causes} />
           <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
             <CauseStreamForm caseId={caseId} causeType="occurrence" title="Occurrence Cause — 5 Whys" />
             <CauseStreamForm caseId={caseId} causeType="escape" title="Escape Cause — 5 Whys" />
@@ -1002,7 +1018,7 @@ function AnalysisWorkbench({ caseId, models, activeModel, nodes, causes }) {
   );
 }
 
-function CauseCards({ caseId, causes }) {
+function CauseCards({ caseId, modelId, causes }) {
   return (
     <div style={{ display: "grid", gap: "14px", marginTop: "18px" }}>
       {causes.map((cause) => (
@@ -1029,9 +1045,10 @@ function CauseCards({ caseId, causes }) {
             <form action={reviewCauseHypothesis} style={{ marginTop: "14px" }}>
               <input type="hidden" name="case_id" value={caseId} />
               <input type="hidden" name="cause_id" value={cause.id} />
+              <input type="hidden" name="model_id" value={modelId} />
               <div style={formGrid}>
-                <textarea name="validation_method" rows={3} placeholder="Validation method / test performed" style={fieldStyle} />
-                <textarea name="validation_result" rows={3} placeholder="Objective validation result" style={fieldStyle} />
+                <textarea name="validation_method" required rows={3} placeholder="Required: validation method / test performed" style={fieldStyle} />
+                <textarea name="validation_result" required rows={3} placeholder="Required: objective validation result" style={fieldStyle} />
               </div>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
                 <button name="decision" value="validate" style={approveButton}>Human Validate Cause</button>
@@ -1117,8 +1134,8 @@ function AnalysisNodeCard({ caseId, modelId, node }) {
           <input type="hidden" name="case_id" value={caseId} />
           <input type="hidden" name="model_id" value={modelId} />
           <input type="hidden" name="node_id" value={node.id} />
-          <textarea name="validation_method" rows={2} placeholder="Validation method / test" style={fieldStyle} />
-          <textarea name="validation_result" rows={2} placeholder="Objective validation result" style={{ ...fieldStyle, marginTop: "8px" }} />
+          <textarea name="validation_method" required rows={2} placeholder="Required: validation method / test" style={fieldStyle} />
+          <textarea name="validation_result" required rows={2} placeholder="Required: objective validation result" style={{ ...fieldStyle, marginTop: "8px" }} />
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
             <button name="decision" value="validate" style={approveButton}>Human Validate</button>
             <button name="decision" value="reject" style={rejectButton}>Reject</button>
