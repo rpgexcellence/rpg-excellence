@@ -7,6 +7,13 @@ import {
   hasActiveSubscription,
 } from "../../lib/subscription";
 
+const AVAILABLE_ASSESSMENT_STANDARDS = [
+  "ISO 9001:2015/Amd 1:2024",
+  "ISO 14001:2026",
+  "ISO 45001:2018",
+  "ISO/IEC 17024:2026",
+];
+
 export async function createOrganization(formData) {
   const supabase = await createClient();
 
@@ -104,7 +111,7 @@ export async function createAssessment(formData) {
   }
 
   // --------------------------------------------------
-  // READ FORM VALUES
+  // READ AND VALIDATE FORM VALUES
   // --------------------------------------------------
 
   const organizationId =
@@ -112,7 +119,7 @@ export async function createAssessment(formData) {
       "organization_id"
     );
 
-  const standard =
+  const standardRaw =
     formData.get("standard");
 
   if (
@@ -126,12 +133,25 @@ export async function createAssessment(formData) {
   }
 
   if (
-    typeof standard !==
+    typeof standardRaw !==
       "string" ||
-    standard.trim() === ""
+    standardRaw.trim() === ""
   ) {
     throw new Error(
       "ISO standard is required."
+    );
+  }
+
+  const standard =
+    standardRaw.trim();
+
+  if (
+    !AVAILABLE_ASSESSMENT_STANDARDS.includes(
+      standard
+    )
+  ) {
+    throw new Error(
+      "The selected ISO standard is not available."
     );
   }
 
@@ -177,8 +197,7 @@ export async function createAssessment(formData) {
       organization_id:
         organizationId,
       owner_id: user.id,
-      standard:
-        standard.trim(),
+      standard,
       status: "draft",
     })
     .select("id")
