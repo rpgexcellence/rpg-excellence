@@ -694,3 +694,244 @@ export async function addObjectiveEvidence(formData) {
   revalidatePath(`/portal/rca/${caseId}`);
   redirect(`/portal/rca/${caseId}?d=${discipline}`);
 }
+
+const ANALYSIS_METHODS = {
+  "3x5_whys": "3 × 5 Whys",
+  ishikawa: "Ishikawa / Fishbone",
+  bow_tie: "HSE Bow Tie",
+};
+
+const ANALYSIS_NODE_TYPES = [
+  "cause",
+  "hazard",
+  "top_event",
+  "threat",
+  "preventive_barrier",
+  "consequence",
+  "recovery_barrier",
+  "barrier_failure",
+];
+
+export async function createAnalysisModel(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const method = clean(formData.get("method"));
+
+  if (!caseId || !method || !ANALYSIS_METHODS[method]) {
+    throw new Error("Select a valid root cause analysis method.");
+  }
+
+  await getOwnedCase(supabase, user.id, caseId);
+  await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("rca_analysis_models")
+    .select("id")
+    .eq("case_id", caseId)
+    .eq("owner_id", user.id)
+    .eq("method", method)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (existingError) throw new Error(existingError.message);
+  if (existing) {
+    redirect(`/portal/rca/${caseId}?d=4&model=${existing.id}`);
+  }
+
+  const { data: model, error } = await supabase
+    .from("rca_analysis_models")
+    .insert({
+      case_id: caseId,
+      owner_id: user.id,
+      discipline: 4,
+      method,
+      title: ANALYSIS_METHODS[method],
+      status: "active",
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("rca_case_events").insert({
+    case_id: caseId,
+    owner_id: user.id,
+    event_type: "analysis_model_created",
+    discipline: 4,
+    summary: `${ANALYSIS_METHODS[method]} analysis started`,
+    event_data: { model_id: model.id, method },
+  });
+
+  revalidatePath(`/portal/rca/${caseId}`);
+  redirect(`/portal/rca/${caseId}?d=4&model=${model.id}`);
+}
+
+export async function addAnalysisNode(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const modelId = clean(formData.get("model_id"));
+  const nodeType = clean(formData.get("node_type"));
+  const title = clean(formData.get("title"));
+  const causeType = clean(formData.get("cause_type"));
+
+  if (
+    !caseId ||
+    !modelId ||
+    !title ||
+    !ANALYSIS_NODE_TYPES.includes(nodeType)
+  ) {
+    throw new Error("Complete the required analysis-node fields.");
+  }
+
+  if (
+    causeType &&
+    !["occurrence", "escape", "systemic", "contributing"].includes(causeType)
+  ) {
+    throw new Error("Select a valid cause classification.");
+  }
+
+  await getOwnedCase(supabase, user.id, caseId);
+  await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
+
+  const { data: model, error: modelError } = await supabase
+    .from("rca_analysis_models")
+    .select("id, method")
+    .eq("id", modelId)
+    .eq("case_id", caseId)
+    .eq("owner_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (modelError) throw new Error(modelError.message);
+  if (!model) throw new Error("Analysis model not found.");
+
+  const parentNodeId = clean(formData.get("parent_node_id"));
+  if (parentNodeId) {
+    const { count, error: parentError } = await supabase
+      .from("rca_analysis_nodes")
+      .select("id", { count: "exact", head: true })
+      .eq("id", parentNodeId)
+      .eq("model_id", modelId)
+      .eq("owner_id", user.id);
+    if (parentError) throw new Error(parentError.message);
+    if ((count ?? 0) !== 1) throw new Error("Parent analysis node not found.");
+  }
+
+  const { error } = await supabase.from("rca_analysis_nodes").insert({
+    model_id: modelId,
+    case_id: caseId,
+    owner_id: user.id,
+    parent_node_id: parentNodeId,
+    node_type: nodeType,
+    cause_type: causeType,
+    category: clean(formData.get("category")),
+    title,
+    description: clean(formData.get("description")),
+    evidence_for: clean(formData.get("evidence_for")),
+    evidence_against: clean(formData.get("evidence_against")),
+    status: "hypothesis",
+    metadata: {
+      control_owner: clean(formData.get("control_owner")),
+      control_effectiveness: clean(formData.get("control_effectiveness")),
+    },
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/portal/rca/${caseId}`);
+  redirect(`/portal/rca/${caseId}?d=4&model=${modelId}`);
+}
+
+export async function reviewAnalysisNode(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const modelId = clean(formData.get("model_id"));
+  const nodeId = clean(formData.get("node_id"));
+  const decision = clean(formData.get("decision"));
+  const validationMethod = clean(formData.get("validation_method"));
+  const validationResult = clean(formData.get("validation_result"));
+
+  if (
+    !caseId ||
+    !modelId ||
+    !nodeId ||
+    !["validate", "reject"].includes(decision)
+  ) {
+    throw new Error("Invalid analysis-node review decision.");
+  }
+
+  if (decision === "validate" && (!validationMethod || !validationResult)) {
+    throw new Error(
+      "Document the validation method and objective result before validation."
+    );
+  }
+
+  await getOwnedCase(supabase, user.id, caseId);
+  await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
+
+  const { data: node, error: nodeError } = await supabase
+    .from("rca_analysis_nodes")
+    .select("id, title, description, node_type, cause_type, category, evidence_for, evidence_against, linked_cause_id")
+    .eq("id", nodeId)
+    .eq("model_id", modelId)
+    .eq("case_id", caseId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  if (nodeError) throw new Error(nodeError.message);
+  if (!node) throw new Error("Analysis node not found.");
+
+  const validated = decision === "validate";
+  const now = new Date().toISOString();
+  let linkedCauseId = node.linked_cause_id;
+
+  if (validated && node.cause_type && !linkedCauseId) {
+    const { data: linkedCause, error: causeError } = await supabase
+      .from("rca_causes")
+      .insert({
+        case_id: caseId,
+        owner_id: user.id,
+        cause_type: node.cause_type,
+        statement: node.title,
+        fishbone_category: node.category,
+        evidence_for: node.evidence_for,
+        evidence_against: node.evidence_against,
+        validation_method: validationMethod,
+        validation_result: validationResult,
+        status: "validated",
+        proposed_by_ai: false,
+        validated_by: user.id,
+        validated_at: now,
+      })
+      .select("id")
+      .single();
+    if (causeError) throw new Error(causeError.message);
+    linkedCauseId = linkedCause.id;
+  }
+
+  const { error } = await supabase
+    .from("rca_analysis_nodes")
+    .update({
+      status: validated ? "validated" : "rejected",
+      validation_method: validated ? validationMethod : null,
+      validation_result: validated ? validationResult : null,
+      validated_by: validated ? user.id : null,
+      validated_at: validated ? now : null,
+      linked_cause_id: validated ? linkedCauseId : node.linked_cause_id,
+      updated_at: now,
+    })
+    .eq("id", nodeId)
+    .eq("owner_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("rca_case_events").insert({
+    case_id: caseId,
+    owner_id: user.id,
+    event_type: validated ? "analysis_node_validated" : "analysis_node_rejected",
+    discipline: 4,
+    summary: `${node.node_type} ${validated ? "validated" : "rejected"}`,
+    event_data: { model_id: modelId, node_id: nodeId, linked_cause_id: linkedCauseId },
+  });
+
+  revalidatePath(`/portal/rca/${caseId}`);
+  redirect(`/portal/rca/${caseId}?d=4&model=${modelId}`);
