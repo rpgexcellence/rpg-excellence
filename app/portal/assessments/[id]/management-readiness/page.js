@@ -206,6 +206,72 @@ const ISO_9001_DIMENSIONS = [
   },
 ];
 
+const ISO_17024_DIMENSIONS = [
+  {
+    key: "pcb_leadership_impartiality",
+    name: "Leadership, Impartiality & Certification Integrity",
+    order: 1,
+    guidance:
+      "Assess top-management accountability for impartiality, competence, confidentiality, consistent certification decisions and protection of confidence in person-certification activities.",
+  },
+  {
+    key: "pcb_governance_structure",
+    name: "Governance, Structure & Impartiality Safeguards",
+    order: 2,
+    guidance:
+      "Assess legal responsibility, organisational structure, authority, oversight, conflict-of-interest controls, stakeholder balance and safeguards against commercial, financial or other pressures.",
+  },
+  {
+    key: "pcb_scheme_governance",
+    name: "Certification Scheme Governance",
+    order: 3,
+    guidance:
+      "Assess ownership, development, validation, review and maintenance of certification schemes, including job and task analysis, competence requirements and involvement of appropriate experts and interested parties.",
+  },
+  {
+    key: "pcb_competence_resources",
+    name: "Personnel Competence & Resource Control",
+    order: 4,
+    guidance:
+      "Assess competence criteria, selection, training, monitoring and authorisation of employees, examiners, assessors, decision makers, committees, contractors and other external resources.",
+  },
+  {
+    key: "pcb_information_records",
+    name: "Confidentiality, Security, Records & Public Information",
+    order: 5,
+    guidance:
+      "Assess confidentiality, information security, certification records, public information, use of certificates and marks, candidate data protection and controls preventing fraudulent practices.",
+  },
+  {
+    key: "pcb_assessment_examination",
+    name: "Application, Assessment & Examination Control",
+    order: 6,
+    guidance:
+      "Assess application review, candidate eligibility, reasonable accommodation, assessment methods, examination development, delivery, security, invigilation, scoring, reliability and control of examination irregularities.",
+  },
+  {
+    key: "pcb_certification_lifecycle",
+    name: "Certification Decisions & Lifecycle Control",
+    order: 7,
+    guidance:
+      "Assess independent certification decisions, granting and maintaining certification, surveillance where applicable, recertification, scope changes, suspension, withdrawal and reduction of certification.",
+  },
+  {
+    key: "pcb_appeals_complaints",
+    name: "Appeals, Complaints & Stakeholder Confidence",
+    order: 8,
+    guidance:
+      "Assess accessible, impartial and timely appeals and complaints processes, independent review, communication, corrective action and protection of appellants and complainants from discriminatory treatment.",
+  },
+  {
+    key: "pcb_internal_assurance_improvement",
+    name: "Internal Assurance, Corrective Action & Improvement",
+    order: 9,
+    guidance:
+      "Assess document and record control, internal audit, management review, nonconformity, root-cause analysis, corrective action, effectiveness verification and continual improvement of the person-certification management system.",
+  },
+];
+
 const READINESS_RATINGS = [
   "Not Ready",
   "Developing",
@@ -263,41 +329,47 @@ function overallReadinessLabel(
 function getDimensions(
   standard
 ) {
-  if (
-    standard ===
-    "ISO 9001:2015/Amd 1:2024"
-  ) {
-    return ISO_9001_DIMENSIONS;
-  }
+  switch (standard) {
+    case "ISO 9001:2015/Amd 1:2024":
+      return ISO_9001_DIMENSIONS;
 
-  if (
-    standard ===
-    "ISO 45001:2018"
-  ) {
-    return ISO_45001_DIMENSIONS;
-  }
+    case "ISO 14001:2026":
+      return ISO_14001_DIMENSIONS;
 
-  return ISO_14001_DIMENSIONS;
+    case "ISO 45001:2018":
+      return ISO_45001_DIMENSIONS;
+
+    case "ISO/IEC 17024:2026":
+      return ISO_17024_DIMENSIONS;
+
+    default:
+      throw new Error(
+        `Management readiness is not configured for ${standard}.`
+      );
+  }
 }
 
 function getReadinessDescription(
   standard
 ) {
-  if (
-    standard ===
-    "ISO 9001:2015/Amd 1:2024"
-  ) {
-    return "Management readiness is separate from clause conformity. It evaluates whether leadership, customer focus, process governance, risk and change control, operational assurance, quality performance information and organisational capability can sustain an effective quality management system.";
-  }
+  switch (standard) {
+    case "ISO 9001:2015/Amd 1:2024":
+      return "Management readiness is separate from clause conformity. It evaluates whether leadership, customer focus, process governance, risk and change control, operational assurance, quality performance information and organisational capability can sustain an effective quality management system.";
 
-  if (
-    standard ===
-    "ISO 45001:2018"
-  ) {
-    return "Management readiness is separate from clause conformity. It evaluates whether leadership, worker participation, governance, risk control, operational assurance and organisational capability can sustain an effective OH&S management system.";
-  }
+    case "ISO 14001:2026":
+      return "Management readiness is separate from clause conformity. It evaluates whether leadership, governance, assurance and organisational capability can sustain an effective environmental management system.";
 
-  return "Management readiness is separate from clause conformity. It evaluates whether leadership, governance, assurance and organisational capability can sustain an effective environmental management system.";
+    case "ISO 45001:2018":
+      return "Management readiness is separate from clause conformity. It evaluates whether leadership, worker participation, governance, risk control, operational assurance and organisational capability can sustain an effective OH&S management system.";
+
+    case "ISO/IEC 17024:2026":
+      return "Management readiness is separate from clause conformity. It evaluates whether leadership, impartiality safeguards, scheme governance, personnel competence, examination security, certification controls and organisational capability can sustain credible certification of persons.";
+
+    default:
+      throw new Error(
+        `Management readiness is not configured for ${standard}.`
+      );
+  }
 }
 
 export default async function ManagementReadinessPage({
