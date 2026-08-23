@@ -399,6 +399,7 @@ export async function reviewCauseHypothesis(formData) {
   const { supabase, user } = await context();
   const caseId = clean(formData.get("case_id"));
   const causeId = clean(formData.get("cause_id"));
+  const modelId = clean(formData.get("model_id"));
   const decision = clean(formData.get("decision"));
   const validationMethod = clean(formData.get("validation_method"));
   const validationResult = clean(formData.get("validation_result"));
@@ -408,8 +409,9 @@ export async function reviewCauseHypothesis(formData) {
   }
 
   if (decision === "validate" && (!validationMethod || !validationResult)) {
-    throw new Error(
-      "Document the validation method and objective result before validating a cause."
+    const modelQuery = modelId ? `&model=${encodeURIComponent(modelId)}` : "";
+    redirect(
+      `/portal/rca/${caseId}?d=4${modelQuery}&error=cause_validation_required&cause=${encodeURIComponent(causeId)}`
     );
   }
 
@@ -450,7 +452,8 @@ export async function reviewCauseHypothesis(formData) {
   });
 
   revalidatePath(`/portal/rca/${caseId}`);
-  redirect(`/portal/rca/${caseId}?d=4`);
+  const modelQuery = modelId ? `&model=${encodeURIComponent(modelId)}` : "";
+  redirect(`/portal/rca/${caseId}?d=4${modelQuery}`);
 }
 
 export async function addCorrectiveAction(formData) {
@@ -867,8 +870,8 @@ export async function reviewAnalysisNode(formData) {
   }
 
   if (decision === "validate" && (!validationMethod || !validationResult)) {
-    throw new Error(
-      "Document the validation method and objective result before validation."
+    redirect(
+      `/portal/rca/${caseId}?d=4&model=${encodeURIComponent(modelId)}&error=node_validation_required&node=${encodeURIComponent(nodeId)}`
     );
   }
 
