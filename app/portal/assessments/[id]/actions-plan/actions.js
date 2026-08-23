@@ -1,474 +1,1201 @@
-"use server";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import {
-  revalidatePath,
-} from "next/cache";
+import { createClient } from "../../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../../lib/supabase/admin";
 
-import {
-  redirect,
-} from "next/navigation";
+import { updateManagementAction } from "./actions";
 
-import {
-  createClient,
-} from "../../../../../lib/supabase/server";
+const priorityFor = (type) =>
+  type === "major_nc"
+    ? "critical"
+    : type === "minor_nc"
+      ? "high"
+      : type === "observation"
+        ? "medium"
+        : "low";
 
-import {
-  createAdminClient,
-} from "../../../../../lib/supabase/admin";
+const priorityLabel = (priority) =>
+  ({
+    critical: "Critical",
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+  }[priority] ?? priority);
 
-const PRIORITIES = [
-  "critical",
-  "high",
-  "medium",
-  "low",
-];
+const labelFor = (type) =>
+  ({
+    major_nc: "Major NC",
+    minor_nc: "Minor NC",
+    observation: "Observation",
+    ofi: "OFI",
+  }[type] ?? type);
 
-const STATUSES = [
-  "open",
-  "in_progress",
-  "completed",
-  "verified",
-];
+const isCompletedManagementStatus = (status) =>
+  status === "completed" ||
+  status === "verified";
 
-const clean = (value) =>
-  typeof value === "string" &&
-  value.trim()
-    ? value.trim()
-    : null;
+export default async function ManagementActionPlanPage({
+  params,
+}) {
+  const { id } = await params;
 
-function labelFor(type) {
-  return (
-    {
-      major_nc:
-        "Major NC",
-      minor_nc:
-        "Minor NC",
-      observation:
-        "Observation",
-      ofi:
-        "OFI",
-    }[type] ??
-    "Finding"
-  );
-}
-
-function progressFor(
-  status
-) {
-  switch (status) {
-    case "verified":
-      return 100;
-
-    case "completed":
-      return 90;
-
-    case "in_progress":
-      return 50;
-
-    default:
-      return 0;
-  }
-}
-
-export async function updateManagementAction(
-  formData
-) {
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
-  } =
-    await supabase.auth.getUser();
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(
-      "/portal/login"
-    );
-  }
-
-  const assessmentId =
-    formData.get(
-      "assessment_id"
-    );
-
-  const findingId =
-    formData.get(
-      "finding_id"
-    );
-
-  const rawPriority =
-    formData.get(
-      "priority"
-    );
-
-  const priority =
-    typeof rawPriority ===
-      "string"
-      ? rawPriority.toLowerCase()
-      : rawPriority;
-
-  const status =
-    formData.get(
-      "status"
-    );
-
-  if (
-    typeof assessmentId !==
-      "string" ||
-    typeof findingId !==
-      "string" ||
-    typeof priority !==
-      "string" ||
-    typeof status !==
-      "string" ||
-    !PRIORITIES.includes(
-      priority
-    ) ||
-    !STATUSES.includes(
-      status
-    )
-  ) {
-    throw new Error(
-      "Invalid management action."
-    );
+    redirect("/portal/login");
   }
 
   const {
     data: assessment,
     error: assessmentError,
   } = await supabase
-    .from(
-      "assessments"
-    )
-    .select(
-      "id, standard"
-    )
-    .eq(
-      "id",
-      assessmentId
-    )
-    .eq(
-      "owner_id",
-      user.id
-    )
+    .from("assessments")
+    .select("id, standard, status")
+    .eq("id", id)
+    .eq("owner_id", user.id)
     .single();
 
-  if (
-    assessmentError ||
-    !assessment
-  ) {
-    throw new Error(
-      "Assessment not found."
-    );
+  if (assessmentError || !assessment) {
+    redirect("/portal");
   }
 
-  const admin =
-    createAdminClient();
+  const admin = createAdminClient();
 
   const {
-    data: finding,
-    error: findingError,
+    data: findingsData,
+    error: findingsError,
   } = await admin
-    .from(
-      "assessment_findings"
-    )
-    .select(
-      `
-        id,
-        finding_type,
-        question_number,
-        clause,
-        finding_statement,
-        requirement_summary,
-        status
-      `
-    )
-    .eq(
-      "id",
-      findingId
-    )
-    .eq(
-      "assessment_id",
-      assessmentId
-    )
-    .eq(
-      "owner_id",
-      user.id
-    )
-    .single();
+    .from("assessment_findings")
+    .select("*")
+    .eq("assessment_id", id)
+    .eq("owner_id", user.id)
+    .neq("finding_type", "conformity")
+    .order("created_at", {
+      ascending: true,
+    });
 
-  if (
-    findingError ||
-    !finding ||
-    finding.finding_type ===
-      "conformity"
-  ) {
+  if (findingsError) {
     throw new Error(
-      "Finding not found."
+      findingsError.message
     );
   }
 
-  const actionRequired =
-    clean(
-      formData.get(
-        "action_required"
+  const findings =
+    findingsData ?? [];
+
+  const findingIds =
+    findings.map(
+      (finding) => finding.id
+    );
+
+  let correctiveActions = [];
+
+  if (findingIds.length) {
+    const {
+      data,
+      error,
+    } = await admin
+      .from("corrective_actions")
+      .select("*")
+      .eq(
+        "assessment_id",
+        id
+      )
+      .eq(
+        "owner_id",
+        user.id
+      )
+      .in(
+        "finding_id",
+        findingIds
+      );
+
+    if (error) {
+      throw new Error(
+        error.message
+      );
+    }
+
+    correctiveActions =
+      data ?? [];
+  }
+
+  const correctiveByFinding =
+    Object.fromEntries(
+      correctiveActions.map(
+        (action) => [
+          action.finding_id,
+          action,
+        ]
       )
     );
 
-  const actionTitle =
-    `${
-      finding.question_number ??
-      "Finding"
-    } - ${labelFor(
-      finding.finding_type
-    )}`;
-
-  const now =
-    new Date().toISOString();
-
-  /*
-   * Canonical Management Action Plan fields.
-   *
-   * related_finding_id is the relationship
-   * used by this module.
-   */
-  const payload = {
-    assessment_id:
-      assessmentId,
-
-    owner_id:
-      user.id,
-
-    standard:
-      assessment.standard,
-
-    priority,
-
-    action_title:
-      actionTitle,
-
-    action_description:
-      actionRequired,
-
-    related_clause:
-      finding.clause ??
-      null,
-
-    related_finding_id:
-      findingId,
-
-    action_owner:
-      clean(
-        formData.get(
-          "action_owner"
-        )
-      ),
-
-    target_date:
-      clean(
-        formData.get(
-          "target_date"
-        )
-      ),
-
-    progress:
-      progressFor(
-        status
-      ),
-
-    resource_decision:
-      clean(
-        formData.get(
-          "resource_decision"
-        )
-      ),
-
-    management_commentary:
-      clean(
-        formData.get(
-          "management_commentary"
-        )
-      ),
-
-    verification_evidence:
-      clean(
-        formData.get(
-          "verification_evidence"
-        )
-      ),
-
-    status,
-
-    updated_at:
-      now,
-  };
-
   const {
-    data: existing,
-    error: existingError,
+    data: planData,
+    error: planError,
   } = await admin
     .from(
       "management_action_plan"
     )
-    .select(
-      "id"
-    )
+    .select("*")
     .eq(
       "assessment_id",
-      assessmentId
-    )
-    .eq(
-      "related_finding_id",
-      findingId
+      id
     )
     .eq(
       "owner_id",
       user.id
-    )
-    .limit(1)
-    .maybeSingle();
+    );
 
-  if (existingError) {
+  if (planError) {
     throw new Error(
-      existingError.message
+      planError.message
     );
   }
 
-  if (existing) {
-    const {
-      error,
-    } = await admin
-      .from(
-        "management_action_plan"
-      )
-      .update(
-        payload
-      )
-      .eq(
-        "id",
-        existing.id
-      )
-      .eq(
-        "owner_id",
-        user.id
-      );
+  const managementPlans =
+    planData ?? [];
 
-    if (error) {
-      throw new Error(
-        error.message
-      );
-    }
-  } else {
-    const {
-      error,
-    } = await admin
-      .from(
-        "management_action_plan"
-      )
-      .insert(
-        payload
-      );
+  const {
+    data: readinessData,
+    error: readinessError,
+  } = await supabase
+    .from("management_readiness")
+    .select(
+      "dimension_key, dimension_name, display_order, readiness_rating, evidence_confidence, management_concern, management_action, action_owner, target_date"
+    )
+    .eq("assessment_id", id)
+    .eq("owner_id", user.id)
+    .order("display_order", {
+      ascending: true,
+    });
 
-    if (error) {
-      throw new Error(
-        error.message
-      );
-    }
+  if (readinessError) {
+    throw new Error(
+      readinessError.message
+    );
   }
 
-  /*
-   * Management Action status does not
-   * formally close a Major / Minor NC.
-   *
-   * Management lifecycle:
-   *
-   * open
-   *   -> in_progress
-   *   -> completed
-   *   -> verified
-   *
-   * Finding lifecycle:
-   *
-   * open
-   *   -> action_in_progress
-   *   -> verification
-   *   -> explicit controlled closure
-   *
-   * Both "completed" and "verified"
-   * therefore leave the formal finding
-   * in Verification.
-   */
-  const findingStatus =
-    status ===
-      "completed" ||
-    status ===
-      "verified"
-      ? "verification"
-      : status ===
-          "in_progress"
-        ? "action_in_progress"
-        : "open";
+  const readinessActions =
+    (readinessData ?? []).filter(
+      (row) =>
+        typeof row.management_action ===
+          "string" &&
+        row.management_action.trim() !==
+          ""
+    );
 
   /*
-   * Do not reopen an already formally
-   * closed finding if someone later edits
-   * its historical management action.
+   * Canonical finding relationship for the
+   * management action plan.
    */
-  if (
-    finding.status !==
-    "closed"
-  ) {
-    const {
-      error: syncError,
-    } = await admin
-      .from(
-        "assessment_findings"
-      )
-      .update({
-        status:
-          findingStatus,
+  const planByFinding =
+    Object.fromEntries(
+      managementPlans
+        .filter(
+          (row) =>
+            row.related_finding_id
+        )
+        .map(
+          (row) => [
+            row.related_finding_id,
+            row,
+          ]
+        )
+    );
 
-        updated_at:
-          now,
-      })
-      .eq(
-        "id",
-        findingId
-      )
-      .eq(
-        "assessment_id",
-        assessmentId
-      )
-      .eq(
-        "owner_id",
-        user.id
-      );
+  /*
+   * Major and Minor NCs enter the management
+   * plan automatically.
+   *
+   * Observation / OFI only appear here if a
+   * management action row already exists.
+   */
+  const planFindings =
+    findings.filter(
+      (finding) =>
+        [
+          "major_nc",
+          "minor_nc",
+        ].includes(
+          finding.finding_type
+        ) ||
+        Boolean(
+          planByFinding[
+            finding.id
+          ]
+        )
+    );
 
-    if (syncError) {
-      throw new Error(
-        syncError.message
-      );
-    }
-  }
+  const today =
+    new Date();
 
-  revalidatePath(
-    `/portal/assessments/${assessmentId}/actions-plan`
-  );
+  /*
+   * CRITICAL OPEN
+   *
+   * If a management action exists, its status
+   * is authoritative for the Management Action
+   * Plan.
+   *
+   * If no management action exists yet, an
+   * unclosed Major NC still needs management
+   * attention and therefore remains open.
+   */
+  const openCritical =
+    planFindings.filter(
+      (finding) => {
+        if (
+          finding.finding_type !==
+          "major_nc"
+        ) {
+          return false;
+        }
 
-  revalidatePath(
-    `/portal/assessments/${assessmentId}/findings`
-  );
+        const plan =
+          planByFinding[
+            finding.id
+          ];
 
-  revalidatePath(
-    `/portal/assessments/${assessmentId}/summary`
-  );
+        if (plan) {
+          return !isCompletedManagementStatus(
+            plan.status
+          );
+        }
 
-  revalidatePath(
-    `/portal/assessments/${assessmentId}/readiness`
-  );
+        return (
+          finding.status !==
+          "closed"
+        );
+      }
+    ).length;
 
-  redirect(
-    `/portal/assessments/${assessmentId}/actions-plan`
+  /*
+   * HIGH OPEN
+   *
+   * Same rule for Minor NCs.
+   */
+  const openHigh =
+    planFindings.filter(
+      (finding) => {
+        if (
+          finding.finding_type !==
+          "minor_nc"
+        ) {
+          return false;
+        }
+
+        const plan =
+          planByFinding[
+            finding.id
+          ];
+
+        if (plan) {
+          return !isCompletedManagementStatus(
+            plan.status
+          );
+        }
+
+        return (
+          finding.status !==
+          "closed"
+        );
+      }
+    ).length;
+
+  /*
+   * COMPLETED
+   *
+   * This metric represents completed /
+   * verified Management Action Plan records.
+   *
+   * A formally closed finding is NOT counted
+   * here unless its management action itself
+   * is completed or verified.
+   */
+  const completed =
+    managementPlans.filter(
+      (plan) =>
+        isCompletedManagementStatus(
+          plan.status
+        )
+    ).length;
+
+  const findingOverdue =
+    planFindings.filter(
+      (finding) => {
+        const plan =
+          planByFinding[
+            finding.id
+          ];
+
+        const corrective =
+          correctiveByFinding[
+            finding.id
+          ];
+
+        const targetDate =
+          plan?.target_date ??
+          corrective?.target_date;
+
+        const status =
+          plan?.status ??
+          corrective?.status ??
+          finding.status;
+
+        return Boolean(
+          targetDate &&
+            ![
+              "completed",
+              "verified",
+              "closed",
+              "effective",
+            ].includes(
+              status
+            ) &&
+            new Date(
+              `${targetDate}T23:59:59`
+            ) < today
+        );
+      }
+    ).length;
+
+  const readinessOverdue =
+    readinessActions.filter(
+      (action) =>
+        Boolean(
+          action.target_date &&
+            new Date(
+              `${action.target_date}T23:59:59`
+            ) < today
+        )
+    ).length;
+
+  const overdue =
+    findingOverdue +
+    readinessOverdue;
+
+  const box = {
+    background: "#fff",
+    border:
+      "1px solid #dfe6ee",
+    borderRadius: "12px",
+    padding: "18px",
+  };
+
+  const input = {
+    padding: "12px",
+    borderRadius: "8px",
+    border:
+      "1px solid #d8e0ea",
+    boxSizing:
+      "border-box",
+    width: "100%",
+  };
+
+  return (
+    <main
+      style={{
+        minHeight:
+          "100vh",
+        background:
+          "#f3f6f9",
+        padding: "40px",
+        fontFamily:
+          "Arial, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          maxWidth:
+            "1180px",
+          margin:
+            "0 auto",
+        }}
+      >
+        <div
+          style={{
+            display:
+              "flex",
+            justifyContent:
+              "space-between",
+            gap: "20px",
+            flexWrap:
+              "wrap",
+            marginBottom:
+              "24px",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                color:
+                  "#1459D9",
+                fontWeight:
+                  800,
+                fontSize:
+                  "12px",
+                letterSpacing:
+                  ".8px",
+              }}
+            >
+              RPG INTELLIGENCE
+            </div>
+
+            <h1
+              style={{
+                color:
+                  "#071A33",
+                marginBottom:
+                  "6px",
+              }}
+            >
+              Management Action Plan
+            </h1>
+
+            <p
+              style={{
+                color:
+                  "#617087",
+                margin: 0,
+              }}
+            >
+              {
+                assessment.standard
+              }{" "}
+              Assessment
+            </p>
+          </div>
+
+          <div
+            style={{
+              display:
+                "flex",
+              gap: "10px",
+              flexWrap:
+                "wrap",
+            }}
+          >
+            <Link
+              href={`/portal/assessments/${id}/findings`}
+              style={{
+                ...input,
+                width: "auto",
+                background:
+                  "#fff",
+                color:
+                  "#071A33",
+                textDecoration:
+                  "none",
+                fontWeight:
+                  700,
+              }}
+            >
+              ← Findings Register
+            </Link>
+
+            <Link
+              href={`/portal/assessments/${id}/summary`}
+              style={{
+                ...input,
+                width: "auto",
+                background:
+                  "#071A33",
+                color: "#fff",
+                textDecoration:
+                  "none",
+                fontWeight:
+                  700,
+              }}
+            >
+              Executive Summary
+            </Link>
+          </div>
+        </div>
+
+        <section
+          style={{
+            display:
+              "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit,minmax(180px,1fr))",
+            gap: "14px",
+            marginBottom:
+              "24px",
+          }}
+        >
+          {[
+            [
+              "CRITICAL OPEN",
+              openCritical,
+            ],
+            [
+              "HIGH OPEN",
+              openHigh,
+            ],
+            [
+              "OVERDUE",
+              overdue,
+            ],
+            [
+              "COMPLETED",
+              completed,
+            ],
+            [
+              "READINESS ACTIONS",
+              readinessActions.length,
+            ],
+          ].map(
+            ([
+              label,
+              value,
+            ]) => (
+              <div
+                key={
+                  label
+                }
+                style={
+                  box
+                }
+              >
+                <div
+                  style={{
+                    color:
+                      "#617087",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      800,
+                  }}
+                >
+                  {label}
+                </div>
+
+                <strong
+                  style={{
+                    color:
+                      "#071A33",
+                    fontSize:
+                      "28px",
+                  }}
+                >
+                  {value}
+                </strong>
+              </div>
+            )
+          )}
+        </section>
+
+        <div
+          style={{
+            background:
+              "#eef4ff",
+            border:
+              "1px solid #d6e4ff",
+            color:
+              "#405574",
+            padding:
+              "16px 18px",
+            borderRadius:
+              "10px",
+            lineHeight:
+              1.55,
+            marginBottom:
+              "24px",
+          }}
+        >
+          Major and Minor
+          Nonconformities
+          automatically enter this
+          management plan.
+          Observations and OFIs
+          remain in the Findings
+          Register unless management
+          chooses to promote them
+          later. Actions raised through
+          Management Readiness are shown
+          separately below so their source
+          and governance context remain
+          clear.
+        </div>
+
+        {readinessActions.length > 0 && (
+          <section
+            style={{
+              ...box,
+              marginBottom: "24px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "flex-start",
+                gap: "16px",
+                flexWrap: "wrap",
+                marginBottom: "16px",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    color: "#1459D9",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    marginBottom: "5px",
+                  }}
+                >
+                  MANAGEMENT READINESS
+                </div>
+
+                <h2
+                  style={{
+                    color: "#071A33",
+                    margin: 0,
+                  }}
+                >
+                  Readiness Actions
+                </h2>
+              </div>
+
+              <Link
+                href={`/portal/assessments/${id}/management-readiness`}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  background: "#1459D9",
+                  color: "#ffffff",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                }}
+              >
+                Edit Management Readiness
+              </Link>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              {readinessActions.map(
+                (action) => {
+                  const isOverdue =
+                    Boolean(
+                      action.target_date &&
+                        new Date(
+                          `${action.target_date}T23:59:59`
+                        ) < today
+                    );
+
+                  return (
+                    <div
+                      key={
+                        action.dimension_key
+                      }
+                      style={{
+                        background: "#f7f9fc",
+                        border: isOverdue
+                          ? "1px solid #efb4ae"
+                          : "1px solid #e6ebf1",
+                        borderRadius: "10px",
+                        padding: "16px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent:
+                            "space-between",
+                          gap: "12px",
+                          flexWrap: "wrap",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            color: "#071A33",
+                          }}
+                        >
+                          {action.dimension_name}
+                        </strong>
+
+                        <span
+                          style={{
+                            color: isOverdue
+                              ? "#b42318"
+                              : "#617087",
+                            fontWeight: 800,
+                            fontSize: "12px",
+                          }}
+                        >
+                          {isOverdue
+                            ? "OVERDUE"
+                            : "OPEN"}
+                        </span>
+                      </div>
+
+                      {action.management_concern && (
+                        <p
+                          style={{
+                            color: "#617087",
+                            lineHeight: 1.55,
+                            margin: "0 0 8px",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              color: "#071A33",
+                            }}
+                          >
+                            Concern:{" "}
+                          </strong>
+                          {action.management_concern}
+                        </p>
+                      )}
+
+                      <p
+                        style={{
+                          color: "#617087",
+                          lineHeight: 1.55,
+                          margin: "0 0 10px",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            color: "#071A33",
+                          }}
+                        >
+                          Action:{" "}
+                        </strong>
+                        {action.management_action}
+                      </p>
+
+                      <div
+                        style={{
+                          color: "#617087",
+                          fontSize: "13px",
+                          display: "flex",
+                          gap: "18px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>
+                          <strong>Owner:</strong>{" "}
+                          {action.action_owner ??
+                            "Unassigned"}
+                        </span>
+                        <span>
+                          <strong>Target:</strong>{" "}
+                          {action.target_date ??
+                            "—"}
+                        </span>
+                        <span>
+                          <strong>Rating:</strong>{" "}
+                          {action.readiness_rating ??
+                            "Not assessed"}
+                        </span>
+                        <span>
+                          <strong>Evidence:</strong>{" "}
+                          {action.evidence_confidence ??
+                            "Not set"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          </section>
+        )}
+
+        {planFindings.length ===
+        0 ? (
+          <section
+            style={box}
+          >
+            There are currently no
+            finding-driven management
+            actions arising from this
+            assessment.
+          </section>
+        ) : (
+          <div
+            style={{
+              display:
+                "grid",
+              gap: "18px",
+            }}
+          >
+            {planFindings.map(
+              (finding) => {
+                const corrective =
+                  correctiveByFinding[
+                    finding.id
+                  ] ?? {};
+
+                const plan =
+                  planByFinding[
+                    finding.id
+                  ] ?? {};
+
+                const priority =
+                  plan.priority ??
+                  priorityFor(
+                    finding.finding_type
+                  );
+
+                const target =
+                  plan.target_date ??
+                  corrective.target_date ??
+                  "";
+
+                const status =
+                  plan.status ??
+                  "open";
+
+                const isOverdue =
+                  Boolean(
+                    target &&
+                      ![
+                        "completed",
+                        "verified",
+                      ].includes(
+                        status
+                      ) &&
+                      new Date(
+                        `${target}T23:59:59`
+                      ) <
+                        today
+                  );
+
+                return (
+                  <section
+                    key={
+                      finding.id
+                    }
+                    style={{
+                      ...box,
+                      border:
+                        priority ===
+                        "critical"
+                          ? "2px solid #efb4ae"
+                          : box.border,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display:
+                          "flex",
+                        justifyContent:
+                          "space-between",
+                        gap:
+                          "12px",
+                        flexWrap:
+                          "wrap",
+                        marginBottom:
+                          "18px",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          color:
+                            "#071A33",
+                        }}
+                      >
+                        {
+                          finding.question_number
+                        }{" "}
+                        ·{" "}
+                        {labelFor(
+                          finding.finding_type
+                        )}
+                      </strong>
+
+                      <span
+                        style={{
+                          fontWeight:
+                            800,
+                          color:
+                            priority ===
+                            "critical"
+                              ? "#b42318"
+                              : "#8a6116",
+                        }}
+                      >
+                        {priorityLabel(
+                          priority
+                        )}
+                      </span>
+                    </div>
+
+                    <p
+                      style={{
+                        color:
+                          "#617087",
+                        lineHeight:
+                          1.6,
+                      }}
+                    >
+                      <strong
+                        style={{
+                          color:
+                            "#071A33",
+                        }}
+                      >
+                        Finding:{" "}
+                      </strong>
+
+                      {finding.finding_statement ||
+                        finding.requirement_summary ||
+                        "—"}
+                    </p>
+
+                    <form
+                      action={
+                        updateManagementAction
+                      }
+                      style={{
+                        display:
+                          "grid",
+                        gap:
+                          "12px",
+                      }}
+                    >
+                      <input
+                        type="hidden"
+                        name="assessment_id"
+                        value={id}
+                      />
+
+                      <input
+                        type="hidden"
+                        name="finding_id"
+                        value={
+                          finding.id
+                        }
+                      />
+
+                      <div
+                        style={{
+                          display:
+                            "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit,minmax(190px,1fr))",
+                          gap:
+                            "12px",
+                        }}
+                      >
+                        <select
+                          name="priority"
+                          defaultValue={
+                            priority
+                          }
+                          style={
+                            input
+                          }
+                        >
+                          {[
+                            [
+                              "critical",
+                              "Critical",
+                            ],
+                            [
+                              "high",
+                              "High",
+                            ],
+                            [
+                              "medium",
+                              "Medium",
+                            ],
+                            [
+                              "low",
+                              "Low",
+                            ],
+                          ].map(
+                            ([
+                              value,
+                              label,
+                            ]) => (
+                              <option
+                                key={
+                                  value
+                                }
+                                value={
+                                  value
+                                }
+                              >
+                                {
+                                  label
+                                }
+                              </option>
+                            )
+                          )}
+                        </select>
+
+                        <input
+                          name="action_owner"
+                          defaultValue={
+                            plan.action_owner ??
+                            corrective.action_owner ??
+                            ""
+                          }
+                          placeholder="Management owner"
+                          style={
+                            input
+                          }
+                        />
+
+                        <input
+                          name="target_date"
+                          type="date"
+                          defaultValue={
+                            target
+                          }
+                          style={{
+                            ...input,
+                            border:
+                              isOverdue
+                                ? "1px solid #b42318"
+                                : input.border,
+                          }}
+                        />
+
+                        <select
+                          name="status"
+                          defaultValue={
+                            status
+                          }
+                          style={
+                            input
+                          }
+                        >
+                          <option value="open">
+                            Open
+                          </option>
+
+                          <option value="in_progress">
+                            In progress
+                          </option>
+
+                          <option value="completed">
+                            Completed
+                          </option>
+
+                          <option value="verified">
+                            Verified
+                          </option>
+                        </select>
+                      </div>
+
+                      {isOverdue && (
+                        <div
+                          style={{
+                            color:
+                              "#b42318",
+                            fontWeight:
+                              700,
+                          }}
+                        >
+                          Management
+                          action is
+                          overdue.
+                        </div>
+                      )}
+
+                      <textarea
+                        name="action_required"
+                        rows="3"
+                        defaultValue={
+                          plan.action_description ??
+                          corrective.corrective_action ??
+                          ""
+                        }
+                        placeholder="Management action required"
+                        style={
+                          input
+                        }
+                      />
+
+                      <textarea
+                        name="resource_decision"
+                        rows="2"
+                        defaultValue={
+                          plan.resource_decision ??
+                          ""
+                        }
+                        placeholder="Resource / investment / management decision required"
+                        style={
+                          input
+                        }
+                      />
+
+                      <textarea
+                        name="management_commentary"
+                        rows="3"
+                        defaultValue={
+                          plan.management_commentary ??
+                          ""
+                        }
+                        placeholder="Management commentary / progress"
+                        style={
+                          input
+                        }
+                      />
+
+                      <textarea
+                        name="verification_evidence"
+                        rows="3"
+                        defaultValue={
+                          plan.verification_evidence ??
+                          corrective.verification_evidence ??
+                          ""
+                        }
+                        placeholder="Verification / effectiveness evidence"
+                        style={
+                          input
+                        }
+                      />
+
+                      <button
+                        type="submit"
+                        style={{
+                          justifySelf:
+                            "start",
+                          padding:
+                            "11px 17px",
+                          border:
+                            0,
+                          borderRadius:
+                            "8px",
+                          background:
+                            "#1459D9",
+                          color:
+                            "#fff",
+                          fontWeight:
+                            700,
+                          cursor:
+                            "pointer",
+                        }}
+                      >
+                        Save Management
+                        Action
+                      </button>
+                    </form>
+                  </section>
+                );
+              }
+            )}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
