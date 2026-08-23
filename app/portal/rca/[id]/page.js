@@ -323,11 +323,14 @@ export default async function RcaCasePage({
           style={{
             display: "grid",
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+              selected === 4
+                ? "minmax(0, 1fr)"
+                : "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
             gap: "22px",
             marginTop: "24px",
           }}
         >
+          {selected !== 4 && (
           <aside>
             <div
               style={{
@@ -411,6 +414,7 @@ export default async function RcaCasePage({
               })}
             </div>
           </aside>
+          )}
 
           <div style={{ minWidth: 0 }}>
             {discipline && (
