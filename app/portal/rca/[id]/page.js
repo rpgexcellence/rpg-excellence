@@ -8,6 +8,7 @@ import {
   addObjectiveEvidence,
   addTeamMember,
   createAnalysisModel,
+  decideCorrectiveActionCandidate,
   recordNoContainmentRequired,
   reviewAnalysisNode,
   reviewCauseHypothesis,
@@ -201,6 +202,8 @@ export default async function RcaCasePage({
     actions,
     selectedEvidence,
     rcaCase,
+    analysisModels,
+    analysisNodes,
   });
 
   return (
@@ -407,6 +410,24 @@ export default async function RcaCasePage({
                     </div>
                   </div>
                 )}
+                {pageError === "selection_rationale_required" && (
+                  <div style={validationNoticeStyle}>
+                    Record why the proposed action was selected before confirming the decision.
+                  </div>
+                )}
+                {pageError === "candidate_fields_required" && (
+                  <div style={validationNoticeStyle}>
+                    A selected action requires a validated cause, accountable owner, due date and measurable effectiveness criteria.
+                  </div>
+                )}
+                {pageError === "d5_selection_incomplete" && (
+                  <div style={validationNoticeStyle}>
+                    <strong>D5 cannot be approved yet.</strong>
+                    <div style={{ marginTop: "6px" }}>
+                      Select at least one complete permanent corrective action for every validated cause. Missing cause coverage: {missingCauseTypes.join(", ") || "review the selected actions below"}.
+                    </div>
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",
@@ -488,7 +509,7 @@ export default async function RcaCasePage({
                       textTransform: "uppercase",
                     }}
                   >
-                    D{selected} deterministic review
+                    {evidenceChallenge.title}
                   </div>
                   <h3 style={{ margin: "6px 0" }}>
                     {evidenceChallenge.readiness}
@@ -732,7 +753,15 @@ export default async function RcaCasePage({
               />
             )}
 
-            {[3, 5, 6, 7].includes(selected) && (
+            {selected === 5 && (
+              <CorrectiveActionSelectionWorkbench
+                caseId={id}
+                causes={causes.filter((cause) => cause.status === "validated")}
+                actions={actions.filter((action) => action.discipline === 5)}
+              />
+            )}
+
+            {[3, 6, 7].includes(selected) && (
               <section style={cardStyle}>
                 <h2>Containment and corrective actions</h2>
                 {selected === 3 && discipline?.no_action_required && (
@@ -787,7 +816,7 @@ export default async function RcaCasePage({
                   </form>
                 )}
 
-                {!discipline?.no_action_required && (
+                {selected === 3 && !discipline?.no_action_required && (
                 <form action={addCorrectiveAction} style={{ marginTop: "16px" }}>
                   <input type="hidden" name="case_id" value={id} />
                   <div style={formGrid}>
@@ -823,6 +852,148 @@ export default async function RcaCasePage({
         </div>
       </div>
     </main>
+  );
+}
+
+function CorrectiveActionSelectionWorkbench({ caseId, causes, actions }) {
+  const causeById = new Map(causes.map((cause) => [cause.id, cause]));
+  const selectedActions = actions.filter((action) => action.selection_status === "selected");
+  const candidates = actions.filter((action) => action.selection_status === "candidate");
+  const rejected = actions.filter((action) => action.selection_status === "rejected");
+
+  return (
+    <section style={cardStyle}>
+      <div style={{ color: "#155eef", fontSize: "12px", fontWeight: 800, textTransform: "uppercase" }}>
+        D5 Permanent Corrective Action Selection
+      </div>
+      <h2 style={{ margin: "6px 0" }}>Compare, select and control permanent corrective actions</h2>
+      <p style={{ color: "#607089", lineHeight: 1.6 }}>
+        Each selected action must address a validated cause, have an accountable owner and due date, and define measurable effectiveness criteria before implementation.
+      </p>
+
+      <div style={d5SummaryGridStyle}>
+        {[
+          ["Validated causes", causes.length],
+          ["Candidates", candidates.length],
+          ["Selected", selectedActions.length],
+          ["Rejected", rejected.length],
+        ].map(([title, value]) => (
+          <div key={title} style={d5SummaryCardStyle}>
+            <span>{title}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+
+      <h3 style={{ marginTop: "24px" }}>Validated cause coverage</h3>
+      <div style={coverageGridStyle}>
+        {causes.map((cause) => {
+          const linkedSelected = selectedActions.filter((action) => action.cause_id === cause.id);
+          return (
+            <div key={cause.id} style={coverageCardStyle(linkedSelected.length > 0)}>
+              <strong>{label(cause.cause_type)}</strong>
+              <span style={{ lineHeight: 1.45 }}>{cause.statement}</span>
+              <span style={{ fontWeight: 800 }}>
+                {linkedSelected.length > 0 ? `${linkedSelected.length} selected action(s)` : "Action not yet selected"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <h3 style={{ marginTop: "24px" }}>Action candidates</h3>
+      <div style={{ display: "grid", gap: "12px" }}>
+        {actions.map((action) => {
+          const cause = causeById.get(action.cause_id);
+          const decisionScore =
+            Number(action.effectiveness_score || 0) +
+            Number(action.feasibility_score || 0) +
+            (6 - Number(action.implementation_risk_score || 5));
+          return (
+            <div key={action.id} style={candidateCardStyle(action.selection_status)}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
+                <div>
+                  <strong style={{ fontSize: "18px" }}>{action.title}</strong>
+                  <div style={{ marginTop: "5px", color: "#607089" }}>
+                    {cause ? `${label(cause.cause_type)}: ${cause.statement}` : "Cause link unavailable"}
+                  </div>
+                </div>
+                <span style={selectionBadgeStyle(action.selection_status)}>{label(action.selection_status)}</span>
+              </div>
+              <p style={{ lineHeight: 1.55 }}>{action.description || "No action description recorded."}</p>
+              <div style={candidateMetricsStyle}>
+                <span><strong>Effectiveness:</strong> {action.effectiveness_score ?? "—"}/5</span>
+                <span><strong>Feasibility:</strong> {action.feasibility_score ?? "—"}/5</span>
+                <span><strong>Implementation risk:</strong> {action.implementation_risk_score ?? "—"}/5</span>
+                <span><strong>Decision score:</strong> {decisionScore}/15</span>
+                <span><strong>Owner:</strong> {action.action_owner || "Unassigned"}</span>
+                <span><strong>Due:</strong> {action.due_date || "Not set"}</span>
+              </div>
+              <div style={{ marginTop: "12px" }}>
+                <strong>Effectiveness criteria:</strong>{" "}
+                {action.effectiveness_criteria || "Not defined"}
+              </div>
+              {action.selection_rationale && (
+                <div style={{ marginTop: "10px" }}><strong>Decision rationale:</strong> {action.selection_rationale}</div>
+              )}
+              {action.selection_status === "candidate" && (
+                <form action={decideCorrectiveActionCandidate} style={{ marginTop: "14px" }}>
+                  <input type="hidden" name="case_id" value={caseId} />
+                  <input type="hidden" name="action_id" value={action.id} />
+                  <textarea name="selection_rationale" rows={2} placeholder="Required when selecting: explain why this action is suitable, proportionate and preferable to alternatives" style={fieldStyle} />
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "10px" }}>
+                    <button name="decision" value="select" style={approveButton}>Select Permanent Action</button>
+                    <button name="decision" value="reject" style={rejectButton}>Reject Candidate</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          );
+        })}
+        {actions.length === 0 && <div style={emptyWorkbenchStyle}>No corrective-action candidates recorded.</div>}
+      </div>
+
+      <details style={{ ...causeBuilderStyle, marginTop: "20px" }} open={actions.length === 0}>
+        <summary style={{ cursor: "pointer", fontWeight: 800, fontSize: "18px" }}>Add permanent corrective-action candidate</summary>
+        <form action={addCorrectiveAction} style={{ marginTop: "16px" }}>
+          <input type="hidden" name="case_id" value={caseId} />
+          <div style={formGrid}>
+            <select name="action_type" required defaultValue="corrective" style={fieldStyle}>
+              <option value="corrective">Corrective action</option>
+              <option value="preventive">Preventive action</option>
+              <option value="systemic">Systemic action</option>
+              <option value="correction">Permanent correction</option>
+            </select>
+            <select name="cause_id" required defaultValue="" style={fieldStyle}>
+              <option value="" disabled>Select validated cause</option>
+              {causes.map((cause) => (
+                <option value={cause.id} key={cause.id}>{label(cause.cause_type)}: {cause.statement}</option>
+              ))}
+            </select>
+            <input name="action_owner" required placeholder="Accountable action owner" style={fieldStyle} />
+            <input type="date" name="due_date" required style={fieldStyle} />
+          </div>
+          <input name="action_title" required placeholder="Candidate action title" style={{ ...fieldStyle, marginTop: "12px" }} />
+          <textarea name="description" required rows={3} placeholder="Describe exactly what will change" style={{ ...fieldStyle, marginTop: "12px" }} />
+          <textarea name="effectiveness_criteria" required rows={3} placeholder="Define measurable effectiveness criteria and acceptance threshold" style={{ ...fieldStyle, marginTop: "12px" }} />
+          <div style={formGrid}>
+            <ScoreSelect name="effectiveness_score" title="Expected effectiveness" />
+            <ScoreSelect name="feasibility_score" title="Feasibility" />
+            <ScoreSelect name="implementation_risk_score" title="Implementation risk" />
+          </div>
+          <button type="submit" style={{ ...primaryButton, marginTop: "14px" }}>Add Candidate</button>
+        </form>
+      </details>
+    </section>
+  );
+}
+
+function ScoreSelect({ name, title }) {
+  return (
+    <select name={name} required defaultValue="" style={fieldStyle}>
+      <option value="" disabled>{title}: select 1–5</option>
+      {[1, 2, 3, 4, 5].map((score) => <option value={score} key={score}>{title}: {score}/5</option>)}
+    </select>
   );
 }
 
@@ -1159,6 +1330,8 @@ function buildEvidenceChallenge({
   actions,
   selectedEvidence,
   rcaCase,
+  analysisModels,
+  analysisNodes,
 }) {
   const challenges = [];
   const missingEvidence = [];
@@ -1169,34 +1342,54 @@ function buildEvidenceChallenge({
     (action) => action.discipline === selected
   );
 
-  if (narrative.length < 80) {
-    challenges.push(
-      "The discipline conclusion is brief. Confirm that facts, analysis, decisions and remaining uncertainty are explicitly recorded."
-    );
-  } else {
-    strengths.push("A substantive discipline narrative has been recorded.");
-  }
+  const titles = [
+    "D0 INITIAL RESPONSE AND PROTECTION REVIEW",
+    "D1 TEAM CAPABILITY REVIEW",
+    "D2 PROBLEM DEFINITION REVIEW",
+    "D3 CONTAINMENT EFFECTIVENESS REVIEW",
+    "D4 ROOT CAUSE VALIDATION REVIEW",
+    "D5 CORRECTIVE ACTION SELECTION REVIEW",
+    "D6 IMPLEMENTATION AND EFFECTIVENESS REVIEW",
+    "D7 RECURRENCE PREVENTION REVIEW",
+    "D8 CLOSURE AND LEARNING REVIEW",
+  ];
 
-  if (selected >= 2 && selectedEvidence.length === 0) {
-    missingEvidence.push(
-      "No objective evidence file is attached to this discipline."
+  const recordNarrative = (minimum, message) => {
+    if (narrative.length < minimum) challenges.push(message);
+    else strengths.push("The discipline conclusion records substantive analysis and decisions.");
+  };
+
+  const requireEvidence = (message) => {
+    if (selectedEvidence.length === 0) missingEvidence.push(message);
+    else strengths.push(
+      `${selectedEvidence.length} objective evidence file${selectedEvidence.length === 1 ? " is" : "s are"} attached to this gate.`
     );
-  } else if (selectedEvidence.length > 0) {
-    strengths.push(
-      `${selectedEvidence.length} objective evidence file${selectedEvidence.length === 1 ? " is" : "s are"} attached.`
-    );
-  }
+  };
 
   if (selected === 0) {
+    recordNarrative(
+      60,
+      "Record the urgency decision, immediate protection applied and any unresolved exposure."
+    );
     if (!rcaCase.problem_statement) {
       missingEvidence.push("The initial problem or risk requiring 8D is not defined.");
     }
+    if (!rcaCase.sponsor_name || !rcaCase.leader_name) {
+      challenges.push("Name both the accountable sponsor and the investigation leader.");
+    } else {
+      strengths.push("An accountable sponsor and investigation leader are assigned.");
+    }
     requiredVerification.push(
-      "Confirm urgency, affected parties, immediate protection and the decision to use 8D."
+      "Verify the scale of exposure, affected people or customers, regulatory implications and immediate protective controls."
     );
+    requiredVerification.push("Confirm that 8D is proportionate to the problem and that escalation criteria were applied.");
   }
 
   if (selected === 1) {
+    recordNarrative(
+      50,
+      "Explain why the selected team has the authority, independence and combined competence needed for this investigation."
+    );
     if (team.length === 0) {
       missingEvidence.push("No cross-functional team members are recorded.");
     } else {
@@ -1208,13 +1401,19 @@ function buildEvidenceChallenge({
       );
     }
     requiredVerification.push(
-      "Confirm the team collectively has process, technical, customer and decision-making authority."
+      "Verify coverage of process knowledge, technical expertise, customer or user impact and decision-making authority."
     );
+    requiredVerification.push("Confirm every member understands their named 8D responsibility and route for escalation.");
   }
 
   if (selected === 2) {
+    recordNarrative(
+      100,
+      "Define the problem with measurable facts, scope, impact and boundaries; avoid a short or solution-led statement."
+    );
+    requireEvidence("Attach source evidence supporting the problem definition, extent and baseline.");
     requiredVerification.push(
-      "Verify the problem statement using what, where, when, extent and impact, including what is not affected."
+      "Test the definition using what, where, when, who, extent and impact, including IS/IS NOT boundaries."
     );
     challenges.push(
       "Separate observed facts from suspected causes; causes must not be embedded in the problem statement."
@@ -1222,6 +1421,10 @@ function buildEvidenceChallenge({
   }
 
   if (selected === 3) {
+    recordNarrative(
+      80,
+      "Record the containment decision, coverage, verification result, residual risk and exit criteria."
+    );
     const containmentActions = actions.filter(
       (action) => action.action_type === "containment"
     );
@@ -1231,11 +1434,25 @@ function buildEvidenceChallenge({
       );
     }
     requiredVerification.push(
-      "Confirm containment coverage, owner, timing, verification, unintended effects and exit criteria."
+      "Test whether containment reached every affected unit, customer, location and time period without creating unacceptable new risk."
     );
+    if (containmentActions.length > 0) {
+      requireEvidence("Attach evidence that containment was implemented and is effective, not merely planned.");
+      if (containmentActions.some((action) => !action.action_owner || !action.due_date)) {
+        challenges.push("Every containment action needs an accountable owner and controlled completion date.");
+      }
+    } else if (discipline?.no_action_required) {
+      strengths.push("A no-containment decision has been explicitly recorded for human review.");
+      requiredVerification.push("Confirm the no-containment justification is risk-based and authorised.");
+    }
   }
 
   if (selected === 4) {
+    recordNarrative(
+      120,
+      "Summarise the causal logic, competing hypotheses, contradictory evidence and the basis for the validated conclusions."
+    );
+    requireEvidence("Attach objective evidence used to test and validate the causal conclusions.");
     const requiredTypes = ["occurrence", "escape", "systemic"];
     for (const type of requiredTypes) {
       const typeCauses = causes.filter((cause) => cause.cause_type === type);
@@ -1243,9 +1460,12 @@ function buildEvidenceChallenge({
         (cause) => Array.isArray(cause.why_chain) && cause.why_chain.length === 5
       );
       const validated = typeCauses.some((cause) => cause.status === "validated");
-      if (!completeChain) {
+      const modelCoverage = (analysisNodes ?? []).some(
+        (node) => node.cause_type === type || node.branch_key === type
+      );
+      if (!completeChain && !modelCoverage) {
         missingEvidence.push(
-          `A complete five-Why chain is required for the ${type} cause.`
+          `Analyse the ${type} cause using a complete 5-Why chain or another documented workbench method.`
         );
       }
       if (!validated) {
@@ -1257,14 +1477,29 @@ function buildEvidenceChallenge({
     requiredVerification.push(
       "Attempt to disprove each causal chain and record the validation method, result and contradictory evidence."
     );
+    if ((analysisModels ?? []).length > 0) {
+      strengths.push(`${analysisModels.length} structured root-cause analysis model${analysisModels.length === 1 ? " is" : "s are"} recorded.`);
+    } else {
+      missingEvidence.push("No 3×5 Whys, Ishikawa/Fishbone or HSE Bow Tie model is recorded.");
+    }
   }
 
-  if ([5, 6, 7].includes(selected)) {
-    const reviewedActions = selected === 5
-      ? stageActions
-      : actions.filter((action) => action.action_type !== "containment");
+  if (selected === 5) {
+    recordNarrative(
+      100,
+      "Explain the option comparison, selection rationale, expected risk reduction and any residual implementation risk."
+    );
+    const reviewedActions = stageActions;
     if (reviewedActions.length === 0) {
-      missingEvidence.push("No controlled action is assigned to this discipline.");
+      missingEvidence.push("No permanent corrective-action candidate is recorded.");
+    }
+    const selectedActions = reviewedActions.filter(
+      (action) => action.selection_status === "selected"
+    );
+    if (selectedActions.length === 0) {
+      missingEvidence.push("No corrective-action candidate has been selected.");
+    } else {
+      strengths.push(`${selectedActions.length} corrective action${selectedActions.length === 1 ? " is" : "s are"} selected for implementation.`);
     }
     if (reviewedActions.some((action) => !action.action_owner || !action.due_date)) {
       challenges.push("One or more actions lack an owner or due date.");
@@ -1274,16 +1509,60 @@ function buildEvidenceChallenge({
         "Measurable effectiveness criteria are missing from one or more actions."
       );
     }
-    requiredVerification.push(
-      selected === 5
-        ? "Demonstrate that selected actions address validated causes and introduce no unacceptable new risk."
-        : selected === 6
-          ? "Verify implementation against the approved change and retain evidence of results."
-          : "Confirm equivalent processes, products and sites were reviewed for recurrence risk."
+    if (selectedActions.some((action) => !action.selection_rationale)) {
+      challenges.push("Record why each selected action is preferred over the alternatives.");
+    }
+    requiredVerification.push("Trace every selected action to a validated cause and confirm that no validated cause is left untreated.");
+    requiredVerification.push("Review feasibility, implementation risk, unintended consequences and measurable effectiveness criteria before approval.");
+  }
+
+  if (selected === 6) {
+    recordNarrative(
+      120,
+      "Record what was implemented, deviations from the approved plan, measured results, residual risk and the effectiveness conclusion."
     );
+    requireEvidence("Attach implementation records and objective before/after results for the permanent corrective actions.");
+    const implementationActions = actions.filter(
+      (action) => action.action_type !== "containment" && action.selection_status !== "rejected"
+    );
+    if (implementationActions.length === 0) {
+      missingEvidence.push("No selected permanent corrective action is available for implementation review.");
+    }
+    if (implementationActions.some((action) => !action.action_owner || !action.due_date)) {
+      challenges.push("Every implemented action must retain an accountable owner and controlled completion date.");
+    }
+    if (implementationActions.some((action) => !action.effectiveness_criteria)) {
+      missingEvidence.push("Measurable effectiveness criteria are missing from one or more implemented actions.");
+    }
+    requiredVerification.push("Compare implementation against the approved change and investigate every deviation.");
+    requiredVerification.push("Demonstrate effectiveness using the predefined measure and an adequate monitoring period before removing containment.");
+  }
+
+  if (selected === 7) {
+    recordNarrative(
+      110,
+      "Record how learning was applied across equivalent processes, products, locations and management-system controls."
+    );
+    requireEvidence("Attach updated procedures, risk controls, training, audit checks or other systemic-change records.");
+    const preventiveActions = actions.filter(
+      (action) => ["preventive", "systemic"].includes(action.action_type)
+    );
+    if (preventiveActions.length === 0) {
+      missingEvidence.push("No preventive or systemic action is recorded for recurrence prevention.");
+    }
+    if (preventiveActions.some((action) => !action.effectiveness_criteria)) {
+      challenges.push("Define how each systemic change will be monitored for recurrence.");
+    }
+    requiredVerification.push("Confirm equivalent processes, products, sites and suppliers were screened for the same causal conditions.");
+    requiredVerification.push("Verify that relevant standards, risk assessments, training, audit criteria and change controls were updated.");
   }
 
   if (selected === 8) {
+    recordNarrative(
+      120,
+      "Record the sustained-effectiveness decision, lessons learned, residual risks, recognition and formal closure authority."
+    );
+    requireEvidence("Attach the final effectiveness record and evidence supporting authorised closure.");
     const unverified = actions.filter(
       (action) => !["verified", "cancelled"].includes(action.status)
     );
@@ -1293,12 +1572,14 @@ function buildEvidenceChallenge({
       );
     }
     requiredVerification.push(
-      "Confirm sustained effectiveness, lessons learned, recognition, record completion and authorised closure."
+      "Confirm effectiveness was sustained for a justified period and that recurrence indicators remain acceptable."
     );
+    requiredVerification.push("Verify lessons learned, record completion, team recognition and sponsor or authorised-person closure.");
   }
 
   const issueCount = challenges.length + missingEvidence.length;
   return {
+    title: titles[selected] ?? `D${selected} DISCIPLINE REVIEW`,
     readiness: issueCount === 0 ? "No structural gaps detected" : `${issueCount} review point${issueCount === 1 ? "" : "s"} identified`,
     assessment:
       issueCount === 0
@@ -1351,6 +1632,85 @@ const methodGridStyle = {
   gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   gap: "12px",
   marginTop: "18px",
+};
+
+const d5SummaryGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: "10px",
+  marginTop: "18px",
+};
+
+const d5SummaryCardStyle = {
+  display: "grid",
+  gap: "7px",
+  padding: "15px",
+  border: "1px solid #dce4ee",
+  borderRadius: "12px",
+  background: "#f8faff",
+};
+
+const coverageGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: "10px",
+};
+
+const coverageCardStyle = (covered) => ({
+  display: "grid",
+  gap: "8px",
+  padding: "14px",
+  borderRadius: "12px",
+  border: covered ? "1px solid #75c69a" : "1px solid #f2b8b5",
+  background: covered ? "#e8f8ef" : "#fff5f4",
+  color: covered ? "#065f46" : "#9b1c1c",
+});
+
+const candidateCardStyle = (status) => ({
+  padding: "18px",
+  borderRadius: "14px",
+  border:
+    status === "selected"
+      ? "2px solid #36a269"
+      : status === "rejected"
+        ? "1px solid #f2b8b5"
+        : "1px solid #cbd7e6",
+  background:
+    status === "selected"
+      ? "#f0fbf5"
+      : status === "rejected"
+        ? "#fff7f6"
+        : "#f8faff",
+});
+
+const selectionBadgeStyle = (status) => ({
+  alignSelf: "flex-start",
+  padding: "7px 11px",
+  borderRadius: "999px",
+  background:
+    status === "selected"
+      ? "#d8f3e4"
+      : status === "rejected"
+        ? "#ffe2df"
+        : "#e9eff8",
+  color:
+    status === "selected"
+      ? "#067647"
+      : status === "rejected"
+        ? "#b42318"
+        : "#173a68",
+  fontWeight: 800,
+  fontSize: "12px",
+});
+
+const candidateMetricsStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: "8px",
+  marginTop: "12px",
+  padding: "12px",
+  borderRadius: "10px",
+  background: "white",
 };
 
 const disciplineStatusNavStyle = {
