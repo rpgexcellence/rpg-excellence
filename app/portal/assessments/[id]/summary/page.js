@@ -19,7 +19,7 @@ const CLAUSE_NUMBERS = [
   "10",
 ];
 
-const CLAUSE_TITLES = {
+const DEFAULT_CLAUSE_TITLES = {
   "4": "Context of the Organization",
   "5": "Leadership",
   "6": "Planning",
@@ -29,12 +29,32 @@ const CLAUSE_TITLES = {
   "10": "Improvement",
 };
 
+const CLAUSE_TITLES_BY_STANDARD = {
+  "ISO/IEC 17024:2026": {
+    "4": "General Requirements",
+    "5": "Structural Requirements",
+    "6": "Resource Requirements",
+    "7": "Records and Information Requirements",
+    "8": "Certification Schemes",
+    "9": "Certification Process Requirements",
+    "10": "Management System Requirements",
+  },
+};
+
 const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
+  "ISO/IEC 17024:2026",
 ];
 
+function getClauseTitle(standard, clauseNumber) {
+  return (
+    CLAUSE_TITLES_BY_STANDARD[standard]?.[clauseNumber] ??
+    DEFAULT_CLAUSE_TITLES[clauseNumber] ??
+    `Clause ${clauseNumber}`
+  );
+}
 
 function managementReadinessValue(rating) {
   switch (rating) {
@@ -319,10 +339,10 @@ export default async function AssessmentSummaryPage({
 
         return {
           number,
-          title:
-            CLAUSE_TITLES[
-              number
-            ],
+          title: getClauseTitle(
+            assessment.standard,
+            number
+          ),
           score:
             calculateClauseScore(
               number,
