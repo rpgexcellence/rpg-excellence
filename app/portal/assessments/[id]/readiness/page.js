@@ -94,6 +94,25 @@ function decisionStyle(decision) {
   };
 }
 
+function progressingDescription(standard) {
+  switch (standard) {
+    case "ISO 9001:2015/Amd 1:2024":
+      return "The QMS is established and developing, but further evidence or implementation is required.";
+
+    case "ISO 14001:2026":
+      return "The EMS is established and developing, but further evidence or implementation is required.";
+
+    case "ISO 45001:2018":
+      return "The OH&S management system is established and developing, but further evidence or implementation is required.";
+
+    case "ISO/IEC 17024:2026":
+      return "The person-certification management system is established and developing, but further evidence, implementation or control of certification activities is required.";
+
+    default:
+      return "The management system is established and developing, but further evidence or implementation is required.";
+  }
+}
+
 export default async function CertificationReadinessPage({
   params,
 }) {
@@ -743,11 +762,9 @@ export default async function CertificationReadinessPage({
 
     [
       "Progressing",
-      assessment.standard === "ISO 9001:2015/Amd 1:2024"
-        ? "The QMS is established and developing, but further evidence or implementation is required."
-        : assessment.standard === "ISO 45001:2018"
-          ? "The OH&S management system is established and developing, but further evidence or implementation is required."
-          : "The EMS is established and developing, but further evidence or implementation is required.",
+      progressingDescription(
+        assessment.standard
+      ),
     ],
 
     [
