@@ -1,4 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createClient } from "../../../../../lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -58,7 +60,10 @@ export async function GET(_request, { params }) {
   const costs = costsResult.data ?? [];
   const validatedCauses = causes.filter((cause) => cause.status === "validated");
   const selectedActions = actions.filter(
-    (action) => action.selection_status === "selected" || ["in_progress", "completed", "verified"].includes(action.status)
+    (action) =>
+      action.action_type !== "containment" &&
+      action.selection_status !== "rejected" &&
+      action.status !== "cancelled"
   );
   const openActions = actions.filter((action) => !["verified", "cancelled"].includes(action.status));
   const approvedCount = disciplines.filter((discipline) => discipline.status === "approved").length;
@@ -71,6 +76,13 @@ export async function GET(_request, { params }) {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  let logoImage = null;
+  try {
+    const logoBytes = await readFile(join(process.cwd(), "public", "rpg-excellence-logo.png"));
+    logoImage = await pdf.embedPng(logoBytes);
+  } catch {
+    logoImage = null;
+  }
   const navy = rgb(0.024, 0.102, 0.208);
   const blue = rgb(0.082, 0.369, 0.937);
   const grey = rgb(0.37, 0.44, 0.54);
@@ -84,7 +96,17 @@ export async function GET(_request, { params }) {
   const addPage = () => {
     page = pdf.addPage([pageWidth, pageHeight]);
     y = pageHeight - margin;
-    page.drawText("RPG EXCELLENCE", { x: margin, y, size: 10, font: bold, color: blue });
+    if (logoImage) {
+      const dimensions = logoImage.scaleToFit(125, 34);
+      page.drawImage(logoImage, {
+        x: margin,
+        y: y - dimensions.height + 9,
+        width: dimensions.width,
+        height: dimensions.height,
+      });
+    } else {
+      page.drawText("RPG EXCELLENCE", { x: margin, y, size: 10, font: bold, color: blue });
+    }
     page.drawText("8D RCA Executive Report", { x: pageWidth - margin - 126, y, size: 9, font: regular, color: grey });
     y -= 26;
   };
@@ -158,6 +180,21 @@ export async function GET(_request, { params }) {
   bullet(`Location: ${rcaCase.location || "Not recorded"}`);
   bullet(`Sponsor: ${rcaCase.sponsor_name || "Not recorded"}; 8D leader: ${rcaCase.leader_name || "Not recorded"}`);
 
+  const governanceExceptions = [];
+  if (!rcaCase.sponsor_name) governanceExceptions.push("Accountable sponsor is not recorded.");
+  if (!rcaCase.leader_name) governanceExceptions.push("8D investigation leader is not recorded.");
+  if (!rcaCase.customer_or_stakeholder) governanceExceptions.push("Affected customer or stakeholder is not recorded.");
+  if (!rcaCase.product_service_process) governanceExceptions.push("Affected product, service or process is not recorded.");
+  if (openActions.length > 0) governanceExceptions.push(`${openActions.length} action${openActions.length === 1 ? " remains" : "s remain"} open or unverified.`);
+  if (disciplines.every((item) => item.status === "approved") && openActions.length > 0) {
+    governanceExceptions.push("The 8D gates are approved although actions remain open; formal closure should be reconfirmed.");
+  }
+
+  if (governanceExceptions.length > 0) {
+    heading("Management exceptions");
+    governanceExceptions.forEach(bullet);
+  }
+
   heading("Validated root causes");
   for (const type of ["occurrence", "escape", "systemic"]) {
     const typeCauses = validatedCauses.filter((cause) => cause.cause_type === type);
@@ -184,10 +221,9 @@ export async function GET(_request, { params }) {
   );
   costs.forEach((entry) => bullet(`D${entry.discipline} | ${cleanLabel(entry.cost_category)} | ${entry.description} | ${money(entry.amount, entry.currency)} | ${cleanLabel(entry.cost_status)}`));
 
-  heading("8D stage status");
+  heading("8D gate status");
   disciplines.forEach((item) => {
-    paragraph(`D${item.discipline} - ${DISCIPLINE_NAMES[item.discipline]} - ${cleanLabel(item.status)}`, { bold: true, after: 2 });
-    if (item.narrative) paragraph(item.narrative, { color: grey, after: 7 });
+    bullet(`D${item.discipline} | ${DISCIPLINE_NAMES[item.discipline]} | ${cleanLabel(item.status)}`);
   });
 
   const pages = pdf.getPages();
