@@ -161,6 +161,35 @@ export default async function ManagementActionPlanPage({
   const managementPlans =
     planData ?? [];
 
+  const {
+    data: readinessData,
+    error: readinessError,
+  } = await supabase
+    .from("management_readiness")
+    .select(
+      "dimension_key, dimension_name, display_order, readiness_rating, evidence_confidence, management_concern, management_action, action_owner, target_date"
+    )
+    .eq("assessment_id", id)
+    .eq("owner_id", user.id)
+    .order("display_order", {
+      ascending: true,
+    });
+
+  if (readinessError) {
+    throw new Error(
+      readinessError.message
+    );
+  }
+
+  const readinessActions =
+    (readinessData ?? []).filter(
+      (row) =>
+        typeof row.management_action ===
+          "string" &&
+        row.management_action.trim() !==
+          ""
+    );
+
   /*
    * Canonical finding relationship for the
    * management action plan.
@@ -296,7 +325,7 @@ export default async function ManagementActionPlanPage({
         )
     ).length;
 
-  const overdue =
+  const findingOverdue =
     planFindings.filter(
       (finding) => {
         const plan =
@@ -334,6 +363,21 @@ export default async function ManagementActionPlanPage({
         );
       }
     ).length;
+
+  const readinessOverdue =
+    readinessActions.filter(
+      (action) =>
+        Boolean(
+          action.target_date &&
+            new Date(
+              `${action.target_date}T23:59:59`
+            ) < today
+        )
+    ).length;
+
+  const overdue =
+    findingOverdue +
+    readinessOverdue;
 
   const box = {
     background: "#fff",
@@ -501,6 +545,10 @@ export default async function ManagementActionPlanPage({
               "COMPLETED",
               completed,
             ],
+            [
+              "READINESS ACTIONS",
+              readinessActions.length,
+            ],
           ].map(
             ([
               label,
@@ -568,18 +616,214 @@ export default async function ManagementActionPlanPage({
           remain in the Findings
           Register unless management
           chooses to promote them
-          later.
+          later. Actions raised through
+          Management Readiness are shown
+          separately below so their source
+          and governance context remain
+          clear.
         </div>
+
+        {readinessActions.length > 0 && (
+          <section
+            style={{
+              ...box,
+              marginBottom: "24px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "flex-start",
+                gap: "16px",
+                flexWrap: "wrap",
+                marginBottom: "16px",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    color: "#1459D9",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    marginBottom: "5px",
+                  }}
+                >
+                  MANAGEMENT READINESS
+                </div>
+
+                <h2
+                  style={{
+                    color: "#071A33",
+                    margin: 0,
+                  }}
+                >
+                  Readiness Actions
+                </h2>
+              </div>
+
+              <Link
+                href={`/portal/assessments/${id}/management-readiness`}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  background: "#1459D9",
+                  color: "#ffffff",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                }}
+              >
+                Edit Management Readiness
+              </Link>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              {readinessActions.map(
+                (action) => {
+                  const isOverdue =
+                    Boolean(
+                      action.target_date &&
+                        new Date(
+                          `${action.target_date}T23:59:59`
+                        ) < today
+                    );
+
+                  return (
+                    <div
+                      key={
+                        action.dimension_key
+                      }
+                      style={{
+                        background: "#f7f9fc",
+                        border: isOverdue
+                          ? "1px solid #efb4ae"
+                          : "1px solid #e6ebf1",
+                        borderRadius: "10px",
+                        padding: "16px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent:
+                            "space-between",
+                          gap: "12px",
+                          flexWrap: "wrap",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            color: "#071A33",
+                          }}
+                        >
+                          {action.dimension_name}
+                        </strong>
+
+                        <span
+                          style={{
+                            color: isOverdue
+                              ? "#b42318"
+                              : "#617087",
+                            fontWeight: 800,
+                            fontSize: "12px",
+                          }}
+                        >
+                          {isOverdue
+                            ? "OVERDUE"
+                            : "OPEN"}
+                        </span>
+                      </div>
+
+                      {action.management_concern && (
+                        <p
+                          style={{
+                            color: "#617087",
+                            lineHeight: 1.55,
+                            margin: "0 0 8px",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              color: "#071A33",
+                            }}
+                          >
+                            Concern:{" "}
+                          </strong>
+                          {action.management_concern}
+                        </p>
+                      )}
+
+                      <p
+                        style={{
+                          color: "#617087",
+                          lineHeight: 1.55,
+                          margin: "0 0 10px",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            color: "#071A33",
+                          }}
+                        >
+                          Action:{" "}
+                        </strong>
+                        {action.management_action}
+                      </p>
+
+                      <div
+                        style={{
+                          color: "#617087",
+                          fontSize: "13px",
+                          display: "flex",
+                          gap: "18px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>
+                          <strong>Owner:</strong>{" "}
+                          {action.action_owner ??
+                            "Unassigned"}
+                        </span>
+                        <span>
+                          <strong>Target:</strong>{" "}
+                          {action.target_date ??
+                            "—"}
+                        </span>
+                        <span>
+                          <strong>Rating:</strong>{" "}
+                          {action.readiness_rating ??
+                            "Not assessed"}
+                        </span>
+                        <span>
+                          <strong>Evidence:</strong>{" "}
+                          {action.evidence_confidence ??
+                            "Not set"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          </section>
+        )}
 
         {planFindings.length ===
         0 ? (
           <section
             style={box}
           >
-            There are currently
-            no mandatory
-            management actions
-            arising from this
+            There are currently no
+            finding-driven management
+            actions arising from this
             assessment.
           </section>
         ) : (
