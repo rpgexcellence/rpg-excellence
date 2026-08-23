@@ -4,9 +4,12 @@ import { createClient } from "../../../../lib/supabase/server";
 import {
   addCauseHypothesis,
   addCorrectiveAction,
+  addAnalysisNode,
   addObjectiveEvidence,
   addTeamMember,
+  createAnalysisModel,
   recordNoContainmentRequired,
+  reviewAnalysisNode,
   reviewCauseHypothesis,
   saveCaseOverview,
   saveDiscipline,
@@ -53,6 +56,8 @@ export default async function RcaCasePage({
     causesResult,
     actionsResult,
     evidenceResult,
+    analysisModelsResult,
+    analysisNodesResult,
   ] = await Promise.all([
     supabase
       .from("rca_cases")
@@ -91,6 +96,19 @@ export default async function RcaCasePage({
       .eq("case_id", id)
       .eq("owner_id", user.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("rca_analysis_models")
+      .select("*")
+      .eq("case_id", id)
+      .eq("owner_id", user.id)
+      .eq("status", "active")
+      .order("created_at"),
+    supabase
+      .from("rca_analysis_nodes")
+      .select("*")
+      .eq("case_id", id)
+      .eq("owner_id", user.id)
+      .order("created_at"),
   ]);
 
   if (caseResult.error) throw new Error(caseResult.error.message);
@@ -101,6 +119,8 @@ export default async function RcaCasePage({
     causesResult,
     actionsResult,
     evidenceResult,
+    analysisModelsResult,
+    analysisNodesResult,
   ]) {
     if (result.error) throw new Error(result.error.message);
   }
@@ -123,6 +143,8 @@ export default async function RcaCasePage({
   const team = teamResult.data ?? [];
   const causes = causesResult.data ?? [];
   const actions = actionsResult.data ?? [];
+  const analysisModels = analysisModelsResult.data ?? [];
+  const analysisNodes = analysisNodesResult.data ?? [];
   const evidenceRecords = await Promise.all(
     (evidenceResult.data ?? []).map(async (record) => {
       if (!record.storage_path) return { ...record, download_url: null };
@@ -159,6 +181,14 @@ export default async function RcaCasePage({
   const selectedEvidence = evidenceRecords.filter(
     (record) => record.discipline === selected
   );
+  const requestedModelId = String(query?.model ?? "");
+  const activeAnalysisModel =
+    analysisModels.find((model) => model.id === requestedModelId) ??
+    analysisModels[0] ??
+    null;
+  const activeAnalysisNodes = activeAnalysisModel
+    ? analysisNodes.filter((node) => node.model_id === activeAnalysisModel.id)
+    : [];
   const evidenceChallenge = buildEvidenceChallenge({
     selected,
     discipline,
@@ -703,74 +733,13 @@ export default async function RcaCasePage({
             )}
 
             {selected === 4 && (
-              <section style={cardStyle}>
-                <h2>3 × 5 Whys Cause Architecture</h2>
-                <p style={{ color: "#607089" }}>
-                  Complete a separate five-Why chain for occurrence, escape and systemic causes. A plausible cause is not a validated cause.
-                </p>
-                <div style={{ display: "grid", gap: "14px", marginTop: "18px" }}>
-                  {causes.map((cause) => (
-                    <div key={cause.id} style={causeCardStyle}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: "12px",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <strong>{label(cause.cause_type)} cause</strong>
-                        <span style={causeStatusStyle(cause.status)}>
-                          {label(cause.status)}
-                        </span>
-                      </div>
-                      <div style={{ marginTop: "8px", fontWeight: 700 }}>
-                        {cause.statement}
-                      </div>
-
-                      {Array.isArray(cause.why_chain) && cause.why_chain.length > 0 && (
-                        <ol style={{ margin: "12px 0 0", paddingLeft: "24px", lineHeight: 1.55 }}>
-                          {cause.why_chain.map((why, index) => (
-                            <li key={`${cause.id}-why-${index}`} style={{ marginTop: "5px" }}>
-                              <strong>Why {index + 1}:</strong> {why}
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-
-                      <div style={causeEvidenceGrid}>
-                        <div><strong>Evidence supporting:</strong><br />{cause.evidence_for || "Not recorded"}</div>
-                        <div><strong>Evidence against / missing:</strong><br />{cause.evidence_against || "Not recorded"}</div>
-                      </div>
-
-                      {["hypothesis", "under_test"].includes(cause.status) && (
-                        <form action={reviewCauseHypothesis} style={{ marginTop: "14px" }}>
-                          <input type="hidden" name="case_id" value={id} />
-                          <input type="hidden" name="cause_id" value={cause.id} />
-                          <div style={formGrid}>
-                            <textarea name="validation_method" rows={3} placeholder="Validation method / test performed" style={fieldStyle} />
-                            <textarea name="validation_result" rows={3} placeholder="Objective validation result" style={fieldStyle} />
-                          </div>
-                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
-                            <button name="decision" value="validate" style={approveButton}>
-                              Human Validate Cause
-                            </button>
-                            <button name="decision" value="reject" style={rejectButton}>
-                              Reject Hypothesis
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
-                  <CauseStreamForm caseId={id} causeType="occurrence" title="Occurrence Cause — 5 Whys" />
-                  <CauseStreamForm caseId={id} causeType="escape" title="Escape Cause — 5 Whys" />
-                  <CauseStreamForm caseId={id} causeType="systemic" title="Systemic Cause — 5 Whys" />
-                </div>
-              </section>
+              <AnalysisWorkbench
+                caseId={id}
+                models={analysisModels}
+                activeModel={activeAnalysisModel}
+                nodes={activeAnalysisNodes}
+                causes={causes}
+              />
             )}
 
             {[3, 5, 6, 7].includes(selected) && (
@@ -864,6 +833,281 @@ export default async function RcaCasePage({
         </div>
       </div>
     </main>
+  );
+}
+
+function AnalysisWorkbench({ caseId, models, activeModel, nodes, causes }) {
+  const methods = [
+    {
+      key: "3x5_whys",
+      title: "3 × 5 Whys",
+      description: "Trace occurrence, escape and systemic causal chains through five evidence-tested questions.",
+    },
+    {
+      key: "ishikawa",
+      title: "Ishikawa / Fishbone",
+      description: "Explore interacting causes across People, Process, Equipment, Material, Measurement, Environment and Management.",
+    },
+    {
+      key: "bow_tie",
+      title: "HSE Bow Tie",
+      description: "Map hazard, top event, threats, preventive barriers, consequences and recovery barriers.",
+    },
+  ];
+
+  return (
+    <section style={cardStyle}>
+      <div style={{ color: "#155eef", fontSize: "12px", fontWeight: 800, textTransform: "uppercase" }}>
+        D4 Root Cause Analysis Workbench
+      </div>
+      <h2 style={{ margin: "6px 0" }}>Choose and combine investigation tools</h2>
+      <p style={{ color: "#607089", lineHeight: 1.6 }}>
+        Start one or more analysis models. Every proposed cause remains a hypothesis until a competent person validates it against objective evidence.
+      </p>
+
+      <div style={methodGridStyle}>
+        {methods.map((method) => {
+          const existing = models.find((model) => model.method === method.key);
+          const selected = activeModel?.method === method.key;
+          return existing ? (
+            <Link
+              key={method.key}
+              href={`/portal/rca/${caseId}?d=4&model=${existing.id}`}
+              style={methodCardStyle(selected)}
+            >
+              <strong style={{ fontSize: "18px" }}>{method.title}</strong>
+              <span style={{ color: selected ? "#dbe8ff" : "#607089", lineHeight: 1.45 }}>
+                {method.description}
+              </span>
+              <span style={{ fontWeight: 800 }}>{selected ? "Open workspace" : "Continue analysis →"}</span>
+            </Link>
+          ) : (
+            <form action={createAnalysisModel} key={method.key} style={methodCardStyle(false)}>
+              <input type="hidden" name="case_id" value={caseId} />
+              <input type="hidden" name="method" value={method.key} />
+              <strong style={{ fontSize: "18px" }}>{method.title}</strong>
+              <span style={{ color: "#607089", lineHeight: 1.45 }}>{method.description}</span>
+              <button type="submit" style={methodStartButton}>Start this method</button>
+            </form>
+          );
+        })}
+      </div>
+
+      {!activeModel && (
+        <div style={emptyWorkbenchStyle}>
+          Select a method above to open its interactive investigation workspace.
+        </div>
+      )}
+
+      {activeModel?.method === "3x5_whys" && (
+        <div style={workbenchStyle}>
+          <h3>3 × 5 Whys Cause Architecture</h3>
+          <p style={{ color: "#607089" }}>
+            Complete separate occurrence, escape and systemic chains. Test every final causal statement before validation.
+          </p>
+          <CauseCards caseId={caseId} causes={causes} />
+          <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
+            <CauseStreamForm caseId={caseId} causeType="occurrence" title="Occurrence Cause — 5 Whys" />
+            <CauseStreamForm caseId={caseId} causeType="escape" title="Escape Cause — 5 Whys" />
+            <CauseStreamForm caseId={caseId} causeType="systemic" title="Systemic Cause — 5 Whys" />
+          </div>
+        </div>
+      )}
+
+      {activeModel?.method === "ishikawa" && (
+        <div style={workbenchStyle}>
+          <h3>Ishikawa / Fishbone Analysis</h3>
+          <p style={{ color: "#607089" }}>
+            Add evidence-based hypotheses to the relevant branch. Classify validated nodes as occurrence, escape or systemic so they transfer into D5.
+          </p>
+          <FishboneWorkspace caseId={caseId} model={activeModel} nodes={nodes} />
+        </div>
+      )}
+
+      {activeModel?.method === "bow_tie" && (
+        <div style={workbenchStyle}>
+          <h3>HSE Bow Tie Analysis</h3>
+          <p style={{ color: "#607089" }}>
+            Build the pathway from hazard to top event, then examine threats, preventive barriers, consequences and recovery barriers.
+          </p>
+          <BowTieWorkspace caseId={caseId} model={activeModel} nodes={nodes} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CauseCards({ caseId, causes }) {
+  return (
+    <div style={{ display: "grid", gap: "14px", marginTop: "18px" }}>
+      {causes.map((cause) => (
+        <div key={cause.id} style={causeCardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+            <strong>{label(cause.cause_type)} cause</strong>
+            <span style={causeStatusStyle(cause.status)}>{label(cause.status)}</span>
+          </div>
+          <div style={{ marginTop: "8px", fontWeight: 700 }}>{cause.statement}</div>
+          {Array.isArray(cause.why_chain) && cause.why_chain.length > 0 && (
+            <ol style={{ margin: "12px 0 0", paddingLeft: "24px", lineHeight: 1.55 }}>
+              {cause.why_chain.map((why, index) => (
+                <li key={`${cause.id}-why-${index}`} style={{ marginTop: "5px" }}>
+                  <strong>Why {index + 1}:</strong> {why}
+                </li>
+              ))}
+            </ol>
+          )}
+          <div style={causeEvidenceGrid}>
+            <div><strong>Evidence supporting:</strong><br />{cause.evidence_for || "Not recorded"}</div>
+            <div><strong>Evidence against / missing:</strong><br />{cause.evidence_against || "Not recorded"}</div>
+          </div>
+          {["hypothesis", "under_test"].includes(cause.status) && (
+            <form action={reviewCauseHypothesis} style={{ marginTop: "14px" }}>
+              <input type="hidden" name="case_id" value={caseId} />
+              <input type="hidden" name="cause_id" value={cause.id} />
+              <div style={formGrid}>
+                <textarea name="validation_method" rows={3} placeholder="Validation method / test performed" style={fieldStyle} />
+                <textarea name="validation_result" rows={3} placeholder="Objective validation result" style={fieldStyle} />
+              </div>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
+                <button name="decision" value="validate" style={approveButton}>Human Validate Cause</button>
+                <button name="decision" value="reject" style={rejectButton}>Reject Hypothesis</button>
+              </div>
+            </form>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FishboneWorkspace({ caseId, model, nodes }) {
+  const categories = ["people", "process", "equipment", "material", "measurement", "environment", "management"];
+  return (
+    <>
+      <div style={fishboneGridStyle}>
+        {categories.map((category) => (
+          <div key={category} style={fishboneBranchStyle}>
+            <strong>{label(category)}</strong>
+            <div style={{ display: "grid", gap: "8px", marginTop: "10px" }}>
+              {nodes.filter((node) => node.category === category).map((node) => (
+                <AnalysisNodeCard key={node.id} caseId={caseId} modelId={model.id} node={node} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <AnalysisNodeForm caseId={caseId} model={model} nodes={nodes} mode="ishikawa" />
+    </>
+  );
+}
+
+function BowTieWorkspace({ caseId, model, nodes }) {
+  const columns = [
+    ["threat", "Threats"],
+    ["preventive_barrier", "Preventive barriers"],
+    ["top_event", "Top event"],
+    ["consequence", "Consequences"],
+    ["recovery_barrier", "Recovery barriers"],
+  ];
+  const hazards = nodes.filter((node) => node.node_type === "hazard");
+  return (
+    <>
+      <div style={hazardBannerStyle}>
+        <strong>Hazard:</strong>{" "}
+        {hazards.length ? hazards.map((node) => node.title).join(" · ") : "Not yet defined"}
+      </div>
+      <div style={bowTieGridStyle}>
+        {columns.map(([type, title]) => (
+          <div key={type} style={bowTieColumnStyle(type)}>
+            <strong>{title}</strong>
+            <div style={{ display: "grid", gap: "9px", marginTop: "10px" }}>
+              {nodes.filter((node) => node.node_type === type).map((node) => (
+                <AnalysisNodeCard key={node.id} caseId={caseId} modelId={model.id} node={node} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <AnalysisNodeForm caseId={caseId} model={model} nodes={nodes} mode="bow_tie" />
+    </>
+  );
+}
+
+function AnalysisNodeCard({ caseId, modelId, node }) {
+  return (
+    <details style={analysisNodeStyle(node.status)}>
+      <summary style={{ cursor: "pointer", fontWeight: 800 }}>
+        {node.title} · {label(node.status)}
+      </summary>
+      <div style={{ marginTop: "10px", color: "#607089", lineHeight: 1.5 }}>
+        {node.description || "No supporting description recorded."}
+      </div>
+      {node.cause_type && <div style={{ marginTop: "8px" }}><strong>Cause classification:</strong> {label(node.cause_type)}</div>}
+      <div style={causeEvidenceGrid}>
+        <div><strong>Evidence supporting:</strong><br />{node.evidence_for || "Not recorded"}</div>
+        <div><strong>Evidence against:</strong><br />{node.evidence_against || "Not recorded"}</div>
+      </div>
+      {["hypothesis", "under_test"].includes(node.status) && (
+        <form action={reviewAnalysisNode} style={{ marginTop: "12px" }}>
+          <input type="hidden" name="case_id" value={caseId} />
+          <input type="hidden" name="model_id" value={modelId} />
+          <input type="hidden" name="node_id" value={node.id} />
+          <textarea name="validation_method" rows={2} placeholder="Validation method / test" style={fieldStyle} />
+          <textarea name="validation_result" rows={2} placeholder="Objective validation result" style={{ ...fieldStyle, marginTop: "8px" }} />
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
+            <button name="decision" value="validate" style={approveButton}>Human Validate</button>
+            <button name="decision" value="reject" style={rejectButton}>Reject</button>
+          </div>
+        </form>
+      )}
+    </details>
+  );
+}
+
+function AnalysisNodeForm({ caseId, model, nodes, mode }) {
+  const bowTieTypes = ["hazard", "threat", "preventive_barrier", "top_event", "consequence", "recovery_barrier", "barrier_failure"];
+  return (
+    <details style={{ ...causeBuilderStyle, marginTop: "18px" }} open={nodes.length === 0}>
+      <summary style={{ fontWeight: 800, cursor: "pointer", fontSize: "18px" }}>Add analysis element</summary>
+      <form action={addAnalysisNode} style={{ marginTop: "16px" }}>
+        <input type="hidden" name="case_id" value={caseId} />
+        <input type="hidden" name="model_id" value={model.id} />
+        <div style={formGrid}>
+          {mode === "ishikawa" ? (
+            <>
+              <input type="hidden" name="node_type" value="cause" />
+              <select name="category" required defaultValue="process" style={fieldStyle}>
+                {["people", "process", "equipment", "material", "measurement", "environment", "management"].map((category) => (
+                  <option key={category} value={category}>{label(category)}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <select name="node_type" required defaultValue="threat" style={fieldStyle}>
+              {bowTieTypes.map((type) => <option value={type} key={type}>{label(type)}</option>)}
+            </select>
+          )}
+          <select name="cause_type" defaultValue="" style={fieldStyle}>
+            <option value="">Not a cause / not yet classified</option>
+            <option value="occurrence">Occurrence cause</option>
+            <option value="escape">Escape cause</option>
+            <option value="systemic">Systemic cause</option>
+            <option value="contributing">Contributing cause</option>
+          </select>
+          <select name="parent_node_id" defaultValue="" style={fieldStyle}>
+            <option value="">No parent element</option>
+            {nodes.map((node) => <option value={node.id} key={node.id}>{label(node.node_type)}: {node.title}</option>)}
+          </select>
+          <input name="title" required placeholder="Element or testable hypothesis" style={fieldStyle} />
+        </div>
+        <textarea name="description" rows={3} placeholder="Describe the causal logic, control purpose or failure mechanism" style={{ ...fieldStyle, marginTop: "12px" }} />
+        <div style={formGrid}>
+          <textarea name="evidence_for" rows={3} placeholder="Evidence supporting" style={fieldStyle} />
+          <textarea name="evidence_against" rows={3} placeholder="Evidence against / missing" style={fieldStyle} />
+        </div>
+        <button type="submit" style={{ ...primaryButton, marginTop: "12px" }}>Add to model</button>
+      </form>
+    </details>
   );
 }
 
@@ -1110,6 +1354,114 @@ const cardStyle = {
   padding: "24px",
   marginBottom: "18px",
 };
+
+const methodGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: "12px",
+  marginTop: "18px",
+};
+
+const methodCardStyle = (selected) => ({
+  display: "grid",
+  gap: "10px",
+  alignContent: "start",
+  minHeight: "170px",
+  boxSizing: "border-box",
+  padding: "18px",
+  border: selected ? "2px solid #155eef" : "1px solid #cfdae8",
+  borderRadius: "14px",
+  background: selected ? "#155eef" : "#f8faff",
+  color: selected ? "white" : "#061a35",
+  textDecoration: "none",
+});
+
+const methodStartButton = {
+  justifySelf: "start",
+  border: 0,
+  borderRadius: "9px",
+  background: "#061a35",
+  color: "white",
+  padding: "10px 13px",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const emptyWorkbenchStyle = {
+  marginTop: "18px",
+  padding: "28px",
+  border: "2px dashed #b9c8da",
+  borderRadius: "14px",
+  color: "#607089",
+  textAlign: "center",
+};
+
+const workbenchStyle = {
+  marginTop: "22px",
+  paddingTop: "20px",
+  borderTop: "1px solid #dce4ee",
+};
+
+const fishboneGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+  gap: "12px",
+  marginTop: "18px",
+};
+
+const fishboneBranchStyle = {
+  minHeight: "130px",
+  padding: "16px",
+  borderLeft: "5px solid #155eef",
+  borderRadius: "12px",
+  background: "#f5f8fd",
+};
+
+const hazardBannerStyle = {
+  marginTop: "16px",
+  padding: "14px 16px",
+  borderRadius: "12px",
+  background: "#fff4e5",
+  color: "#8a3f00",
+};
+
+const bowTieGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gap: "10px",
+  alignItems: "stretch",
+  marginTop: "14px",
+};
+
+const bowTieColumnStyle = (type) => ({
+  minHeight: "180px",
+  padding: "14px",
+  borderRadius: "12px",
+  border: type === "top_event" ? "2px solid #b42318" : "1px solid #dce4ee",
+  background:
+    type === "top_event"
+      ? "#fff0ee"
+      : type.includes("barrier")
+        ? "#eefbf3"
+        : "#f7f9fc",
+});
+
+const analysisNodeStyle = (status) => ({
+  padding: "11px",
+  borderRadius: "10px",
+  border:
+    status === "validated"
+      ? "1px solid #75c69a"
+      : status === "rejected"
+        ? "1px solid #fda29b"
+        : "1px solid #cbd7e6",
+  background:
+    status === "validated"
+      ? "#e8f8ef"
+      : status === "rejected"
+        ? "#fff0ee"
+        : "white",
+});
 
 const itemStyle = {
   display: "flex",
