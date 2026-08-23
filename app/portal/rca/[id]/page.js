@@ -142,6 +142,34 @@ export default async function RcaCasePage({
           }}
         >
           <div>
+            <Link
+              href="/en"
+              aria-label="RPG Excellence home"
+              style={{
+                width: "260px",
+                height: "70px",
+                display: "flex",
+                alignItems: "center",
+                overflow: "hidden",
+                textDecoration: "none",
+                marginBottom: "22px",
+              }}
+            >
+              <img
+                src="/rpg-excellence-logo.png"
+                alt="RPG Excellence"
+                style={{
+                  display: "block",
+                  width: "260px",
+                  maxWidth: "260px",
+                  height: "70px",
+                  maxHeight: "70px",
+                  objectFit: "contain",
+                  objectPosition: "left center",
+                }}
+              />
+            </Link>
+
             <div
               style={{
                 color: "#155eef",
