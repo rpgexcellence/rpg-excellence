@@ -326,19 +326,15 @@ export default async function RcaCasePage({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns:
-              selected === 4
-                ? "minmax(0, 1fr)"
-                : "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+            gridTemplateColumns: "minmax(0, 1fr)",
             gap: "22px",
             marginTop: "24px",
           }}
         >
-          {selected === 4 && (
-            <nav
-              aria-label="8D discipline status"
-              style={disciplineStatusNavStyle}
-            >
+          <nav
+            aria-label="8D discipline status"
+            style={disciplineStatusNavStyle}
+          >
               {disciplines.map((item) => {
                 const active = item.discipline === selected;
                 const locked = item.discipline > highestUnlocked;
@@ -374,94 +370,7 @@ export default async function RcaCasePage({
                   </Link>
                 );
               })}
-            </nav>
-          )}
-
-          {selected !== 4 && (
-          <aside>
-            <div
-              style={{
-                background: "white",
-                border: "1px solid #dce4ee",
-                borderRadius: "18px",
-                padding: "14px",
-                display: "grid",
-                gap: "8px",
-              }}
-            >
-              {disciplines.map((item) => {
-                const active = item.discipline === selected;
-                const locked = item.discipline > highestUnlocked;
-                const content = (
-                  <>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: "10px",
-                        fontWeight: 800,
-                      }}
-                    >
-                      <span>D{item.discipline}</span>
-                      <span>
-                        {item.status === "approved"
-                          ? "✓"
-                          : locked
-                            ? "🔒"
-                            : ""}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: "4px",
-                        fontSize: "13px",
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {item.title}
-                    </div>
-                  </>
-                );
-
-                if (locked) {
-                  return (
-                    <div
-                      key={item.id}
-                      aria-disabled="true"
-                      title={`Complete and approve D${item.discipline - 1} to unlock D${item.discipline}.`}
-                      style={{
-                        padding: "13px",
-                        borderRadius: "12px",
-                        color: "#8190a5",
-                        background: "#eef1f5",
-                        cursor: "not-allowed",
-                        opacity: 0.78,
-                      }}
-                    >
-                      {content}
-                    </div>
-                  );
-                }
-
-                return (
-                  <Link
-                    key={item.id}
-                    href={`/portal/rca/${id}?d=${item.discipline}`}
-                    style={{
-                      padding: "13px",
-                      borderRadius: "12px",
-                      textDecoration: "none",
-                      color: active ? "white" : "#061a35",
-                      background: active ? "#155eef" : "#f6f8fb",
-                    }}
-                  >
-                    {content}
-                  </Link>
-                );
-              })}
-            </div>
-          </aside>
-          )}
+          </nav>
 
           <div style={{ minWidth: 0 }}>
             {discipline && (
