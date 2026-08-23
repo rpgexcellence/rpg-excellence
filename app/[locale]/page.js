@@ -39,12 +39,37 @@ const standards = [
 ];
 
 const tools = [
-  "Risk Assessment",
-  "Method Statement",
-  "COSHH",
-  "Fire Risk",
-  "ISO Gap Analysis",
-  "Internal Audit",
+  {
+    title: "Risk Assessment",
+    href: "/ai-tools",
+  },
+  {
+    title: "Method Statement",
+    href: "/ai-tools",
+  },
+  {
+    title: "COSHH",
+    href: "/ai-tools",
+  },
+  {
+    title: "Fire Risk",
+    href: "/ai-tools",
+  },
+  {
+    title: "ISO Gap Analysis",
+    href: "/ai-tools",
+  },
+  {
+    title: "Internal Audit",
+    href: "/ai-tools",
+  },
+  {
+    title: "8D & CAPA",
+    description:
+      "Root cause and corrective action →",
+    href: "/portal/rca",
+    live: true,
+  },
 ];
 
 const steps = [
@@ -461,19 +486,40 @@ export default async function Home({ params }) {
         <div className="toolGrid darkTools">
           {tools.map((tool) => (
             <Link
-              href={`/${locale}/ai-tools`}
+              href={
+                tool.href.startsWith("/portal")
+                  ? tool.href
+                  : `/${locale}${tool.href}`
+              }
               className="toolCard darkTool"
-              key={tool}
+              key={tool.title}
             >
               <span className="toolIcon">
                 ◈
               </span>
 
-              <strong>{tool}</strong>
+              <strong>{tool.title}</strong>
 
               <span>
-                AI-assisted workflow →
+                {tool.description ??
+                  "AI-assisted workflow →"}
               </span>
+
+              {tool.live && (
+                <span
+                  style={{
+                    display: "inline-block",
+                    marginTop: "10px",
+                    color: "#67f5e7",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Available now
+                </span>
+              )}
             </Link>
           ))}
         </div>
