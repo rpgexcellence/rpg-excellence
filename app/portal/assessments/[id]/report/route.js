@@ -87,6 +87,17 @@ function systemNameFor(standard) {
   return "management system";
 }
 
+function findingLabelFor(type) {
+  return (
+    {
+      major_nc: "Major NC",
+      minor_nc: "Minor NC",
+      observation: "Observation",
+      ofi: "Opportunity for Improvement",
+    }[type] ?? "Finding"
+  );
+}
+
 function getMaturityLevel(score) {
   if (score === null) return "Not assessed";
   if (score <= 20) return "Initial";
@@ -599,7 +610,9 @@ export async function GET(request, { params }) {
 
       return {
         questionNumber: finding.question_number ?? "-",
-        type: finding.finding_type ?? "finding",
+        type: findingLabelFor(
+          finding.finding_type
+        ),
         risk: finding.risk_impact ?? "-",
         statement:
           finding.finding_statement ??
@@ -1212,10 +1225,35 @@ export async function GET(request, { params }) {
       );
     } else {
       priorityFindingItems.forEach((item, index) => {
-        drawText(
+        const findingHeading =
           `${index + 1}. ${item.questionNumber} | ${cleanText(
             item.type
-          )} | Risk: ${item.risk}`,
+          )} | Risk: ${item.risk}`;
+
+        const findingText =
+          `Finding: ${item.statement}`;
+
+        const actionText =
+          `Action: ${item.action}`;
+
+        const ownerText =
+          `Owner: ${item.owner}${
+            item.targetDate
+              ? ` | Target: ${item.targetDate}`
+              : ""
+          }`;
+
+        const requiredHeight =
+          wrapText(findingHeading, 88).length * 14 +
+          wrapText(findingText, 88).length * 13 +
+          wrapText(actionText, 88).length * 13 +
+          wrapText(ownerText, 88).length * 13 +
+          16;
+
+        ensureSpace(requiredHeight);
+
+        drawText(
+          findingHeading,
           {
             size: 10,
             font: bold,
@@ -1226,7 +1264,7 @@ export async function GET(request, { params }) {
         );
 
         drawText(
-          `Finding: ${item.statement}`,
+          findingText,
           {
             size: 9,
             color: grey,
@@ -1236,7 +1274,7 @@ export async function GET(request, { params }) {
         );
 
         drawText(
-          `Action: ${item.action}`,
+          actionText,
           {
             size: 9,
             color: grey,
@@ -1246,11 +1284,7 @@ export async function GET(request, { params }) {
         );
 
         drawText(
-          `Owner: ${item.owner}${
-            item.targetDate
-              ? ` | Target: ${item.targetDate}`
-              : ""
-          }`,
+          ownerText,
           {
             size: 9,
             color: grey,
@@ -1294,10 +1328,39 @@ export async function GET(request, { params }) {
             ) < today
           );
 
-          drawText(
+          const readinessHeading =
             `${index + 1}. ${action.dimension_name ?? action.dimension_key}${
               isOverdue ? " | OVERDUE" : " | OPEN"
-            }`,
+            }`;
+
+          const concernText =
+            action.management_concern
+              ? `Concern: ${action.management_concern}`
+              : null;
+
+          const readinessActionText =
+            `Action: ${action.management_action}`;
+
+          const readinessOwnerText =
+            `Owner: ${action.action_owner ?? "Unassigned"}${
+              action.target_date
+                ? ` | Target: ${action.target_date}`
+                : ""
+            } | Rating: ${action.readiness_rating ?? "Not assessed"} | Evidence: ${action.evidence_confidence ?? "Not set"}`;
+
+          const requiredHeight =
+            wrapText(readinessHeading, 88).length * 14 +
+            (concernText
+              ? wrapText(concernText, 88).length * 13
+              : 0) +
+            wrapText(readinessActionText, 88).length * 13 +
+            wrapText(readinessOwnerText, 88).length * 13 +
+            16;
+
+          ensureSpace(requiredHeight);
+
+          drawText(
+            readinessHeading,
             {
               size: 10,
               font: bold,
@@ -1307,9 +1370,9 @@ export async function GET(request, { params }) {
             }
           );
 
-          if (action.management_concern) {
+          if (concernText) {
             drawText(
-              `Concern: ${action.management_concern}`,
+              concernText,
               {
                 size: 9,
                 color: grey,
@@ -1320,7 +1383,7 @@ export async function GET(request, { params }) {
           }
 
           drawText(
-            `Action: ${action.management_action}`,
+            readinessActionText,
             {
               size: 9,
               color: grey,
@@ -1330,11 +1393,7 @@ export async function GET(request, { params }) {
           );
 
           drawText(
-            `Owner: ${action.action_owner ?? "Unassigned"}${
-              action.target_date
-                ? ` | Target: ${action.target_date}`
-                : ""
-            } | Rating: ${action.readiness_rating ?? "Not assessed"} | Evidence: ${action.evidence_confidence ?? "Not set"}`,
+            readinessOwnerText,
             {
               size: 9,
               color: grey,
