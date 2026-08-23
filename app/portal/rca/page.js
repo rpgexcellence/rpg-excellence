@@ -55,7 +55,7 @@ export default async function RcaCommandCentre() {
             current_discipline,
             target_close_date,
             updated_at,
-            organizations(name)
+            organization_id
           `
         )
         .eq("owner_id", user.id)
@@ -72,6 +72,12 @@ export default async function RcaCommandCentre() {
 
   const organizations = organizationsResult.data ?? [];
   const cases = casesResult.data ?? [];
+  const organizationNames = new Map(
+    organizations.map((organization) => [
+      organization.id,
+      organization.name,
+    ])
+  );
   const openCases = cases.filter(
     (item) =>
       !["closed", "cancelled"].includes(item.status)
@@ -513,7 +519,9 @@ export default async function RcaCommandCentre() {
                         color: "#607089",
                       }}
                     >
-                      {item.organizations?.name ??
+                      {organizationNames.get(
+                        item.organization_id
+                      ) ??
                         "Organisation"}
                       {" · "}
                       {label(item.source_type)}
