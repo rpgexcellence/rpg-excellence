@@ -74,14 +74,12 @@ export default function Header({ locale, nav }) {
           Sign in
         </a>
 
-        <a
+        <Link
           className="button buttonSmall"
-          href="YOUR_BOOKING_URL"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={`/${locale}/contact`}
         >
           Book
-        </a>
+        </Link>
       </div>
     </header>
   );
