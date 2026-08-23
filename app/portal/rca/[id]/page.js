@@ -4,11 +4,13 @@ import { createClient } from "../../../../lib/supabase/server";
 import {
   addCauseHypothesis,
   addCorrectiveAction,
+  addCostEntry,
   addAnalysisNode,
   addObjectiveEvidence,
   addTeamMember,
   createAnalysisModel,
   decideCorrectiveActionCandidate,
+  deleteCostEntry,
   recordNoContainmentRequired,
   reviewAnalysisNode,
   reviewCauseHypothesis,
@@ -63,6 +65,7 @@ export default async function RcaCasePage({
     evidenceResult,
     analysisModelsResult,
     analysisNodesResult,
+    costsResult,
   ] = await Promise.all([
     supabase
       .from("rca_cases")
@@ -114,6 +117,12 @@ export default async function RcaCasePage({
       .eq("case_id", id)
       .eq("owner_id", user.id)
       .order("created_at"),
+    supabase
+      .from("rca_cost_entries")
+      .select("*")
+      .eq("case_id", id)
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false }),
   ]);
 
   if (caseResult.error) throw new Error(caseResult.error.message);
@@ -126,6 +135,7 @@ export default async function RcaCasePage({
     evidenceResult,
     analysisModelsResult,
     analysisNodesResult,
+    costsResult,
   ]) {
     if (result.error) throw new Error(result.error.message);
   }
@@ -150,6 +160,7 @@ export default async function RcaCasePage({
   const actions = actionsResult.data ?? [];
   const analysisModels = analysisModelsResult.data ?? [];
   const analysisNodes = analysisNodesResult.data ?? [];
+  const costEntries = costsResult.data ?? [];
   const evidenceRecords = await Promise.all(
     (evidenceResult.data ?? []).map(async (record) => {
       if (!record.storage_path) return { ...record, download_url: null };
@@ -186,6 +197,14 @@ export default async function RcaCasePage({
   const selectedEvidence = evidenceRecords.filter(
     (record) => record.discipline === selected
   );
+  const selectedCosts = costEntries.filter(
+    (entry) => entry.discipline === selected
+  );
+  const selectedCostTotals = selectedCosts.reduce((totals, entry) => {
+    const currency = entry.currency || "GBP";
+    totals[currency] = (totals[currency] || 0) + Number(entry.amount || 0);
+    return totals;
+  }, {});
   const requestedModelId = String(query?.model ?? "");
   const activeAnalysisModel =
     analysisModels.find((model) => model.id === requestedModelId) ??
@@ -277,6 +296,9 @@ export default async function RcaCasePage({
             </div>
           </div>
           <div style={{ display: "flex", gap: "10px" }}>
+            <Link href={`/portal/rca/${id}/summary`} style={primaryLinkButton}>
+              Executive Summary
+            </Link>
             <Link href="/portal/rca" style={linkButton}>
               ← 8D Command Centre
             </Link>
@@ -578,6 +600,101 @@ export default async function RcaCasePage({
                 </form>
               </section>
             )}
+
+            <section id="copq" style={cardStyle}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "14px",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <div style={sectionKickerStyle}>Optional · D{selected}</div>
+                  <h2 style={{ margin: "6px 0" }}>Cost of Poor Quality</h2>
+                  <p style={{ margin: 0, color: "#607089", lineHeight: 1.55 }}>
+                    Record direct or estimated costs attributable to this stage. These values inform the executive summary but do not control gate approval.
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {Object.entries(selectedCostTotals).map(([currency, total]) => (
+                    <span key={currency} style={evidenceCountStyle}>
+                      {formatMoney(total, currency)}
+                    </span>
+                  ))}
+                  {Object.keys(selectedCostTotals).length === 0 && (
+                    <span style={evidenceCountStyle}>No cost recorded</span>
+                  )}
+                </div>
+              </div>
+
+              <div style={costGuidanceStyle}>
+                <strong>What may be included?</strong>
+                <div style={{ marginTop: "6px" }}>
+                  Material and scrap · investigation and rework labour · downtime and lost capacity · administration · inspection and testing · containment and recovery · logistics · customer claims, returns or other external failure costs.
+                </div>
+              </div>
+
+              {selectedCosts.length > 0 && (
+                <div style={{ display: "grid", gap: "10px", marginTop: "18px" }}>
+                  {selectedCosts.map((entry) => (
+                    <div key={entry.id} style={itemStyle}>
+                      <div>
+                        <strong>{label(entry.cost_category)} · {formatMoney(entry.amount, entry.currency)}</strong>
+                        <div style={{ color: "#607089", marginTop: "4px" }}>
+                          {entry.description} · {entry.quantity} × {formatMoney(entry.unit_cost, entry.currency)} · {label(entry.cost_status)}
+                        </div>
+                        {entry.source_reference && (
+                          <div style={{ color: "#607089", marginTop: "4px" }}>Source: {entry.source_reference}</div>
+                        )}
+                      </div>
+                      <form action={deleteCostEntry}>
+                        <input type="hidden" name="case_id" value={id} />
+                        <input type="hidden" name="cost_id" value={entry.id} />
+                        <input type="hidden" name="discipline" value={selected} />
+                        <button style={deleteButton}>Remove</button>
+                      </form>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <form action={addCostEntry} style={{ marginTop: "18px" }}>
+                <input type="hidden" name="case_id" value={id} />
+                <input type="hidden" name="discipline" value={selected} />
+                <div style={costFormGridStyle}>
+                  <select name="cost_category" required defaultValue="" style={fieldStyle}>
+                    <option value="" disabled>Cost category</option>
+                    <option value="material">Material / scrap / rework</option>
+                    <option value="labour">Investigation or rework labour</option>
+                    <option value="downtime">Downtime / lost capacity</option>
+                    <option value="administration">Administration</option>
+                    <option value="external_failure">External failure / customer impact</option>
+                    <option value="inspection_testing">Inspection / testing</option>
+                    <option value="containment_recovery">Containment / recovery</option>
+                    <option value="logistics">Logistics / expedited delivery</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input name="description" required placeholder="Description and basis" style={fieldStyle} />
+                  <input name="quantity" type="number" min="0.01" step="0.01" required defaultValue="1" placeholder="Quantity / hours" style={fieldStyle} />
+                  <input name="unit_cost" type="number" min="0" step="0.01" required placeholder="Unit cost" style={fieldStyle} />
+                  <select name="currency" defaultValue="GBP" style={fieldStyle}>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="USD">USD ($)</option>
+                  </select>
+                  <select name="cost_status" defaultValue="estimated" style={fieldStyle}>
+                    <option value="estimated">Estimated</option>
+                    <option value="confirmed">Confirmed</option>
+                  </select>
+                  <input name="source_reference" placeholder="Source / invoice / timesheet reference" style={fieldStyle} />
+                  <input name="incurred_at" type="date" style={fieldStyle} />
+                </div>
+                <button style={{ ...primaryButton, marginTop: "12px" }}>Add Cost Entry</button>
+              </form>
+            </section>
 
             {selected >= 2 && (
               <section style={cardStyle}>
@@ -1619,6 +1736,47 @@ function ReviewList({ title, items }) {
   );
 }
 
+function formatMoney(value, currency = "GBP") {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
+
+const sectionKickerStyle = {
+  color: "#155eef",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  fontSize: "13px",
+};
+
+const costGuidanceStyle = {
+  marginTop: "16px",
+  padding: "15px",
+  borderRadius: "12px",
+  background: "#eef4ff",
+  color: "#274c7a",
+  lineHeight: 1.55,
+};
+
+const costFormGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gap: "10px",
+};
+
+const deleteButton = {
+  border: "1px solid #fda29b",
+  borderRadius: "9px",
+  background: "#fff0ee",
+  color: "#b42318",
+  padding: "9px 12px",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
 const cardStyle = {
   background: "white",
   border: "1px solid #dce4ee",
@@ -2006,4 +2164,11 @@ const linkButton = {
   background: "white",
   fontWeight: 800,
   textDecoration: "none",
+};
+
+const primaryLinkButton = {
+  ...linkButton,
+  background: "#155eef",
+  borderColor: "#155eef",
+  color: "white",
 };
