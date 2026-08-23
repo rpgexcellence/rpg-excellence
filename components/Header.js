@@ -1,6 +1,9 @@
 import Link from "next/link";
 import LanguageSwitcher from "./LanguageSwitcher";
 
+const MICROSOFT_BOOKING_URL =
+  "https://bookings.cloud.microsoft/bookwithme/user/3e31957cbcf643eb8e7e828a5eac6aaa%40rpgexcellence.com?anonymous&ismsaljsauthenabled";
+
 export default function Header({ locale, nav }) {
   return (
     <header className="header">
@@ -74,12 +77,15 @@ export default function Header({ locale, nav }) {
           Sign in
         </a>
 
-        <Link
+        <a
           className="button buttonSmall"
-          href={`/${locale}/contact`}
+          href={MICROSOFT_BOOKING_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Book an appointment with RPG Excellence"
         >
           Book
-        </Link>
+        </a>
       </div>
     </header>
   );
