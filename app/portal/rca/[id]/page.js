@@ -11,11 +11,6 @@ import {
   saveCaseOverview,
   saveDiscipline,
 } from "./actions";
-import {
-  generateAiChallenge,
-  reviewAiChallenge,
-} from "./ai-actions";
-
 const label = (value) =>
   String(value ?? "")
     .replaceAll("_", " ")
@@ -57,7 +52,6 @@ export default async function RcaCasePage({
     teamResult,
     causesResult,
     actionsResult,
-    aiRunsResult,
     evidenceResult,
   ] = await Promise.all([
     supabase
@@ -92,12 +86,6 @@ export default async function RcaCasePage({
       .eq("owner_id", user.id)
       .order("created_at"),
     supabase
-      .from("rca_ai_runs")
-      .select("*")
-      .eq("case_id", id)
-      .eq("owner_id", user.id)
-      .order("created_at", { ascending: false }),
-    supabase
       .from("rca_evidence")
       .select("*")
       .eq("case_id", id)
@@ -112,7 +100,6 @@ export default async function RcaCasePage({
     teamResult,
     causesResult,
     actionsResult,
-    aiRunsResult,
     evidenceResult,
   ]) {
     if (result.error) throw new Error(result.error.message);
@@ -136,7 +123,6 @@ export default async function RcaCasePage({
   const team = teamResult.data ?? [];
   const causes = causesResult.data ?? [];
   const actions = actionsResult.data ?? [];
-  const aiRuns = aiRunsResult.data ?? [];
   const evidenceRecords = await Promise.all(
     (evidenceResult.data ?? []).map(async (record) => {
       if (!record.storage_path) return { ...record, download_url: null };
@@ -170,12 +156,18 @@ export default async function RcaCasePage({
   const openActions = actions.filter(
     (item) => !["verified", "cancelled"].includes(item.status)
   ).length;
-  const latestAiRun = aiRuns.find(
-    (run) => run.discipline === selected
-  );
   const selectedEvidence = evidenceRecords.filter(
     (record) => record.discipline === selected
   );
+  const evidenceChallenge = buildEvidenceChallenge({
+    selected,
+    discipline,
+    team,
+    causes,
+    actions,
+    selectedEvidence,
+    rcaCase,
+  });
 
   return (
     <main
@@ -461,108 +453,42 @@ export default async function RcaCasePage({
                     lineHeight: 1.55,
                   }}
                 >
-                  <strong>AI Evidence Challenge</strong>
+                  <strong>Evidence Challenge</strong>
                   <div style={{ marginTop: "5px" }}>
-                    The assistant will challenge assumptions,
-                    identify missing evidence and propose tests. It
-                    cannot approve this gate or convert a hypothesis
-                    into a validated cause.
+                    These structured checks identify missing evidence,
+                    unsupported assumptions and incomplete validation.
+                    They run locally without an external analysis service and
+                    cannot approve this gate or validate a cause.
                   </div>
-                  <form
-                    action={generateAiChallenge}
-                    style={{ marginTop: "14px" }}
-                  >
-                    <input type="hidden" name="case_id" value={id} />
-                    <input type="hidden" name="discipline" value={selected} />
-                    <button type="submit" style={aiButton}>
-                      {latestAiRun
-                        ? `Run New AI Challenge for D${selected}`
-                        : `Generate AI Challenge for D${selected}`}
-                    </button>
-                  </form>
                 </div>
 
-                {latestAiRun && (
-                  <div style={aiResultStyle}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: "12px",
-                        alignItems: "flex-start",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div>
-                        <div
-                          style={{
-                            color: "#155eef",
-                            fontSize: "12px",
-                            fontWeight: 800,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Latest AI evidence challenge
-                        </div>
-                        <h3 style={{ margin: "6px 0" }}>
-                          {label(latestAiRun.output?.gate_recommendation)}
-                        </h3>
-                      </div>
-                      <span style={decisionBadge(latestAiRun.human_decision)}>
-                        Human decision: {label(latestAiRun.human_decision)}
-                      </span>
-                    </div>
-
-                    <p style={{ lineHeight: 1.6 }}>
-                      {latestAiRun.output?.executive_assessment}
-                    </p>
-
-                    <div style={aiGridStyle}>
-                      <AiList
-                        title="Challenges"
-                        items={latestAiRun.output?.challenges}
-                      />
-                      <AiList
-                        title="Missing evidence"
-                        items={latestAiRun.output?.missing_evidence}
-                      />
-                      <AiList
-                        title="Recommended tests"
-                        items={latestAiRun.output?.recommended_tests}
-                      />
-                      <AiList
-                        title="Strengths"
-                        items={latestAiRun.output?.strengths}
-                      />
-                    </div>
-
-                    <div style={{ color: "#607089", marginTop: "14px" }}>
-                      AI confidence: {latestAiRun.confidence ?? "—"}% · This is advisory analysis, not gate approval.
-                    </div>
-
-                    {latestAiRun.human_decision === "pending" && (
-                      <form
-                        action={reviewAiChallenge}
-                        style={{
-                          display: "flex",
-                          gap: "10px",
-                          flexWrap: "wrap",
-                          marginTop: "16px",
-                        }}
-                      >
-                        <input type="hidden" name="case_id" value={id} />
-                        <input type="hidden" name="run_id" value={latestAiRun.id} />
-                        <input type="hidden" name="discipline" value={selected} />
-                        <button name="decision" value="accepted" style={approveButton}>
-                          Accept as Advisory Input
-                        </button>
-                        <button name="decision" value="rejected" style={rejectButton}>
-                          Reject AI Analysis
-                        </button>
-                      </form>
-                    )}
+                <div style={reviewResultStyle}>
+                  <div
+                    style={{
+                      color: "#155eef",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    D{selected} deterministic review
                   </div>
-                )}
+                  <h3 style={{ margin: "6px 0" }}>
+                    {evidenceChallenge.readiness}
+                  </h3>
+                  <p style={{ lineHeight: 1.6 }}>
+                    {evidenceChallenge.assessment}
+                  </p>
+                  <div style={reviewGridStyle}>
+                    <ReviewList title="Challenges" items={evidenceChallenge.challenges} />
+                    <ReviewList title="Missing evidence" items={evidenceChallenge.missingEvidence} />
+                    <ReviewList title="Required verification" items={evidenceChallenge.requiredVerification} />
+                    <ReviewList title="Recorded strengths" items={evidenceChallenge.strengths} />
+                  </div>
+                  <div style={{ color: "#607089", marginTop: "14px" }}>
+                    Rules-based advisory review only · Human approval remains mandatory.
+                  </div>
+                </div>
 
                 <form action={saveDiscipline}>
                   <input type="hidden" name="case_id" value={id} />
@@ -990,7 +916,167 @@ function CauseStreamForm({ caseId, causeType, title }) {
   );
 }
 
-function AiList({ title, items }) {
+function buildEvidenceChallenge({
+  selected,
+  discipline,
+  team,
+  causes,
+  actions,
+  selectedEvidence,
+  rcaCase,
+}) {
+  const challenges = [];
+  const missingEvidence = [];
+  const requiredVerification = [];
+  const strengths = [];
+  const narrative = String(discipline?.narrative ?? "").trim();
+  const stageActions = actions.filter(
+    (action) => action.discipline === selected
+  );
+
+  if (narrative.length < 80) {
+    challenges.push(
+      "The discipline conclusion is brief. Confirm that facts, analysis, decisions and remaining uncertainty are explicitly recorded."
+    );
+  } else {
+    strengths.push("A substantive discipline narrative has been recorded.");
+  }
+
+  if (selected >= 2 && selectedEvidence.length === 0) {
+    missingEvidence.push(
+      "No objective evidence file is attached to this discipline."
+    );
+  } else if (selectedEvidence.length > 0) {
+    strengths.push(
+      `${selectedEvidence.length} objective evidence file${selectedEvidence.length === 1 ? " is" : "s are"} attached.`
+    );
+  }
+
+  if (selected === 0) {
+    if (!rcaCase.problem_statement) {
+      missingEvidence.push("The initial problem or risk requiring 8D is not defined.");
+    }
+    requiredVerification.push(
+      "Confirm urgency, affected parties, immediate protection and the decision to use 8D."
+    );
+  }
+
+  if (selected === 1) {
+    if (team.length === 0) {
+      missingEvidence.push("No cross-functional team members are recorded.");
+    } else {
+      strengths.push(`${team.length} active team member${team.length === 1 ? " is" : "s are"} recorded.`);
+    }
+    if (team.some((member) => !member.email || !member.responsibility)) {
+      challenges.push(
+        "One or more team members lack an email address or defined 8D responsibility."
+      );
+    }
+    requiredVerification.push(
+      "Confirm the team collectively has process, technical, customer and decision-making authority."
+    );
+  }
+
+  if (selected === 2) {
+    requiredVerification.push(
+      "Verify the problem statement using what, where, when, extent and impact, including what is not affected."
+    );
+    challenges.push(
+      "Separate observed facts from suspected causes; causes must not be embedded in the problem statement."
+    );
+  }
+
+  if (selected === 3) {
+    const containmentActions = actions.filter(
+      (action) => action.action_type === "containment"
+    );
+    if (containmentActions.length === 0 && !discipline?.no_action_required) {
+      missingEvidence.push(
+        "No containment action or approved no-containment justification is recorded."
+      );
+    }
+    requiredVerification.push(
+      "Confirm containment coverage, owner, timing, verification, unintended effects and exit criteria."
+    );
+  }
+
+  if (selected === 4) {
+    const requiredTypes = ["occurrence", "escape", "systemic"];
+    for (const type of requiredTypes) {
+      const typeCauses = causes.filter((cause) => cause.cause_type === type);
+      const completeChain = typeCauses.some(
+        (cause) => Array.isArray(cause.why_chain) && cause.why_chain.length === 5
+      );
+      const validated = typeCauses.some((cause) => cause.status === "validated");
+      if (!completeChain) {
+        missingEvidence.push(
+          `A complete five-Why chain is required for the ${type} cause.`
+        );
+      }
+      if (!validated) {
+        challenges.push(
+          `The ${type} cause has not been validated against objective evidence.`
+        );
+      }
+    }
+    requiredVerification.push(
+      "Attempt to disprove each causal chain and record the validation method, result and contradictory evidence."
+    );
+  }
+
+  if ([5, 6, 7].includes(selected)) {
+    const reviewedActions = selected === 5
+      ? stageActions
+      : actions.filter((action) => action.action_type !== "containment");
+    if (reviewedActions.length === 0) {
+      missingEvidence.push("No controlled action is assigned to this discipline.");
+    }
+    if (reviewedActions.some((action) => !action.action_owner || !action.due_date)) {
+      challenges.push("One or more actions lack an owner or due date.");
+    }
+    if (reviewedActions.some((action) => !action.effectiveness_criteria)) {
+      missingEvidence.push(
+        "Measurable effectiveness criteria are missing from one or more actions."
+      );
+    }
+    requiredVerification.push(
+      selected === 5
+        ? "Demonstrate that selected actions address validated causes and introduce no unacceptable new risk."
+        : selected === 6
+          ? "Verify implementation against the approved change and retain evidence of results."
+          : "Confirm equivalent processes, products and sites were reviewed for recurrence risk."
+    );
+  }
+
+  if (selected === 8) {
+    const unverified = actions.filter(
+      (action) => !["verified", "cancelled"].includes(action.status)
+    );
+    if (unverified.length > 0) {
+      missingEvidence.push(
+        `${unverified.length} action${unverified.length === 1 ? " remains" : "s remain"} unverified.`
+      );
+    }
+    requiredVerification.push(
+      "Confirm sustained effectiveness, lessons learned, recognition, record completion and authorised closure."
+    );
+  }
+
+  const issueCount = challenges.length + missingEvidence.length;
+  return {
+    readiness: issueCount === 0 ? "No structural gaps detected" : `${issueCount} review point${issueCount === 1 ? "" : "s"} identified`,
+    assessment:
+      issueCount === 0
+        ? "The recorded structure meets the configured checks. Review content quality and objective evidence before human approval."
+        : "Resolve or consciously address the points below before submitting this discipline for human approval.",
+    challenges,
+    missingEvidence,
+    requiredVerification,
+    strengths,
+  };
+}
+
+function ReviewList({ title, items }) {
   const values = Array.isArray(items) ? items : [];
   return (
     <div
@@ -1015,19 +1101,6 @@ function AiList({ title, items }) {
       )}
     </div>
   );
-}
-
-function decisionBadge(decision) {
-  const accepted = decision === "accepted";
-  const rejected = decision === "rejected";
-  return {
-    padding: "7px 11px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    fontWeight: 800,
-    background: accepted ? "#e8f8ef" : rejected ? "#fff0ee" : "#fff7e6",
-    color: accepted ? "#067647" : rejected ? "#b42318" : "#92400e",
-  };
 }
 
 const cardStyle = {
@@ -1076,16 +1149,6 @@ const approveButton = {
   background: "#067647",
 };
 
-const aiButton = {
-  border: 0,
-  borderRadius: "10px",
-  background: "#061a35",
-  color: "white",
-  padding: "12px 16px",
-  fontWeight: 800,
-  cursor: "pointer",
-};
-
 const rejectButton = {
   ...primaryButton,
   background: "#fff0ee",
@@ -1093,7 +1156,7 @@ const rejectButton = {
   border: "1px solid #fda29b",
 };
 
-const aiResultStyle = {
+const reviewResultStyle = {
   marginTop: "16px",
   border: "1px solid #b9d0ff",
   borderRadius: "14px",
@@ -1101,7 +1164,7 @@ const aiResultStyle = {
   padding: "18px",
 };
 
-const aiGridStyle = {
+const reviewGridStyle = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: "10px",
