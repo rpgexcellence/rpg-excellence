@@ -145,19 +145,9 @@ export default async function RcaCommandCentre() {
               />
             </Link>
 
-            <div
-              style={{
-                color: "#155eef",
-                fontWeight: 800,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}
-            >
-              RPG Intelligence
-            </div>
             <h1
               style={{
-                margin: "10px 0 8px",
+                margin: "0 0 8px",
                 fontSize: "clamp(34px, 5vw, 56px)",
               }}
             >
