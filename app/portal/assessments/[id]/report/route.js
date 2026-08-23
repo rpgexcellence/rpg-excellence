@@ -23,7 +23,7 @@ const CLAUSE_NUMBERS = [
   "10",
 ];
 
-const CLAUSE_TITLES = {
+const DEFAULT_CLAUSE_TITLES = {
   "4": "Context of the Organization",
   "5": "Leadership",
   "6": "Planning",
@@ -33,12 +33,33 @@ const CLAUSE_TITLES = {
   "10": "Improvement",
 };
 
+const CLAUSE_TITLES_BY_STANDARD = {
+  "ISO/IEC 17024:2026": {
+    "4": "General Requirements",
+    "5": "Structural Requirements",
+    "6": "Resource Requirements",
+    "7": "Records and Information Requirements",
+    "8": "Certification Schemes",
+    "9": "Certification Process Requirements",
+    "10": "Management System Requirements",
+  },
+};
+
 
 const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
+  "ISO/IEC 17024:2026",
 ];
+
+function getClauseTitle(standard, clauseNumber) {
+  return (
+    CLAUSE_TITLES_BY_STANDARD[standard]?.[clauseNumber] ??
+    DEFAULT_CLAUSE_TITLES[clauseNumber] ??
+    `Clause ${clauseNumber}`
+  );
+}
 
 function managementReadinessValue(rating) {
   switch (rating) {
@@ -62,6 +83,7 @@ function systemNameFor(standard) {
   if (standard === "ISO 9001:2015/Amd 1:2024") return "quality management system";
   if (standard === "ISO 45001:2018") return "OH&S management system";
   if (standard === "ISO 14001:2026") return "environmental management system";
+  if (standard === "ISO/IEC 17024:2026") return "person-certification management system";
   return "management system";
 }
 
@@ -323,10 +345,10 @@ export async function GET(request, { params }) {
     CLAUSE_NUMBERS.map(
       (number) => ({
         number,
-        title:
-          CLAUSE_TITLES[
-            number
-          ],
+        title: getClauseTitle(
+          assessment.standard,
+          number
+        ),
         score:
           calculateClauseScore(
             number,
@@ -439,7 +461,7 @@ export async function GET(request, { params }) {
 
     const { data: readinessData, error: readinessError } = await supabase
       .from("management_readiness")
-      .select("dimension_key, dimension_name, readiness_rating, evidence_confidence, management_action, action_owner, target_date")
+      .select("dimension_key, dimension_name, readiness_rating, evidence_confidence, management_concern, management_action, action_owner, target_date")
       .eq("assessment_id", assessment.id)
       .eq("owner_id", user.id)
       .order("display_order", { ascending: true });
@@ -470,7 +492,7 @@ export async function GET(request, { params }) {
 
   const today = new Date();
 
-  const overdueActionCount = openFindings.filter((finding) => {
+  const findingOverdueActionCount = openFindings.filter((finding) => {
     const managementAction = managementByFinding[finding.id];
     const correctiveAction = correctiveByFinding[finding.id];
     const targetDate = managementAction?.target_date ?? correctiveAction?.target_date;
@@ -482,6 +504,26 @@ export async function GET(request, { params }) {
 
     return new Date(`${targetDate}T23:59:59`) < today;
   }).length;
+
+  const managementReadinessActions =
+    managementReadinessRows.filter(
+      (row) =>
+        typeof row.management_action === "string" &&
+        row.management_action.trim() !== ""
+    );
+
+  const readinessOverdueActionCount =
+    managementReadinessActions.filter(
+      (row) =>
+        Boolean(
+          row.target_date &&
+          new Date(`${row.target_date}T23:59:59`) < today
+        )
+    ).length;
+
+  const overdueActionCount =
+    findingOverdueActionCount +
+    readinessOverdueActionCount;
 
   const managementValues = managementReadinessRows
     .map((row) => managementReadinessValue(row.readiness_rating))
@@ -837,6 +879,19 @@ export async function GET(request, { params }) {
     }
   );
 
+  if (progress.percentage < 100) {
+    drawText(
+      `DRAFT / INCOMPLETE: ${progress.total - progress.answered} question(s) remain unanswered. Scores and readiness conclusions are provisional until the assessment is complete.`,
+      {
+        size: 10,
+        font: bold,
+        color: grey,
+        lineHeight: 14,
+        maxLength: 88,
+      }
+    );
+  }
+
   y -= 15;
 
   // EXECUTIVE OVERVIEW
@@ -1055,6 +1110,7 @@ export async function GET(request, { params }) {
 
     drawText(
       `Management readiness: ${managementReadiness}${
+        managementDimensionsCompleted === 9 &&
         managementReadinessScore !== null
           ? ` (${managementReadinessScore}%)`
           : ""
@@ -1205,6 +1261,91 @@ export async function GET(request, { params }) {
 
         y -= 6;
       });
+    }
+
+    y -= 12;
+
+    drawText(
+      "Management Readiness Actions",
+      {
+        size: 18,
+        font: bold,
+      }
+    );
+
+    y -= 4;
+
+    if (managementReadinessActions.length === 0) {
+      drawText(
+        "No actions have been raised through the Management Readiness assessment.",
+        {
+          size: 10,
+          color: grey,
+          lineHeight: 14,
+        }
+      );
+    } else {
+      managementReadinessActions.forEach(
+        (action, index) => {
+          const isOverdue = Boolean(
+            action.target_date &&
+            new Date(
+              `${action.target_date}T23:59:59`
+            ) < today
+          );
+
+          drawText(
+            `${index + 1}. ${action.dimension_name ?? action.dimension_key}${
+              isOverdue ? " | OVERDUE" : " | OPEN"
+            }`,
+            {
+              size: 10,
+              font: bold,
+              color: navy,
+              lineHeight: 14,
+              maxLength: 88,
+            }
+          );
+
+          if (action.management_concern) {
+            drawText(
+              `Concern: ${action.management_concern}`,
+              {
+                size: 9,
+                color: grey,
+                lineHeight: 13,
+                maxLength: 88,
+              }
+            );
+          }
+
+          drawText(
+            `Action: ${action.management_action}`,
+            {
+              size: 9,
+              color: grey,
+              lineHeight: 13,
+              maxLength: 88,
+            }
+          );
+
+          drawText(
+            `Owner: ${action.action_owner ?? "Unassigned"}${
+              action.target_date
+                ? ` | Target: ${action.target_date}`
+                : ""
+            } | Rating: ${action.readiness_rating ?? "Not assessed"} | Evidence: ${action.evidence_confidence ?? "Not set"}`,
+            {
+              size: 9,
+              color: grey,
+              lineHeight: 13,
+              maxLength: 88,
+            }
+          );
+
+          y -= 6;
+        }
+      );
     }
 
     if (
