@@ -244,6 +244,49 @@ export async function saveDiscipline(formData) {
     }
   }
 
+  if (intent === "approve" && discipline === 5) {
+    const [causesResult, selectedActionsResult] = await Promise.all([
+      supabase
+        .from("rca_causes")
+        .select("id, cause_type")
+        .eq("case_id", caseId)
+        .eq("owner_id", user.id)
+        .eq("status", "validated")
+        .in("cause_type", ["occurrence", "escape", "systemic"]),
+      supabase
+        .from("rca_actions")
+        .select("cause_id, action_owner, due_date, effectiveness_criteria, selection_rationale")
+        .eq("case_id", caseId)
+        .eq("owner_id", user.id)
+        .eq("discipline", 5)
+        .eq("selection_status", "selected"),
+    ]);
+
+    if (causesResult.error) throw new Error(causesResult.error.message);
+    if (selectedActionsResult.error) throw new Error(selectedActionsResult.error.message);
+
+    const selectedActions = selectedActionsResult.data ?? [];
+    const coveredCauseIds = new Set(
+      selectedActions.map((action) => action.cause_id).filter(Boolean)
+    );
+    const uncoveredTypes = (causesResult.data ?? [])
+      .filter((cause) => !coveredCauseIds.has(cause.id))
+      .map((cause) => cause.cause_type);
+    const incompleteSelectedAction = selectedActions.some(
+      (action) =>
+        !action.action_owner ||
+        !action.due_date ||
+        !action.effectiveness_criteria ||
+        !action.selection_rationale
+    );
+
+    if (selectedActions.length === 0 || uncoveredTypes.length > 0 || incompleteSelectedAction) {
+      redirect(
+        `/portal/rca/${caseId}?d=5&error=d5_selection_incomplete&missing=${encodeURIComponent([...new Set(uncoveredTypes)].join(","))}`
+      );
+    }
+  }
+
   const approved = intent === "approve";
   const status = approved
     ? "approved"
@@ -461,6 +504,10 @@ export async function addCorrectiveAction(formData) {
   const caseId = clean(formData.get("case_id"));
   const title = clean(formData.get("action_title"));
   const actionType = clean(formData.get("action_type"));
+  const causeId = clean(formData.get("cause_id"));
+  const effectivenessScore = Number(formData.get("effectiveness_score"));
+  const feasibilityScore = Number(formData.get("feasibility_score"));
+  const implementationRiskScore = Number(formData.get("implementation_risk_score"));
 
   if (
     !caseId ||
@@ -495,12 +542,25 @@ export async function addCorrectiveAction(formData) {
       );
     }
   }
+
+  if (discipline === 5) {
+    if (!causeId) {
+      throw new Error("Link every permanent corrective-action candidate to a validated cause.");
+    }
+    if (
+      ![effectivenessScore, feasibilityScore, implementationRiskScore].every(
+        (score) => Number.isInteger(score) && score >= 1 && score <= 5
+      )
+    ) {
+      throw new Error("Score effectiveness, feasibility and implementation risk from 1 to 5.");
+    }
+  }
   const { error } = await supabase
     .from("rca_actions")
     .insert({
       case_id: caseId,
       owner_id: user.id,
-      cause_id: clean(formData.get("cause_id")),
+      cause_id: causeId,
       discipline,
       action_type: actionType,
       title,
@@ -510,12 +570,85 @@ export async function addCorrectiveAction(formData) {
       effectiveness_criteria: clean(
         formData.get("effectiveness_criteria")
       ),
+      effectiveness_score: discipline === 5 ? effectivenessScore : null,
+      feasibility_score: discipline === 5 ? feasibilityScore : null,
+      implementation_risk_score: discipline === 5 ? implementationRiskScore : null,
+      selection_status: discipline === 5 ? "candidate" : "selected",
       status: "open",
     });
 
   if (error) throw new Error(error.message);
   revalidatePath(`/portal/rca/${caseId}`);
   redirect(`/portal/rca/${caseId}?d=${discipline}`);
+}
+
+export async function decideCorrectiveActionCandidate(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const actionId = clean(formData.get("action_id"));
+  const decision = clean(formData.get("decision"));
+  const rationale = clean(formData.get("selection_rationale"));
+
+  if (!caseId || !actionId || !["select", "reject"].includes(decision)) {
+    throw new Error("Invalid corrective-action selection decision.");
+  }
+
+  if (decision === "select" && !rationale) {
+    redirect(`/portal/rca/${caseId}?d=5&error=selection_rationale_required`);
+  }
+
+  await getOwnedCase(supabase, user.id, caseId);
+  await assertDisciplineUnlocked(supabase, user.id, caseId, 5);
+
+  const { data: candidate, error: candidateError } = await supabase
+    .from("rca_actions")
+    .select("id, title, cause_id, action_owner, due_date, effectiveness_criteria")
+    .eq("id", actionId)
+    .eq("case_id", caseId)
+    .eq("owner_id", user.id)
+    .eq("discipline", 5)
+    .maybeSingle();
+
+  if (candidateError) throw new Error(candidateError.message);
+  if (!candidate) throw new Error("Corrective-action candidate not found.");
+
+  if (
+    decision === "select" &&
+    (!candidate.cause_id ||
+      !candidate.action_owner ||
+      !candidate.due_date ||
+      !candidate.effectiveness_criteria)
+  ) {
+    redirect(`/portal/rca/${caseId}?d=5&error=candidate_fields_required`);
+  }
+
+  const selected = decision === "select";
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("rca_actions")
+    .update({
+      selection_status: selected ? "selected" : "rejected",
+      selection_rationale: rationale,
+      selected_by: selected ? user.id : null,
+      selected_at: selected ? now : null,
+      updated_at: now,
+    })
+    .eq("id", actionId)
+    .eq("owner_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("rca_case_events").insert({
+    case_id: caseId,
+    owner_id: user.id,
+    event_type: selected ? "corrective_action_selected" : "corrective_action_rejected",
+    discipline: 5,
+    summary: `${candidate.title} ${selected ? "selected" : "rejected"}`,
+    event_data: { action_id: actionId, selection_rationale: rationale },
+  });
+
+  revalidatePath(`/portal/rca/${caseId}`);
+  redirect(`/portal/rca/${caseId}?d=5`);
 }
 
 export async function recordNoContainmentRequired(formData) {
@@ -945,4 +1078,107 @@ export async function reviewAnalysisNode(formData) {
 
   revalidatePath(`/portal/rca/${caseId}`);
   redirect(`/portal/rca/${caseId}?d=4&model=${modelId}`);
+}
+
+const COST_CATEGORIES = new Set([
+  "material",
+  "labour",
+  "downtime",
+  "administration",
+  "external_failure",
+  "inspection_testing",
+  "containment_recovery",
+  "logistics",
+  "other",
+]);
+
+const COST_CURRENCIES = new Set(["GBP", "EUR", "USD"]);
+
+export async function addCostEntry(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const discipline = Number(formData.get("discipline"));
+  const costCategory = clean(formData.get("cost_category"));
+  const description = clean(formData.get("description"));
+  const currency = clean(formData.get("currency")) ?? "GBP";
+  const costStatus = clean(formData.get("cost_status")) ?? "estimated";
+  const quantity = Number(formData.get("quantity"));
+  const unitCost = Number(formData.get("unit_cost"));
+
+  if (
+    !caseId ||
+    !Number.isInteger(discipline) ||
+    discipline < 0 ||
+    discipline > 8 ||
+    !costCategory ||
+    !COST_CATEGORIES.has(costCategory) ||
+    !description ||
+    !Number.isFinite(quantity) ||
+    quantity <= 0 ||
+    !Number.isFinite(unitCost) ||
+    unitCost < 0 ||
+    !COST_CURRENCIES.has(currency) ||
+    !["estimated", "confirmed"].includes(costStatus)
+  ) {
+    throw new Error("Enter a valid cost category, description, quantity and unit cost.");
+  }
+
+  await getOwnedCase(supabase, user.id, caseId);
+  await assertDisciplineUnlocked(supabase, user.id, caseId, discipline);
+
+  const amount = Math.round(quantity * unitCost * 100) / 100;
+  const { error } = await supabase.from("rca_cost_entries").insert({
+    case_id: caseId,
+    owner_id: user.id,
+    discipline,
+    cost_category: costCategory,
+    description,
+    quantity,
+    unit_cost: unitCost,
+    amount,
+    currency,
+    cost_status: costStatus,
+    source_reference: clean(formData.get("source_reference")),
+    incurred_at: clean(formData.get("incurred_at")),
+  });
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("rca_case_events").insert({
+    case_id: caseId,
+    owner_id: user.id,
+    event_type: "cost_recorded",
+    discipline,
+    summary: `${costCategory} cost recorded`,
+    event_data: { amount, currency, cost_status: costStatus },
+  });
+
+  revalidatePath(`/portal/rca/${caseId}`);
+  revalidatePath(`/portal/rca/${caseId}/summary`);
+  redirect(`/portal/rca/${caseId}?d=${discipline}#copq`);
+}
+
+export async function deleteCostEntry(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const costId = clean(formData.get("cost_id"));
+  const discipline = Number(formData.get("discipline"));
+
+  if (!caseId || !costId || !Number.isInteger(discipline)) {
+    throw new Error("Invalid cost entry.");
+  }
+
+  await getOwnedCase(supabase, user.id, caseId);
+  const { error } = await supabase
+    .from("rca_cost_entries")
+    .delete()
+    .eq("id", costId)
+    .eq("case_id", caseId)
+    .eq("owner_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/portal/rca/${caseId}`);
+  revalidatePath(`/portal/rca/${caseId}/summary`);
+  redirect(`/portal/rca/${caseId}?d=${discipline}#copq`);
 }
