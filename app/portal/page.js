@@ -1243,13 +1243,6 @@ export default async function PortalPage() {
                         ISO/IEC 17024:2026 — Certification of Persons
                       </option>
 
-                      <option value="ISO 22301">
-                        ISO 22301
-                      </option>
-
-                      <option value="ISO 27001">
-                        ISO 27001
-                      </option>
                     </select>
 
                     <button
