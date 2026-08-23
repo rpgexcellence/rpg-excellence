@@ -496,11 +496,6 @@ export default async function ManagementReadinessPage({
         )
       : null;
 
-  const overallLabel =
-    overallReadinessLabel(
-      overallScore
-    );
-
   const completedDimensions =
     dimensions.filter(
       (dimension) =>
@@ -510,6 +505,22 @@ export default async function ManagementReadinessPage({
           ]?.readiness_rating
         )
     ).length;
+
+  const isReadinessComplete =
+    completedDimensions ===
+    dimensions.length;
+
+  const displayedOverallScore =
+    isReadinessComplete
+      ? overallScore
+      : null;
+
+  const overallLabel =
+    isReadinessComplete
+      ? overallReadinessLabel(
+          overallScore
+        )
+      : "Not assessed";
 
   const highConfidenceCount =
     dimensions.filter(
@@ -721,8 +732,8 @@ export default async function ManagementReadinessPage({
                 fontWeight: 800,
               }}
             >
-              {overallScore !== null
-                ? `${overallScore}%`
+              {displayedOverallScore !== null
+                ? `${displayedOverallScore}%`
                 : "—"}
             </div>
           </div>
