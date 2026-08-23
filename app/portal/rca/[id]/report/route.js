@@ -108,7 +108,8 @@ export async function GET(_request, { params }) {
       page.drawText("RPG EXCELLENCE", { x: margin, y, size: 10, font: bold, color: blue });
     }
     page.drawText("8D RCA Executive Report", { x: pageWidth - margin - 126, y, size: 9, font: regular, color: grey });
-    y -= 26;
+    // Reserve enough vertical space for the repeating logo/header on every page.
+    y -= 48;
   };
 
   const ensureSpace = (height = 40) => {
@@ -206,6 +207,14 @@ export async function GET(_request, { params }) {
   heading("Corrective actions");
   if (selectedActions.length) {
     selectedActions.forEach((action) => {
+      const titleLines = wrap(action.title, bold, 10, contentWidth);
+      const effectivenessLines = wrap(
+        `Effectiveness: ${action.effectiveness_criteria || "Not defined"}`,
+        regular,
+        10,
+        contentWidth
+      );
+      ensureSpace(46 + (titleLines.length + effectivenessLines.length) * 15);
       paragraph(action.title, { bold: true, after: 1 });
       paragraph(`Owner: ${action.action_owner || "Unassigned"} | Due: ${action.due_date || "Not set"} | Status: ${cleanLabel(action.status)}`, { color: grey, after: 2 });
       paragraph(`Effectiveness: ${action.effectiveness_criteria || "Not defined"}`, { after: 8 });
