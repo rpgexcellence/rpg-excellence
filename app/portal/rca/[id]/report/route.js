@@ -210,3 +210,4 @@ export async function GET(_request, { params }) {
       "Cache-Control": "private, no-store",
     },
   });
+}
