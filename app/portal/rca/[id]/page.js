@@ -37,6 +37,10 @@ export default async function RcaCasePage({
   const { id } = await params;
   const query = await searchParams;
   const pageError = query?.error;
+  const missingCauseTypes = String(query?.missing ?? "")
+    .split(",")
+    .filter(Boolean)
+    .map(label);
   const requestedDiscipline = Math.min(
     8,
     Math.max(0, Number(query?.d ?? 0) || 0)
@@ -330,6 +334,49 @@ export default async function RcaCasePage({
             marginTop: "24px",
           }}
         >
+          {selected === 4 && (
+            <nav
+              aria-label="8D discipline status"
+              style={disciplineStatusNavStyle}
+            >
+              {disciplines.map((item) => {
+                const active = item.discipline === selected;
+                const locked = item.discipline > highestUnlocked;
+                const statusMark =
+                  item.status === "approved"
+                    ? "✓ Approved"
+                    : locked
+                      ? "🔒 Locked"
+                      : label(item.status);
+
+                if (locked) {
+                  return (
+                    <div
+                      key={item.id}
+                      aria-disabled="true"
+                      title={`Complete and approve D${item.discipline - 1} to unlock D${item.discipline}.`}
+                      style={disciplineStatusItemStyle(active, true)}
+                    >
+                      <strong>D{item.discipline}</strong>
+                      <span>{statusMark}</span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/portal/rca/${id}?d=${item.discipline}`}
+                    style={disciplineStatusItemStyle(active, false)}
+                  >
+                    <strong>D{item.discipline}</strong>
+                    <span>{statusMark}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
+
           {selected !== 4 && (
           <aside>
             <div
@@ -422,6 +469,17 @@ export default async function RcaCasePage({
                 {pageError === "narrative_required" && (
                   <div style={validationNoticeStyle}>
                     Record the discipline evidence, analysis and conclusion before submitting it for review. For D3, you may instead record an evidence-based “No containment action required” decision.
+                  </div>
+                )}
+                {pageError === "missing_validated_causes" && (
+                  <div style={validationNoticeStyle}>
+                    <strong>D4 cannot be approved yet.</strong>
+                    <div style={{ marginTop: "6px" }}>
+                      Complete and human-validate the following cause classifications: {missingCauseTypes.join(", ") || "Occurrence, Escape and Systemic"}.
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      Saving a causal chain creates a hypothesis. Open each hypothesis and record its validation method and objective result before selecting Human Approve D4.
+                    </div>
                   </div>
                 )}
                 <div
@@ -527,6 +585,9 @@ export default async function RcaCasePage({
                 <form action={saveDiscipline}>
                   <input type="hidden" name="case_id" value={id} />
                   <input type="hidden" name="discipline" value={selected} />
+                  {selected === 4 && activeAnalysisModel && (
+                    <input type="hidden" name="model_id" value={activeAnalysisModel.id} />
+                  )}
                   <label
                     style={{
                       display: "block",
@@ -1365,6 +1426,31 @@ const methodGridStyle = {
   gap: "12px",
   marginTop: "18px",
 };
+
+const disciplineStatusNavStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(9, minmax(105px, 1fr))",
+  gap: "8px",
+  overflowX: "auto",
+  padding: "12px",
+  border: "1px solid #dce4ee",
+  borderRadius: "16px",
+  background: "white",
+};
+
+const disciplineStatusItemStyle = (active, locked) => ({
+  display: "grid",
+  gap: "5px",
+  minWidth: "105px",
+  padding: "11px 12px",
+  borderRadius: "10px",
+  textDecoration: "none",
+  background: active ? "#155eef" : locked ? "#eef1f5" : "#f6f8fb",
+  color: active ? "white" : locked ? "#8190a5" : "#061a35",
+  opacity: locked ? 0.78 : 1,
+  cursor: locked ? "not-allowed" : "pointer",
+  fontSize: "12px",
+});
 
 const methodCardStyle = (selected) => ({
   display: "grid",
