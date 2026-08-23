@@ -44,10 +44,6 @@ const plannedModules = [
     status: "Planned module",
   },
   {
-    title: "CAPA Assistant",
-    status: "Planned module",
-  },
-  {
     title: "Business Continuity Planner",
     status: "Planned module",
   },
@@ -123,6 +119,41 @@ export default async function AiTools({
                 </Link>
               )
             )}
+          </div>
+
+          <h2 id="eight-d-capa">
+            Root cause and corrective action
+          </h2>
+
+          <div className="toolGrid">
+            <Link
+              className="toolCard toolCardLink"
+              href="/portal/rca"
+              style={{
+                color: "inherit",
+                textDecoration: "none",
+              }}
+              aria-label="Open the 8D and CAPA workspace"
+            >
+              <span className="toolIcon">
+                ◈
+              </span>
+
+              <strong>
+                8D Root Cause & CAPA
+              </strong>
+
+              <span>
+                Standalone investigation and
+                corrective-action workspace
+              </span>
+
+              <span>Available now</span>
+
+              <span aria-hidden="true">
+                Open 8D workspace →
+              </span>
+            </Link>
           </div>
 
           <h2>Further intelligence modules</h2>
