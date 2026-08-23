@@ -123,6 +123,7 @@ export async function saveDiscipline(formData) {
   const { supabase, user } = await context();
   const caseId = clean(formData.get("case_id"));
   const discipline = Number(formData.get("discipline"));
+  const modelId = clean(formData.get("model_id"));
   let narrative = clean(formData.get("narrative"));
   const intent = clean(formData.get("intent")) ?? "save";
 
@@ -236,8 +237,9 @@ export async function saveDiscipline(formData) {
     );
 
     if (missingTypes.length > 0) {
-      throw new Error(
-        `D4 requires validated occurrence, escape and systemic causes. Missing: ${missingTypes.join(", ")}.`
+      const modelQuery = modelId ? `&model=${encodeURIComponent(modelId)}` : "";
+      redirect(
+        `/portal/rca/${caseId}?d=4${modelQuery}&error=missing_validated_causes&missing=${encodeURIComponent(missingTypes.join(","))}`
       );
     }
   }
@@ -303,7 +305,10 @@ export async function saveDiscipline(formData) {
 
   revalidatePath(`/portal/rca/${caseId}`);
   revalidatePath("/portal/rca");
-  redirect(`/portal/rca/${caseId}?d=${discipline}`);
+  const modelQuery = discipline === 4 && modelId
+    ? `&model=${encodeURIComponent(modelId)}`
+    : "";
+  redirect(`/portal/rca/${caseId}?d=${discipline}${modelQuery}`);
 }
 
 export async function addTeamMember(formData) {
