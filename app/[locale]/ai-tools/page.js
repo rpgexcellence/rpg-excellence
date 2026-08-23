@@ -34,6 +34,113 @@ const assessmentModules = [
   },
 ];
 
+const supportingDocumentPacks = [
+  {
+    standard: "ISO 9001:2015/Amd 1:2024",
+    system: "Quality Management System",
+    shortCode: "QMS",
+    documents: [
+      {
+        code: "RPG-QMS-PRO-001",
+        title: "Readiness Assessment Procedure",
+        href: "/documents/iso-9001/RPG-QMS-PRO-001_ISO_9001-2015_Amd1-2024_Readiness_Assessment_Procedure.docx",
+      },
+      {
+        code: "RPG-QMS-FRM-001",
+        title: "Evidence Sampling Worksheet",
+        href: "/documents/iso-9001/RPG-QMS-FRM-001_Evidence_Sampling_Worksheet.docx",
+      },
+      {
+        code: "RPG-QMS-FRM-002",
+        title: "Finding and Corrective Action Record",
+        href: "/documents/iso-9001/RPG-QMS-FRM-002_Finding_and_Corrective_Action_Record.docx",
+      },
+      {
+        code: "RPG-QMS-FRM-003",
+        title: "Management Action Plan",
+        href: "/documents/iso-9001/RPG-QMS-FRM-003_Management_Action_Plan.docx",
+      },
+      {
+        code: "RPG-QMS-FRM-004",
+        title: "Management Readiness Assessment",
+        href: "/documents/iso-9001/RPG-QMS-FRM-004_Management_Readiness_Assessment.docx",
+      },
+      {
+        code: "RPG-QMS-SCR-001",
+        title: "Opening Meeting Script",
+        href: "/documents/iso-9001/RPG-QMS-SCR-001_Opening_Meeting_Script.docx",
+      },
+      {
+        code: "RPG-QMS-SCR-002",
+        title: "Closing Meeting Script",
+        href: "/documents/iso-9001/RPG-QMS-SCR-002_Closing_Meeting_Script.docx",
+      },
+      {
+        code: "RPG-QMS-RPT-001",
+        title: "Executive Summary Template",
+        href: "/documents/iso-9001/RPG-QMS-RPT-001_Executive_Summary_Template.docx",
+      },
+      {
+        code: "RPG-QMS-FRM-005",
+        title: "Certification Readiness Decision Guide",
+        href: "/documents/iso-9001/RPG-QMS-FRM-005_Certification_Readiness_Decision_Guide.docx",
+      },
+    ],
+  },
+  {
+    standard: "ISO 45001:2018",
+    system: "Occupational Health & Safety Management System",
+    shortCode: "OHSMS",
+    documents: [
+      {
+        code: "RPG-OHSMS-PRO-001",
+        title: "Readiness Assessment Procedure",
+        href: "/documents/iso-45001/RPG-OHSMS-PRO-001_ISO_45001-2018_Readiness_Assessment_Procedure.docx",
+      },
+      {
+        code: "RPG-OHSMS-FRM-001",
+        title: "Evidence Sampling Worksheet",
+        href: "/documents/iso-45001/RPG-OHSMS-FRM-001_Evidence_Sampling_Worksheet.docx",
+      },
+      {
+        code: "RPG-OHSMS-FRM-002",
+        title: "Finding and Corrective Action Record",
+        href: "/documents/iso-45001/RPG-OHSMS-FRM-002_Finding_and_Corrective_Action_Record.docx",
+      },
+      {
+        code: "RPG-OHSMS-FRM-003",
+        title: "Management Action Plan",
+        href: "/documents/iso-45001/RPG-OHSMS-FRM-003_Management_Action_Plan.docx",
+      },
+      {
+        code: "RPG-OHSMS-FRM-004",
+        title: "Management Readiness Assessment",
+        href: "/documents/iso-45001/RPG-OHSMS-FRM-004_Management_Readiness_Assessment.docx",
+      },
+      {
+        code: "RPG-OHSMS-SCR-001",
+        title: "Opening Meeting Script",
+        href: "/documents/iso-45001/RPG-OHSMS-SCR-001_Opening_Meeting_Script.docx",
+      },
+      {
+        code: "RPG-OHSMS-SCR-002",
+        title: "Closing Meeting Script",
+        href: "/documents/iso-45001/RPG-OHSMS-SCR-002_Closing_Meeting_Script.docx",
+      },
+      {
+        code: "RPG-OHSMS-RPT-001",
+        title: "Executive Summary Template",
+        href: "/documents/iso-45001/RPG-OHSMS-RPT-001_Executive_Summary_Template.docx",
+      },
+      {
+        code: "RPG-OHSMS-FRM-005",
+        title: "Certification Readiness Decision Guide",
+        href: "/documents/iso-45001/RPG-OHSMS-FRM-005_Certification_Readiness_Decision_Guide.docx",
+      },
+    ],
+  },
+];
+
 const plannedModules = [
   {
     title: "Risk Assessment Builder",
@@ -52,6 +159,42 @@ const plannedModules = [
     status: "Planned module",
   },
 ];
+
+const sectionStyle = {
+  marginTop: "48px",
+};
+
+const packGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+  gap: "24px",
+};
+
+const packStyle = {
+  background: "#ffffff",
+  border: "1px solid #d8e0ea",
+  borderRadius: "22px",
+  padding: "28px",
+};
+
+const documentListStyle = {
+  display: "grid",
+  gap: "10px",
+  marginTop: "22px",
+};
+
+const documentLinkStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "18px",
+  alignItems: "center",
+  padding: "14px 16px",
+  background: "#f4f7fb",
+  border: "1px solid #dfe6ef",
+  borderRadius: "12px",
+  color: "#071a33",
+  textDecoration: "none",
+};
 
 export default async function AiTools({
   params,
@@ -120,6 +263,99 @@ export default async function AiTools({
               )
             )}
           </div>
+
+          <section
+            id="supporting-documents"
+            style={sectionStyle}
+          >
+            <span className="kicker">
+              Controlled resources
+            </span>
+
+            <h2>Supporting assessment documents</h2>
+
+            <p className="lead">
+              Download practical, editable Word
+              templates for planning assessments,
+              sampling evidence, recording findings,
+              managing actions and reporting readiness.
+            </p>
+
+            <div style={packGridStyle}>
+              {supportingDocumentPacks.map(
+                ({
+                  standard,
+                  system,
+                  shortCode,
+                  documents,
+                }) => (
+                  <article
+                    key={standard}
+                    style={packStyle}
+                  >
+                    <span className="kicker">
+                      {shortCode} document pack
+                    </span>
+
+                    <h3
+                      style={{
+                        marginBottom: "6px",
+                      }}
+                    >
+                      {standard}
+                    </h3>
+
+                    <p>{system}</p>
+
+                    <div style={documentListStyle}>
+                      {documents.map(
+                        ({ code, title, href }) => (
+                          <a
+                            href={href}
+                            key={code}
+                            download
+                            style={documentLinkStyle}
+                            aria-label={`Download ${code} ${title} as a Word document`}
+                          >
+                            <span>
+                              <small
+                                style={{
+                                  display: "block",
+                                  color: "#526783",
+                                  marginBottom: "3px",
+                                }}
+                              >
+                                {code}
+                              </small>
+
+                              <strong>{title}</strong>
+                            </span>
+
+                            <span
+                              aria-hidden="true"
+                              style={{
+                                color: "#1f5eea",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Word ↓
+                            </span>
+                          </a>
+                        )
+                      )}
+                    </div>
+                  </article>
+                )
+              )}
+            </div>
+
+            <div className="notice">
+              These templates support structured
+              readiness assessment and improvement.
+              They do not constitute certification,
+              legal advice or an accredited audit.
+            </div>
+          </section>
 
           <h2 id="eight-d-capa">
             Root cause and corrective action
