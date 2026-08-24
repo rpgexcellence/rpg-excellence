@@ -64,6 +64,19 @@ function splitControlledList(value) {
     .filter(Boolean);
 }
 
+function createMailtoHref({ recipients, ccRecipients, subject, body }) {
+  const query = new URLSearchParams();
+
+  if (ccRecipients.length) {
+    query.set("cc", ccRecipients.join(","));
+  }
+
+  query.set("subject", subject);
+  query.set("body", body);
+
+  return `mailto:${recipients.join(",")}?${query.toString()}`;
+}
+
 export default async function InternalAuditWorkspace({ params, searchParams }) {
   const { id } = await params;
   const query = await searchParams;
@@ -116,6 +129,49 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     .map((row) => row.internal_audit_standard_catalogue?.display_name)
     .filter(Boolean);
 
+  const teamEmails = [...new Set(
+    team.map((member) => member.email?.trim()).filter(Boolean)
+  )];
+  const notificationRecipients = notification?.recipients?.length
+    ? notification.recipients
+    : splitControlledList(audit.auditee_contact_email);
+  const notificationCcRecipients = notification?.cc_recipients?.length
+    ? notification.cc_recipients
+    : teamEmails;
+  const notificationSubject = notification?.subject
+    ?? `${audit.audit_reference} — Internal audit notification`;
+  const notificationRequest = notification?.body
+    ?? "Please provide current procedures, applicable records, relevant performance data, prior findings and evidence of completed actions before the opening meeting.";
+  const notificationEmailBody = [
+    `Dear ${audit.auditee_contact_name || "Auditee"},`,
+    "",
+    `This is the formal notification of internal audit ${audit.audit_reference}: ${audit.title}.`,
+    "",
+    `Organisation: ${organization?.name || "Not specified"}`,
+    `Audit period: ${displayDate(audit.planned_start_at)} – ${displayDate(audit.planned_end_at)}`,
+    `Audit method: ${audit.audit_method || "Not specified"}`,
+    `Audit criteria: ${standards.join(", ") || "Approved audit criteria"}`,
+    `Audit purpose: ${audit.purpose || "See controlled audit record"}`,
+    `Audit scope: ${audit.scope_statement || "See controlled audit record"}`,
+    `Processes in scope: ${inheritedProcesses.join(", ") || "See approved scope"}`,
+    `Sites / locations: ${inheritedSites.join(", ") || "Not specified"}`,
+    `Audit team: ${team.map((member) => `${member.member_name}${member.audit_role ? ` (${ROLE_LABELS[member.audit_role] ?? member.audit_role})` : ""}`).join(", ") || "To be confirmed"}`,
+    "",
+    "Requested information:",
+    notificationRequest,
+    "",
+    "Please acknowledge receipt and advise promptly of any availability, access, safety, confidentiality or operational constraints that may affect the audit.",
+    "",
+    "Regards,",
+    defaultLead?.member_name || audit.leader_name || "Lead Auditor",
+  ].join("\n");
+  const notificationMailtoHref = createMailtoHref({
+    recipients: notificationRecipients,
+    ccRecipients: notificationCcRecipients,
+    subject: notificationSubject,
+    body: notificationEmailBody,
+  });
+
   const scopeComplete = Boolean(audit.scope_approved);
   const teamComplete = ["plan", "notification", "fieldwork", "findings", "closing", "report", "follow_up", "closure"].includes(audit.current_gate);
   const planComplete = Boolean(audit.plan_approved) || ["notification", "fieldwork", "findings", "closing", "report", "follow_up", "closure"].includes(audit.current_gate);
@@ -165,8 +221,11 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         .actionBar:before{content:"Controlled decision";margin-right:auto;color:#9cb3cd;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
         .button{transition:transform .18s ease,box-shadow .18s ease}.button:hover{transform:translateY(-2px);box-shadow:0 9px 20px #0003}.button.approve{background:linear-gradient(135deg,#07945a,#057444)}
         .teamList,.planPreview,.coming{margin-left:34px;margin-right:34px}.teamList+.coming{margin-top:0}.teamCard{background:linear-gradient(145deg,#f8fbff,#f1f6fb)}
+        .notificationPreview{margin-top:26px;overflow:hidden;border:1px solid #bfd2e6;border-radius:18px;background:#fff;box-shadow:0 16px 38px #061a3510}
+        .notificationPreviewHead{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:22px 24px;border-bottom:1px solid #dce6f0;background:linear-gradient(135deg,#eef5ff,#f8fbff)}
+        .notificationPreviewHead h4{margin:7px 0 0;font-size:22px}.notificationPreviewBody{padding:24px}.notificationRouting{display:grid;grid-template-columns:1fr 1fr;gap:14px}.notificationRouting p,.notificationSubject{display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;margin:0;padding:14px 16px;border:1px solid #dce6f0;border-radius:12px;background:#f8fafc}.notificationSubject{margin-top:14px}.notificationRouting strong,.notificationSubject strong{color:#48617d;text-transform:uppercase;font-size:11px;letter-spacing:.08em}.notificationRouting span,.notificationSubject span{overflow-wrap:anywhere;color:#102944;font-weight:750}.notificationCopy{margin:16px 0 0;padding:22px;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #dce6f0;border-radius:14px;background:#fbfcfe;color:#17324f;font:inherit;font-size:15px;line-height:1.7}.emailAction{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.sendNote{margin:14px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
         @media(max-width:1050px){.auditHeader{grid-template-columns:1fr}.sideRail{grid-template-columns:repeat(2,1fr)}.sideRail>.railMetric{min-height:82px}.railBlock{border-top:1px solid #e2e9f1}.gateNav{grid-template-columns:repeat(5,200px);overflow-x:auto}.teamCard{grid-template-columns:1fr 1fr}.grid3,.readinessGrid{grid-template-columns:repeat(2,1fr)}.record{grid-template-columns:1fr auto}}
-        @media(max-width:700px){.workspacePage{padding:14px 10px 60px}.workspaceLogo{width:185px;height:auto}.auditHeader{padding:25px 21px}.auditHeader h1{font-size:34px}.sideRail{grid-template-columns:1fr 1fr}.sideRail>.railMetric,.railBlock{padding:16px}.mainPanel>div.panelKicker,.mainPanel>h2,.mainPanel>p.panelLead,.teamList,.planPreview,.coming{margin-left:18px;margin-right:18px}.mainPanel>div.panelKicker{padding-top:24px}.mainPanel form{padding:0 18px 24px}.mainPanel form>.grid2,.section{padding:14px}.auditStandard,.grid2,.grid3,.planPreview,.teamCard,.readinessGrid{grid-template-columns:1fr}.planStack,.planGate{margin-left:18px;margin-right:18px}.record{grid-template-columns:1fr}.actionBar{position:static;align-items:stretch;flex-direction:column}.actionBar:before{margin:0 0 4px}.button{width:100%}}
+        @media(max-width:700px){.workspacePage{padding:14px 10px 60px}.workspaceLogo{width:185px;height:auto}.auditHeader{padding:25px 21px}.auditHeader h1{font-size:34px}.sideRail{grid-template-columns:1fr 1fr}.sideRail>.railMetric,.railBlock{padding:16px}.mainPanel>div.panelKicker,.mainPanel>h2,.mainPanel>p.panelLead,.teamList,.planPreview,.coming{margin-left:18px;margin-right:18px}.mainPanel>div.panelKicker{padding-top:24px}.mainPanel form{padding:0 18px 24px}.mainPanel form>.grid2,.section{padding:14px}.auditStandard,.grid2,.grid3,.planPreview,.teamCard,.readinessGrid,.notificationRouting{grid-template-columns:1fr}.planStack,.planGate{margin-left:18px;margin-right:18px}.record{grid-template-columns:1fr}.actionBar{position:static;align-items:stretch;flex-direction:column}.actionBar:before{margin:0 0 4px}.button{width:100%}.notificationPreviewHead,.notificationPreviewBody{padding:18px}.notificationRouting p,.notificationSubject{grid-template-columns:1fr}}
       `}</style>
 
       <div className="workspaceShell">
@@ -232,7 +291,86 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                   <form action={addAuditScheduleItem}><input type="hidden" name="audit_id" value={id} /><datalist id="approved-processes">{inheritedProcesses.map((process) => <option value={process} key={process} />)}</datalist><datalist id="approved-sites">{inheritedSites.map((site) => <option value={site} key={site} />)}</datalist><div className="grid3"><label className="field"><span>Activity type *</span><select name="activity_type" required defaultValue="process_audit">{Object.entries(ACTIVITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span>Activity title *</span><input name="title" required defaultValue={defaultProcess ? `${defaultProcess} audit` : ""} /></label><label className="field"><span>Process / scope *</span><input name="process_or_scope" list="approved-processes" required defaultValue={defaultProcess} /><small>Select an approved process or refine the activity scope.</small></label><label className="field"><span>Starts *</span><input name="starts_at" type="datetime-local" required defaultValue={localDateTime(audit.planned_start_at)} /></label><label className="field"><span>Ends *</span><input name="ends_at" type="datetime-local" required defaultValue={localDateTime(audit.planned_end_at)} /></label><label className="field"><span>Lead auditor</span><select name="lead_team_member_id" defaultValue={defaultLead?.id ?? ""}><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label><label className="field"><span>Location or meeting link</span><input name="location_or_link" list="approved-sites" defaultValue={defaultSite} /></label><label className="field"><span>Expected attendees</span><input name="expected_attendees" defaultValue={audit.auditee_contact_name ?? ""} /></label><label className="field"><span>Notes / evidence focus</span><textarea name="notes" defaultValue={audit.known_risks_changes ?? ""} /></label></div><div className="actionBar"><button className="button primary">Add Agenda Activity</button></div></form>
                 </div></section>
 
-                <section className="planModule" id="notification-draft"><div className="moduleHead"><div><h3>02 · Controlled auditee notification</h3><p>Prepare the audit notice, coordination instructions and requested information.</p></div><span className="countBadge">{notification ? "Draft saved" : "Not prepared"}</span></div><div className="moduleBody">{query?.saved === "notification" ? <div className="notice success">✓ Notification draft saved. The controlled draft remains editable below and is ready for the formal plan review.</div> : null}<form action={saveAuditNotification}><input type="hidden" name="audit_id" value={id} /><div className="grid2"><label className="field"><span>Recipients *</span><input name="recipients" type="text" required defaultValue={notification?.recipients?.join(", ") ?? audit.auditee_contact_email ?? ""} placeholder="Comma-separated email addresses" /></label><label className="field"><span>CC recipients</span><input name="cc_recipients" type="text" defaultValue={notification?.cc_recipients?.join(", ") ?? ""} /></label><label className="field"><span>Subject *</span><input name="subject" required defaultValue={notification?.subject ?? `${audit.audit_reference} — Internal audit notification`} /></label><label className="field"><span>Requested information *</span><textarea name="requested_information" required defaultValue={notification?.body ?? "Please provide current procedures, applicable records, relevant performance data, prior findings and evidence of completed actions before the opening meeting."} /></label></div><div className="actionBar"><button className="button secondary">Save Notification Draft</button></div></form></div></section>
+                <section className="planModule" id="notification-draft">
+                  <div className="moduleHead">
+                    <div>
+                      <h3>02 · Controlled audit notification</h3>
+                      <p>Prepare, review and issue the audit notice to the auditee and assigned audit team.</p>
+                    </div>
+                    <span className="countBadge">{notification ? "Draft ready" : "Not prepared"}</span>
+                  </div>
+                  <div className="moduleBody">
+                    {query?.saved === "notification" ? (
+                      <div className="notice success">✓ Notification draft saved and refreshed below.</div>
+                    ) : null}
+
+                    <form action={saveAuditNotification}>
+                      <input type="hidden" name="audit_id" value={id} />
+                      <div className="grid2">
+                        <label className="field">
+                          <span>Auditee recipients *</span>
+                          <input
+                            name="recipients"
+                            type="text"
+                            required
+                            defaultValue={notificationRecipients.join(", ")}
+                            placeholder="Comma-separated email addresses"
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Audit team / CC recipients</span>
+                          <input
+                            name="cc_recipients"
+                            type="text"
+                            defaultValue={notificationCcRecipients.join(", ")}
+                            placeholder="Assigned team emails are included automatically"
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Subject *</span>
+                          <input name="subject" required defaultValue={notificationSubject} />
+                        </label>
+                        <label className="field">
+                          <span>Requested information *</span>
+                          <textarea name="requested_information" required defaultValue={notificationRequest} />
+                        </label>
+                      </div>
+                      <div className="actionBar">
+                        <button className="button secondary">Save & Refresh Notification Draft</button>
+                      </div>
+                    </form>
+
+                    {notification ? (
+                      <article className="notificationPreview">
+                        <div className="notificationPreviewHead">
+                          <div>
+                            <span className="panelKicker">Controlled email preview</span>
+                            <h4>Audit notification ready for human review</h4>
+                          </div>
+                          <span className="countBadge">Draft</span>
+                        </div>
+                        <div className="notificationPreviewBody">
+                          <div className="notificationRouting">
+                            <p><strong>To</strong><span>{notificationRecipients.join(", ") || "No auditee recipient recorded"}</span></p>
+                            <p><strong>CC</strong><span>{notificationCcRecipients.join(", ") || "No audit-team recipient recorded"}</span></p>
+                          </div>
+                          <p className="notificationSubject"><strong>Subject</strong><span>{notificationSubject}</span></p>
+                          <pre className="notificationCopy">{notificationEmailBody}</pre>
+                          <div className="actionBar">
+                            <a className="button primary emailAction" href={notificationMailtoHref}>
+                              Review & Send in Outlook / Email App →
+                            </a>
+                          </div>
+                          <p className="sendNote">
+                            Human-controlled issue: the button opens the complete draft in the configured email application. Review recipients and content before sending. Delivery is not marked automatically.
+                          </p>
+                        </div>
+                      </article>
+                    ) : (
+                      <div className="emptyState">Save the notification once to generate the controlled email preview and send action.</div>
+                    )}
+                  </div>
+                </section>
               </div>
               <section className="planGate"><h3>Formal plan readiness decision</h3><p>Human approval confirms that the planned audit is feasible, risk-based, adequately resourced and communicated. Approval locks Gate 03 and unlocks Fieldwork.</p><div className="readinessGrid"><div className={`readinessItem ${schedule.length >= 2 ? "ready" : "missing"}`}>{schedule.length >= 2 ? "✓" : "!"} Agenda coverage</div><div className={`readinessItem ${notification ? "ready" : "missing"}`}>{notification ? "✓" : "!"} Notification draft</div></div><form action={approveAuditPlan}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="plan_confirmation" required /><span><strong>Human plan approval</strong><br />I confirm that timing, competence, resources, notification and information requirements are sufficient for controlled fieldwork.</span></label><div className="actionBar"><button className="button approve">Human Approve Plan & Unlock Fieldwork →</button></div></form></section>
             </> : null}
