@@ -162,3 +162,162 @@ export async function approveAuditTeam(formData) {
 
   returnTo(auditId, "plan");
 }
+
+function integer(value) {
+  if (value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function emails(value) {
+  return (clean(value) ?? "")
+    .split(/[;,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export async function addSamplingPlan(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  if (!auditId) throw new Error("Missing audit ID.");
+  const { supabase, user, audit } = await context(auditId);
+  if (!audit.scope_approved || audit.current_gate === "team") {
+    throw new Error("Approve the scope and audit team before planning samples.");
+  }
+
+  const sampleReference = clean(formData.get("sample_reference"));
+  const populationDescription = clean(formData.get("population_description"));
+  const selectionMethod = clean(formData.get("selection_method"));
+  const sampleSize = integer(formData.get("sample_size"));
+  const populationSize = integer(formData.get("population_size"));
+  const rationale = clean(formData.get("rationale"));
+  if (!sampleReference || !populationDescription || !selectionMethod || !sampleSize || !rationale) {
+    throw new Error("Sample reference, population, method, sample size and rationale are required.");
+  }
+  if (populationSize !== null && populationSize < sampleSize) {
+    throw new Error("Sample size cannot exceed the stated population.");
+  }
+
+  const { error } = await supabase.from("internal_audit_samples").insert({
+    owner_id: user.id,
+    audit_id: auditId,
+    sample_reference: sampleReference,
+    population_description: populationDescription,
+    population_size: populationSize,
+    sample_size: sampleSize,
+    sampling_period_start: clean(formData.get("sampling_period_start")),
+    sampling_period_end: clean(formData.get("sampling_period_end")),
+    selection_method: selectionMethod,
+    shifts_locations_covered: clean(formData.get("shifts_locations_covered")),
+    limitations: clean(formData.get("limitations")),
+    rationale,
+  });
+  if (error) throw new Error(error.message);
+  returnTo(auditId, "plan");
+}
+
+export async function addAuditScheduleItem(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  if (!auditId) throw new Error("Missing audit ID.");
+  const { supabase, user, audit } = await context(auditId);
+  if (!audit.scope_approved || audit.current_gate === "team") {
+    throw new Error("Approve the scope and audit team before building the agenda.");
+  }
+
+  const startsAt = clean(formData.get("starts_at"));
+  const endsAt = clean(formData.get("ends_at"));
+  const activityType = clean(formData.get("activity_type"));
+  const title = clean(formData.get("title"));
+  const processOrScope = clean(formData.get("process_or_scope"));
+  const allowedTypes = ["opening_meeting", "interview", "process_audit", "site_walk", "document_review", "sample_review", "team_review", "break", "closing_meeting", "other"];
+  if (!startsAt || !endsAt || !activityType || !title || !processOrScope || !allowedTypes.includes(activityType)) {
+    throw new Error("A valid activity, title, scope, start and end are required.");
+  }
+  if (new Date(endsAt) <= new Date(startsAt)) throw new Error("Agenda activity end must be after its start.");
+
+  const memberId = clean(formData.get("lead_team_member_id"));
+  if (memberId) {
+    const { data: member } = await supabase.from("internal_audit_team_members").select("id")
+      .eq("id", memberId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+    if (!member) throw new Error("The selected lead auditor is not assigned to this audit.");
+  }
+
+  const { error } = await supabase.from("internal_audit_schedule_items").insert({
+    owner_id: user.id,
+    audit_id: auditId,
+    starts_at: new Date(startsAt).toISOString(),
+    ends_at: new Date(endsAt).toISOString(),
+    activity_type: activityType,
+    title,
+    location_or_link: clean(formData.get("location_or_link")),
+    process_or_scope: processOrScope,
+    lead_team_member_id: memberId,
+    expected_attendees: clean(formData.get("expected_attendees")),
+    notes: clean(formData.get("notes")),
+  });
+  if (error) throw new Error(error.message);
+  returnTo(auditId, "plan");
+}
+
+export async function saveAuditNotification(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  if (!auditId) throw new Error("Missing audit ID.");
+  const { supabase, user, audit } = await context(auditId);
+  if (!audit.scope_approved || audit.current_gate === "team") {
+    throw new Error("Approve the scope and audit team before preparing notification.");
+  }
+
+  const recipients = emails(formData.get("recipients"));
+  const ccRecipients = emails(formData.get("cc_recipients"));
+  const subject = clean(formData.get("subject"));
+  const body = clean(formData.get("requested_information"));
+  if (!recipients.length || !subject || !body) throw new Error("Recipient, subject and requested information are required.");
+
+  const { data: existing, error: existingError } = await supabase.from("internal_audit_notifications").select("id")
+    .eq("audit_id", auditId).eq("owner_id", user.id).eq("notification_type", "audit_notification")
+    .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  const payload = { recipients, cc_recipients: ccRecipients, subject, body, status: "draft", updated_at: new Date().toISOString() };
+  const result = existing
+    ? await supabase.from("internal_audit_notifications").update(payload).eq("id", existing.id).eq("owner_id", user.id)
+    : await supabase.from("internal_audit_notifications").insert({ owner_id: user.id, audit_id: auditId, notification_type: "audit_notification", ...payload });
+  if (result.error) throw new Error(result.error.message);
+  returnTo(auditId, "plan");
+}
+
+export async function approveAuditPlan(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  if (!auditId) throw new Error("Missing audit ID.");
+  if (formData.get("plan_confirmation") !== "on") throw new Error("Human plan confirmation is required.");
+  const { supabase, user, audit } = await context(auditId);
+  if (!audit.scope_approved || audit.current_gate === "team") throw new Error("Scope and team approval are required first.");
+
+  const [samples, schedule, notification] = await Promise.all([
+    supabase.from("internal_audit_samples").select("id", { count: "exact", head: true }).eq("audit_id", auditId).eq("owner_id", user.id),
+    supabase.from("internal_audit_schedule_items").select("id", { count: "exact", head: true }).eq("audit_id", auditId).eq("owner_id", user.id),
+    supabase.from("internal_audit_notifications").select("id", { count: "exact", head: true }).eq("audit_id", auditId).eq("owner_id", user.id).eq("notification_type", "audit_notification"),
+  ]);
+  if (samples.error || schedule.error || notification.error) throw new Error(samples.error?.message || schedule.error?.message || notification.error?.message);
+  if ((samples.count ?? 0) < 1) throw new Error("Add at least one risk-based sampling instruction before approval.");
+  if ((schedule.count ?? 0) < 2) throw new Error("Add at least two agenda activities before approval.");
+  if ((notification.count ?? 0) < 1) throw new Error("Prepare the auditee notification before approval.");
+
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("internal_audits").update({
+    plan_approved: true,
+    current_gate: "fieldwork",
+    status: "scheduled",
+    updated_at: now,
+  }).eq("id", auditId).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  await supabase.from("internal_audit_notifications").update({ status: "approved", updated_at: now })
+    .eq("audit_id", auditId).eq("owner_id", user.id).eq("notification_type", "audit_notification");
+  await supabase.from("internal_audit_events").insert({
+    owner_id: user.id,
+    audit_id: auditId,
+    event_type: "plan_approved",
+    summary: "Risk-based audit plan approved; fieldwork unlocked",
+    event_data: { sample_count: samples.count, schedule_item_count: schedule.count },
+    created_by: user.id,
+  });
+  returnTo(auditId, "fieldwork");
+}
