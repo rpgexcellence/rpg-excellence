@@ -1,5 +1,7 @@
 "use server";
 
+// RPG INTERNAL AUDIT PLAN GATE — NO SAMPLING APPROVAL DEPENDENCY — 2026-08-24
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -18,7 +20,7 @@ async function context(caseId) {
 
   const { data: audit, error: auditError } = await supabase
     .from("internal_audits")
-    .select("id, current_gate, scope_approved, plan_approved")
+    .select("id, current_gate, scope_approved, plan_approved, planned_start_at, planned_end_at")
     .eq("id", caseId)
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -163,56 +165,11 @@ export async function approveAuditTeam(formData) {
   returnTo(auditId, "plan");
 }
 
-function integer(value) {
-  if (value === null || value === "") return null;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) ? parsed : null;
-}
-
 function emails(value) {
   return (clean(value) ?? "")
     .split(/[;,\n]/)
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-export async function addSamplingPlan(formData) {
-  const auditId = clean(formData.get("audit_id"));
-  if (!auditId) throw new Error("Missing audit ID.");
-  const { supabase, user, audit } = await context(auditId);
-  if (!audit.scope_approved || audit.current_gate === "team") {
-    throw new Error("Approve the scope and audit team before planning samples.");
-  }
-
-  const sampleReference = clean(formData.get("sample_reference"));
-  const populationDescription = clean(formData.get("population_description"));
-  const selectionMethod = clean(formData.get("selection_method"));
-  const sampleSize = integer(formData.get("sample_size"));
-  const populationSize = integer(formData.get("population_size"));
-  const rationale = clean(formData.get("rationale"));
-  if (!sampleReference || !populationDescription || !selectionMethod || !sampleSize || !rationale) {
-    throw new Error("Sample reference, population, method, sample size and rationale are required.");
-  }
-  if (populationSize !== null && populationSize < sampleSize) {
-    throw new Error("Sample size cannot exceed the stated population.");
-  }
-
-  const { error } = await supabase.from("internal_audit_samples").insert({
-    owner_id: user.id,
-    audit_id: auditId,
-    sample_reference: sampleReference,
-    population_description: populationDescription,
-    population_size: populationSize,
-    sample_size: sampleSize,
-    sampling_period_start: clean(formData.get("sampling_period_start")),
-    sampling_period_end: clean(formData.get("sampling_period_end")),
-    selection_method: selectionMethod,
-    shifts_locations_covered: clean(formData.get("shifts_locations_covered")),
-    limitations: clean(formData.get("limitations")),
-    rationale,
-  });
-  if (error) throw new Error(error.message);
-  returnTo(auditId, "plan");
 }
 
 export async function addAuditScheduleItem(formData) {
@@ -232,7 +189,15 @@ export async function addAuditScheduleItem(formData) {
   if (!startsAt || !endsAt || !activityType || !title || !processOrScope || !allowedTypes.includes(activityType)) {
     throw new Error("A valid activity, title, scope, start and end are required.");
   }
-  if (new Date(endsAt) <= new Date(startsAt)) throw new Error("Agenda activity end must be after its start.");
+  const startDate = new Date(startsAt);
+  const endDate = new Date(endsAt);
+  if (endDate <= startDate) throw new Error("Agenda activity end must be after its start.");
+  if (
+    (audit.planned_start_at && startDate < new Date(audit.planned_start_at)) ||
+    (audit.planned_end_at && endDate > new Date(audit.planned_end_at))
+  ) {
+    throw new Error("Agenda activity must remain within the approved audit window.");
+  }
 
   const memberId = clean(formData.get("lead_team_member_id"));
   if (memberId) {
@@ -244,8 +209,8 @@ export async function addAuditScheduleItem(formData) {
   const { error } = await supabase.from("internal_audit_schedule_items").insert({
     owner_id: user.id,
     audit_id: auditId,
-    starts_at: new Date(startsAt).toISOString(),
-    ends_at: new Date(endsAt).toISOString(),
+    starts_at: startDate.toISOString(),
+    ends_at: endDate.toISOString(),
     activity_type: activityType,
     title,
     location_or_link: clean(formData.get("location_or_link")),
@@ -291,13 +256,11 @@ export async function approveAuditPlan(formData) {
   const { supabase, user, audit } = await context(auditId);
   if (!audit.scope_approved || audit.current_gate === "team") throw new Error("Scope and team approval are required first.");
 
-  const [samples, schedule, notification] = await Promise.all([
-    supabase.from("internal_audit_samples").select("id", { count: "exact", head: true }).eq("audit_id", auditId).eq("owner_id", user.id),
+  const [schedule, notification] = await Promise.all([
     supabase.from("internal_audit_schedule_items").select("id", { count: "exact", head: true }).eq("audit_id", auditId).eq("owner_id", user.id),
     supabase.from("internal_audit_notifications").select("id", { count: "exact", head: true }).eq("audit_id", auditId).eq("owner_id", user.id).eq("notification_type", "audit_notification"),
   ]);
-  if (samples.error || schedule.error || notification.error) throw new Error(samples.error?.message || schedule.error?.message || notification.error?.message);
-  if ((samples.count ?? 0) < 1) throw new Error("Add at least one risk-based sampling instruction before approval.");
+  if (schedule.error || notification.error) throw new Error(schedule.error?.message || notification.error?.message);
   if ((schedule.count ?? 0) < 2) throw new Error("Add at least two agenda activities before approval.");
   if ((notification.count ?? 0) < 1) throw new Error("Prepare the auditee notification before approval.");
 
@@ -315,8 +278,8 @@ export async function approveAuditPlan(formData) {
     owner_id: user.id,
     audit_id: auditId,
     event_type: "plan_approved",
-    summary: "Risk-based audit plan approved; fieldwork unlocked",
-    event_data: { sample_count: samples.count, schedule_item_count: schedule.count },
+    summary: "Audit plan approved; fieldwork unlocked",
+    event_data: { schedule_item_count: schedule.count },
     created_by: user.id,
   });
   returnTo(auditId, "fieldwork");
