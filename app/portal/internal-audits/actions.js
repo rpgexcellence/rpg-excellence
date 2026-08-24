@@ -210,6 +210,6 @@ export async function createInternalAudit(formData) {
 
   revalidatePath("/portal/internal-audits");
   redirect(
-    `/portal/internal-audits?created=${audit.id}`
+    `/portal/internal-audits/${audit.id}?created=1`
   );
 }
