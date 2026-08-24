@@ -10,6 +10,10 @@ export default function SubscribeButton({
     useState(false);
 
   async function handleSubscribe() {
+    if (loading) {
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -28,27 +32,92 @@ export default function SubscribeButton({
           }
         );
 
-      const data =
-        await response.json();
+      let data = null;
 
-      if (
-        !response.ok ||
-        !data?.url
-      ) {
+      try {
+        data =
+          await response.json();
+      } catch {
+        data = null;
+      }
+
+      // ---------------------------------------------
+      // CUSTOMER MUST SIGN IN BEFORE CHECKOUT
+      // ---------------------------------------------
+
+      if (response.status === 401) {
+        const currentPath =
+          `${window.location.pathname}${window.location.search}`;
+
+        const loginUrl =
+          new URL(
+            "/portal/login",
+            window.location.origin
+          );
+
+        loginUrl.searchParams.set(
+          "next",
+          currentPath
+        );
+
+        loginUrl.searchParams.set(
+          "plan",
+          plan
+        );
+
+        loginUrl.searchParams.set(
+          "subscription",
+          "required"
+        );
+
+        window.location.assign(
+          loginUrl.toString()
+        );
+
+        return;
+      }
+
+      // ---------------------------------------------
+      // OTHER CHECKOUT ERRORS
+      // ---------------------------------------------
+
+      if (!response.ok) {
         throw new Error(
           data?.error ||
-            "Unable to start checkout"
+            "Unable to start checkout."
         );
       }
 
-      window.location.href =
-        data.url;
-    } catch (error) {
-      console.error(error);
+      if (
+        typeof data?.url !==
+          "string" ||
+        data.url.trim() === ""
+      ) {
+        throw new Error(
+          "Stripe did not return a checkout URL."
+        );
+      }
 
-      alert(
-        "Unable to start checkout. Please try again."
+      // ---------------------------------------------
+      // OPEN STRIPE CHECKOUT
+      // ---------------------------------------------
+
+      window.location.assign(
+        data.url
       );
+    } catch (error) {
+      console.error(
+        "Checkout request failed:",
+        error
+      );
+
+      const message =
+        error instanceof Error &&
+        error.message
+          ? error.message
+          : "Unable to start checkout. Please try again.";
+
+      alert(message);
 
       setLoading(false);
     }
@@ -59,6 +128,7 @@ export default function SubscribeButton({
       type="button"
       onClick={handleSubscribe}
       disabled={loading}
+      aria-busy={loading}
       className="button"
       style={{
         cursor: loading
