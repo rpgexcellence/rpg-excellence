@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "../../../lib/supabase/server";
 import { createInternalAudit } from "./actions";
+import ProcessScopeSelector from "./ProcessScopeSelector";
 
 const STATUS_LABELS = {
   draft: "Draft", scope_review: "Scope review", team_assignment: "Team assignment",
@@ -151,13 +152,12 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
                 <div className="iaGrid3" style={{marginTop:"17px"}}>
                   <label className="iaField"><span>Sites and locations</span><input name="sites" placeholder="e.g. Cambridge, Port Talbot" /></label>
                   <label className="iaField"><span>Functions and departments</span><input name="departments" placeholder="e.g. Operations, QHSE, Procurement" /></label>
-                  <label className="iaField"><span>Processes in scope</span><input name="processes" placeholder="e.g. Design, delivery, calibration" /></label>
                   <label className="iaField"><span>Primary auditee contact</span><input name="auditee_contact_name" placeholder="Full name" /></label>
                   <label className="iaField"><span>Auditee email</span><input name="auditee_contact_email" type="email" placeholder="name@example.com" /></label>
                 </div>
 
                 <div className="iaDivider" />
-                <fieldset className="iaStandards"><legend><div className="iaSectionTitle"><b>3</b>Audit standards and criteria</div></legend><div className="iaStandardGrid">{standards.map((s) => <label className="iaStandard" key={s.id}><input type="checkbox" name="standard_ids" value={s.id} /><span><strong>{s.display_name}</strong><small>{s.discipline}</small></span></label>)}</div></fieldset>
+                <ProcessScopeSelector standards={standards} />
                 <div className="iaActionBar"><p><strong>Next:</strong> confirm detailed clauses, appoint an independent and competent audit team, then approve the risk-based audit plan.</p><button className="iaSubmit" type="submit">Create Audit & Open Scope Review →</button></div>
               </form>
             </div>
