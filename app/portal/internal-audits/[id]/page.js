@@ -3,7 +3,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "../../../../lib/supabase/server";
-import { addAuditTeamMember, approveAuditTeam, saveAuditScope } from "./actions";
+import {
+  addAuditScheduleItem,
+  addAuditTeamMember,
+  addSamplingPlan,
+  approveAuditPlan,
+  approveAuditTeam,
+  saveAuditNotification,
+  saveAuditScope,
+} from "./actions";
 
 const GATES = [
   ["scope", "01", "Scope"],
@@ -22,6 +30,19 @@ const ROLE_LABELS = {
   independent_reviewer: "Independent reviewer",
 };
 
+const ACTIVITY_LABELS = {
+  opening_meeting: "Opening meeting",
+  interview: "Interview",
+  process_audit: "Process audit",
+  site_walk: "Site walk",
+  document_review: "Document review",
+  sample_review: "Sample review",
+  team_review: "Audit team review",
+  break: "Break",
+  closing_meeting: "Closing meeting",
+  other: "Other activity",
+};
+
 function displayDate(value) {
   if (!value) return "Not scheduled";
   return new Intl.DateTimeFormat("en-GB", {
@@ -36,7 +57,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/portal/login?next=/portal/internal-audits/${id}`);
 
-  const [auditResult, teamResult] = await Promise.all([
+  const [auditResult, teamResult, scheduleResult, samplesResult, notificationsResult] = await Promise.all([
     supabase.from("internal_audits").select(`
       *,
       internal_audit_selected_standards(
@@ -46,14 +67,27 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     `).eq("id", id).eq("owner_id", user.id).maybeSingle(),
     supabase.from("internal_audit_team_members").select("*")
       .eq("audit_id", id).eq("owner_id", user.id).order("created_at"),
+    supabase.from("internal_audit_schedule_items").select("*")
+      .eq("audit_id", id).eq("owner_id", user.id).order("starts_at"),
+    supabase.from("internal_audit_samples").select("*")
+      .eq("audit_id", id).eq("owner_id", user.id).order("created_at"),
+    supabase.from("internal_audit_notifications").select("*")
+      .eq("audit_id", id).eq("owner_id", user.id).eq("notification_type", "audit_notification")
+      .order("updated_at", { ascending: false }).limit(1),
   ]);
 
   if (auditResult.error) throw new Error(auditResult.error.message);
   if (!auditResult.data) notFound();
   if (teamResult.error) throw new Error(teamResult.error.message);
+  if (scheduleResult.error) throw new Error(scheduleResult.error.message);
+  if (samplesResult.error) throw new Error(samplesResult.error.message);
+  if (notificationsResult.error) throw new Error(notificationsResult.error.message);
 
   const audit = auditResult.data;
   const team = teamResult.data ?? [];
+  const schedule = scheduleResult.data ?? [];
+  const samples = samplesResult.data ?? [];
+  const notification = notificationsResult.data?.[0] ?? null;
   const { data: organization, error: organizationError } = await supabase
     .from("organizations")
     .select("name")
@@ -67,12 +101,14 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
 
   const scopeComplete = Boolean(audit.scope_approved);
   const teamComplete = ["plan", "notification", "fieldwork", "findings", "closing", "report", "follow_up", "closure"].includes(audit.current_gate);
+  const planComplete = Boolean(audit.plan_approved) || ["notification", "fieldwork", "findings", "closing", "report", "follow_up", "closure"].includes(audit.current_gate);
   const requested = typeof query?.gate === "string" ? query.gate : audit.current_gate;
   const gate = requested === "team" && scopeComplete ? "team"
     : requested === "plan" && teamComplete ? "plan"
+      : requested === "fieldwork" && planComplete ? "fieldwork"
       : requested === "scope" ? "scope"
         : audit.current_gate === "team" && scopeComplete ? "team"
-          : teamComplete ? "plan" : "scope";
+          : planComplete ? "fieldwork" : teamComplete ? "plan" : "scope";
 
   return (
     <main className="workspacePage">
@@ -84,7 +120,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         .notice{margin:18px 0;padding:14px 18px;border:1px solid #9bdab9;border-radius:13px;background:#e9f8ef;color:#075f39;font-weight:850}.gateNav{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px 0}.gate{display:flex;gap:11px;align-items:center;min-height:70px;padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--navy);text-decoration:none}.gate b{display:grid;width:32px;height:32px;place-items:center;border-radius:50%;background:#eaf1ff;color:var(--blue);font-size:11px}.gate span strong,.gate span small{display:block}.gate span small{margin-top:3px;color:var(--muted);font-size:11px}.gate.active{border-color:var(--blue);background:#1761e8;color:#fff;box-shadow:0 12px 28px #1761e82c}.gate.active b{background:#fff;color:var(--blue)}.gate.active small{color:#dbe8ff}.gate.locked{pointer-events:none;opacity:.48;background:#eef2f7}
         .workspaceGrid{display:grid;grid-template-columns:270px minmax(0,1fr);overflow:hidden;border:1px solid var(--line);border-radius:24px;background:#fff;box-shadow:0 18px 50px #061a3510}.sideRail{padding:27px 22px;border-right:1px solid #e4ebf3;background:#f7f9fc}.railLabel{color:#718298;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.railMetric{margin:8px 0 24px;font-size:34px;font-weight:950}.railBlock{margin-top:18px;padding-top:18px;border-top:1px solid #dfe7f0}.railBlock strong,.railBlock span{display:block}.railBlock span{margin-top:5px;color:var(--muted);font-size:12px;line-height:1.5}.mainPanel{padding:34px}.panelKicker{color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.mainPanel h2{margin:7px 0 6px;font-size:31px}.panelLead{margin:0 0 28px;color:var(--muted);line-height:1.55}
         .section{margin-top:28px;padding-top:27px;border-top:1px solid #e3eaf2}.section h3{margin:0 0 16px;font-size:18px}.grid2,.grid3{display:grid;gap:16px}.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}.field{display:flex;flex-direction:column;gap:7px}.field span{color:#2d4562;font-size:13px;font-weight:850}.field input,.field select,.field textarea{width:100%;min-height:49px;padding:12px 13px;border:1px solid #cbd8e6;border-radius:10px;background:#fff;color:#102944;font:inherit;font-size:14px}.field textarea{min-height:112px;resize:vertical;line-height:1.5}.field input:focus,.field select:focus,.field textarea:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 4px #1761e817}.check{display:flex;gap:10px;align-items:flex-start;padding:13px;border:1px solid #d5e0ec;border-radius:11px;background:#f8fafd;color:#314a67;font-size:13px;line-height:1.4}.check input{width:18px;height:18px;accent-color:var(--blue)}
-        .actionBar{display:flex;justify-content:flex-end;gap:12px;margin-top:25px;padding:17px;border-radius:14px;background:#071d39}.button{min-height:47px;padding:0 19px;border:0;border-radius:10px;font:inherit;font-weight:900;cursor:pointer}.button.secondary{background:#eaf1ff;color:#164fba}.button.primary{background:linear-gradient(135deg,#1761e8,#0d4ec8);color:#fff}.button.approve{background:#07824d;color:#fff}.teamList{display:grid;gap:11px;margin-bottom:22px}.teamCard{display:grid;grid-template-columns:minmax(0,1fr) 190px 190px;gap:15px;align-items:center;padding:16px;border:1px solid #d8e3ee;border-radius:13px;background:#f8fafd}.teamCard strong,.teamCard small{display:block}.teamCard small{margin-top:3px;color:var(--muted)}.confirmation{color:var(--green);font-size:12px;font-weight:850}.warning{color:#9a5700;font-size:12px;font-weight:850}.planPreview{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.previewCard{padding:20px;border:1px solid #d7e2ed;border-radius:14px;background:#f8fafd}.previewCard b,.previewCard span{display:block}.previewCard b{color:var(--blue)}.previewCard span{margin-top:8px;color:var(--muted);line-height:1.5}.coming{margin-top:24px;padding:20px;border:1px solid #efd18c;border-radius:14px;background:#fff8e7;color:#6a4c08;line-height:1.55}
+        .actionBar{display:flex;justify-content:flex-end;gap:12px;margin-top:25px;padding:17px;border-radius:14px;background:#071d39}.button{min-height:47px;padding:0 19px;border:0;border-radius:10px;font:inherit;font-weight:900;cursor:pointer}.button.secondary{background:#eaf1ff;color:#164fba}.button.primary{background:linear-gradient(135deg,#1761e8,#0d4ec8);color:#fff}.button.approve{background:#07824d;color:#fff}.teamList{display:grid;gap:11px;margin-bottom:22px}.teamCard{display:grid;grid-template-columns:minmax(0,1fr) 190px 190px;gap:15px;align-items:center;padding:16px;border:1px solid #d8e3ee;border-radius:13px;background:#f8fafd}.teamCard strong,.teamCard small{display:block}.teamCard small{margin-top:3px;color:var(--muted)}.confirmation{color:var(--green);font-size:12px;font-weight:850}.warning{color:#9a5700;font-size:12px;font-weight:850}.planPreview{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.previewCard{padding:20px;border:1px solid #d7e2ed;border-radius:14px;background:#f8fafd}.previewCard b,.previewCard span{display:block}.previewCard b{color:var(--blue)}.previewCard span{margin-top:8px;color:var(--muted);line-height:1.5}.coming{margin-top:24px;padding:20px;border:1px solid #efd18c;border-radius:14px;background:#fff8e7;color:#6a4c08;line-height:1.55}.planStack{display:grid;gap:18px;margin:0 34px 34px}.planModule{overflow:hidden;border:1px solid #d9e4ef;border-radius:18px;background:#fff;box-shadow:0 12px 30px #061a3509}.moduleHead{display:flex;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid #e1e8f0;background:linear-gradient(135deg,#f8fbff,#eef5fc)}.moduleHead h3{margin:0;font-size:21px}.moduleHead p{margin:5px 0 0;color:var(--muted);line-height:1.5}.countBadge{align-self:flex-start;padding:7px 10px;border-radius:999px;background:#e8f0ff;color:var(--blue);font-size:12px;font-weight:900;white-space:nowrap}.moduleBody{padding:22px}.recordList{display:grid;gap:10px;margin-bottom:18px}.record{display:grid;grid-template-columns:170px minmax(0,1fr) auto;gap:16px;align-items:center;padding:15px;border:1px solid #dce5ee;border-radius:13px;background:#f8fafc}.record strong,.record small{display:block}.record small{margin-top:4px;color:var(--muted);line-height:1.45}.recordTag{padding:6px 9px;border-radius:999px;background:#eaf1ff;color:#1652bf;font-size:11px;font-weight:900}.emptyState{margin-bottom:18px;padding:18px;border:1px dashed #b8c9dc;border-radius:13px;color:var(--muted);text-align:center}.planGate{margin:0 34px 34px;padding:24px;border:1px solid #9ed8bd;border-radius:18px;background:linear-gradient(135deg,#effaf4,#f8fcfa)}.planGate h3{margin:0 0 8px;font-size:22px}.readinessGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.readinessItem{padding:13px;border-radius:11px;background:#fff;color:#31506b;font-weight:800}.readinessItem.ready{color:#067647}.readinessItem.missing{color:#9a5700}
         /* Premium audit operating workspace */
         .workspacePage{background:
           radial-gradient(circle at 92% 4%,#d9ebff 0,transparent 25%),
@@ -112,8 +148,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         .actionBar:before{content:"Controlled decision";margin-right:auto;color:#9cb3cd;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
         .button{transition:transform .18s ease,box-shadow .18s ease}.button:hover{transform:translateY(-2px);box-shadow:0 9px 20px #0003}.button.approve{background:linear-gradient(135deg,#07945a,#057444)}
         .teamList,.planPreview,.coming{margin-left:34px;margin-right:34px}.teamList+.coming{margin-top:0}.teamCard{background:linear-gradient(145deg,#f8fbff,#f1f6fb)}
-        @media(max-width:1050px){.auditHeader{grid-template-columns:1fr}.sideRail{grid-template-columns:repeat(2,1fr)}.sideRail>.railMetric{min-height:82px}.railBlock{border-top:1px solid #e2e9f1}.gateNav{grid-template-columns:repeat(5,200px);overflow-x:auto}.teamCard{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:repeat(2,1fr)}}
-        @media(max-width:700px){.workspacePage{padding:14px 10px 60px}.workspaceLogo{width:185px;height:auto}.auditHeader{padding:25px 21px}.auditHeader h1{font-size:34px}.sideRail{grid-template-columns:1fr 1fr}.sideRail>.railMetric,.railBlock{padding:16px}.mainPanel>div.panelKicker,.mainPanel>h2,.mainPanel>p.panelLead,.teamList,.planPreview,.coming{margin-left:18px;margin-right:18px}.mainPanel>div.panelKicker{padding-top:24px}.mainPanel form{padding:0 18px 24px}.mainPanel form>.grid2,.section{padding:14px}.auditStandard,.grid2,.grid3,.planPreview,.teamCard{grid-template-columns:1fr}.actionBar{position:static;align-items:stretch;flex-direction:column}.actionBar:before{margin:0 0 4px}.button{width:100%}}
+        @media(max-width:1050px){.auditHeader{grid-template-columns:1fr}.sideRail{grid-template-columns:repeat(2,1fr)}.sideRail>.railMetric{min-height:82px}.railBlock{border-top:1px solid #e2e9f1}.gateNav{grid-template-columns:repeat(5,200px);overflow-x:auto}.teamCard{grid-template-columns:1fr 1fr}.grid3,.readinessGrid{grid-template-columns:repeat(2,1fr)}.record{grid-template-columns:1fr auto}}
+        @media(max-width:700px){.workspacePage{padding:14px 10px 60px}.workspaceLogo{width:185px;height:auto}.auditHeader{padding:25px 21px}.auditHeader h1{font-size:34px}.sideRail{grid-template-columns:1fr 1fr}.sideRail>.railMetric,.railBlock{padding:16px}.mainPanel>div.panelKicker,.mainPanel>h2,.mainPanel>p.panelLead,.teamList,.planPreview,.coming{margin-left:18px;margin-right:18px}.mainPanel>div.panelKicker{padding-top:24px}.mainPanel form{padding:0 18px 24px}.mainPanel form>.grid2,.section{padding:14px}.auditStandard,.grid2,.grid3,.planPreview,.teamCard,.readinessGrid{grid-template-columns:1fr}.planStack,.planGate{margin-left:18px;margin-right:18px}.record{grid-template-columns:1fr}.actionBar{position:static;align-items:stretch;flex-direction:column}.actionBar:before{margin:0 0 4px}.button{width:100%}}
       `}</style>
 
       <div className="workspaceShell">
@@ -132,8 +168,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
 
         <nav className="gateNav" aria-label="Audit lifecycle">
           {GATES.map(([key, number, label], index) => {
-            const unlocked = index === 0 || (index === 1 && scopeComplete) || (index === 2 && teamComplete);
-            const complete = key === "scope" ? scopeComplete : key === "team" ? teamComplete : false;
+            const unlocked = index === 0 || (index === 1 && scopeComplete) || (index === 2 && teamComplete) || (index === 3 && planComplete);
+            const complete = key === "scope" ? scopeComplete : key === "team" ? teamComplete : key === "plan" ? planComplete : false;
             return <Link key={key} href={`/portal/internal-audits/${id}?gate=${key}`} className={`gate ${gate === key ? "active" : ""} ${!unlocked ? "locked" : ""}`} aria-disabled={!unlocked}><b>{number}</b><span><strong>{label}</strong><small>{complete ? "✓ Approved" : unlocked ? "Open" : "🔒 Locked"}</small></span></Link>;
           })}
         </nav>
@@ -170,8 +206,23 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
             {gate === "plan" ? <>
               <div className="panelKicker">Gate 03 · Risk-based audit planning</div><h2>Design the audit plan</h2><p className="panelLead">The approved scope and team are now controlled. Build sampling, agenda, notification and auditee coordination before fieldwork.</p>
               <div className="planPreview"><div className="previewCard"><b>Sampling strategy</b><span>Prioritise significant risks, changes, previous findings and weak performance signals.</span></div><div className="previewCard"><b>Audit agenda</b><span>Allocate processes, interviews, site activity and document review to competent team members.</span></div><div className="previewCard"><b>Notification</b><span>Issue a controlled audit notification covering scope, criteria, timing, team and requested information.</span></div></div>
-              <div className="coming"><strong>Gate unlocked successfully.</strong><br />The next deployment adds the interactive schedule, sampling plan, notification email and formal plan approval controls.</div>
+              <div className="planStack">
+                <section className="planModule"><div className="moduleHead"><div><h3>01 · Risk-based sampling plan</h3><p>Define populations, sample sizes, periods, selection methods and limitations.</p></div><span className="countBadge">{samples.length} sample{samples.length === 1 ? "" : "s"}</span></div><div className="moduleBody">
+                  {samples.length ? <div className="recordList">{samples.map((sample) => <div className="record" key={sample.id}><div><strong>{sample.sample_reference}</strong><small>{sample.selection_method}</small></div><div><strong>{sample.population_description}</strong><small>Sample {sample.sample_size}{sample.population_size ? ` of ${sample.population_size}` : ""} · {sample.rationale || "Rationale recorded"}</small></div><span className="recordTag">Controlled sample</span></div>)}</div> : <div className="emptyState">No sampling instructions recorded yet.</div>}
+                  <form action={addSamplingPlan}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Sample reference *</span><input name="sample_reference" required placeholder="e.g. SMP-01" /></label><label className="field"><span>Population *</span><input name="population_description" required placeholder="Training records, permits, orders…" /></label><label className="field"><span>Selection method *</span><select name="selection_method" required defaultValue="risk_based"><option value="risk_based">Risk-based</option><option value="random">Random</option><option value="systematic">Systematic interval</option><option value="judgemental">Professional judgement</option><option value="stratified">Stratified</option><option value="targeted">Targeted exception</option></select></label><label className="field"><span>Population size</span><input name="population_size" type="number" min="1" /></label><label className="field"><span>Sample size *</span><input name="sample_size" type="number" min="1" required /></label><label className="field"><span>Shifts / locations covered</span><input name="shifts_locations_covered" /></label><label className="field"><span>Period start</span><input name="sampling_period_start" type="date" /></label><label className="field"><span>Period end</span><input name="sampling_period_end" type="date" /></label><label className="field"><span>Rationale *</span><textarea name="rationale" required placeholder="Why this sample is sufficient and relevant to audit risk" /></label><label className="field"><span>Limitations</span><textarea name="limitations" /></label></div><div className="actionBar"><button className="button primary">Add Controlled Sample</button></div></form>
+                </div></section>
+
+                <section className="planModule"><div className="moduleHead"><div><h3>02 · Audit agenda and resource deployment</h3><p>Sequence meetings, process audits, interviews, site work and team reviews.</p></div><span className="countBadge">{schedule.length} activit{schedule.length === 1 ? "y" : "ies"}</span></div><div className="moduleBody">
+                  {schedule.length ? <div className="recordList">{schedule.map((item) => <div className="record" key={item.id}><div><strong>{displayDate(item.starts_at)}</strong><small>to {displayDate(item.ends_at)}</small></div><div><strong>{item.title}</strong><small>{ACTIVITY_LABELS[item.activity_type] ?? item.activity_type} · {item.process_or_scope || "General audit scope"}{item.location_or_link ? ` · ${item.location_or_link}` : ""}</small></div><span className="recordTag">{item.expected_attendees || "Audit team"}</span></div>)}</div> : <div className="emptyState">No agenda activities recorded yet. Include opening and closing meetings plus sufficient fieldwork coverage.</div>}
+                  <form action={addAuditScheduleItem}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Activity type *</span><select name="activity_type" required defaultValue="process_audit">{Object.entries(ACTIVITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span>Activity title *</span><input name="title" required /></label><label className="field"><span>Process / scope *</span><input name="process_or_scope" required /></label><label className="field"><span>Starts *</span><input name="starts_at" type="datetime-local" required /></label><label className="field"><span>Ends *</span><input name="ends_at" type="datetime-local" required /></label><label className="field"><span>Lead auditor</span><select name="lead_team_member_id" defaultValue=""><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label><label className="field"><span>Location or meeting link</span><input name="location_or_link" /></label><label className="field"><span>Expected attendees</span><input name="expected_attendees" /></label><label className="field"><span>Notes / evidence focus</span><textarea name="notes" /></label></div><div className="actionBar"><button className="button primary">Add Agenda Activity</button></div></form>
+                </div></section>
+
+                <section className="planModule"><div className="moduleHead"><div><h3>03 · Controlled auditee notification</h3><p>Prepare the audit notice, coordination instructions and requested information.</p></div><span className="countBadge">{notification ? "Draft saved" : "Not prepared"}</span></div><div className="moduleBody"><form action={saveAuditNotification}><input type="hidden" name="audit_id" value={id} /><div className="grid2"><label className="field"><span>Recipients *</span><input name="recipients" type="text" required defaultValue={notification?.recipients?.join(", ") ?? audit.auditee_contact_email ?? ""} placeholder="Comma-separated email addresses" /></label><label className="field"><span>CC recipients</span><input name="cc_recipients" type="text" defaultValue={notification?.cc_recipients?.join(", ") ?? ""} /></label><label className="field"><span>Subject *</span><input name="subject" required defaultValue={notification?.subject ?? `${audit.audit_reference} — Internal audit notification`} /></label><label className="field"><span>Requested information *</span><textarea name="requested_information" required defaultValue={notification?.body ?? "Please provide current procedures, applicable records, relevant performance data, prior findings and evidence of completed actions before the opening meeting."} /></label></div><div className="actionBar"><button className="button secondary">Save Notification Draft</button></div></form></div></section>
+              </div>
+              <section className="planGate"><h3>Formal plan readiness decision</h3><p>Human approval confirms that the planned audit is feasible, risk-based, adequately resourced and communicated. Approval locks Gate 03 and unlocks Fieldwork.</p><div className="readinessGrid"><div className={`readinessItem ${samples.length ? "ready" : "missing"}`}>{samples.length ? "✓" : "!"} Sampling strategy</div><div className={`readinessItem ${schedule.length >= 2 ? "ready" : "missing"}`}>{schedule.length >= 2 ? "✓" : "!"} Agenda coverage</div><div className={`readinessItem ${notification ? "ready" : "missing"}`}>{notification ? "✓" : "!"} Notification draft</div></div><form action={approveAuditPlan}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="plan_confirmation" required /><span><strong>Human plan approval</strong><br />I confirm that sampling, timing, competence, resources, notification and information requirements are sufficient for controlled fieldwork.</span></label><div className="actionBar"><button className="button approve">Human Approve Plan & Unlock Fieldwork →</button></div></form></section>
             </> : null}
+
+            {gate === "fieldwork" ? <><div className="panelKicker">Gate 04 · Evidence-led fieldwork</div><h2>Execute the approved audit plan</h2><p className="panelLead">The audit plan is approved. The next controlled workspace records interviews, samples, objective evidence, conclusions and findings against the approved criteria.</p><div className="coming"><strong>Fieldwork unlocked.</strong><br />The approved sampling plan and agenda are now the controlled basis for audit execution.</div></> : null}
           </section>
         </div>
       </div>
