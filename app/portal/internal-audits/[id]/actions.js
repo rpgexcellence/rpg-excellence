@@ -261,8 +261,17 @@ export async function approveAuditPlan(formData) {
     supabase.from("internal_audit_notifications").select("id", { count: "exact", head: true }).eq("audit_id", auditId).eq("owner_id", user.id).eq("notification_type", "audit_notification"),
   ]);
   if (schedule.error || notification.error) throw new Error(schedule.error?.message || notification.error?.message);
-  if ((schedule.count ?? 0) < 2) throw new Error("Add at least two agenda activities before approval.");
-  if ((notification.count ?? 0) < 1) throw new Error("Prepare the auditee notification before approval.");
+  if ((schedule.count ?? 0) < 2) {
+    redirect(
+      `/portal/internal-audits/${auditId}?gate=plan&plan_error=agenda`
+    );
+  }
+
+  if ((notification.count ?? 0) < 1) {
+    redirect(
+      `/portal/internal-audits/${auditId}?gate=plan&plan_error=notification`
+    );
+  }
 
   const now = new Date().toISOString();
   const { error } = await supabase.from("internal_audits").update({
