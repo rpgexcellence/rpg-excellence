@@ -1,4 +1,5 @@
 import Image from "next/image";
+// RPG INTERNAL AUDIT PLAN GATE — NO SEPARATE SAMPLING MODULE — 2026-08-24
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -6,7 +7,6 @@ import { createClient } from "../../../../lib/supabase/server";
 import {
   addAuditScheduleItem,
   addAuditTeamMember,
-  addSamplingPlan,
   approveAuditPlan,
   approveAuditTeam,
   saveAuditNotification,
@@ -50,6 +50,20 @@ function displayDate(value) {
   }).format(new Date(value));
 }
 
+function localDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function splitControlledList(value) {
+  return String(value ?? "")
+    .split(/[,;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export default async function InternalAuditWorkspace({ params, searchParams }) {
   const { id } = await params;
   const query = await searchParams;
@@ -57,7 +71,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/portal/login?next=/portal/internal-audits/${id}`);
 
-  const [auditResult, teamResult, scheduleResult, samplesResult, notificationsResult] = await Promise.all([
+  const [auditResult, teamResult, scheduleResult, notificationsResult] = await Promise.all([
     supabase.from("internal_audits").select(`
       *,
       internal_audit_selected_standards(
@@ -69,8 +83,6 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
       .eq("audit_id", id).eq("owner_id", user.id).order("created_at"),
     supabase.from("internal_audit_schedule_items").select("*")
       .eq("audit_id", id).eq("owner_id", user.id).order("starts_at"),
-    supabase.from("internal_audit_samples").select("*")
-      .eq("audit_id", id).eq("owner_id", user.id).order("created_at"),
     supabase.from("internal_audit_notifications").select("*")
       .eq("audit_id", id).eq("owner_id", user.id).eq("notification_type", "audit_notification")
       .order("updated_at", { ascending: false }).limit(1),
@@ -80,14 +92,19 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   if (!auditResult.data) notFound();
   if (teamResult.error) throw new Error(teamResult.error.message);
   if (scheduleResult.error) throw new Error(scheduleResult.error.message);
-  if (samplesResult.error) throw new Error(samplesResult.error.message);
   if (notificationsResult.error) throw new Error(notificationsResult.error.message);
 
   const audit = auditResult.data;
   const team = teamResult.data ?? [];
   const schedule = scheduleResult.data ?? [];
-  const samples = samplesResult.data ?? [];
   const notification = notificationsResult.data?.[0] ?? null;
+  const inheritedProcesses = splitControlledList(audit.processes);
+  const inheritedSites = splitControlledList(audit.sites);
+  const defaultProcess = inheritedProcesses[0] ?? audit.scope_statement ?? "";
+  const defaultSite = inheritedSites[0] ?? "";
+  const defaultLead = team.find((member) =>
+    /lead/i.test(`${member.role_title ?? ""} ${member.responsibility ?? ""}`)
+  ) ?? team[0] ?? null;
   const { data: organization, error: organizationError } = await supabase
     .from("organizations")
     .select("name")
@@ -204,25 +221,21 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
             </> : null}
 
             {gate === "plan" ? <>
-              <div className="panelKicker">Gate 03 · Risk-based audit planning</div><h2>Design the audit plan</h2><p className="panelLead">The approved scope and team are now controlled. Build sampling, agenda, notification and auditee coordination before fieldwork.</p>
-              <div className="planPreview"><div className="previewCard"><b>Sampling strategy</b><span>Prioritise significant risks, changes, previous findings and weak performance signals.</span></div><div className="previewCard"><b>Audit agenda</b><span>Allocate processes, interviews, site activity and document review to competent team members.</span></div><div className="previewCard"><b>Notification</b><span>Issue a controlled audit notification covering scope, criteria, timing, team and requested information.</span></div></div>
+              <div className="panelKicker">Gate 03 · Risk-based audit planning</div><h2>Design the audit plan</h2><p className="panelLead">The approved scope and team are now controlled. Build the agenda, notification and auditee coordination before fieldwork.</p>
+              <div className="planPreview"><div className="previewCard"><b>Approved scope</b><span>Carry approved processes, locations, criteria and risk priorities directly into the agenda.</span></div><div className="previewCard"><b>Audit agenda</b><span>Allocate processes, interviews, site activity and document review to competent team members.</span></div><div className="previewCard"><b>Notification</b><span>Issue a controlled audit notification covering scope, criteria, timing, team and requested information.</span></div></div>
               <div className="planStack">
-                <section className="planModule"><div className="moduleHead"><div><h3>01 · Risk-based sampling plan</h3><p>Define populations, sample sizes, periods, selection methods and limitations.</p></div><span className="countBadge">{samples.length} sample{samples.length === 1 ? "" : "s"}</span></div><div className="moduleBody">
-                  {samples.length ? <div className="recordList">{samples.map((sample) => <div className="record" key={sample.id}><div><strong>{sample.sample_reference}</strong><small>{sample.selection_method}</small></div><div><strong>{sample.population_description}</strong><small>Sample {sample.sample_size}{sample.population_size ? ` of ${sample.population_size}` : ""} · {sample.rationale || "Rationale recorded"}</small></div><span className="recordTag">Controlled sample</span></div>)}</div> : <div className="emptyState">No sampling instructions recorded yet.</div>}
-                  <form action={addSamplingPlan}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Sample reference *</span><input name="sample_reference" required placeholder="e.g. SMP-01" /></label><label className="field"><span>Population *</span><input name="population_description" required placeholder="Training records, permits, orders…" /></label><label className="field"><span>Selection method *</span><select name="selection_method" required defaultValue="risk_based"><option value="risk_based">Risk-based</option><option value="random">Random</option><option value="systematic">Systematic interval</option><option value="judgemental">Professional judgement</option><option value="stratified">Stratified</option><option value="targeted">Targeted exception</option></select></label><label className="field"><span>Population size</span><input name="population_size" type="number" min="1" /></label><label className="field"><span>Sample size *</span><input name="sample_size" type="number" min="1" required /></label><label className="field"><span>Shifts / locations covered</span><input name="shifts_locations_covered" /></label><label className="field"><span>Period start</span><input name="sampling_period_start" type="date" /></label><label className="field"><span>Period end</span><input name="sampling_period_end" type="date" /></label><label className="field"><span>Rationale *</span><textarea name="rationale" required placeholder="Why this sample is sufficient and relevant to audit risk" /></label><label className="field"><span>Limitations</span><textarea name="limitations" /></label></div><div className="actionBar"><button className="button primary">Add Controlled Sample</button></div></form>
-                </div></section>
-
-                <section className="planModule"><div className="moduleHead"><div><h3>02 · Audit agenda and resource deployment</h3><p>Sequence meetings, process audits, interviews, site work and team reviews.</p></div><span className="countBadge">{schedule.length} activit{schedule.length === 1 ? "y" : "ies"}</span></div><div className="moduleBody">
+                <section className="planModule"><div className="moduleHead"><div><h3>01 · Audit agenda and resource deployment</h3><p>Sequence meetings, process audits, interviews, site work and team reviews.</p></div><span className="countBadge">{schedule.length} activit{schedule.length === 1 ? "y" : "ies"}</span></div><div className="moduleBody">
+                  <div className="coming"><strong>Inherited from the approved gates</strong><br />Processes: {inheritedProcesses.join(" · ") || "Approved scope statement"}<br />Sites: {inheritedSites.join(" · ") || "No site specified"}<br />Audit window: {displayDate(audit.planned_start_at)} – {displayDate(audit.planned_end_at)} · Team: {team.map((member) => member.member_name).join(", ") || "No members assigned"}</div>
                   {schedule.length ? <div className="recordList">{schedule.map((item) => <div className="record" key={item.id}><div><strong>{displayDate(item.starts_at)}</strong><small>to {displayDate(item.ends_at)}</small></div><div><strong>{item.title}</strong><small>{ACTIVITY_LABELS[item.activity_type] ?? item.activity_type} · {item.process_or_scope || "General audit scope"}{item.location_or_link ? ` · ${item.location_or_link}` : ""}</small></div><span className="recordTag">{item.expected_attendees || "Audit team"}</span></div>)}</div> : <div className="emptyState">No agenda activities recorded yet. Include opening and closing meetings plus sufficient fieldwork coverage.</div>}
-                  <form action={addAuditScheduleItem}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Activity type *</span><select name="activity_type" required defaultValue="process_audit">{Object.entries(ACTIVITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span>Activity title *</span><input name="title" required /></label><label className="field"><span>Process / scope *</span><input name="process_or_scope" required /></label><label className="field"><span>Starts *</span><input name="starts_at" type="datetime-local" required /></label><label className="field"><span>Ends *</span><input name="ends_at" type="datetime-local" required /></label><label className="field"><span>Lead auditor</span><select name="lead_team_member_id" defaultValue=""><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label><label className="field"><span>Location or meeting link</span><input name="location_or_link" /></label><label className="field"><span>Expected attendees</span><input name="expected_attendees" /></label><label className="field"><span>Notes / evidence focus</span><textarea name="notes" /></label></div><div className="actionBar"><button className="button primary">Add Agenda Activity</button></div></form>
+                  <form action={addAuditScheduleItem}><input type="hidden" name="audit_id" value={id} /><datalist id="approved-processes">{inheritedProcesses.map((process) => <option value={process} key={process} />)}</datalist><datalist id="approved-sites">{inheritedSites.map((site) => <option value={site} key={site} />)}</datalist><div className="grid3"><label className="field"><span>Activity type *</span><select name="activity_type" required defaultValue="process_audit">{Object.entries(ACTIVITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span>Activity title *</span><input name="title" required defaultValue={defaultProcess ? `${defaultProcess} audit` : ""} /></label><label className="field"><span>Process / scope *</span><input name="process_or_scope" list="approved-processes" required defaultValue={defaultProcess} /><small>Select an approved process or refine the activity scope.</small></label><label className="field"><span>Starts *</span><input name="starts_at" type="datetime-local" required defaultValue={localDateTime(audit.planned_start_at)} /></label><label className="field"><span>Ends *</span><input name="ends_at" type="datetime-local" required defaultValue={localDateTime(audit.planned_end_at)} /></label><label className="field"><span>Lead auditor</span><select name="lead_team_member_id" defaultValue={defaultLead?.id ?? ""}><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label><label className="field"><span>Location or meeting link</span><input name="location_or_link" list="approved-sites" defaultValue={defaultSite} /></label><label className="field"><span>Expected attendees</span><input name="expected_attendees" defaultValue={audit.auditee_contact_name ?? ""} /></label><label className="field"><span>Notes / evidence focus</span><textarea name="notes" defaultValue={audit.known_risks_changes ?? ""} /></label></div><div className="actionBar"><button className="button primary">Add Agenda Activity</button></div></form>
                 </div></section>
 
-                <section className="planModule"><div className="moduleHead"><div><h3>03 · Controlled auditee notification</h3><p>Prepare the audit notice, coordination instructions and requested information.</p></div><span className="countBadge">{notification ? "Draft saved" : "Not prepared"}</span></div><div className="moduleBody"><form action={saveAuditNotification}><input type="hidden" name="audit_id" value={id} /><div className="grid2"><label className="field"><span>Recipients *</span><input name="recipients" type="text" required defaultValue={notification?.recipients?.join(", ") ?? audit.auditee_contact_email ?? ""} placeholder="Comma-separated email addresses" /></label><label className="field"><span>CC recipients</span><input name="cc_recipients" type="text" defaultValue={notification?.cc_recipients?.join(", ") ?? ""} /></label><label className="field"><span>Subject *</span><input name="subject" required defaultValue={notification?.subject ?? `${audit.audit_reference} — Internal audit notification`} /></label><label className="field"><span>Requested information *</span><textarea name="requested_information" required defaultValue={notification?.body ?? "Please provide current procedures, applicable records, relevant performance data, prior findings and evidence of completed actions before the opening meeting."} /></label></div><div className="actionBar"><button className="button secondary">Save Notification Draft</button></div></form></div></section>
+                <section className="planModule"><div className="moduleHead"><div><h3>02 · Controlled auditee notification</h3><p>Prepare the audit notice, coordination instructions and requested information.</p></div><span className="countBadge">{notification ? "Draft saved" : "Not prepared"}</span></div><div className="moduleBody"><form action={saveAuditNotification}><input type="hidden" name="audit_id" value={id} /><div className="grid2"><label className="field"><span>Recipients *</span><input name="recipients" type="text" required defaultValue={notification?.recipients?.join(", ") ?? audit.auditee_contact_email ?? ""} placeholder="Comma-separated email addresses" /></label><label className="field"><span>CC recipients</span><input name="cc_recipients" type="text" defaultValue={notification?.cc_recipients?.join(", ") ?? ""} /></label><label className="field"><span>Subject *</span><input name="subject" required defaultValue={notification?.subject ?? `${audit.audit_reference} — Internal audit notification`} /></label><label className="field"><span>Requested information *</span><textarea name="requested_information" required defaultValue={notification?.body ?? "Please provide current procedures, applicable records, relevant performance data, prior findings and evidence of completed actions before the opening meeting."} /></label></div><div className="actionBar"><button className="button secondary">Save Notification Draft</button></div></form></div></section>
               </div>
-              <section className="planGate"><h3>Formal plan readiness decision</h3><p>Human approval confirms that the planned audit is feasible, risk-based, adequately resourced and communicated. Approval locks Gate 03 and unlocks Fieldwork.</p><div className="readinessGrid"><div className={`readinessItem ${samples.length ? "ready" : "missing"}`}>{samples.length ? "✓" : "!"} Sampling strategy</div><div className={`readinessItem ${schedule.length >= 2 ? "ready" : "missing"}`}>{schedule.length >= 2 ? "✓" : "!"} Agenda coverage</div><div className={`readinessItem ${notification ? "ready" : "missing"}`}>{notification ? "✓" : "!"} Notification draft</div></div><form action={approveAuditPlan}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="plan_confirmation" required /><span><strong>Human plan approval</strong><br />I confirm that sampling, timing, competence, resources, notification and information requirements are sufficient for controlled fieldwork.</span></label><div className="actionBar"><button className="button approve">Human Approve Plan & Unlock Fieldwork →</button></div></form></section>
+              <section className="planGate"><h3>Formal plan readiness decision</h3><p>Human approval confirms that the planned audit is feasible, risk-based, adequately resourced and communicated. Approval locks Gate 03 and unlocks Fieldwork.</p><div className="readinessGrid"><div className={`readinessItem ${schedule.length >= 2 ? "ready" : "missing"}`}>{schedule.length >= 2 ? "✓" : "!"} Agenda coverage</div><div className={`readinessItem ${notification ? "ready" : "missing"}`}>{notification ? "✓" : "!"} Notification draft</div></div><form action={approveAuditPlan}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="plan_confirmation" required /><span><strong>Human plan approval</strong><br />I confirm that timing, competence, resources, notification and information requirements are sufficient for controlled fieldwork.</span></label><div className="actionBar"><button className="button approve">Human Approve Plan & Unlock Fieldwork →</button></div></form></section>
             </> : null}
 
-            {gate === "fieldwork" ? <><div className="panelKicker">Gate 04 · Evidence-led fieldwork</div><h2>Execute the approved audit plan</h2><p className="panelLead">The audit plan is approved. The next controlled workspace records interviews, samples, objective evidence, conclusions and findings against the approved criteria.</p><div className="coming"><strong>Fieldwork unlocked.</strong><br />The approved sampling plan and agenda are now the controlled basis for audit execution.</div></> : null}
+            {gate === "fieldwork" ? <><div className="panelKicker">Gate 04 · Evidence-led fieldwork</div><h2>Execute the approved audit plan</h2><p className="panelLead">The audit plan is approved. The next controlled workspace records interviews, objective evidence, conclusions and findings against the approved criteria.</p><div className="coming"><strong>Fieldwork unlocked.</strong><br />The approved scope and agenda are now the controlled basis for audit execution.</div></> : null}
           </section>
         </div>
       </div>
