@@ -9,9 +9,7 @@ export const metadata = {
     "Practical ISO guidance, standards updates, RPG Intelligence releases and business assurance insights from RPG Excellence.",
 };
 
-export default async function InsightsPage({
-  params,
-}) {
+export default async function InsightsPage({ params }) {
   const { locale } = await params;
 
   if (!locales.includes(locale)) {
@@ -20,13 +18,28 @@ export default async function InsightsPage({
 
   const issues = [
     {
+      number: "006",
+      title:
+        "RPG Intelligence Releases ISO/IEC 17024:2026 Readiness Assessment",
+      description:
+        "A structured, evidence-led assessment for organisations operating certification of persons, combining clause conformity, management readiness, findings, action planning and executive reporting.",
+      href: "iso-17024-readiness",
+    },
+    {
+      number: "005",
+      title:
+        "Introducing the RPG Intelligence CAPA–8D Module",
+      description:
+        "An evidence-led investigation workspace for root-cause validation, controlled corrective action, effectiveness review and accountable D0–D8 gate approval.",
+      href: "capa-8d-release",
+    },
+    {
       number: "004",
       title:
         "ISO 45001:2018 — From Safety Compliance to Evidence-Led OH&S Assurance",
       description:
         "How RPG Intelligence connects OH&S conformity, worker participation, hazard and risk management, evidence sampling, findings, management action and certification-readiness decision support.",
-      href:
-        "iso-45001-readiness",
+      href: "iso-45001-readiness",
     },
     {
       number: "003",
@@ -34,26 +47,21 @@ export default async function InsightsPage({
         "ISO 14001:2026 — Environmental Management Moves from Compliance to Business Assurance",
       description:
         "How RPG Intelligence brings environmental conformity, evidence assurance, compliance obligations, findings, management action and management readiness together in one structured assessment workflow.",
-      href:
-        "iso-14001-readiness",
+      href: "iso-14001-readiness",
     },
     {
       number: "002",
-      title:
-        "ISO 9001 Moves Beyond the Checklist",
+      title: "ISO 9001 Moves Beyond the Checklist",
       description:
-        "RPG Intelligence now supports ISO 9001:2015/Amd 1:2024 as a complete evidence-led business assurance and certification-readiness assessment, combining weighted scoring, findings, evidence assurance, management readiness and climate-action considerations.",
-      href:
-        "iso-9001-readiness",
+        "RPG Intelligence supports ISO 9001:2015/Amd 1:2024 as a complete evidence-led business assurance and certification-readiness assessment.",
+      href: "iso-9001-readiness",
     },
     {
       number: "001",
-      title:
-        "A Word from RPG",
+      title: "A Word from RPG",
       description:
         "Why RPG Excellence exists, what RPG Intelligence is being built to do, and how we intend to support organisations with practical assurance, management systems and responsible AI.",
-      href:
-        "a-word-from-rpg",
+      href: "a-word-from-rpg",
     },
   ];
 
@@ -61,9 +69,7 @@ export default async function InsightsPage({
     <PageShell locale={locale}>
       <main className="simplePage">
         <div className="simpleInner">
-          <span className="kicker">
-            RPG Insights
-          </span>
+          <span className="kicker">RPG Insights</span>
 
           <h1>
             Practical guidance for better assurance,
@@ -85,19 +91,12 @@ export default async function InsightsPage({
             RPG Excellence.
           </p>
 
-          <section
-            style={{
-              display: "grid",
-              gap: "20px",
-            }}
-          >
+          <section style={{ display: "grid", gap: "20px" }}>
             {issues.map((issue) => (
               <article
                 key={issue.number}
                 className="assuranceCard"
-                style={{
-                  padding: "28px",
-                }}
+                style={{ padding: "28px" }}
               >
                 <span className="kicker">
                   Issue {issue.number}
