@@ -475,6 +475,30 @@ export default async function PortalPage() {
               Document Register
             </Link>
 
+            <Link
+              href="/portal/internal-audits"
+              style={{
+                padding: "10px 14px",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              Internal Audits
+            </Link>
+
+            <Link
+              href="/portal/rca"
+              style={{
+                padding: "10px 14px",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              8D &amp; CAPA
+            </Link>
+
             <form
               action="/auth/signout"
               method="post"
@@ -1124,6 +1148,242 @@ export default async function PortalPage() {
                 </div>
               </Link>
             </div>
+
+            {/* ASSURANCE TOOLS */}
+
+            <section
+              style={{
+                marginBottom: "24px",
+                padding: "28px",
+                borderRadius: "18px",
+                background:
+                  "linear-gradient(135deg, #071A33 0%, #0B315F 100%)",
+                color: "#ffffff",
+                boxShadow:
+                  "0 18px 45px rgba(7, 26, 51, 0.18)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-end",
+                  gap: "20px",
+                  flexWrap: "wrap",
+                  marginBottom: "22px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      color: "#52E5DA",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      letterSpacing: "1.2px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    ASSURANCE COMMAND CENTRE
+                  </div>
+
+                  <h2
+                    style={{
+                      margin: 0,
+                      color: "#ffffff",
+                      fontSize: "28px",
+                    }}
+                  >
+                    Launch your assurance tools
+                  </h2>
+
+                  <p
+                    style={{
+                      maxWidth: "720px",
+                      margin: "8px 0 0",
+                      color: "#C9D8E9",
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    Plan audits, investigate root causes, control
+                    corrective actions and access approved working
+                    documents from one governed workspace.
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    border: "1px solid rgba(82, 229, 218, 0.35)",
+                    borderRadius: "999px",
+                    background: "rgba(82, 229, 218, 0.1)",
+                    color: "#52E5DA",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                  }}
+                >
+                  ISO 19011 · CAPA · 8D
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(230px, 1fr))",
+                  gap: "14px",
+                }}
+              >
+                <Link
+                  href="/portal/internal-audits"
+                  style={{
+                    minHeight: "190px",
+                    padding: "22px",
+                    border: "1px solid rgba(255, 255, 255, 0.16)",
+                    borderRadius: "16px",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: "#52E5DA",
+                        fontSize: "25px",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      ◈
+                    </div>
+                    <strong style={{ fontSize: "20px" }}>
+                      Internal Audit
+                    </strong>
+                    <p
+                      style={{
+                        margin: "8px 0 0",
+                        color: "#C9D8E9",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Open the ISO 19011 audit command centre,
+                      create a scope and manage the full audit lifecycle.
+                    </p>
+                  </div>
+                  <span
+                    style={{
+                      marginTop: "18px",
+                      color: "#52E5DA",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Open Internal Audits →
+                  </span>
+                </Link>
+
+                <Link
+                  href="/portal/rca"
+                  style={{
+                    minHeight: "190px",
+                    padding: "22px",
+                    border: "1px solid rgba(255, 255, 255, 0.16)",
+                    borderRadius: "16px",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: "#52E5DA",
+                        fontSize: "25px",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      ◈
+                    </div>
+                    <strong style={{ fontSize: "20px" }}>
+                      8D &amp; Root Cause Analysis
+                    </strong>
+                    <p
+                      style={{
+                        margin: "8px 0 0",
+                        color: "#C9D8E9",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Start an investigation using 3 × 5 Whys,
+                      Ishikawa or Bow Tie and control corrective actions.
+                    </p>
+                  </div>
+                  <span
+                    style={{
+                      marginTop: "18px",
+                      color: "#52E5DA",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Open 8D &amp; CAPA →
+                  </span>
+                </Link>
+
+                <Link
+                  href="/portal/documents"
+                  style={{
+                    minHeight: "190px",
+                    padding: "22px",
+                    border: "1px solid rgba(255, 255, 255, 0.16)",
+                    borderRadius: "16px",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: "#52E5DA",
+                        fontSize: "25px",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      ◈
+                    </div>
+                    <strong style={{ fontSize: "20px" }}>
+                      Controlled Documents
+                    </strong>
+                    <p
+                      style={{
+                        margin: "8px 0 0",
+                        color: "#C9D8E9",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Access approved assessment, audit and RCA/CAPA
+                      procedures, forms, scripts and guidance.
+                    </p>
+                  </div>
+                  <span
+                    style={{
+                      marginTop: "18px",
+                      color: "#52E5DA",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Open Document Register →
+                  </span>
+                </Link>
+              </div>
+            </section>
 
             {/* START ASSESSMENT */}
 
