@@ -12,9 +12,11 @@ import {
   addAuditEvidence,
   addAuditFinding,
   completeAuditFieldwork,
+  completeAuditClosure,
   saveAuditAnswer,
   saveAuditNotification,
   saveAuditScope,
+  verifyAuditFindingEffectiveness,
 } from "./actions";
 
 const GATES = [
@@ -134,6 +136,25 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const answers = answersResult.data ?? [];
   const evidence = evidenceResult.data ?? [];
   const findings = findingsResult.data ?? [];
+  const linkedRcaIds = [...new Set(findings.map((finding) => finding.linked_rca_case_id).filter(Boolean))];
+  const [rcaCasesResult, rcaActionsResult] = linkedRcaIds.length
+    ? await Promise.all([
+        supabase.from("rca_cases").select("id, case_reference, status, current_discipline, target_close_date, closed_at").in("id", linkedRcaIds).eq("owner_id", user.id),
+        supabase.from("rca_actions").select("id, case_id, status, title, due_date, effectiveness_result").in("case_id", linkedRcaIds).eq("owner_id", user.id),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (rcaCasesResult.error) throw new Error(rcaCasesResult.error.message);
+  if (rcaActionsResult.error) throw new Error(rcaActionsResult.error.message);
+  const rcaCasesById = new Map((rcaCasesResult.data ?? []).map((rcaCase) => [rcaCase.id, rcaCase]));
+  const rcaActionsByCase = new Map();
+  for (const action of rcaActionsResult.data ?? []) {
+    const current = rcaActionsByCase.get(action.case_id) ?? [];
+    current.push(action);
+    rcaActionsByCase.set(action.case_id, current);
+  }
+  const nonconformities = findings.filter((finding) => ["major_nc", "minor_nc"].includes(finding.finding_type));
+  const advisoryFindings = findings.filter((finding) => !["major_nc", "minor_nc"].includes(finding.finding_type));
+  const unresolvedNonconformities = nonconformities.filter((finding) => !finding.linked_rca_case_id || finding.status !== "closed" || !finding.closure_verified);
   const answersByQuestion = new Map(answers.map((answer) => [answer.question_id, answer]));
   const assessedCount = answers.filter((answer) => answer.result && answer.result !== "not_assessed").length;
   const inheritedProcesses = splitControlledList(audit.processes);
@@ -456,7 +477,18 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
               </div>
             </> : null}
 
-            {gate === "closing" ? <><div className="panelKicker">Gate 05 · Closing and reporting</div><h2>Conclude the audit</h2><p className="panelLead">Fieldwork is complete. Consolidate conclusions, confirm findings with the auditee, issue the controlled report and connect nonconformities to corrective action and RCA.</p><div className="coming"><strong>Closing review unlocked.</strong><br />The verified evidence trail and controlled findings are now ready for formal reporting and follow-up.</div></> : null}
+            {gate === "closing" ? <>
+              <div className="panelKicker">Gate 05 · CAPA effectiveness and controlled closure</div><h2>Verify corrective action before closing the audit</h2>
+              <p className="panelLead">Major and minor nonconformities use the established CAPA–8D workflow. The auditor must verify implementation and effectiveness against objective evidence before either the finding or this audit can close.</p>
+              <div className="grid4" style={{ marginBottom: 24 }}><div className="metricCard"><strong>{nonconformities.length}</strong><span>Major / Minor NCs</span></div><div className="metricCard"><strong>{nonconformities.filter((item) => item.linked_rca_case_id).length}</strong><span>Linked CAPA–8D cases</span></div><div className="metricCard"><strong>{nonconformities.filter((item) => item.closure_verified).length}</strong><span>Effectiveness verified</span></div><div className="metricCard"><strong>{unresolvedNonconformities.length}</strong><span>Blocking closure</span></div></div>
+              <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">01 · Nonconformity follow-up</span><h3>CAPA–8D effectiveness register</h3><p>Review the linked investigation, corrective actions and verification evidence. Recording an action as complete does not itself prove effectiveness.</p></div><span className="countBadge">{nonconformities.length} NCs</span></div>
+                {nonconformities.length ? <div className="findingList">{nonconformities.map((finding) => { const rcaCase = rcaCasesById.get(finding.linked_rca_case_id); const correctiveActions = rcaActionsByCase.get(finding.linked_rca_case_id) ?? []; const isClosed = finding.status === "closed" && finding.closure_verified; return <article className={`findingCard ${finding.finding_type}`} key={finding.id} style={{ display: "block" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-start" }}><div><b>{finding.finding_reference}</b><h4>{finding.title}</h4><p>{finding.failure_statement || finding.objective_evidence}</p></div><span className="countBadge">{isClosed ? "Effectiveness verified" : "Verification required"}</span></div>
+                  {rcaCase ? <div className="coming" style={{ marginTop: 16 }}><strong>Linked CAPA–8D: {rcaCase.case_reference}</strong><br />Status: {rcaCase.status?.replaceAll("_", " ")} · Current discipline: D{rcaCase.current_discipline ?? 0} · Controlled actions: {correctiveActions.length}<div style={{ marginTop: 12 }}><Link className="button" href={`/portal/rca/${rcaCase.id}`}>Open CAPA–8D Case →</Link></div></div> : <div className="coming" style={{ marginTop: 16 }}><strong>CAPA–8D link missing.</strong><br />This nonconformity cannot be closed until its controlled RCA case exists.</div>}
+                  {!isClosed && rcaCase ? <form action={verifyAuditFindingEffectiveness} style={{ marginTop: 18 }}><input type="hidden" name="audit_id" value={id} /><input type="hidden" name="finding_id" value={finding.id} /><div className="grid3"><label className="field"><span>Effectiveness result *</span><select name="effectiveness_result" defaultValue="effective"><option value="effective">Effective — close finding</option><option value="partially_effective">Partially effective — keep open</option><option value="ineffective">Ineffective — return for action</option></select></label><label className="field span2"><span>Auditor verification conclusion *</span><textarea name="verification_conclusion" required placeholder="State the objective evidence sampled, result obtained and why recurrence risk is acceptably controlled—or why further action is required." /></label></div><label className="check"><input type="checkbox" name="human_verification" required /><span><strong>Independent human verification</strong><br />I reviewed the linked CAPA–8D record and verified this conclusion against objective evidence.</span></label><div className="compactAction"><button className="button approve">Record Effectiveness Decision</button></div></form> : null}</article>; })}</div> : <div className="emptyState">No Major or Minor nonconformities were raised during this audit.</div>}
+              </section>
+              {advisoryFindings.length ? <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">02 · Advisory findings</span><h3>Observations, OFIs and positive practice</h3><p>These remain in the audit record and do not require CAPA–8D unless management formally promotes them.</p></div><span className="countBadge">{advisoryFindings.length} items</span></div><div className="findingList">{advisoryFindings.map((finding) => <article className={`findingCard ${finding.finding_type}`} key={finding.id}><div><b>{finding.finding_reference}</b><h4>{finding.title}</h4><p>{finding.objective_evidence}</p></div><span>{finding.finding_type?.replaceAll("_", " ")}</span></article>)}</div></section> : null}
+              <section className="fieldworkGate"><div><span className="panelKicker">Gate 05 decision</span><h3>Close the controlled audit</h3><p>{unresolvedNonconformities.length ? `${unresolvedNonconformities.length} nonconformity record(s) still block closure. Complete and verify their linked CAPA–8D cases first.` : "All Major and Minor nonconformities have verified effective CAPA. The audit may now be formally closed."}</p></div><form action={completeAuditClosure}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="closure_confirmation" required disabled={unresolvedNonconformities.length > 0} /><span><strong>Accountable audit closure</strong><br />I confirm conclusions are supported, required follow-up is complete, and the audit record is ready for controlled closure.</span></label><div className="compactAction"><button className="button approve" disabled={unresolvedNonconformities.length > 0}>Close Audit</button></div></form></section>
+            </> : null}
           </section>
         </div>
       </div>
