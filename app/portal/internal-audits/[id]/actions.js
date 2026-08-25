@@ -32,7 +32,7 @@ async function context(caseId) {
   } = await supabase
     .from("internal_audits")
     .select(
-      "id, audit_reference, current_gate, scope_approved, plan_approved, planned_start_at, planned_end_at"
+      "id, audit_reference, organization_id, title, current_gate, status, scope_approved, plan_approved, planned_start_at, planned_end_at, auditee_contact_name, auditee_contact_email, sites, processes"
     )
     .eq("id", caseId)
     .eq("owner_id", user.id)
@@ -1585,7 +1585,24 @@ export async function addAuditFinding(
       .slice(0, 4)
       .toUpperCase()}`;
 
-  const { error } = await supabase
+  const isNonconformity = [
+    "major_nc",
+    "minor_nc",
+  ].includes(findingType);
+
+  const responsibleOwnerName = clean(
+    formData.get("responsible_owner_name")
+  );
+
+  const responsibleOwnerEmail = clean(
+    formData.get("responsible_owner_email")
+  );
+
+  const riskLevel = clean(
+    formData.get("risk_level")
+  ) ?? "medium";
+
+  const { data: finding, error } = await supabase
     .from(
       "internal_audit_findings"
     )
@@ -1641,35 +1658,105 @@ export async function addAuditFinding(
         ),
 
       responsible_owner_name:
-        clean(
-          formData.get(
-            "responsible_owner_name"
-          )
-        ),
+        responsibleOwnerName,
 
       responsible_owner_email:
-        clean(
-          formData.get(
-            "responsible_owner_email"
-          )
-        ),
+        responsibleOwnerEmail,
 
       risk_level:
-        clean(
-          formData.get(
-            "risk_level"
-          )
-        ) ?? "medium",
+        riskLevel,
 
       status:
-        "draft",
-    });
+        isNonconformity
+          ? "action_required"
+          : "open",
+    })
+    .select("*")
+    .single();
 
   if (error) {
     throw new Error(
       error.message
     );
   }
+
+  if (isNonconformity) {
+    const rcaReference =
+      `8D-${audit.audit_reference}-${crypto.randomUUID()
+        .slice(0, 6)
+        .toUpperCase()}`;
+
+    const { data: rcaCase, error: rcaError } = await supabase
+      .from("rca_cases")
+      .insert({
+        case_reference: rcaReference,
+        owner_id: user.id,
+        organization_id: audit.organization_id,
+        finding_id: finding.id,
+        method: "8d",
+        source_type: "internal_audit",
+        title: `${findingReference} · ${title}`,
+        problem_statement: failureStatement,
+        severity: riskLevel,
+        status: "draft",
+        current_discipline: 0,
+        sponsor_name: responsibleOwnerName,
+        customer_or_stakeholder:
+          audit.auditee_contact_name ||
+          audit.auditee_contact_email,
+        product_service_process:
+          clean(formData.get("process_area")) ||
+          audit.processes,
+        location: audit.sites,
+        detected_at: new Date().toISOString(),
+        target_close_date:
+          clean(formData.get("corrective_action_due_date")) ||
+          clean(formData.get("response_due_date")),
+      })
+      .select("id")
+      .single();
+
+    if (rcaError || !rcaCase) {
+      await supabase
+        .from("internal_audit_findings")
+        .delete()
+        .eq("id", finding.id)
+        .eq("owner_id", user.id);
+
+      throw new Error(
+        rcaError?.message ||
+        "Unable to create the linked 8D case."
+      );
+    }
+
+    const { error: linkError } = await supabase
+      .from("internal_audit_findings")
+      .update({
+        linked_rca_case_id: rcaCase.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", finding.id)
+      .eq("owner_id", user.id);
+
+    if (linkError) {
+      throw new Error(linkError.message);
+    }
+  }
+
+  await supabase
+    .from("internal_audit_events")
+    .insert({
+      owner_id: user.id,
+      audit_id: auditId,
+      event_type: "finding_recorded",
+      summary: `${findingReference} recorded`,
+      event_data: {
+        finding_id: finding.id,
+        finding_type: findingType,
+        rca_required: isNonconformity,
+      },
+      created_by: user.id,
+    });
 
   returnTo(
     auditId,
@@ -1819,4 +1906,196 @@ export async function completeAuditFieldwork(
     auditId,
     "closing"
   );
+}
+
+export async function verifyAuditFindingEffectiveness(
+  formData
+) {
+  const auditId = clean(formData.get("audit_id"));
+  const findingId = clean(formData.get("finding_id"));
+  const result = clean(formData.get("effectiveness_result"));
+  const conclusion = clean(formData.get("effectiveness_conclusion"));
+
+  if (
+    !auditId ||
+    !findingId ||
+    !["effective", "partially_effective", "ineffective"].includes(result) ||
+    !conclusion ||
+    formData.get("human_verification") !== "on"
+  ) {
+    throw new Error(
+      "A documented effectiveness result and human verification are required."
+    );
+  }
+
+  const { supabase, user } = await context(auditId);
+
+  const { data: finding, error: findingError } = await supabase
+    .from("internal_audit_findings")
+    .select("id, finding_reference, finding_type, linked_rca_case_id")
+    .eq("id", findingId)
+    .eq("audit_id", auditId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  if (
+    findingError ||
+    !finding ||
+    !["major_nc", "minor_nc"].includes(finding.finding_type) ||
+    !finding.linked_rca_case_id
+  ) {
+    throw new Error("A linked audit nonconformity and 8D case are required.");
+  }
+
+  const [rcaResult, actionsResult] = await Promise.all([
+    supabase
+      .from("rca_cases")
+      .select("id, status, current_discipline")
+      .eq("id", finding.linked_rca_case_id)
+      .eq("owner_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("rca_actions")
+      .select("id, status")
+      .eq("case_id", finding.linked_rca_case_id)
+      .eq("owner_id", user.id),
+  ]);
+
+  if (rcaResult.error || !rcaResult.data || actionsResult.error) {
+    throw new Error(
+      rcaResult.error?.message ||
+      actionsResult.error?.message ||
+      "The linked 8D case could not be verified."
+    );
+  }
+
+  const actions = actionsResult.data ?? [];
+  const allActionsComplete =
+    actions.length > 0 &&
+    actions.every((action) =>
+      ["completed", "verified"].includes(action.status)
+    );
+  const rcaAtEffectivenessGate =
+    Number(rcaResult.data.current_discipline) >= 8 ||
+    ["effectiveness_review", "closed"].includes(rcaResult.data.status);
+
+  if (
+    result === "effective" &&
+    (!allActionsComplete || !rcaAtEffectivenessGate)
+  ) {
+    throw new Error(
+      "The 8D must reach effectiveness review and all corrective actions must be completed or verified before the nonconformity can close."
+    );
+  }
+
+  const effective = result === "effective";
+  const now = new Date().toISOString();
+
+  const { error: updateError } = await supabase
+    .from("internal_audit_findings")
+    .update({
+      status: effective ? "closed" : "action_required",
+      closure_verified: effective,
+      closure_verified_by: effective ? user.id : null,
+      closure_verified_at: effective ? now : null,
+      closed_at: effective ? now : null,
+      updated_at: now,
+    })
+    .eq("id", findingId)
+    .eq("audit_id", auditId)
+    .eq("owner_id", user.id);
+
+  if (updateError) throw new Error(updateError.message);
+
+  const { error: rcaUpdateError } = await supabase
+    .from("rca_cases")
+    .update({
+      status: effective ? "closed" : "effectiveness_review",
+      closed_at: effective ? now : null,
+      closure_summary: conclusion,
+      updated_at: now,
+    })
+    .eq("id", finding.linked_rca_case_id)
+    .eq("owner_id", user.id);
+
+  if (rcaUpdateError) throw new Error(rcaUpdateError.message);
+
+  await supabase.from("internal_audit_events").insert({
+    owner_id: user.id,
+    audit_id: auditId,
+    event_type: "capa_effectiveness_verified",
+    summary: `${finding.finding_reference}: ${result}`,
+    event_data: {
+      finding_id: findingId,
+      rca_case_id: finding.linked_rca_case_id,
+      effectiveness_result: result,
+      conclusion,
+    },
+    created_by: user.id,
+  });
+
+  returnTo(auditId, "closing", "effectiveness");
+}
+
+export async function completeAuditClosure(formData) {
+  const auditId = clean(formData.get("audit_id"));
+
+  if (
+    !auditId ||
+    formData.get("closure_confirmation") !== "on"
+  ) {
+    throw new Error("Human audit closure confirmation is required.");
+  }
+
+  const { supabase, user } = await context(auditId);
+
+  const { data: findings, error: findingsError } = await supabase
+    .from("internal_audit_findings")
+    .select("id, finding_reference, linked_rca_case_id, closure_verified, status")
+    .eq("audit_id", auditId)
+    .eq("owner_id", user.id)
+    .in("finding_type", ["major_nc", "minor_nc"]);
+
+  if (findingsError) throw new Error(findingsError.message);
+
+  const unresolved = (findings ?? []).filter(
+    (finding) =>
+      !finding.linked_rca_case_id ||
+      !finding.closure_verified ||
+      finding.status !== "closed"
+  );
+
+  if (unresolved.length > 0) {
+    throw new Error(
+      `Close and verify CAPA effectiveness for: ${unresolved
+        .map((finding) => finding.finding_reference)
+        .join(", ")}.`
+    );
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("internal_audits")
+    .update({
+      current_gate: "closure",
+      status: "closed",
+      updated_at: now,
+    })
+    .eq("id", auditId)
+    .eq("owner_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("internal_audit_events").insert({
+    owner_id: user.id,
+    audit_id: auditId,
+    event_type: "audit_closed",
+    summary: "Audit closed after CAPA effectiveness verification",
+    event_data: {
+      nonconformity_count: (findings ?? []).length,
+    },
+    created_by: user.id,
+  });
+
+  returnTo(auditId, "closing", "closed");
 }
