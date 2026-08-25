@@ -9,6 +9,10 @@ import {
   addAuditTeamMember,
   approveAuditPlan,
   approveAuditTeam,
+  addAuditEvidence,
+  addAuditFinding,
+  completeAuditFieldwork,
+  saveAuditAnswer,
   saveAuditNotification,
   saveAuditScope,
 } from "./actions";
@@ -88,7 +92,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     supabase.from("internal_audits").select(`
       *,
       internal_audit_selected_standards(
-        id, full_or_partial, included_clauses, excluded_clauses,
+        id, standard_id, full_or_partial, included_clauses, excluded_clauses,
         internal_audit_standard_catalogue(display_name, discipline)
       )
     `).eq("id", id).eq("owner_id", user.id).maybeSingle(),
@@ -111,6 +115,27 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const team = teamResult.data ?? [];
   const schedule = scheduleResult.data ?? [];
   const notification = notificationsResult.data?.[0] ?? null;
+  const standardIds = (audit.internal_audit_selected_standards ?? [])
+    .map((row) => row.standard_id)
+    .filter(Boolean);
+  const [questionsResult, answersResult, evidenceResult, findingsResult] = await Promise.all([
+    standardIds.length
+      ? supabase.from("internal_audit_questions").select("*").in("standard_id", standardIds).eq("active", true).order("display_order")
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from("internal_audit_answers").select("*").eq("audit_id", id).eq("owner_id", user.id),
+    supabase.from("internal_audit_evidence").select("*").eq("audit_id", id).eq("owner_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("internal_audit_findings").select("*").eq("audit_id", id).eq("owner_id", user.id).order("created_at", { ascending: false }),
+  ]);
+  if (questionsResult.error) throw new Error(questionsResult.error.message);
+  if (answersResult.error) throw new Error(answersResult.error.message);
+  if (evidenceResult.error) throw new Error(evidenceResult.error.message);
+  if (findingsResult.error) throw new Error(findingsResult.error.message);
+  const questions = questionsResult.data ?? [];
+  const answers = answersResult.data ?? [];
+  const evidence = evidenceResult.data ?? [];
+  const findings = findingsResult.data ?? [];
+  const answersByQuestion = new Map(answers.map((answer) => [answer.question_id, answer]));
+  const assessedCount = answers.filter((answer) => answer.result && answer.result !== "not_assessed").length;
   const inheritedProcesses = splitControlledList(audit.processes);
   const inheritedSites = splitControlledList(audit.sites);
   const defaultProcess = inheritedProcesses[0] ?? audit.scope_statement ?? "";
@@ -175,13 +200,15 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const scopeComplete = Boolean(audit.scope_approved);
   const teamComplete = ["plan", "notification", "fieldwork", "findings", "closing", "report", "follow_up", "closure"].includes(audit.current_gate);
   const planComplete = Boolean(audit.plan_approved) || ["notification", "fieldwork", "findings", "closing", "report", "follow_up", "closure"].includes(audit.current_gate);
+  const fieldworkComplete = ["closing", "report", "follow_up", "closure"].includes(audit.current_gate);
   const requested = typeof query?.gate === "string" ? query.gate : audit.current_gate;
   const gate = requested === "team" && scopeComplete ? "team"
     : requested === "plan" && teamComplete ? "plan"
       : requested === "fieldwork" && planComplete ? "fieldwork"
+        : requested === "closing" && fieldworkComplete ? "closing"
       : requested === "scope" ? "scope"
         : audit.current_gate === "team" && scopeComplete ? "team"
-          : planComplete ? "fieldwork" : teamComplete ? "plan" : "scope";
+          : fieldworkComplete ? "closing" : planComplete ? "fieldwork" : teamComplete ? "plan" : "scope";
 
   return (
     <main className="workspacePage">
@@ -224,8 +251,10 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         .notificationPreview{margin-top:26px;overflow:hidden;border:1px solid #bfd2e6;border-radius:18px;background:#fff;box-shadow:0 16px 38px #061a3510}
         .notificationPreviewHead{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:22px 24px;border-bottom:1px solid #dce6f0;background:linear-gradient(135deg,#eef5ff,#f8fbff)}
         .notificationPreviewHead h4{margin:7px 0 0;font-size:22px}.notificationPreviewBody{padding:24px}.notificationRouting{display:grid;grid-template-columns:1fr 1fr;gap:14px}.notificationRouting p,.notificationSubject{display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;margin:0;padding:14px 16px;border:1px solid #dce6f0;border-radius:12px;background:#f8fafc}.notificationSubject{margin-top:14px}.notificationRouting strong,.notificationSubject strong{color:#48617d;text-transform:uppercase;font-size:11px;letter-spacing:.08em}.notificationRouting span,.notificationSubject span{overflow-wrap:anywhere;color:#102944;font-weight:750}.notificationCopy{margin:16px 0 0;padding:22px;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #dce6f0;border-radius:14px;background:#fbfcfe;color:#17324f;font:inherit;font-size:15px;line-height:1.7}.emailAction{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.sendNote{margin:14px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
-        @media(max-width:1050px){.auditHeader{grid-template-columns:1fr}.sideRail{grid-template-columns:repeat(2,1fr)}.sideRail>.railMetric{min-height:82px}.railBlock{border-top:1px solid #e2e9f1}.gateNav{grid-template-columns:repeat(5,200px);overflow-x:auto}.teamCard{grid-template-columns:1fr 1fr}.grid3,.readinessGrid{grid-template-columns:repeat(2,1fr)}.record{grid-template-columns:1fr auto}}
-        @media(max-width:700px){.workspacePage{padding:14px 10px 60px}.workspaceLogo{width:185px;height:auto}.auditHeader{padding:25px 21px}.auditHeader h1{font-size:34px}.sideRail{grid-template-columns:1fr 1fr}.sideRail>.railMetric,.railBlock{padding:16px}.mainPanel>div.panelKicker,.mainPanel>h2,.mainPanel>p.panelLead,.teamList,.planPreview,.coming{margin-left:18px;margin-right:18px}.mainPanel>div.panelKicker{padding-top:24px}.mainPanel form{padding:0 18px 24px}.mainPanel form>.grid2,.section{padding:14px}.auditStandard,.grid2,.grid3,.planPreview,.teamCard,.readinessGrid,.notificationRouting{grid-template-columns:1fr}.planStack,.planGate{margin-left:18px;margin-right:18px}.record{grid-template-columns:1fr}.actionBar{position:static;align-items:stretch;flex-direction:column}.actionBar:before{margin:0 0 4px}.button{width:100%}.notificationPreviewHead,.notificationPreviewBody{padding:18px}.notificationRouting p,.notificationSubject{grid-template-columns:1fr}}
+        .fieldworkMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 34px 24px}.fieldworkMetrics>div{display:flex;min-height:96px;flex-direction:column;justify-content:center;padding:18px 20px;border:1px solid #d7e3ef;border-radius:16px;background:linear-gradient(145deg,#fafdff,#f1f6fb);box-shadow:0 10px 25px #061a3508}.fieldworkMetrics b{font-size:28px;line-height:1;color:#0d4ec8}.fieldworkMetrics span{margin-top:9px;color:#63778f;font-size:13px;font-weight:800}
+        .fieldworkLayout{display:grid;gap:22px;margin:0 34px 34px}.fieldworkModule{overflow:hidden;border:1px solid #d7e3ef;border-radius:20px;background:#fff;box-shadow:0 16px 38px #061a350b}.fieldworkHead{display:flex;justify-content:space-between;gap:24px;padding:24px 26px;border-bottom:1px solid #dce6f0;background:linear-gradient(135deg,#f7fbff,#edf5fd)}.fieldworkHead h3{margin:6px 0 5px;font-size:25px;letter-spacing:-.02em}.fieldworkHead p{max-width:920px;margin:0;color:var(--muted);font-size:15px;line-height:1.55}.questionList{display:grid;gap:12px;padding:22px}.questionCard{overflow:hidden;border:1px solid #dbe5ef;border-radius:15px;background:#fff}.questionCard.answered{border-left:5px solid #07824d}.questionCard summary{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:center;padding:17px 19px;cursor:pointer;list-style:none;background:#f8fafc}.questionCard summary::-webkit-details-marker{display:none}.questionNumber{display:grid;width:38px;height:38px;place-items:center;border-radius:50%;background:#e9f1ff;color:var(--blue);font-size:12px;font-weight:950}.questionSummary strong,.questionSummary small{display:block}.questionSummary strong{font-size:16px}.questionSummary small{margin-top:4px;color:var(--muted)}.questionState{padding:7px 10px;border-radius:999px;background:#edf2f7;color:#52677e;font-size:11px;font-weight:900;text-transform:capitalize}.questionBody{padding:22px}.questionPrompt{padding:20px;border-radius:15px;background:#071d39;color:#fff}.questionPrompt h4{margin:0 0 13px;color:#fff;font-size:21px;line-height:1.4}.questionPrompt p{display:grid;grid-template-columns:130px minmax(0,1fr);gap:14px;margin:10px 0;color:#d9e6f4;font-size:14px;line-height:1.55}.questionPrompt b{color:#54e2dc}.probeGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}.probeGrid>div{padding:18px;border:1px solid #dce6f0;border-radius:14px;background:#f7faff}.probeGrid b{font-size:15px}.probeGrid ul{margin:10px 0 0;padding-left:20px}.probeGrid li,.probeGrid p{margin:6px 0;color:#536b84;font-size:14px;line-height:1.5}.answerForm{padding:0!important}.answerForm .grid3{padding:0!important;border:0!important;background:transparent!important}.span2{grid-column:span 2}.compactAction{display:flex;justify-content:flex-end;margin-top:16px}.compactAction .button{min-height:48px}.evidenceList,.findingList{display:grid;gap:10px;padding:22px 22px 0}.evidenceCard,.findingCard{display:flex;justify-content:space-between;gap:20px;padding:17px 19px;border:1px solid #dce6f0;border-radius:14px;background:#f8fafc}.evidenceCard h4,.findingCard h4{margin:4px 0 5px;font-size:17px}.evidenceCard p,.findingCard p{margin:0;color:var(--muted);line-height:1.5}.evidenceCard>span,.findingCard>span{align-self:flex-start;padding:7px 10px;border-radius:999px;background:#e9f1ff;color:#1753bf;font-size:11px;font-weight:900;text-transform:capitalize;white-space:nowrap}.findingCard.major_nc{border-left:5px solid #c81e1e}.findingCard.minor_nc{border-left:5px solid #e87917}.findingCard.positive_practice{border-left:5px solid #07824d}.fieldworkModule>form{padding:22px 22px 26px!important}.fieldworkModule>form>.grid3{padding:20px!important;border:1px solid #dce6f0!important;border-radius:17px!important;background:linear-gradient(145deg,#f8fbff,#f3f7fb)!important}.fieldworkGate{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:28px;align-items:center;padding:26px;border:1px solid #9ed8bd;border-radius:20px;background:linear-gradient(135deg,#effaf4,#f9fcfb);box-shadow:0 15px 35px #087a4b0d}.fieldworkGate h3{margin:7px 0 7px;font-size:25px}.fieldworkGate p{margin:0;color:#526b63;line-height:1.55}.fieldworkGate form{padding:0!important}.fieldworkGate .check{min-height:auto}.fieldworkGate .compactAction{margin-top:12px}
+        @media(max-width:1050px){.auditHeader{grid-template-columns:1fr}.sideRail{grid-template-columns:repeat(2,1fr)}.sideRail>.railMetric{min-height:82px}.railBlock{border-top:1px solid #e2e9f1}.gateNav{grid-template-columns:repeat(5,200px);overflow-x:auto}.teamCard{grid-template-columns:1fr 1fr}.grid3,.readinessGrid{grid-template-columns:repeat(2,1fr)}.record{grid-template-columns:1fr auto}.fieldworkMetrics{grid-template-columns:repeat(2,1fr)}.fieldworkGate{grid-template-columns:1fr}.span2{grid-column:auto}}
+        @media(max-width:700px){.workspacePage{padding:14px 10px 60px}.workspaceLogo{width:185px;height:auto}.auditHeader{padding:25px 21px}.auditHeader h1{font-size:34px}.sideRail{grid-template-columns:1fr 1fr}.sideRail>.railMetric,.railBlock{padding:16px}.mainPanel>div.panelKicker,.mainPanel>h2,.mainPanel>p.panelLead,.teamList,.planPreview,.coming{margin-left:18px;margin-right:18px}.mainPanel>div.panelKicker{padding-top:24px}.mainPanel form{padding:0 18px 24px}.mainPanel form>.grid2,.section{padding:14px}.auditStandard,.grid2,.grid3,.planPreview,.teamCard,.readinessGrid,.notificationRouting,.probeGrid{grid-template-columns:1fr}.planStack,.planGate,.fieldworkMetrics,.fieldworkLayout{margin-left:18px;margin-right:18px}.fieldworkMetrics{grid-template-columns:1fr 1fr}.record{grid-template-columns:1fr}.actionBar{position:static;align-items:stretch;flex-direction:column}.actionBar:before{margin:0 0 4px}.button{width:100%}.notificationPreviewHead,.notificationPreviewBody,.fieldworkHead,.questionBody{padding:18px}.notificationRouting p,.notificationSubject{grid-template-columns:1fr}.questionCard summary{grid-template-columns:38px 1fr}.questionState{grid-column:2}.questionPrompt p{grid-template-columns:1fr}.evidenceCard,.findingCard{flex-direction:column}.fieldworkModule>form{padding:18px!important}}
       `}</style>
 
       <div className="workspaceShell">
@@ -246,8 +275,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
 
         <nav className="gateNav" aria-label="Audit lifecycle">
           {GATES.map(([key, number, label], index) => {
-            const unlocked = index === 0 || (index === 1 && scopeComplete) || (index === 2 && teamComplete) || (index === 3 && planComplete);
-            const complete = key === "scope" ? scopeComplete : key === "team" ? teamComplete : key === "plan" ? planComplete : false;
+            const unlocked = index === 0 || (index === 1 && scopeComplete) || (index === 2 && teamComplete) || (index === 3 && planComplete) || (index === 4 && fieldworkComplete);
+            const complete = key === "scope" ? scopeComplete : key === "team" ? teamComplete : key === "plan" ? planComplete : key === "fieldwork" ? fieldworkComplete : false;
             return <Link key={key} href={`/portal/internal-audits/${id}?gate=${key}`} className={`gate ${gate === key ? "active" : ""} ${!unlocked ? "locked" : ""}`} aria-disabled={!unlocked}><b>{number}</b><span><strong>{label}</strong><small>{complete ? "✓ Approved" : unlocked ? "Open" : "🔒 Locked"}</small></span></Link>;
           })}
         </nav>
@@ -375,7 +404,59 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
               <section className="planGate"><h3>Formal plan readiness decision</h3><p>Human approval confirms that the planned audit is feasible, risk-based, adequately resourced and communicated. Approval locks Gate 03 and unlocks Fieldwork.</p><div className="readinessGrid"><div className={`readinessItem ${schedule.length >= 2 ? "ready" : "missing"}`}>{schedule.length >= 2 ? "✓" : "!"} Agenda coverage</div><div className={`readinessItem ${notification ? "ready" : "missing"}`}>{notification ? "✓" : "!"} Notification draft</div></div><form action={approveAuditPlan}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="plan_confirmation" required /><span><strong>Human plan approval</strong><br />I confirm that timing, competence, resources, notification and information requirements are sufficient for controlled fieldwork.</span></label><div className="actionBar"><button className="button approve">Human Approve Plan & Unlock Fieldwork →</button></div></form></section>
             </> : null}
 
-            {gate === "fieldwork" ? <><div className="panelKicker">Gate 04 · Evidence-led fieldwork</div><h2>Execute the approved audit plan</h2><p className="panelLead">The audit plan is approved. The next controlled workspace records interviews, objective evidence, conclusions and findings against the approved criteria.</p><div className="coming"><strong>Fieldwork unlocked.</strong><br />The approved scope and agenda are now the controlled basis for audit execution.</div></> : null}
+            {gate === "fieldwork" ? <>
+              <div className="panelKicker">Gate 04 · Evidence-led fieldwork</div>
+              <h2>Execute the approved audit plan</h2>
+              <p className="panelLead">Test the approved criteria, preserve objective evidence and convert verified conclusions into controlled findings. Every conclusion remains traceable to its criterion, auditor and evidence trail.</p>
+
+              <div className="fieldworkMetrics">
+                <div><b>{assessedCount}/{questions.length}</b><span>Criteria assessed</span></div>
+                <div><b>{evidence.length}</b><span>Evidence records</span></div>
+                <div><b>{findings.length}</b><span>Controlled findings</span></div>
+                <div><b>{schedule.length}</b><span>Approved activities</span></div>
+              </div>
+
+              <div className="fieldworkLayout">
+                <section className="fieldworkModule criteriaWorkbench">
+                  <div className="fieldworkHead"><div><span className="panelKicker">01 · Criteria execution</span><h3>Audit question workbench</h3><p>Use the approved question bank as a guide—not a checklist substitute. Record what was tested, what the evidence demonstrates and any remaining uncertainty.</p></div><span className="countBadge">{questions.length} criteria</span></div>
+                  {questions.length ? <div className="questionList">{questions.map((question, questionIndex) => {
+                    const answer = answersByQuestion.get(question.id);
+                    const probes = Array.isArray(question.suggested_probes) ? question.suggested_probes : [];
+                    const expected = Array.isArray(question.expected_evidence) ? question.expected_evidence : [];
+                    return <details className={`questionCard ${answer?.result && answer.result !== "not_assessed" ? "answered" : ""}`} key={question.id} open={questionIndex === 0 && !answer}>
+                      <summary><span className="questionNumber">{String(questionIndex + 1).padStart(2, "0")}</span><span className="questionSummary"><strong>{question.question_code || question.clause || `Criterion ${questionIndex + 1}`}</strong><small>{question.process_area || "Approved audit criteria"}</small></span><span className="questionState">{answer?.result ? answer.result.replaceAll("_", " ") : "Not assessed"}</span></summary>
+                      <div className="questionBody">
+                        <div className="questionPrompt"><h4>{question.question_text}</h4>{question.requirement_summary ? <p><b>Requirement</b>{question.requirement_summary}</p> : null}{question.auditor_intent ? <p><b>Audit intent</b>{question.auditor_intent}</p> : null}{question.auditor_guidance ? <p><b>Auditor guidance</b>{question.auditor_guidance}</p> : null}</div>
+                        <div className="probeGrid"><div><b>Suggested probes</b>{probes.length ? <ul>{probes.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Follow the process trail and test implementation.</p>}</div><div><b>Expected evidence</b>{expected.length ? <ul>{expected.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Retain sufficient, relevant and reliable objective evidence.</p>}</div></div>
+                        <form action={saveAuditAnswer} className="answerForm"><input type="hidden" name="audit_id" value={id} /><input type="hidden" name="question_id" value={question.id} /><div className="grid3">
+                          <label className="field"><span>Audit conclusion *</span><select name="result" defaultValue={answer?.result ?? "not_assessed"}><option value="not_assessed">Not assessed</option><option value="conformity">Conformity</option><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option><option value="not_applicable">Not applicable</option></select></label>
+                          <label className="field"><span>Evidence confidence</span><select name="confidence_level" defaultValue={answer?.confidence_level ?? "medium"}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+                          <label className="field"><span>Risk significance</span><select name="risk_level" defaultValue={answer?.risk_level ?? "medium"}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
+                          <label className="field"><span>Assigned auditor</span><select name="assigned_team_member_id" defaultValue={answer?.assigned_team_member_id ?? ""}><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label>
+                          <label className="field span2"><span>Evidence-based conclusion</span><textarea name="conclusion" defaultValue={answer?.conclusion ?? ""} placeholder="State what the sampled evidence demonstrates against the criterion." /></label>
+                          <label className="field"><span>Auditor notes</span><textarea name="auditor_notes" defaultValue={answer?.auditor_notes ?? ""} /></label>
+                          <label className="field"><span>N/A justification</span><textarea name="not_applicable_justification" defaultValue={answer?.not_applicable_justification ?? ""} /></label>
+                        </div><div className="compactAction"><button className="button primary">Save Criterion Assessment</button></div></form>
+                      </div>
+                    </details>;
+                  })}</div> : <div className="emptyState">No active audit questions are registered for the selected standard. Register the fieldwork question bank before execution.</div>}
+                </section>
+
+                <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">02 · Objective evidence</span><h3>Evidence register</h3><p>Preserve provenance, relevance, reliability and confidentiality for every material item reviewed.</p></div><span className="countBadge">{evidence.length} records</span></div>
+                  {evidence.length ? <div className="evidenceList">{evidence.map((item) => <article className="evidenceCard" key={item.id}><div><b>{item.evidence_reference}</b><h4>{item.title}</h4><p>{item.description || "No description recorded."}</p></div><span>{item.evidence_type?.replaceAll("_", " ")} · {item.reliability || "unrated"}</span></article>)}</div> : <div className="emptyState">No objective evidence recorded yet.</div>}
+                  <form action={addAuditEvidence}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Linked criterion</span><select name="answer_id"><option value="">General audit evidence</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label><label className="field"><span>Evidence type *</span><select name="evidence_type" defaultValue="document"><option value="document">Document</option><option value="record">Record</option><option value="interview">Interview</option><option value="observation">Observation</option><option value="photograph">Photograph</option><option value="screenshot">Screenshot</option><option value="system_record">System record</option><option value="measurement">Measurement</option><option value="test_result">Test result</option><option value="external_confirmation">External confirmation</option><option value="other">Other</option></select></label><label className="field"><span>Evidence title *</span><input name="title" required /></label><label className="field span2"><span>Description and relevance</span><textarea name="description" /></label><label className="field"><span>Source / interviewee</span><input name="source_name" /></label><label className="field"><span>Source date</span><input name="source_date" type="date" /></label><label className="field"><span>Evidence owner</span><input name="evidence_owner" /></label><label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label><label className="field"><span>Secure external link</span><input name="external_url" type="url" /></label><label className="field"><span>Confidentiality</span><select name="confidentiality" defaultValue="internal"><option value="public">Public</option><option value="internal">Internal</option><option value="confidential">Confidential</option><option value="restricted">Restricted</option></select></label><label className="field"><span>Reliability</span><select name="reliability" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label></div><div className="compactAction"><button className="button primary">Add Objective Evidence</button></div></form>
+                </section>
+
+                <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">03 · Controlled findings</span><h3>Finding register</h3><p>Separate criterion, objective evidence and the conclusion. Nonconformities require an explicit failure statement.</p></div><span className="countBadge">{findings.length} findings</span></div>
+                  {findings.length ? <div className="findingList">{findings.map((item) => <article className={`findingCard ${item.finding_type}`} key={item.id}><div><b>{item.finding_reference}</b><h4>{item.title}</h4><p>{item.objective_evidence}</p></div><span>{item.finding_type?.replaceAll("_", " ")}</span></article>)}</div> : <div className="emptyState">No findings recorded. Conformity and positive practice can still be documented in the criteria workbench.</div>}
+                  <form action={addAuditFinding}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Linked assessment</span><select name="answer_id"><option value="">Select assessed criterion</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label><label className="field"><span>Finding type *</span><select name="finding_type" defaultValue="minor_nc"><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option></select></label><label className="field"><span>Risk level</span><select name="risk_level" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label><label className="field span2"><span>Finding title *</span><input name="title" required /></label><label className="field"><span>Clause / criterion reference</span><input name="clause" /></label><label className="field span2"><span>Audit criterion *</span><textarea name="criteria" required /></label><label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label><label className="field span2"><span>Objective evidence *</span><textarea name="objective_evidence" required /></label><label className="field"><span>Failure statement for NC</span><textarea name="failure_statement" /></label><label className="field"><span>Responsible owner</span><input name="responsible_owner_name" /></label><label className="field"><span>Owner email</span><input name="responsible_owner_email" type="email" /></label></div><div className="compactAction"><button className="button primary">Create Controlled Finding</button></div></form>
+                </section>
+
+                <section className="fieldworkGate"><div><span className="panelKicker">Gate 04 decision</span><h3>Complete fieldwork and unlock Close</h3><p>Confirm that the approved agenda has been executed, evidence is sufficient and relevant, conclusions are supportable, and draft findings have been reviewed with the audit team.</p></div><form action={completeAuditFieldwork}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="fieldwork_confirmation" required /><span><strong>Human fieldwork completion</strong><br />I confirm the audit trail is sufficient for closing review and reporting.</span></label><div className="compactAction"><button className="button approve">Complete Fieldwork & Unlock Close →</button></div></form></section>
+              </div>
+            </> : null}
+
+            {gate === "closing" ? <><div className="panelKicker">Gate 05 · Closing and reporting</div><h2>Conclude the audit</h2><p className="panelLead">Fieldwork is complete. Consolidate conclusions, confirm findings with the auditee, issue the controlled report and connect nonconformities to corrective action and RCA.</p><div className="coming"><strong>Closing review unlocked.</strong><br />The verified evidence trail and controlled findings are now ready for formal reporting and follow-up.</div></> : null}
           </section>
         </div>
       </div>
