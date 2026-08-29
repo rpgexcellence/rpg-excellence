@@ -1735,7 +1735,6 @@ export async function addAuditFinding(
         case_reference: rcaReference,
         owner_id: user.id,
         organization_id: audit.organization_id,
-        finding_id: finding.id,
         method: "8d",
         source_type: "audit",
         title: `${findingReference} · ${title}`,
