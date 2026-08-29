@@ -132,7 +132,12 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   if (answersResult.error) throw new Error(answersResult.error.message);
   if (evidenceResult.error) throw new Error(evidenceResult.error.message);
   if (findingsResult.error) throw new Error(findingsResult.error.message);
-  const questions = questionsResult.data ?? [];
+  const selectedScopeNames = splitControlledList(audit.processes)
+    .map((value) => value.toLocaleLowerCase("en-GB"));
+  const questions = (questionsResult.data ?? []).filter((question) => {
+    if (selectedScopeNames.length === 0) return true;
+    return selectedScopeNames.includes(String(question.process_area ?? "").toLocaleLowerCase("en-GB"));
+  });
   const answers = answersResult.data ?? [];
   const evidence = evidenceResult.data ?? [];
   const findings = findingsResult.data ?? [];
