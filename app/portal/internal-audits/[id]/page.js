@@ -293,6 +293,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         {query?.saved ? <div className="notice">✓ Changes saved to the controlled audit record.</div> : null}
         {query?.plan_error === "agenda" ? <div className="notice error">Plan approval is not yet available. Add at least two agenda activities—for example, an opening meeting and a process audit—then approve the plan again.</div> : null}
         {query?.plan_error === "notification" ? <div className="notice error">Plan approval is not yet available. Save the controlled auditee notification, then approve the plan again.</div> : null}
+        {query?.plan_error === "questions" ? <div className="notice error">Plan approval is not yet available. The selected audit standard has no active audit questions. Add or activate its question bank before approving the plan.</div> : null}
 
         <nav className="gateNav" aria-label="Audit lifecycle">
           {GATES.map(([key, number, label], index) => {
@@ -341,10 +342,35 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                   <form action={addAuditScheduleItem}><input type="hidden" name="audit_id" value={id} /><datalist id="approved-processes">{inheritedProcesses.map((process) => <option value={process} key={process} />)}</datalist><datalist id="approved-sites">{inheritedSites.map((site) => <option value={site} key={site} />)}</datalist><div className="grid3"><label className="field"><span>Activity type *</span><select name="activity_type" required defaultValue="process_audit">{Object.entries(ACTIVITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span>Activity title *</span><input name="title" required defaultValue={defaultProcess ? `${defaultProcess} audit` : ""} /></label><label className="field"><span>Process / scope *</span><input name="process_or_scope" list="approved-processes" required defaultValue={defaultProcess} /><small>Select an approved process or refine the activity scope.</small></label><label className="field"><span>Starts *</span><input name="starts_at" type="datetime-local" required defaultValue={localDateTime(audit.planned_start_at)} /></label><label className="field"><span>Ends *</span><input name="ends_at" type="datetime-local" required defaultValue={localDateTime(audit.planned_end_at)} /></label><label className="field"><span>Lead auditor</span><select name="lead_team_member_id" defaultValue={defaultLead?.id ?? ""}><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label><label className="field"><span>Location or meeting link</span><input name="location_or_link" list="approved-sites" defaultValue={defaultSite} /></label><label className="field"><span>Expected attendees</span><input name="expected_attendees" defaultValue={audit.auditee_contact_name ?? ""} /></label><label className="field"><span>Notes / evidence focus</span><textarea name="notes" defaultValue={audit.known_risks_changes ?? ""} /></label></div><div className="actionBar"><button className="button primary">Add Agenda Activity</button></div></form>
                 </div></section>
 
+                <section className="planModule">
+                  <div className="moduleHead">
+                    <div>
+                      <h3>02 · Planned criteria and audit questions</h3>
+                      <p>Confirm the questions that will guide fieldwork and ensure every selected criterion can be tested.</p>
+                    </div>
+                    <span className="countBadge">{questions.length} question{questions.length === 1 ? "" : "s"}</span>
+                  </div>
+                  <div className="moduleBody">
+                    {questions.length ? (
+                      <div className="recordList">
+                        {questions.map((question, index) => (
+                          <div className="record" key={question.id}>
+                            <div><strong>{String(index + 1).padStart(2, "0")}</strong><small>{question.question_code || question.clause || "Audit criterion"}</small></div>
+                            <div><strong>{question.question_text || question.question || "Planned audit question"}</strong><small>{question.process_area || "Approved audit scope"}{question.clause ? ` · Clause ${question.clause}` : ""}</small></div>
+                            <span className="recordTag">Ready for fieldwork</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="emptyState"><strong>No audit questions are available for the selected standard.</strong><br />The plan cannot be approved until an active question bank is registered. This prevents Fieldwork opening with 0 criteria.</div>
+                    )}
+                  </div>
+                </section>
+
                 <section className="planModule" id="notification-draft">
                   <div className="moduleHead">
                     <div>
-                      <h3>02 · Controlled audit notification</h3>
+                      <h3>03 · Controlled audit notification</h3>
                       <p>Prepare, review and issue the audit notice to the auditee and assigned audit team.</p>
                     </div>
                     <span className="countBadge">{notification ? "Draft ready" : "Not prepared"}</span>
@@ -422,7 +448,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                   </div>
                 </section>
               </div>
-              <section className="planGate"><h3>Formal plan readiness decision</h3><p>Human approval confirms that the planned audit is feasible, risk-based, adequately resourced and communicated. Approval locks Gate 03 and unlocks Fieldwork.</p><div className="readinessGrid"><div className={`readinessItem ${schedule.length >= 2 ? "ready" : "missing"}`}>{schedule.length >= 2 ? "✓" : "!"} Agenda coverage</div><div className={`readinessItem ${notification ? "ready" : "missing"}`}>{notification ? "✓" : "!"} Notification draft</div></div><form action={approveAuditPlan}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="plan_confirmation" required /><span><strong>Human plan approval</strong><br />I confirm that timing, competence, resources, notification and information requirements are sufficient for controlled fieldwork.</span></label><div className="actionBar"><button className="button approve">Human Approve Plan & Unlock Fieldwork →</button></div></form></section>
+              <section className="planGate"><h3>Formal plan readiness decision</h3><p>Human approval confirms that the planned audit is feasible, risk-based, adequately resourced and communicated. Approval locks Gate 03 and unlocks Fieldwork.</p><div className="readinessGrid"><div className={`readinessItem ${schedule.length >= 2 ? "ready" : "missing"}`}>{schedule.length >= 2 ? "✓" : "!"} Agenda coverage</div><div className={`readinessItem ${questions.length > 0 ? "ready" : "missing"}`}>{questions.length > 0 ? "✓" : "!"} Audit questions ({questions.length})</div><div className={`readinessItem ${notification ? "ready" : "missing"}`}>{notification ? "✓" : "!"} Notification draft</div></div><form action={approveAuditPlan}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="plan_confirmation" required /><span><strong>Human plan approval</strong><br />I confirm that timing, competence, resources, planned questions, notification and information requirements are sufficient for controlled fieldwork.</span></label><div className="actionBar"><button className="button approve">Human Approve Plan & Unlock Fieldwork →</button></div></form></section>
             </> : null}
 
             {gate === "fieldwork" ? <>
@@ -460,7 +486,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                         </div><div className="compactAction"><button className="button primary">Save Criterion Assessment</button></div></form>
                       </div>
                     </details>;
-                  })}</div> : <div className="emptyState">No active audit questions are registered for the selected standard. Register the fieldwork question bank before execution.</div>}
+                  })}</div> : <div className="emptyState"><strong>Fieldwork cannot begin because the approved plan contains no audit questions.</strong><br />Return to the <Link href={`/portal/internal-audits/${id}?gate=plan`}>Internal Audit Plan</Link> and register the question bank before execution.</div>}
                 </section>
 
                 <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">02 · Objective evidence</span><h3>Evidence register</h3><p>Preserve provenance, relevance, reliability and confidentiality for every material item reviewed.</p></div><span className="countBadge">{evidence.length} records</span></div>
