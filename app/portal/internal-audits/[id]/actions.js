@@ -578,33 +578,6 @@ export async function addAuditScheduleItem(
     );
   }
 
-  const { data: selectedStandards, error: selectedStandardsError } =
-    await supabase
-      .from("internal_audit_selected_standards")
-      .select("standard_id")
-      .eq("audit_id", auditId)
-      .eq("owner_id", user.id);
-
-  if (selectedStandardsError) {
-    throw new Error(selectedStandardsError.message);
-  }
-
-  const standardIds = (selectedStandards ?? [])
-    .map((item) => item.standard_id)
-    .filter(Boolean);
-
-  const questionCoverage = standardIds.length
-    ? await supabase
-        .from("internal_audit_questions")
-        .select("id", { count: "exact", head: true })
-        .in("standard_id", standardIds)
-        .eq("active", true)
-    : { count: 0, error: null };
-
-  if (questionCoverage.error) {
-    throw new Error(questionCoverage.error.message);
-  }
-
   const startsAt = clean(
     formData.get("starts_at")
   );
@@ -962,6 +935,41 @@ export async function approveAuditPlan(
       "Scope and team approval are required first."
     );
   }
+
+  const { data: selectedStandards, error: selectedStandardsError } = await supabase
+    .from("internal_audit_selected_standards")
+    .select("standard_id, internal_audit_standard_catalogue(standard_code)")
+    .eq("audit_id", auditId)
+    .eq("owner_id", user.id);
+
+  if (selectedStandardsError) {
+    throw new Error(selectedStandardsError.message);
+  }
+
+  const selectedStandardIds = (selectedStandards ?? []).map((item) => item.standard_id).filter(Boolean);
+  const { data: availableQuestions, error: questionsError } = selectedStandardIds.length
+    ? await supabase
+        .from("internal_audit_questions")
+        .select("id, question_code, process_area, standard_id")
+        .in("standard_id", selectedStandardIds)
+        .eq("active", true)
+    : { data: [], error: null };
+
+  if (questionsError) {
+    throw new Error(questionsError.message);
+  }
+
+  const selectedScopeNames = String(audit.processes ?? "")
+    .split(/[,;\n]+/)
+    .map((value) => value.trim().toLocaleLowerCase("en-GB"))
+    .filter(Boolean);
+
+  const scopedQuestions = (availableQuestions ?? []).filter((question) => {
+    if (selectedScopeNames.length === 0) return true;
+    return selectedScopeNames.includes(String(question.process_area ?? "").toLocaleLowerCase("en-GB"));
+  });
+
+  const questionCoverage = { count: scopedQuestions.length };
 
   const [
     schedule,
