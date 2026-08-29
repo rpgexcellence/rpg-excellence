@@ -1737,7 +1737,7 @@ export async function addAuditFinding(
         organization_id: audit.organization_id,
         finding_id: finding.id,
         method: "8d",
-        source_type: "internal_audit",
+        source_type: "audit",
         title: `${findingReference} · ${title}`,
         problem_statement: failureStatement,
         severity: riskLevel,
