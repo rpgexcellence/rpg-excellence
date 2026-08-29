@@ -1711,8 +1711,8 @@ export async function addAuditFinding(
 
       status:
         isNonconformity
-          ? "action_required"
-          : "open",
+          ? "response_due"
+          : "issued",
     })
     .select("*")
     .single();
@@ -2037,7 +2037,7 @@ export async function verifyAuditFindingEffectiveness(
   const { error: updateError } = await supabase
     .from("internal_audit_findings")
     .update({
-      status: effective ? "closed" : "action_required",
+      status: effective ? "closed" : "action_in_progress",
       closure_verified: effective,
       closure_verified_by: effective ? user.id : null,
       closure_verified_at: effective ? now : null,
