@@ -141,6 +141,11 @@ export default async function RcaCasePage({
   }
 
   const rcaCase = caseResult.data;
+  const { data: linkedAuditAction, error: linkedAuditActionError } = await supabase
+    .from("internal_audit_action_access").select("id, status, audit_id")
+    .eq("rca_case_id", id).eq("owner_id", user.id).limit(1).maybeSingle();
+  if (linkedAuditActionError) throw new Error(linkedAuditActionError.message);
+  const finalOwnerResponseSubmitted = ["submitted", "accepted"].includes(linkedAuditAction?.status);
   const {
     data: organization,
     error: organizationError,
@@ -174,7 +179,7 @@ export default async function RcaCasePage({
     })
   );
   const firstIncomplete = disciplines.find(
-    (item) => item.status !== "approved"
+    (item) => Number(item.completion_score || 0) < 100
   );
   const highestUnlocked = firstIncomplete
     ? firstIncomplete.discipline
@@ -189,7 +194,7 @@ export default async function RcaCasePage({
     (item) => item.discipline === selected
   );
   const approvedCount = disciplines.filter(
-    (item) => item.status === "approved"
+    (item) => Number(item.completion_score || 0) >= 100
   ).length;
   const openActions = actions.filter(
     (item) => !["verified", "cancelled"].includes(item.status)
@@ -364,8 +369,10 @@ export default async function RcaCasePage({
                 const active = item.discipline === selected;
                 const locked = item.discipline > highestUnlocked;
                 const statusMark =
-                  item.status === "approved"
-                    ? "✓ Approved"
+                  item.human_approved
+                    ? "✓ Auditor approved"
+                    : Number(item.completion_score || 0) >= 100
+                      ? "✓ Owner completed"
                     : locked
                       ? "🔒 Locked"
                       : label(item.status);
@@ -489,17 +496,17 @@ export default async function RcaCasePage({
                       padding: "8px 12px",
                       borderRadius: "999px",
                       background:
-                        discipline.status === "approved"
+                        discipline.human_approved
                           ? "#e8f8ef"
                           : "#eef4ff",
                       color:
-                        discipline.status === "approved"
+                        discipline.human_approved
                           ? "#067647"
                           : "#175cd3",
                       fontWeight: 800,
                     }}
                   >
-                    {label(discipline.status)}
+                    {discipline.human_approved ? "Auditor Approved" : Number(discipline.completion_score || 0) >= 100 ? "Owner Completed" : label(discipline.status)}
                   </span>
                 </div>
 
@@ -585,13 +592,13 @@ export default async function RcaCasePage({
                       marginTop: "14px",
                     }}
                   >
-                    <button name="intent" value="save" style={primaryButton}>
+                    <button name="intent" value="save" style={primaryButton} disabled={finalOwnerResponseSubmitted}>
                       Save Progress
                     </button>
-                    <button name="intent" value="review" style={secondaryButton}>
+                    {!finalOwnerResponseSubmitted && <button name="intent" value="review" style={secondaryButton}>
                       Ready for Review
-                    </button>
-                    {discipline.status !== "approved" && (
+                    </button>}
+                    {!finalOwnerResponseSubmitted && discipline.status !== "approved" && (
                       <button name="intent" value="approve" style={approveButton}>
                         Human Approve D{selected}
                       </button>
