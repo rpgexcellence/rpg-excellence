@@ -947,16 +947,23 @@ export async function approveAuditPlan(
   }
 
   const selectedStandardIds = (selectedStandards ?? []).map((item) => item.standard_id).filter(Boolean);
-  const { data: availableQuestions, error: questionsError } = selectedStandardIds.length
-    ? await supabase
+  const [{ data: availableQuestions, error: questionsError }, { data: selectedProcesses, error: selectedProcessesError }] = await Promise.all([
+    selectedStandardIds.length ? supabase
         .from("internal_audit_questions")
-        .select("id, question_code, process_area, standard_id")
+        .select("id, question_code, process_area, standard_id, scope_key")
         .in("standard_id", selectedStandardIds)
-        .eq("active", true)
-    : { data: [], error: null };
+        .eq("active", true) : Promise.resolve({ data: [], error: null }),
+    supabase.from("internal_audit_selected_processes")
+      .select("standard_id, scope_key")
+      .eq("audit_id", auditId)
+      .eq("owner_id", user.id),
+  ]);
 
   if (questionsError) {
     throw new Error(questionsError.message);
+  }
+  if (selectedProcessesError) {
+    throw new Error(selectedProcessesError.message);
   }
 
   const selectedScopeNames = String(audit.processes ?? "")
@@ -964,7 +971,12 @@ export async function approveAuditPlan(
     .map((value) => value.trim().toLocaleLowerCase("en-GB"))
     .filter(Boolean);
 
+  const selectedProcessPairs = new Set((selectedProcesses ?? [])
+    .map((item) => `${item.standard_id}:${item.scope_key}`));
   const scopedQuestions = (availableQuestions ?? []).filter((question) => {
+    if (selectedProcessPairs.size > 0) {
+      return selectedProcessPairs.has(`${question.standard_id}:${question.scope_key}`);
+    }
     if (selectedScopeNames.length === 0) return true;
     return selectedScopeNames.includes(String(question.process_area ?? "").toLocaleLowerCase("en-GB"));
   });
