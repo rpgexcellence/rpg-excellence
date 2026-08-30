@@ -337,6 +337,9 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         {query?.team_warning === "lead_required" ? <div className="notice error" role="alert"><strong>Lead auditor required.</strong> Add a team member with the role “Lead auditor” before approving the audit team.</div> : null}
         {query?.team_warning === "governance_required" ? <div className="notice error" role="alert"><strong>Team confirmations required.</strong> Confirm competence, independence and confidentiality for every team member before approval.</div> : null}
         {query?.answer_error === "na_justification" ? <div className="notice error" role="alert"><strong>Justification required.</strong> You selected “Not applicable”. Explain why this audit criterion does not apply, then save the assessment again.</div> : null}
+        {query?.fieldwork_error === "assessment_and_evidence" ? <div className="notice error" role="alert"><strong>Fieldwork cannot be completed yet.</strong> First <Link href="#criteria-workbench">assess at least one audit criterion</Link> and <Link href="#evidence-register">add at least one objective-evidence record</Link>, then confirm completion again.</div> : null}
+        {query?.fieldwork_error === "assessment" ? <div className="notice error" role="alert"><strong>Assessment required.</strong> <Link href="#criteria-workbench">Assess at least one audit criterion</Link> before completing Fieldwork.</div> : null}
+        {query?.fieldwork_error === "evidence" ? <div className="notice error" role="alert"><strong>Objective evidence required.</strong> <Link href="#evidence-register">Add at least one evidence record</Link> before completing Fieldwork.</div> : null}
 
         <nav className="gateNav" aria-label="Audit lifecycle">
           {GATES.map(([key, number, label], index) => {
@@ -577,7 +580,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                   </div><div className="compactAction"><button className="button primary">Create Controlled Finding</button></div></form>
                 </section>
 
-                <section className="fieldworkGate"><div><span className="panelKicker">Gate 04 decision</span><h3>Complete fieldwork and unlock Close</h3><p>Confirm that the approved agenda has been executed, evidence is sufficient and relevant, conclusions are supportable, and draft findings have been reviewed with the audit team.</p></div><form action={completeAuditFieldwork}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="fieldwork_confirmation" required /><span><strong>Human fieldwork completion</strong><br />I confirm the audit trail is sufficient for closing review and reporting.</span></label><div className="compactAction"><button className="button approve">Complete Fieldwork & Unlock Close →</button></div></form></section>
+                <section className="fieldworkGate" id="fieldwork-requirements"><div><span className="panelKicker">Gate 04 decision</span><h3>Complete fieldwork and unlock Close</h3><p>Confirm that the approved agenda has been executed, evidence is sufficient and relevant, conclusions are supportable, and draft findings have been reviewed with the audit team.</p></div><form action={completeAuditFieldwork}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="fieldwork_confirmation" required /><span><strong>Human fieldwork completion</strong><br />I confirm the audit trail is sufficient for closing review and reporting.</span></label><div className="compactAction"><button className="button approve">Complete Fieldwork & Unlock Close →</button></div></form></section>
               </div>
             </> : null}
 
