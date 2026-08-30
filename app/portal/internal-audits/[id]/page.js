@@ -13,6 +13,7 @@ import {
   addAuditFinding,
   completeAuditFieldwork,
   completeAuditClosure,
+  linkAuditFindingToAnswer,
   saveAuditAnswer,
   saveAuditNotification,
   saveAuditScope,
@@ -500,7 +501,24 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                 </section>
 
                 <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">03 · Controlled findings</span><h3>Finding register</h3><p>Separate criterion, objective evidence and the conclusion. Nonconformities require an explicit failure statement.</p></div><span className="countBadge">{findings.length} findings</span></div>
-                  {findings.length ? <div className="findingList">{findings.map((item) => <article className={`findingCard ${item.finding_type}`} key={item.id}><div><b>{item.finding_reference}</b><h4>{item.title}</h4><p>{item.objective_evidence}</p></div><span>{item.finding_type?.replaceAll("_", " ")}</span></article>)}</div> : <div className="emptyState">No findings recorded. Conformity and positive practice can still be documented in the criteria workbench.</div>}
+                  {findings.length ? <div className="findingList">{findings.map((item) => {
+                    const linkedAnswer = answers.find((answer) => answer.id === item.answer_id);
+                    const linkedQuestion = linkedAnswer ? questions.find((question) => question.id === linkedAnswer.question_id) : null;
+                    return <article className={`findingCard ${item.finding_type}`} key={item.id}>
+                      <div><b>{item.finding_reference}</b><h4>{item.title}</h4><p>{item.objective_evidence}</p>
+                        {linkedQuestion ? <p><strong>Linked criterion:</strong> {linkedQuestion.question_code || linkedQuestion.clause}</p> : (
+                          <form action={linkAuditFindingToAnswer} style={{marginTop:12}}>
+                            <input type="hidden" name="audit_id" value={id} />
+                            <input type="hidden" name="finding_id" value={item.id} />
+                            <div style={{display:"flex",gap:10,alignItems:"end",flexWrap:"wrap"}}>
+                              <label className="field" style={{minWidth:280,flex:1}}><span>Link assessed criterion</span><select name="answer_id" required defaultValue=""><option value="" disabled>Select assessed criterion</option>{answers.map((answer) => { const q = questions.find((question) => question.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"} · {answer.result?.replaceAll("_", " ")}</option>; })}</select></label>
+                              <button className="button primary" type="submit">Link Finding</button>
+                            </div>
+                          </form>
+                        )}
+                      </div><span>{item.finding_type?.replaceAll("_", " ")}</span>
+                    </article>;
+                  })}</div> : <div className="emptyState">No findings recorded. Conformity and positive practice can still be documented in the criteria workbench.</div>}
                   <form action={addAuditFinding}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Linked assessment</span><select name="answer_id"><option value="">Select assessed criterion</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label><label className="field"><span>Finding type *</span><select name="finding_type" defaultValue="minor_nc"><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option></select></label><label className="field"><span>Risk level</span><select name="risk_level" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label><label className="field span2"><span>Finding title *</span><input name="title" required /></label><label className="field"><span>Clause / criterion reference</span><input name="clause" /></label><label className="field span2"><span>Audit criterion *</span><textarea name="criteria" required /></label><label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label><label className="field span2"><span>Objective evidence *</span><textarea name="objective_evidence" required /></label><label className="field"><span>Failure statement for NC</span><textarea name="failure_statement" /></label><label className="field"><span>Responsible owner</span><input name="responsible_owner_name" /></label><label className="field"><span>Owner email</span><input name="responsible_owner_email" type="email" /></label></div><div className="compactAction"><button className="button primary">Create Controlled Finding</button></div></form>
                 </section>
 
