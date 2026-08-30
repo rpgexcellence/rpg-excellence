@@ -101,7 +101,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
       <div className="iaShell">
         <div className="iaTop">
           <Link href="/portal" aria-label="RPG Excellence portal"><Image className="iaLogo" src="/rpg-excellence-logo.png" alt="RPG Excellence" width={250} height={68} priority /></Link>
-          <Link href="/portal" className="iaBack">← Customer Portal</Link>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><Link href="/portal/internal-audit-actions" className="iaBack">My Audit Actions</Link><Link href="/portal" className="iaBack">← Customer Portal</Link></div>
         </div>
 
         <div id="rpgIaWelcomeBanner" aria-labelledby="rpgIaWelcomeTitle">
