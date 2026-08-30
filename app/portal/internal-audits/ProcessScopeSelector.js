@@ -168,6 +168,37 @@ export default function ProcessScopeSelector({ standards }) {
     .filter(Boolean);
   if (includeOther && otherProcess.trim()) selectedNames.push(`Other: ${otherProcess.trim()}`);
 
+  const selectedScopeEntries = useMemo(() => {
+    const entries = [];
+
+    for (const standardId of selectedStandards) {
+      const standard = standards.find((item) => item.id === standardId);
+      const key = catalogueKey(standard?.standard_code);
+
+      for (const process of PROCESS_CATALOGUES[key] ?? []) {
+        if (!selectedProcesses.includes(process[0])) continue;
+
+        entries.push({
+          standard_id: standardId,
+          scope_key: process[0],
+          process_name: process[1],
+        });
+      }
+    }
+
+    if (includeOther && otherProcess.trim()) {
+      for (const standardId of selectedStandards) {
+        entries.push({
+          standard_id: standardId,
+          scope_key: "other",
+          process_name: `Other: ${otherProcess.trim()}`,
+        });
+      }
+    }
+
+    return entries;
+  }, [includeOther, otherProcess, selectedProcesses, selectedStandards, standards]);
+
   function toggleStandard(id) {
     setSelectedStandards((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   }
@@ -205,6 +236,7 @@ export default function ProcessScopeSelector({ standards }) {
       </div>
 
       <input type="hidden" name="processes" value={selectedNames.join("\n")} />
+      <input type="hidden" name="process_scope_json" value={JSON.stringify(selectedScopeEntries)} />
 
       {selectedStandards.length === 0 ? (
         <div className="processEmpty">Select at least one audit standard to load its process-based audit catalogue.</div>
