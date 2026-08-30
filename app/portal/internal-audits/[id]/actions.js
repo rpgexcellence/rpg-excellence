@@ -2427,11 +2427,35 @@ export async function reviewAuditActionResponse(formData) {
   }
   const { supabase, user } = await context(auditId);
   const now = new Date().toISOString();
+  const { data: access, error: accessLookupError } = await supabase.from("internal_audit_action_access")
+    .select("id, rca_case_id").eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+  if (accessLookupError || !access) throw new Error(accessLookupError?.message || "Assigned 8D response not found.");
   const { error } = await supabase.from("internal_audit_action_access").update({
     status: decision, auditor_response: response, auditor_response_at: now,
     auditor_response_by: user.id, updated_at: now,
   }).eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
+  if (access.rca_case_id) {
+    const stageUpdate = decision === "accepted"
+      ? { status: "approved", human_approved: true, approved_by: user.id, approved_at: now }
+      : { status: "in_progress", human_approved: false, approved_by: null, approved_at: null };
+    const { error: stageError } = await supabase.from("rca_8d_disciplines").update(stageUpdate)
+      .eq("case_id", access.rca_case_id).eq("owner_id", user.id);
+    if (stageError) throw new Error(stageError.message);
+    const { error: caseError } = await supabase.from("rca_cases").update({
+      status: decision === "accepted" ? "effectiveness_review" : "active",
+      current_discipline: 8,
+      updated_at: now,
+    }).eq("id", access.rca_case_id).eq("owner_id", user.id);
+    if (caseError) throw new Error(caseError.message);
+    await supabase.from("rca_case_events").insert({
+      case_id: access.rca_case_id, owner_id: user.id,
+      event_type: decision === "accepted" ? "final_8d_accepted" : "final_8d_returned",
+      discipline: 8,
+      summary: decision === "accepted" ? "Final D0-D8 response accepted by auditor" : "Final D0-D8 response returned for revision",
+      event_data: { action_access_id: accessId, auditor_response: response },
+    });
+  }
   returnTo(auditId, "actions", "action_review");
 }
 
