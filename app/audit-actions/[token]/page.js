@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { notFound } from "next/navigation";
 import { createAdminClient } from "../../../lib/supabase/admin";
 import { submitExternalAuditAction } from "./actions";
 
@@ -10,10 +9,18 @@ export default async function AuditActionOwnerPage({ params, searchParams }) {
   const query = await searchParams;
   const supabase = createAdminClient();
   const tokenHash = createHash("sha256").update(token).digest("hex");
-  const { data: access, error } = await supabase.from("internal_audit_action_access").select("*, internal_audit_findings(finding_reference, finding_type, risk_level, title, failure_statement, criteria, objective_evidence, process_area, agreed_date), internal_audits(audit_reference, title)").eq("secure_token_hash", tokenHash).gt("secure_token_expires_at", new Date().toISOString()).maybeSingle();
-  if (error || !access) notFound();
-  const finding = access.internal_audit_findings;
-  const audit = access.internal_audits;
+  const { data: access, error } = await supabase.from("internal_audit_action_access").select("*").eq("secure_token_hash", tokenHash).gt("secure_token_expires_at", new Date().toISOString()).maybeSingle();
+  if (error) throw new Error(`Secure action lookup failed: ${error.message}`);
+  if (!access) return <main style={{minHeight:"100vh",display:"grid",placeItems:"center",padding:24,background:"#eef4fb",color:"#061a35",fontFamily:"Arial,sans-serif"}}><section style={{maxWidth:650,padding:32,border:"1px solid #d5e1ed",borderRadius:18,background:"#fff",boxShadow:"0 15px 35px #061a3510"}}><h1 style={{marginTop:0}}>This secure action link is invalid or has expired</h1><p>Ask the lead auditor to generate a new action-owner link from the audit’s Actions tab. For security, expired and replaced links cannot be reopened.</p></section></main>;
+  const [findingResult, auditResult] = await Promise.all([
+    supabase.from("internal_audit_findings").select("finding_reference, finding_type, risk_level, title, failure_statement, criteria, objective_evidence, process_area, agreed_date").eq("id", access.finding_id).maybeSingle(),
+    supabase.from("internal_audits").select("audit_reference, title").eq("id", access.audit_id).maybeSingle(),
+  ]);
+  if (findingResult.error) throw new Error(`Assigned finding lookup failed: ${findingResult.error.message}`);
+  if (auditResult.error) throw new Error(`Assigned audit lookup failed: ${auditResult.error.message}`);
+  if (!findingResult.data || !auditResult.data) throw new Error("The secure assignment exists but its controlled audit record is unavailable.");
+  const finding = findingResult.data;
+  const audit = auditResult.data;
   return <main className="ownerPage"><style>{`
     *{box-sizing:border-box}.ownerPage{min-height:100vh;padding:32px 18px 70px;background:#eef4fb;color:#061a35;font-family:Arial,sans-serif}.ownerShell{max-width:1050px;margin:auto}.ownerHead{padding:30px;border-radius:22px;background:linear-gradient(125deg,#061a35,#0b4477);color:#fff}.ownerHead small{color:#63e2dd;font-weight:900;text-transform:uppercase;letter-spacing:.1em}.ownerHead h1{margin:8px 0}.ownerHead p{margin:0;color:#d5e3f2}.notice{margin:18px 0;padding:15px 18px;border-radius:12px;background:#e8f8ef;color:#07613a;font-weight:800}.notice.error{background:#fff1e2;color:#844800}.card{margin-top:18px;padding:24px;border:1px solid #d5e1ed;border-radius:18px;background:#fff;box-shadow:0 15px 35px #061a3510}.locked{border-left:5px solid #1761e8}.locked h2{margin:6px 0}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.meta div{padding:13px;border-radius:10px;background:#f3f7fb}.meta b,.meta span{display:block}.meta span{margin-top:5px;color:#60758d}.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.field{display:flex;flex-direction:column;gap:7px}.field span{font-size:13px;font-weight:850}.field textarea,.field input{width:100%;min-height:48px;padding:12px;border:1px solid #cbd8e6;border-radius:10px;font:inherit}.field textarea{min-height:120px;resize:vertical}.wide{grid-column:1/-1}.button{margin-top:18px;min-height:48px;padding:0 20px;border:0;border-radius:10px;background:#1761e8;color:#fff;font:inherit;font-weight:900;cursor:pointer}.control{margin-top:18px;padding:14px;border-radius:12px;background:#fff8e7;color:#6a4c08;line-height:1.5}@media(max-width:700px){.grid,.meta{grid-template-columns:1fr}.wide{grid-column:auto}}
   `}</style><div className="ownerShell">
