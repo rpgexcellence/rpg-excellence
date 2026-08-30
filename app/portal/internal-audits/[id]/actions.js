@@ -1541,6 +1541,52 @@ export async function addAuditEvidence(
   );
 }
 
+export async function linkAuditFindingToAnswer(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  const findingId = clean(formData.get("finding_id"));
+  const answerId = clean(formData.get("answer_id"));
+
+  if (!auditId || !findingId || !answerId) {
+    throw new Error("Select an assessed criterion to link to the finding.");
+  }
+
+  const { supabase, user, audit } = await context(auditId);
+  if (!audit.plan_approved) {
+    throw new Error("The approved audit plan is required.");
+  }
+
+  const [findingResult, answerResult] = await Promise.all([
+    supabase.from("internal_audit_findings").select("id, answer_id")
+      .eq("id", findingId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
+    supabase.from("internal_audit_answers").select("id")
+      .eq("id", answerId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
+  ]);
+
+  if (findingResult.error || !findingResult.data) {
+    throw new Error("Controlled finding not found.");
+  }
+  if (answerResult.error || !answerResult.data) {
+    throw new Error("The selected assessed criterion is unavailable.");
+  }
+
+  const { error } = await supabase.from("internal_audit_findings")
+    .update({ answer_id: answerId, updated_at: new Date().toISOString() })
+    .eq("id", findingId).eq("audit_id", auditId).eq("owner_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("internal_audit_events").insert({
+    owner_id: user.id,
+    audit_id: auditId,
+    event_type: "finding_linked_to_assessment",
+    summary: "Controlled finding linked to assessed audit criterion",
+    event_data: { finding_id: findingId, answer_id: answerId },
+    created_by: user.id,
+  });
+
+  returnTo(auditId, "fieldwork", "finding_linked");
+}
+
 export async function addAuditFinding(
   formData
 ) {
