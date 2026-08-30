@@ -96,7 +96,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
       *,
       internal_audit_selected_standards(
         id, standard_id, full_or_partial, included_clauses, excluded_clauses,
-        internal_audit_standard_catalogue(display_name, discipline)
+        internal_audit_standard_catalogue(standard_code, display_name, discipline)
       )
     `).eq("id", id).eq("owner_id", user.id).maybeSingle(),
     supabase.from("internal_audit_team_members").select("*")
@@ -124,9 +124,21 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const standardIds = (audit.internal_audit_selected_standards ?? [])
     .map((row) => row.standard_id)
     .filter(Boolean);
+  const selectedProcessPairs = new Set((selectedProcessesResult.data ?? [])
+    .map((item) => `${item.standard_id}:${item.scope_key}`));
+  const questionLinksResult = standardIds.length
+    ? await supabase.from("internal_audit_question_scope_links")
+        .select("question_id, standard_id, scope_key, clause, requirement_summary, internal_audit_standard_catalogue(standard_code, display_name)")
+        .in("standard_id", standardIds)
+    : { data: [], error: null };
+  if (questionLinksResult.error) throw new Error(questionLinksResult.error.message);
+  const scopedQuestionLinks = (questionLinksResult.data ?? []).filter((link) =>
+    selectedProcessPairs.size === 0 || selectedProcessPairs.has(`${link.standard_id}:${link.scope_key}`)
+  );
+  const linkedQuestionIds = [...new Set(scopedQuestionLinks.map((link) => link.question_id).filter(Boolean))];
   const [questionsResult, answersResult, evidenceResult, findingsResult] = await Promise.all([
-    standardIds.length
-      ? supabase.from("internal_audit_questions").select("*").in("standard_id", standardIds).eq("active", true).order("display_order")
+    linkedQuestionIds.length
+      ? supabase.from("internal_audit_questions").select("*").in("id", linkedQuestionIds).eq("active", true).order("display_order")
       : Promise.resolve({ data: [], error: null }),
     supabase.from("internal_audit_answers").select("*").eq("audit_id", id).eq("owner_id", user.id),
     supabase.from("internal_audit_evidence").select("*").eq("audit_id", id).eq("owner_id", user.id).order("created_at", { ascending: false }),
@@ -136,20 +148,29 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   if (answersResult.error) throw new Error(answersResult.error.message);
   if (evidenceResult.error) throw new Error(evidenceResult.error.message);
   if (findingsResult.error) throw new Error(findingsResult.error.message);
-  const selectedProcessPairs = new Set((selectedProcessesResult.data ?? [])
-    .map((item) => `${item.standard_id}:${item.scope_key}`));
-  const selectedScopeNames = splitControlledList(audit.processes)
-    .map((value) => value.toLocaleLowerCase("en-GB"));
-  const questions = (questionsResult.data ?? []).filter((question) => {
-    if (selectedProcessPairs.size > 0) {
-      return selectedProcessPairs.has(`${question.standard_id}:${question.scope_key}`);
-    }
-    if (selectedScopeNames.length === 0) return true;
-    return selectedScopeNames.includes(String(question.process_area ?? "").toLocaleLowerCase("en-GB"));
-  });
+  const linksByQuestion = new Map();
+  for (const link of scopedQuestionLinks) {
+    const current = linksByQuestion.get(link.question_id) ?? [];
+    current.push(link);
+    linksByQuestion.set(link.question_id, current);
+  }
+  const questions = (questionsResult.data ?? []).map((question) => ({
+    ...question,
+    criteria_links: linksByQuestion.get(question.id) ?? [],
+  }));
   const answers = answersResult.data ?? [];
   const evidence = evidenceResult.data ?? [];
   const findings = findingsResult.data ?? [];
+  const findingAttachmentPaths = findings.map((finding) => finding.evidence_attachment_path).filter(Boolean);
+  const findingAttachmentUrls = new Map();
+  if (findingAttachmentPaths.length > 0) {
+    const { data: signedAttachments } = await supabase.storage
+      .from("internal-audit-evidence")
+      .createSignedUrls(findingAttachmentPaths, 3600);
+    for (const attachment of signedAttachments ?? []) {
+      if (attachment.path && attachment.signedUrl) findingAttachmentUrls.set(attachment.path, attachment.signedUrl);
+    }
+  }
   const linkedRcaIds = [...new Set(findings.map((finding) => finding.linked_rca_case_id).filter(Boolean))];
   const [rcaCasesResult, rcaActionsResult] = linkedRcaIds.length
     ? await Promise.all([
@@ -187,6 +208,12 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const standards = (audit.internal_audit_selected_standards ?? [])
     .map((row) => row.internal_audit_standard_catalogue?.display_name)
     .filter(Boolean);
+  const selectedStandardOptions = (audit.internal_audit_selected_standards ?? [])
+    .map((row) => ({
+      id: row.standard_id,
+      label: row.internal_audit_standard_catalogue?.display_name,
+    }))
+    .filter((item) => item.id && item.label);
 
   const teamEmails = [...new Set(
     team.map((member) => member.email?.trim()).filter(Boolean)
@@ -489,7 +516,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                     return <details className={`questionCard ${answer?.result && answer.result !== "not_assessed" ? "answered" : ""}`} key={question.id} open={questionIndex === 0 && !answer}>
                       <summary><span className="questionNumber">{String(questionIndex + 1).padStart(2, "0")}</span><span className="questionSummary"><strong>{question.question_code || question.clause || `Criterion ${questionIndex + 1}`}</strong><small>{question.process_area || "Approved audit criteria"}</small></span><span className="questionState">{answer?.result ? answer.result.replaceAll("_", " ") : "Not assessed"}</span></summary>
                       <div className="questionBody">
-                        <div className="questionPrompt"><h4>{question.question_text}</h4>{question.requirement_summary ? <p><b>Requirement</b>{question.requirement_summary}</p> : null}{question.auditor_intent ? <p><b>Audit intent</b>{question.auditor_intent}</p> : null}{question.auditor_guidance ? <p><b>Auditor guidance</b>{question.auditor_guidance}</p> : null}</div>
+                        <div className="questionPrompt"><h4>{question.question_text}</h4>{question.criteria_links?.length ? <p><b>Applicable criteria</b>{question.criteria_links.map((link) => `${link.internal_audit_standard_catalogue?.standard_code ?? "Standard"}${link.clause ? ` ${link.clause}` : ""}`).join(" · ")}</p> : null}{question.requirement_summary ? <p><b>Requirement</b>{question.requirement_summary}</p> : null}{question.auditor_intent ? <p><b>Audit intent</b>{question.auditor_intent}</p> : null}{question.auditor_guidance ? <p><b>Auditor guidance</b>{question.auditor_guidance}</p> : null}</div>
                         <div className="probeGrid"><div><b>Suggested probes</b>{probes.length ? <ul>{probes.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Follow the process trail and test implementation.</p>}</div><div><b>Expected evidence</b>{expected.length ? <ul>{expected.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Retain sufficient, relevant and reliable objective evidence.</p>}</div></div>
                         <form action={saveAuditAnswer} className="answerForm"><input type="hidden" name="audit_id" value={id} /><input type="hidden" name="question_id" value={question.id} /><div className="grid3">
                           <label className="field"><span>Audit conclusion *</span><select name="result" defaultValue={answer?.result ?? "not_assessed"}><option value="not_assessed">Not assessed</option><option value="conformity">Conformity</option><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option><option value="not_applicable">Not applicable</option></select></label>
@@ -515,7 +542,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                     const linkedAnswer = answers.find((answer) => answer.id === item.answer_id);
                     const linkedQuestion = linkedAnswer ? questions.find((question) => question.id === linkedAnswer.question_id) : null;
                     return <article className={`findingCard ${item.finding_type}`} key={item.id}>
-                      <div><b>{item.finding_reference}</b><h4>{item.title}</h4><p>{item.objective_evidence}</p>
+                      <div><b>{item.finding_reference}</b><h4>{item.title}</h4><p>{item.objective_evidence}</p>{item.evidence_attachment_path ? <p><strong>Supporting evidence:</strong> <a href={findingAttachmentUrls.get(item.evidence_attachment_path) ?? "#"} target="_blank" rel="noreferrer">{item.evidence_attachment_name || "Open attachment"}</a></p> : null}
                         {linkedQuestion ? <p><strong>Linked criterion:</strong> {linkedQuestion.question_code || linkedQuestion.clause}</p> : (
                           <form action={linkAuditFindingToAnswer} style={{marginTop:12}}>
                             <input type="hidden" name="audit_id" value={id} />
@@ -529,7 +556,25 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                       </div><span>{item.finding_type?.replaceAll("_", " ")}</span>
                     </article>;
                   })}</div> : <div className="emptyState">No findings recorded. Conformity and positive practice can still be documented in the criteria workbench.</div>}
-                  <form action={addAuditFinding}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Linked assessment</span><select name="answer_id"><option value="">Select assessed criterion</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label><label className="field"><span>Finding type *</span><select name="finding_type" defaultValue="minor_nc"><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option></select></label><label className="field"><span>Risk level</span><select name="risk_level" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label><label className="field span2"><span>Finding title *</span><input name="title" required /></label><label className="field"><span>Clause / criterion reference</span><input name="clause" /></label><label className="field span2"><span>Audit criterion *</span><textarea name="criteria" required /></label><label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label><label className="field span2"><span>Objective evidence *</span><textarea name="objective_evidence" required /></label><label className="field"><span>Failure statement for NC</span><textarea name="failure_statement" /></label><label className="field"><span>Responsible owner</span><input name="responsible_owner_name" /></label><label className="field"><span>Owner email</span><input name="responsible_owner_email" type="email" /></label></div><div className="compactAction"><button className="button primary">Create Controlled Finding</button></div></form>
+                  <form action={addAuditFinding} encType="multipart/form-data"><input type="hidden" name="audit_id" value={id} /><div className="grid3">
+                    <label className="field"><span>Linked assessment</span><select name="answer_id"><option value="">Select assessed criterion</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label>
+                    <label className="field"><span>Finding type *</span><select name="finding_type" defaultValue="minor_nc"><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option></select></label>
+                    <label className="field"><span>Risk level</span><select name="risk_level" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
+                    <label className="field span2"><span>Finding headline *</span><input name="title" required placeholder="Concise description of the issue" /></label>
+                    <label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label>
+                    <label className="field span2"><span>Statement of nonconformity</span><textarea name="failure_statement" placeholder="State clearly what failed to conform. Required for major and minor nonconformities." /></label>
+                    <label className="field"><span>Source of requirement *</span><select name="requirement_source" required defaultValue="management_system_standard"><option value="management_system_standard">Applicable management system standard</option><option value="legal_regulatory">Legal or regulatory requirement</option><option value="customer_contractual">Customer or contractual requirement</option><option value="policy_procedure">Organisation policy or procedure</option><option value="certification_scheme">Certification or accreditation scheme</option><option value="other_criteria">Other specified audit criteria</option></select></label>
+                    <label className="field"><span>Applicable standard</span><select name="requirement_standard_id" defaultValue=""><option value="">Not applicable / select standard</option>{selectedStandardOptions.map((standard) => <option key={standard.id} value={standard.id}>{standard.label}</option>)}</select></label>
+                    <label className="field"><span>Clause / requirement reference</span><input name="clause" placeholder="e.g. ISO 45001 clause 8.2" /></label>
+                    <label className="field span2"><span>Requirement *</span><textarea name="criteria" required placeholder="State the applicable requirement accurately and specifically." /></label>
+                    <label className="field"><span>Source of evidence *</span><select name="evidence_source" required defaultValue="document_record"><option value="document_record">Document or controlled record</option><option value="interview">Interview or testimony</option><option value="observation">Physical or process observation</option><option value="system_record">System or transactional record</option><option value="photograph_screenshot">Photograph or screenshot</option><option value="measurement_test">Measurement or test result</option><option value="external_confirmation">External confirmation</option><option value="multiple_sources">Multiple corroborating sources</option><option value="other">Other evidence source</option></select></label>
+                    <label className="field span2"><span>Evidence *</span><textarea name="objective_evidence" required placeholder="Record the factual, verifiable evidence demonstrating the extent of conformity or failure." /></label>
+                    <label className="field span2"><span>Attach supporting evidence</span><input name="evidence_file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx" /><small>PDF, image, text, CSV, Word or Excel; maximum 10 MB.</small></label>
+                    <label className="field"><span>Agreed date</span><input name="agreed_date" type="date" /></label>
+                    <label className="field"><span>Responsible owner</span><input name="responsible_owner_name" /></label>
+                    <label className="field"><span>Owner email</span><input name="responsible_owner_email" type="email" /></label>
+                    <label className="field"><span>Owner telephone</span><input name="responsible_owner_phone" type="tel" /></label>
+                  </div><div className="compactAction"><button className="button primary">Create Controlled Finding</button></div></form>
                 </section>
 
                 <section className="fieldworkGate"><div><span className="panelKicker">Gate 04 decision</span><h3>Complete fieldwork and unlock Close</h3><p>Confirm that the approved agenda has been executed, evidence is sufficient and relevant, conclusions are supportable, and draft findings have been reviewed with the audit team.</p></div><form action={completeAuditFieldwork}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="fieldwork_confirmation" required /><span><strong>Human fieldwork completion</strong><br />I confirm the audit trail is sufficient for closing review and reporting.</span></label><div className="compactAction"><button className="button approve">Complete Fieldwork & Unlock Close →</button></div></form></section>
