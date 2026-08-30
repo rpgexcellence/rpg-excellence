@@ -2103,7 +2103,7 @@ export async function completeAuditFieldwork(
         "closing",
 
       status:
-        "closing_review",
+        "closing_meeting",
 
       updated_at:
         now,
