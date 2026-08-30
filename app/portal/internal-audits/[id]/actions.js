@@ -4,8 +4,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { createHash, randomBytes } from "node:crypto";
 
 import { createClient } from "../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../lib/supabase/admin";
 
 const clean = (value) =>
   typeof value === "string" && value.trim()
@@ -2100,10 +2102,10 @@ export async function completeAuditFieldwork(
     .from("internal_audits")
     .update({
       current_gate:
-        "closing",
+        "report",
 
       status:
-        "closing_meeting",
+        "report_draft",
 
       updated_at:
         now,
@@ -2130,7 +2132,7 @@ export async function completeAuditFieldwork(
         "fieldwork_completed",
 
       summary:
-        "Fieldwork completed; close gate unlocked",
+        "Fieldwork completed; report gate unlocked",
 
       event_data: {
         assessed:
@@ -2146,7 +2148,7 @@ export async function completeAuditFieldwork(
 
   returnTo(
     auditId,
-    "closing"
+    "report"
   );
 }
 
@@ -2157,12 +2159,14 @@ export async function verifyAuditFindingEffectiveness(
   const findingId = clean(formData.get("finding_id"));
   const result = clean(formData.get("effectiveness_result"));
   const conclusion = clean(formData.get("effectiveness_conclusion"));
+  const verificationMethod = clean(formData.get("verification_method"));
 
   if (
     !auditId ||
     !findingId ||
     !["effective", "partially_effective", "ineffective"].includes(result) ||
     !conclusion ||
+    !verificationMethod ||
     formData.get("human_verification") !== "on"
   ) {
     throw new Error(
@@ -2225,9 +2229,7 @@ export async function verifyAuditFindingEffectiveness(
     result === "effective" &&
     (!allActionsComplete || !rcaAtEffectivenessGate)
   ) {
-    throw new Error(
-      "The 8D must reach effectiveness review and all corrective actions must be completed or verified before the nonconformity can close."
-    );
+    redirect(`/portal/internal-audits/${auditId}?gate=closing&closure_error=capa#verify-${findingId}`);
   }
 
   const effective = result === "effective";
@@ -2262,6 +2264,22 @@ export async function verifyAuditFindingEffectiveness(
 
   if (rcaUpdateError) throw new Error(rcaUpdateError.message);
 
+  const actionStatus = effective
+    ? "verified_effective"
+    : result === "partially_effective"
+      ? "verified_partially_effective"
+      : "verified_ineffective";
+  const { error: accessUpdateError } = await supabase.from("internal_audit_action_access").update({
+    status: actionStatus,
+    verification_method: verificationMethod,
+    verification_evidence: conclusion,
+    effectiveness_result: result,
+    verified_at: now,
+    verified_by: user.id,
+    updated_at: now,
+  }).eq("finding_id", findingId).eq("audit_id", auditId).eq("owner_id", user.id);
+  if (accessUpdateError) throw new Error(accessUpdateError.message);
+
   await supabase.from("internal_audit_events").insert({
     owner_id: user.id,
     audit_id: auditId,
@@ -2279,6 +2297,144 @@ export async function verifyAuditFindingEffectiveness(
   returnTo(auditId, "closing", "effectiveness");
 }
 
+export async function saveAuditReport(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  if (!auditId) throw new Error("Audit reference is required.");
+  const { supabase, user, audit } = await context(auditId);
+  const reportReference = clean(formData.get("report_reference")) || `${audit.audit_reference}-RPT`;
+  const { data: existingReport, error: existingReportError } = await supabase
+    .from("internal_audit_report_controls").select("report_version, status")
+    .eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+  if (existingReportError) throw new Error(existingReportError.message);
+  const payload = {
+    owner_id: user.id,
+    audit_id: auditId,
+    report_reference: reportReference,
+    report_version: existingReport?.status === "issued"
+      ? (existingReport.report_version || 1) + 1
+      : existingReport?.report_version || 1,
+    executive_summary: clean(formData.get("executive_summary")),
+    methodology_and_sampling: clean(formData.get("methodology_and_sampling")),
+    limitations_and_exclusions: clean(formData.get("limitations_and_exclusions")),
+    unresolved_differences: clean(formData.get("unresolved_differences")),
+    overall_conclusion: clean(formData.get("overall_conclusion")),
+    confidentiality_classification: clean(formData.get("confidentiality_classification")) || "controlled",
+    distribution_list: clean(formData.get("distribution_list")),
+    lead_auditor_name: clean(formData.get("lead_auditor_name")),
+    status: "draft",
+    approved_at: null,
+    approved_by: null,
+    issued_at: null,
+    issued_by: null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("internal_audit_report_controls")
+    .upsert(payload, { onConflict: "audit_id" });
+  if (error) throw new Error(error.message);
+  const { error: auditError } = await supabase.from("internal_audits").update({
+    current_gate: "report", status: "report_draft", updated_at: new Date().toISOString(),
+  }).eq("id", auditId).eq("owner_id", user.id);
+  if (auditError) throw new Error(auditError.message);
+  returnTo(auditId, "report", "report");
+}
+
+export async function approveAuditReport(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  if (!auditId || formData.get("report_approval_confirmation") !== "on") {
+    throw new Error("Lead-auditor report approval is required.");
+  }
+  const { supabase, user } = await context(auditId);
+  const { data: report, error: reportError } = await supabase.from("internal_audit_report_controls")
+    .select("id, executive_summary, overall_conclusion, lead_auditor_name")
+    .eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+  if (reportError) throw new Error(reportError.message);
+  if (!report?.executive_summary || !report?.overall_conclusion || !report?.lead_auditor_name) {
+    redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=incomplete`);
+  }
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("internal_audit_report_controls").update({
+    status: "approved", approved_at: now, approved_by: user.id, updated_at: now,
+  }).eq("id", report.id).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  await supabase.from("internal_audits").update({ current_gate: "actions", status: "report_approved", updated_at: now })
+    .eq("id", auditId).eq("owner_id", user.id);
+  returnTo(auditId, "actions", "report_approved");
+}
+
+export async function issueAuditReport(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  if (!auditId) throw new Error("Audit reference is required.");
+  const { supabase, user } = await context(auditId);
+  const { data: report, error: reportReadError } = await supabase.from("internal_audit_report_controls")
+    .select("id, status").eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+  if (reportReadError) throw new Error(reportReadError.message);
+  if (!report || !["approved", "issued"].includes(report.status)) {
+    redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=approval_required`);
+  }
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("internal_audit_report_controls").update({
+    status: "issued", issued_at: now, issued_by: user.id, updated_at: now,
+  }).eq("id", report.id).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  await supabase.from("internal_audits").update({ current_gate: "actions", status: "capa_monitoring", updated_at: now })
+    .eq("id", auditId).eq("owner_id", user.id);
+  returnTo(auditId, "actions", "report_issued");
+}
+
+export async function assignAuditActionOwner(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  const findingId = clean(formData.get("finding_id"));
+  const assigneeName = clean(formData.get("assignee_name"));
+  const assigneeEmail = clean(formData.get("assignee_email"))?.toLowerCase();
+  let assigneeUserId = clean(formData.get("assignee_user_id"));
+  if (!auditId || !findingId || !assigneeName || !assigneeEmail) {
+    throw new Error("Action-owner name and email are required.");
+  }
+  const { supabase, user } = await context(auditId);
+  if (!assigneeUserId) {
+    const admin = createAdminClient();
+    const { data: usersResult } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    assigneeUserId = usersResult?.users?.find((candidate) => candidate.email?.toLowerCase() === assigneeEmail)?.id || null;
+  }
+  const { data: finding, error: findingError } = await supabase.from("internal_audit_findings")
+    .select("id, linked_rca_case_id, finding_type").eq("id", findingId).eq("audit_id", auditId)
+    .eq("owner_id", user.id).maybeSingle();
+  if (findingError || !finding || !["major_nc", "minor_nc"].includes(finding.finding_type)) {
+    throw new Error(findingError?.message || "Only a controlled nonconformity can be assigned.");
+  }
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: access, error } = await supabase.from("internal_audit_action_access").upsert({
+    owner_id: user.id, audit_id: auditId, finding_id: findingId,
+    rca_case_id: finding.linked_rca_case_id, assignee_user_id: assigneeUserId,
+    assignee_name: assigneeName, assignee_email: assigneeEmail,
+    secure_token_hash: tokenHash, secure_token_expires_at: expiresAt,
+    status: "assigned", updated_at: new Date().toISOString(),
+  }, { onConflict: "finding_id" }).select("id").single();
+  if (error || !access) throw new Error(error?.message || "Unable to assign the action owner.");
+  revalidatePath(`/portal/internal-audits/${auditId}`);
+  redirect(`/portal/internal-audits/${auditId}?gate=actions&saved=owner&access=${access.id}&action_token=${token}#action-${findingId}`);
+}
+
+export async function reviewAuditActionResponse(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  const accessId = clean(formData.get("action_access_id"));
+  const decision = clean(formData.get("decision"));
+  const response = clean(formData.get("auditor_response"));
+  if (!auditId || !accessId || !response || !["accepted", "returned"].includes(decision)) {
+    throw new Error("Record an auditor decision and response.");
+  }
+  const { supabase, user } = await context(auditId);
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("internal_audit_action_access").update({
+    status: decision, auditor_response: response, auditor_response_at: now,
+    auditor_response_by: user.id, updated_at: now,
+  }).eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  returnTo(auditId, "actions", "action_review");
+}
+
 export async function completeAuditClosure(formData) {
   const auditId = clean(formData.get("audit_id"));
 
@@ -2290,6 +2446,17 @@ export async function completeAuditClosure(formData) {
   }
 
   const { supabase, user } = await context(auditId);
+
+  const { data: report, error: reportError } = await supabase
+    .from("internal_audit_report_controls")
+    .select("status")
+    .eq("audit_id", auditId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (reportError) throw new Error(reportError.message);
+  if (report?.status !== "issued") {
+    redirect(`/portal/internal-audits/${auditId}?gate=closing&closure_error=report`);
+  }
 
   const { data: findings, error: findingsError } = await supabase
     .from("internal_audit_findings")
@@ -2308,11 +2475,7 @@ export async function completeAuditClosure(formData) {
   );
 
   if (unresolved.length > 0) {
-    throw new Error(
-      `Close and verify CAPA effectiveness for: ${unresolved
-        .map((finding) => finding.finding_reference)
-        .join(", ")}.`
-    );
+    redirect(`/portal/internal-audits/${auditId}?gate=closing&closure_error=actions`);
   }
 
   const now = new Date().toISOString();
