@@ -12,6 +12,28 @@ const clean = (value) =>
     ? value.trim()
     : null;
 
+const AUDIT_EVIDENCE_BUCKET = "internal-audit-evidence";
+const MAX_FINDING_EVIDENCE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_FINDING_EVIDENCE_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "text/plain",
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
+function safeEvidenceFileName(name) {
+  return String(name || "evidence")
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 120) || "evidence";
+}
+
 async function context(caseId) {
   const supabase = await createClient();
 
@@ -1299,8 +1321,8 @@ export async function saveAuditAnswer(
       "not_applicable" &&
     !justification
   ) {
-    throw new Error(
-      "A not-applicable conclusion requires justification."
+    redirect(
+      `/portal/internal-audits/${auditId}?gate=fieldwork&answer_error=na_justification&question=${questionId}#question-${questionId}`
     );
   }
 
@@ -1626,6 +1648,29 @@ export async function addAuditFinding(
     )
   );
 
+  const requirementSource = clean(formData.get("requirement_source"));
+  const requirementStandardId = clean(formData.get("requirement_standard_id"));
+  const evidenceSource = clean(formData.get("evidence_source"));
+  const requirementSources = [
+    "management_system_standard",
+    "legal_regulatory",
+    "customer_contractual",
+    "policy_procedure",
+    "certification_scheme",
+    "other_criteria",
+  ];
+  const evidenceSources = [
+    "document_record",
+    "interview",
+    "observation",
+    "system_record",
+    "photograph_screenshot",
+    "measurement_test",
+    "external_confirmation",
+    "multiple_sources",
+    "other",
+  ];
+
   const types = [
     "major_nc",
     "minor_nc",
@@ -1642,11 +1687,17 @@ export async function addAuditFinding(
     ) ||
     !title ||
     !criteria ||
-    !objectiveEvidence
+    !objectiveEvidence ||
+    !requirementSources.includes(requirementSource) ||
+    !evidenceSources.includes(evidenceSource)
   ) {
     throw new Error(
       "Finding type, title, criteria and objective evidence are required."
     );
+  }
+
+  if (requirementSource === "management_system_standard" && !requirementStandardId) {
+    throw new Error("Select the applicable management system standard.");
   }
 
   const failureStatement = clean(
@@ -1681,6 +1732,19 @@ export async function addAuditFinding(
     );
   }
 
+  if (requirementStandardId) {
+    const { data: selectedStandard } = await supabase
+      .from("internal_audit_selected_standards")
+      .select("id")
+      .eq("audit_id", auditId)
+      .eq("standard_id", requirementStandardId)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!selectedStandard) {
+      throw new Error("The selected requirement standard is not included in this audit.");
+    }
+  }
+
   const findingReference =
     `${audit.audit_reference}-${findingType.toUpperCase()}-${crypto.randomUUID()
       .slice(0, 4)
@@ -1702,6 +1766,16 @@ export async function addAuditFinding(
   const riskLevel = clean(
     formData.get("risk_level")
   ) ?? "medium";
+
+  const evidenceFile = formData.get("evidence_file");
+  const hasEvidenceFile = typeof File !== "undefined" && evidenceFile instanceof File && evidenceFile.size > 0;
+
+  if (hasEvidenceFile && evidenceFile.size > MAX_FINDING_EVIDENCE_BYTES) {
+    throw new Error("The evidence attachment exceeds the 10 MB file limit.");
+  }
+  if (hasEvidenceFile && !ALLOWED_FINDING_EVIDENCE_TYPES.has(evidenceFile.type)) {
+    throw new Error("The evidence attachment file type is not accepted.");
+  }
 
   const { data: finding, error } = await supabase
     .from(
@@ -1731,6 +1805,12 @@ export async function addAuditFinding(
 
       criteria,
 
+      requirement_source:
+        requirementSource,
+
+      requirement_standard_id:
+        requirementStandardId,
+
       clause:
         clean(
           formData.get(
@@ -1740,6 +1820,9 @@ export async function addAuditFinding(
 
       objective_evidence:
         objectiveEvidence,
+
+      evidence_source:
+        evidenceSource,
 
       failure_statement:
         failureStatement,
@@ -1764,6 +1847,12 @@ export async function addAuditFinding(
       responsible_owner_email:
         responsibleOwnerEmail,
 
+      responsible_owner_phone:
+        clean(formData.get("responsible_owner_phone")),
+
+      agreed_date:
+        clean(formData.get("agreed_date")),
+
       risk_level:
         riskLevel,
 
@@ -1779,6 +1868,49 @@ export async function addAuditFinding(
     throw new Error(
       error.message
     );
+  }
+
+  let evidenceStoragePath = null;
+  if (hasEvidenceFile) {
+    evidenceStoragePath = [
+      user.id,
+      auditId,
+      "findings",
+      finding.id,
+      `${crypto.randomUUID()}-${safeEvidenceFileName(evidenceFile.name)}`,
+    ].join("/");
+
+    const { error: uploadError } = await supabase.storage
+      .from(AUDIT_EVIDENCE_BUCKET)
+      .upload(evidenceStoragePath, evidenceFile, {
+        contentType: evidenceFile.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      await supabase.from("internal_audit_findings").delete()
+        .eq("id", finding.id).eq("owner_id", user.id);
+      throw new Error(uploadError.message);
+    }
+
+    const { error: attachmentError } = await supabase
+      .from("internal_audit_findings")
+      .update({
+        evidence_attachment_path: evidenceStoragePath,
+        evidence_attachment_name: evidenceFile.name,
+        evidence_attachment_type: evidenceFile.type,
+        evidence_attachment_size: evidenceFile.size,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", finding.id)
+      .eq("owner_id", user.id);
+
+    if (attachmentError) {
+      await supabase.storage.from(AUDIT_EVIDENCE_BUCKET).remove([evidenceStoragePath]);
+      await supabase.from("internal_audit_findings").delete()
+        .eq("id", finding.id).eq("owner_id", user.id);
+      throw new Error(attachmentError.message);
+    }
   }
 
   if (isNonconformity) {
@@ -1810,6 +1942,7 @@ export async function addAuditFinding(
         location: audit.sites,
         detected_at: new Date().toISOString(),
         target_close_date:
+          clean(formData.get("agreed_date")) ||
           clean(formData.get("corrective_action_due_date")) ||
           clean(formData.get("response_due_date")),
       })
@@ -1817,6 +1950,9 @@ export async function addAuditFinding(
       .single();
 
     if (rcaError || !rcaCase) {
+      if (evidenceStoragePath) {
+        await supabase.storage.from(AUDIT_EVIDENCE_BUCKET).remove([evidenceStoragePath]);
+      }
       await supabase
         .from("internal_audit_findings")
         .delete()
