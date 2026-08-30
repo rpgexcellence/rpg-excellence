@@ -2082,8 +2082,14 @@ export async function completeAuditFieldwork(
     (answers.count ?? 0) < 1 ||
     (evidence.count ?? 0) < 1
   ) {
-    throw new Error(
-      "Record at least one assessed criterion and one item of objective evidence before closing fieldwork."
+    const missing = (answers.count ?? 0) < 1 && (evidence.count ?? 0) < 1
+      ? "assessment_and_evidence"
+      : (answers.count ?? 0) < 1
+        ? "assessment"
+        : "evidence";
+
+    redirect(
+      `/portal/internal-audits/${auditId}?gate=fieldwork&fieldwork_error=${missing}`
     );
   }
 
