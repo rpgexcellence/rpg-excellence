@@ -276,18 +276,14 @@ export async function createInternalAudit(formData) {
     !validDate(plannedStart) ||
     !validDate(plannedEnd)
   ) {
-    throw new Error(
-      "Valid planned start and end dates are required."
-    );
+    redirect("/portal/internal-audits?create_error=invalid_dates#audit-mandate");
   }
 
   const plannedStartDate = new Date(plannedStart);
   const plannedEndDate = new Date(plannedEnd);
 
   if (plannedEndDate <= plannedStartDate) {
-    throw new Error(
-      "The planned end must be later than the planned start."
-    );
+    redirect("/portal/internal-audits?create_error=date_order#audit-mandate");
   }
 
   if (!purpose || !scopeStatement) {
