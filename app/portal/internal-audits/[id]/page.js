@@ -91,7 +91,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/portal/login?next=/portal/internal-audits/${id}`);
 
-  const [auditResult, teamResult, scheduleResult, notificationsResult] = await Promise.all([
+  const [auditResult, teamResult, scheduleResult, notificationsResult, selectedProcessesResult] = await Promise.all([
     supabase.from("internal_audits").select(`
       *,
       internal_audit_selected_standards(
@@ -106,6 +106,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     supabase.from("internal_audit_notifications").select("*")
       .eq("audit_id", id).eq("owner_id", user.id).eq("notification_type", "audit_notification")
       .order("updated_at", { ascending: false }).limit(1),
+    supabase.from("internal_audit_selected_processes").select("standard_id, scope_key, process_name")
+      .eq("audit_id", id).eq("owner_id", user.id),
   ]);
 
   if (auditResult.error) throw new Error(auditResult.error.message);
@@ -113,6 +115,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   if (teamResult.error) throw new Error(teamResult.error.message);
   if (scheduleResult.error) throw new Error(scheduleResult.error.message);
   if (notificationsResult.error) throw new Error(notificationsResult.error.message);
+  if (selectedProcessesResult.error) throw new Error(selectedProcessesResult.error.message);
 
   const audit = auditResult.data;
   const team = teamResult.data ?? [];
@@ -133,9 +136,14 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   if (answersResult.error) throw new Error(answersResult.error.message);
   if (evidenceResult.error) throw new Error(evidenceResult.error.message);
   if (findingsResult.error) throw new Error(findingsResult.error.message);
+  const selectedProcessPairs = new Set((selectedProcessesResult.data ?? [])
+    .map((item) => `${item.standard_id}:${item.scope_key}`));
   const selectedScopeNames = splitControlledList(audit.processes)
     .map((value) => value.toLocaleLowerCase("en-GB"));
   const questions = (questionsResult.data ?? []).filter((question) => {
+    if (selectedProcessPairs.size > 0) {
+      return selectedProcessPairs.has(`${question.standard_id}:${question.scope_key}`);
+    }
     if (selectedScopeNames.length === 0) return true;
     return selectedScopeNames.includes(String(question.process_area ?? "").toLocaleLowerCase("en-GB"));
   });
