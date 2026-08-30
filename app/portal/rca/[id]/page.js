@@ -412,6 +412,14 @@ export default async function RcaCasePage({
                     Record the discipline evidence, analysis and conclusion before submitting it for review. For D3, you may instead record an evidence-based “No containment action required” decision.
                   </div>
                 )}
+                {pageError === "d3_containment_required" && (
+                  <div style={validationNoticeStyle}>
+                    <strong>D3 containment decision required.</strong>
+                    <div style={{ marginTop: "6px" }}>
+                      Add at least one interim containment action below, or select “No containment action required” and provide an evidence-based justification. D3 will remain open until one of these controls is recorded.
+                    </div>
+                  </div>
+                )}
                 {pageError === "missing_validated_causes" && (
                   <div style={validationNoticeStyle}>
                     <strong>D4 cannot be approved yet.</strong>
