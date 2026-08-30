@@ -569,11 +569,10 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                     <label className="field span2"><span>Requirement *</span><textarea name="criteria" required placeholder="State the applicable requirement accurately and specifically." /></label>
                     <label className="field"><span>Source of evidence *</span><select name="evidence_source" required defaultValue="document_record"><option value="document_record">Document or controlled record</option><option value="interview">Interview or testimony</option><option value="observation">Physical or process observation</option><option value="system_record">System or transactional record</option><option value="photograph_screenshot">Photograph or screenshot</option><option value="measurement_test">Measurement or test result</option><option value="external_confirmation">External confirmation</option><option value="multiple_sources">Multiple corroborating sources</option><option value="other">Other evidence source</option></select></label>
                     <label className="field span2"><span>Evidence *</span><textarea name="objective_evidence" required placeholder="Record the factual, verifiable evidence demonstrating the extent of conformity or failure." /></label>
-                    <label className="field span2"><span>Attach supporting evidence</span><input name="evidence_file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx" /><small>PDF, image, text, CSV, Word or Excel; maximum 10 MB.</small></label>
-                    <label className="field"><span>Agreed date</span><input name="agreed_date" type="date" /></label>
+                    <label className="field" style={{gridColumn:"1 / -1"}}><span>Attach supporting evidence</span><input name="evidence_file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx" /><small>PDF, image, text, CSV, Word or Excel; maximum 10 MB.</small></label>
                     <label className="field"><span>Responsible owner</span><input name="responsible_owner_name" /></label>
                     <label className="field"><span>Owner email</span><input name="responsible_owner_email" type="email" /></label>
-                    <label className="field"><span>Owner telephone</span><input name="responsible_owner_phone" type="tel" /></label>
+                    <label className="field"><span>Agreed date</span><input name="agreed_date" type="date" /></label>
                   </div><div className="compactAction"><button className="button primary">Create Controlled Finding</button></div></form>
                 </section>
 
