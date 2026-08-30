@@ -98,6 +98,46 @@ function selectedProcessesFrom(formData) {
   ]);
 }
 
+function selectedProcessScopeFrom(formData, allowedStandardIds) {
+  const raw = clean(formData.get("process_scope_json"));
+  if (!raw) return [];
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("The selected process scope is invalid. Refresh the page and select the processes again.");
+  }
+
+  if (!Array.isArray(parsed) || parsed.length > 250) {
+    throw new Error("The selected process scope is invalid.");
+  }
+
+  const allowed = new Set(allowedStandardIds);
+  const seen = new Set();
+  const result = [];
+
+  for (const item of parsed) {
+    const standardId = clean(item?.standard_id);
+    const scopeKey = clean(item?.scope_key);
+    const processName = clean(item?.process_name);
+
+    if (!standardId || !allowed.has(standardId) || !scopeKey || !processName) {
+      throw new Error("A selected process does not match the selected audit standards.");
+    }
+    if (!/^[a-z0-9-]{1,80}$/.test(scopeKey) || processName.length > 180) {
+      throw new Error("A selected process contains an invalid controlled value.");
+    }
+
+    const identity = `${standardId}:${scopeKey}`;
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    result.push({ standard_id: standardId, scope_key: scopeKey, process_name: processName });
+  }
+
+  return result;
+}
+
 function validDate(value) {
   return Boolean(
     value &&
@@ -200,6 +240,7 @@ export async function createInternalAudit(formData) {
   );
   const selectedProcesses =
     selectedProcessesFrom(formData);
+  const selectedProcessScope = selectedProcessScopeFrom(formData, standardIds);
 
   if (!organizationId) {
     throw new Error(
@@ -394,6 +435,21 @@ export async function createInternalAudit(formData) {
     );
   }
 
+  if (selectedProcessScope.length > 0) {
+    const { error: processScopeError } = await supabase
+      .from("internal_audit_selected_processes")
+      .insert(selectedProcessScope.map((item) => ({
+        owner_id: user.id,
+        audit_id: audit.id,
+        ...item,
+      })));
+
+    if (processScopeError) {
+      await removeIncompleteAudit(supabase, audit.id, user.id);
+      throw new Error(processScopeError.message);
+    }
+  }
+
   const standardSummary =
     (validStandards ?? []).map(
       (standard) => ({
@@ -422,6 +478,7 @@ export async function createInternalAudit(formData) {
           standard_count:
             standardSummary.length,
           processes: selectedProcesses,
+          process_scope: selectedProcessScope,
           process_count:
             selectedProcesses.length,
           scope_basis:
