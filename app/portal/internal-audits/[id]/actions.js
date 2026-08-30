@@ -69,6 +69,11 @@ function returnTo(
   );
 }
 
+function returnTeamWarning(auditId, warning) {
+  revalidatePath(`/portal/internal-audits/${auditId}`);
+  redirect(`/portal/internal-audits/${auditId}?gate=team&team_warning=${warning}`);
+}
+
 export async function saveAuditScope(
   formData
 ) {
@@ -468,9 +473,7 @@ export async function approveAuditTeam(
         "lead_auditor"
     )
   ) {
-    throw new Error(
-      "Assign a lead auditor before approving the team."
-    );
+    returnTeamWarning(auditId, "lead_required");
   }
 
   if (
@@ -481,9 +484,7 @@ export async function approveAuditTeam(
         !member.confidentiality_confirmed
     )
   ) {
-    throw new Error(
-      "Confirm competence, independence and confidentiality for every team member."
-    );
+    returnTeamWarning(auditId, "governance_required");
   }
 
   const { error } = await supabase
