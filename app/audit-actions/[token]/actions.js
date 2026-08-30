@@ -237,9 +237,7 @@ export async function saveDiscipline(formData) {
       Boolean(decisionResult.data?.no_action_justification?.trim());
 
     if ((containmentResult.count ?? 0) === 0 && !noContainmentDocumented) {
-      throw new Error(
-        "Before approving D3, add a containment action or document why no containment action is required."
-      );
+      redirect(await secureCasePath(caseId, "?d=3&error=d3_containment_required"));
     }
   }
 
