@@ -336,6 +336,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         {query?.plan_error === "questions" ? <div className="notice error">Plan approval is not yet available. The selected audit standard has no active audit questions. Add or activate its question bank before approving the plan.</div> : null}
         {query?.team_warning === "lead_required" ? <div className="notice error" role="alert"><strong>Lead auditor required.</strong> Add a team member with the role “Lead auditor” before approving the audit team.</div> : null}
         {query?.team_warning === "governance_required" ? <div className="notice error" role="alert"><strong>Team confirmations required.</strong> Confirm competence, independence and confidentiality for every team member before approval.</div> : null}
+        {query?.answer_error === "na_justification" ? <div className="notice error" role="alert"><strong>Justification required.</strong> You selected “Not applicable”. Explain why this audit criterion does not apply, then save the assessment again.</div> : null}
 
         <nav className="gateNav" aria-label="Audit lifecycle">
           {GATES.map(([key, number, label], index) => {
@@ -513,7 +514,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                     const answer = answersByQuestion.get(question.id);
                     const probes = Array.isArray(question.suggested_probes) ? question.suggested_probes : [];
                     const expected = Array.isArray(question.expected_evidence) ? question.expected_evidence : [];
-                    return <details className={`questionCard ${answer?.result && answer.result !== "not_assessed" ? "answered" : ""}`} key={question.id} open={questionIndex === 0 && !answer}>
+                    return <details id={`question-${question.id}`} className={`questionCard ${answer?.result && answer.result !== "not_assessed" ? "answered" : ""}`} key={question.id} open={(questionIndex === 0 && !answer) || query?.question === question.id}>
                       <summary><span className="questionNumber">{String(questionIndex + 1).padStart(2, "0")}</span><span className="questionSummary"><strong>{question.question_code || question.clause || `Criterion ${questionIndex + 1}`}</strong><small>{question.process_area || "Approved audit criteria"}</small></span><span className="questionState">{answer?.result ? answer.result.replaceAll("_", " ") : "Not assessed"}</span></summary>
                       <div className="questionBody">
                         <div className="questionPrompt"><h4>{question.question_text}</h4>{question.criteria_links?.length ? <p><b>Applicable criteria</b>{question.criteria_links.map((link) => `${link.internal_audit_standard_catalogue?.standard_code ?? "Standard"}${link.clause ? ` ${link.clause}` : ""}`).join(" · ")}</p> : null}{question.requirement_summary ? <p><b>Requirement</b>{question.requirement_summary}</p> : null}{question.auditor_intent ? <p><b>Audit intent</b>{question.auditor_intent}</p> : null}{question.auditor_guidance ? <p><b>Auditor guidance</b>{question.auditor_guidance}</p> : null}</div>
@@ -525,7 +526,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                           <label className="field"><span>Assigned auditor</span><select name="assigned_team_member_id" defaultValue={answer?.assigned_team_member_id ?? ""}><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label>
                           <label className="field span2"><span>Evidence-based conclusion</span><textarea name="conclusion" defaultValue={answer?.conclusion ?? ""} placeholder="State what the sampled evidence demonstrates against the criterion." /></label>
                           <label className="field"><span>Auditor notes</span><textarea name="auditor_notes" defaultValue={answer?.auditor_notes ?? ""} /></label>
-                          <label className="field"><span>N/A justification</span><textarea name="not_applicable_justification" defaultValue={answer?.not_applicable_justification ?? ""} /></label>
+                          <label className="field"><span>N/A justification — required when “Not applicable” is selected</span><textarea name="not_applicable_justification" defaultValue={answer?.not_applicable_justification ?? ""} placeholder="Explain why the criterion is outside the audit scope or does not apply to the organisation, site, process or activity." /></label>
                         </div><div className="compactAction"><button className="button primary">Save Criterion Assessment</button></div></form>
                       </div>
                     </details>;
