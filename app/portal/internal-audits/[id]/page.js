@@ -175,9 +175,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   const inheritedSites = splitControlledList(audit.sites);
   const defaultProcess = inheritedProcesses[0] ?? audit.scope_statement ?? "";
   const defaultSite = inheritedSites[0] ?? "";
-  const defaultLead = team.find((member) =>
-    /lead/i.test(`${member.role_title ?? ""} ${member.responsibility ?? ""}`)
-  ) ?? team[0] ?? null;
+  const defaultLead = team.find((member) => member.audit_role === "lead_auditor") ?? null;
+  const hasLeadAuditor = Boolean(defaultLead);
   const { data: organization, error: organizationError } = await supabase
     .from("organizations")
     .select("name")
@@ -308,6 +307,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         {query?.plan_error === "agenda" ? <div className="notice error">Plan approval is not yet available. Add at least two agenda activities—for example, an opening meeting and a process audit—then approve the plan again.</div> : null}
         {query?.plan_error === "notification" ? <div className="notice error">Plan approval is not yet available. Save the controlled auditee notification, then approve the plan again.</div> : null}
         {query?.plan_error === "questions" ? <div className="notice error">Plan approval is not yet available. The selected audit standard has no active audit questions. Add or activate its question bank before approving the plan.</div> : null}
+        {query?.team_warning === "lead_required" ? <div className="notice error" role="alert"><strong>Lead auditor required.</strong> Add a team member with the role “Lead auditor” before approving the audit team.</div> : null}
+        {query?.team_warning === "governance_required" ? <div className="notice error" role="alert"><strong>Team confirmations required.</strong> Confirm competence, independence and confidentiality for every team member before approval.</div> : null}
 
         <nav className="gateNav" aria-label="Audit lifecycle">
           {GATES.map(([key, number, label], index) => {
@@ -343,7 +344,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
               <form action={addAuditTeamMember}>
                 <input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Member name *</span><input name="member_name" required /></label><label className="field"><span>Email *</span><input name="email" type="email" required /></label><label className="field"><span>Audit role *</span><select name="audit_role" defaultValue="auditor">{Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span>Standards competence</span><textarea name="standards_competence" placeholder="Relevant standards knowledge and audit experience" /></label><label className="field"><span>Sector competence</span><textarea name="sector_competence" /></label><label className="field"><span>Technical competence</span><textarea name="technical_competence" /></label><label className="field"><span>Assigned audit scope</span><textarea name="assigned_scope" /></label><label className="check"><input type="checkbox" name="competence_confirmed" /><span>Competence confirmed against assigned scope</span></label><label className="check"><input type="checkbox" name="independence_confirmed" /><span>Independence and impartiality confirmed</span></label><label className="check"><input type="checkbox" name="confidentiality_confirmed" /><span>Confidentiality obligations confirmed</span></label></div><div className="actionBar"><button className="button primary">Add Team Member</button></div>
               </form>
-              <form action={approveAuditTeam}><input type="hidden" name="audit_id" value={id} /><div className="actionBar"><button className="button approve">Human Approve Team & Unlock Audit Plan →</button></div></form>
+              {!hasLeadAuditor ? <div className="notice error" role="status"><strong>Lead auditor required.</strong> Select “Lead auditor” as the audit role when adding the accountable team member. Team approval remains unavailable until this role is assigned.</div> : null}
+              <form action={approveAuditTeam}><input type="hidden" name="audit_id" value={id} /><div className="actionBar"><button className="button approve" disabled={!hasLeadAuditor} title={!hasLeadAuditor ? "Add a Lead auditor before approving the team" : undefined}>Human Approve Team & Unlock Audit Plan →</button></div></form>
             </> : null}
 
             {gate === "plan" ? <>
