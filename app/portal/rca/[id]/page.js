@@ -1296,31 +1296,51 @@ function FishboneWorkspace({ caseId, model, nodes }) {
 }
 
 function BowTieWorkspace({ caseId, model, nodes }) {
-  const columns = [
-    ["threat", "Threats"],
-    ["preventive_barrier", "Preventive barriers"],
-    ["top_event", "Top event"],
-    ["consequence", "Consequences"],
-    ["recovery_barrier", "Recovery barriers"],
-  ];
   const hazards = nodes.filter((node) => node.node_type === "hazard");
+  const nodeGroup = (type, title, tone) => {
+    const groupedNodes = nodes.filter((node) => node.node_type === type);
+    return (
+      <section style={bowTieGroupStyle(tone)}>
+        <div style={bowTieGroupTitleStyle}>{title}</div>
+        <div style={{ display: "grid", gap: "9px", marginTop: "10px" }}>
+          {groupedNodes.map((node) => (
+            <AnalysisNodeCard key={node.id} caseId={caseId} modelId={model.id} node={node} />
+          ))}
+          {groupedNodes.length === 0 && <div style={bowTieEmptyStyle}>No entries recorded</div>}
+        </div>
+      </section>
+    );
+  };
   return (
     <>
       <div style={hazardBannerStyle}>
         <strong>Hazard:</strong>{" "}
         {hazards.length ? hazards.map((node) => node.title).join(" · ") : "Not yet defined"}
       </div>
-      <div style={bowTieGridStyle}>
-        {columns.map(([type, title]) => (
-          <div key={type} style={bowTieColumnStyle(type)}>
-            <strong>{title}</strong>
-            <div style={{ display: "grid", gap: "9px", marginTop: "10px" }}>
-              {nodes.filter((node) => node.node_type === type).map((node) => (
+      <div style={bowTieViewportStyle}>
+        <div style={bowTieDiagramStyle}>
+          <div style={bowTieFlowLineStyle} aria-hidden="true" />
+          <div style={bowTieLeftWingStyle}>
+            {nodeGroup("threat", "Threats", "threat")}
+            <div style={bowTieArrowStyle} aria-hidden="true">→</div>
+            {nodeGroup("preventive_barrier", "Preventive barriers", "barrier")}
+          </div>
+          <div style={bowTieTopEventStyle}>
+            <div style={bowTieTopEventLabelStyle}>TOP EVENT</div>
+            <div style={{ display: "grid", gap: "9px", marginTop: "12px", width: "100%" }}>
+              {nodes.filter((node) => node.node_type === "top_event").map((node) => (
                 <AnalysisNodeCard key={node.id} caseId={caseId} modelId={model.id} node={node} />
               ))}
+              {nodes.every((node) => node.node_type !== "top_event") && <div style={bowTieEmptyStyle}>Not yet defined</div>}
             </div>
           </div>
-        ))}
+          <div style={bowTieRightWingStyle}>
+            {nodeGroup("consequence", "Consequences", "consequence")}
+            <div style={bowTieArrowStyle} aria-hidden="true">→</div>
+            {nodeGroup("recovery_barrier", "Recovery barriers", "barrier")}
+          </div>
+        </div>
+        <div style={bowTieLegendStyle}>Threats → preventive controls → top event → consequences → recovery controls</div>
       </div>
       <AnalysisNodeForm caseId={caseId} model={model} nodes={nodes} mode="bow_tie" />
     </>
@@ -1974,26 +1994,18 @@ const hazardBannerStyle = {
   color: "#8a3f00",
 };
 
-const bowTieGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-  gap: "10px",
-  alignItems: "stretch",
-  marginTop: "14px",
-};
-
-const bowTieColumnStyle = (type) => ({
-  minHeight: "180px",
-  padding: "14px",
-  borderRadius: "12px",
-  border: type === "top_event" ? "2px solid #b42318" : "1px solid #dce4ee",
-  background:
-    type === "top_event"
-      ? "#fff0ee"
-      : type.includes("barrier")
-        ? "#eefbf3"
-        : "#f7f9fc",
-});
+const bowTieViewportStyle = { overflowX: "auto", marginTop: "14px", paddingBottom: "4px" };
+const bowTieDiagramStyle = { position: "relative", minWidth: "1040px", display: "grid", gridTemplateColumns: "1fr 190px 1fr", gap: "14px", alignItems: "stretch", padding: "22px", border: "1px solid #f2b45f", borderRadius: "18px", background: "linear-gradient(180deg, #fffaf2 0%, #fff5e6 100%)" };
+const bowTieFlowLineStyle = { position: "absolute", left: "5%", right: "5%", top: "50%", borderTop: "4px dotted #8a4b08", opacity: 0.65, zIndex: 0 };
+const bowTieLeftWingStyle = { position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "1fr 34px 1fr", gap: "8px", alignItems: "center", padding: "18px", border: "2px solid #e58a1f", borderRadius: "18px 42px 42px 18px", background: "linear-gradient(135deg, #ffd08a 0%, #f5a33d 100%)", boxShadow: "0 8px 20px rgba(138,75,8,.12)" };
+const bowTieRightWingStyle = { ...bowTieLeftWingStyle, borderRadius: "42px 18px 18px 42px", background: "linear-gradient(225deg, #ffd08a 0%, #f5a33d 100%)" };
+const bowTieTopEventStyle = { position: "relative", zIndex: 2, alignSelf: "center", minHeight: "170px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px", border: "3px solid #8f2d16", borderRadius: "16px", background: "#ffad42", boxShadow: "0 10px 24px rgba(143,45,22,.2)" };
+const bowTieTopEventLabelStyle = { fontSize: "18px", fontWeight: 900, letterSpacing: ".04em", color: "#4a1c08", textAlign: "center" };
+const bowTieGroupStyle = (tone) => ({ minHeight: "220px", padding: "13px", borderRadius: "14px", border: tone === "barrier" ? "2px solid #45966b" : tone === "consequence" ? "2px solid #c14b36" : "2px solid #b56a12", background: tone === "barrier" ? "rgba(232,248,239,.96)" : tone === "consequence" ? "rgba(255,240,238,.96)" : "rgba(255,255,255,.92)" });
+const bowTieGroupTitleStyle = { fontWeight: 900, textAlign: "center", color: "#35200c" };
+const bowTieArrowStyle = { fontSize: "28px", fontWeight: 900, color: "#57320b", textAlign: "center" };
+const bowTieEmptyStyle = { padding: "10px", border: "1px dashed #ba8952", borderRadius: "9px", background: "rgba(255,255,255,.55)", color: "#765b3e", fontSize: "12px", textAlign: "center" };
+const bowTieLegendStyle = { marginTop: "8px", color: "#607089", fontSize: "12px", textAlign: "center" };
 
 const analysisNodeStyle = (status) => ({
   padding: "11px",
