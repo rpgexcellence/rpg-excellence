@@ -872,6 +872,7 @@ export default async function SecureRcaCasePage({
             {selected === 4 && (
               <AnalysisWorkbench
                 caseId={id}
+                problemStatement={rcaCase.problem_statement}
                 models={analysisModels}
                 activeModel={activeAnalysisModel}
                 nodes={activeAnalysisNodes}
@@ -1123,7 +1124,7 @@ function ScoreSelect({ name, title }) {
   );
 }
 
-function AnalysisWorkbench({ caseId, models, activeModel, nodes, causes }) {
+function AnalysisWorkbench({ caseId, problemStatement, models, activeModel, nodes, causes }) {
   const methods = [
     {
       key: "3x5_whys",
@@ -1207,7 +1208,7 @@ function AnalysisWorkbench({ caseId, models, activeModel, nodes, causes }) {
           <p style={{ color: "#607089" }}>
             Add evidence-based hypotheses to the relevant branch. Classify validated nodes as occurrence, escape or systemic so they transfer into D5.
           </p>
-          <FishboneWorkspace caseId={caseId} model={activeModel} nodes={nodes} />
+          <FishboneWorkspace caseId={caseId} problemStatement={problemStatement} model={activeModel} nodes={nodes} />
         </div>
       )}
 
@@ -1268,21 +1269,49 @@ function CauseCards({ caseId, modelId, causes }) {
   );
 }
 
-function FishboneWorkspace({ caseId, model, nodes }) {
-  const categories = ["people", "process", "equipment", "material", "measurement", "environment", "management"];
+function FishboneWorkspace({ caseId, problemStatement, model, nodes }) {
+  const categories = [
+    { key: "people", title: "People", color: "#8b5cf6", side: "top" },
+    { key: "process", title: "Process", color: "#2563eb", side: "top" },
+    { key: "equipment", title: "Equipment", color: "#10b981", side: "top" },
+    { key: "material", title: "Material", color: "#eab308", side: "top" },
+    { key: "measurement", title: "Measurement", color: "#ec4899", side: "bottom" },
+    { key: "environment", title: "Environment", color: "#f97316", side: "bottom" },
+    { key: "management", title: "Management", color: "#0f766e", side: "bottom" },
+  ];
+  const branch = (category) => {
+    const branchNodes = nodes.filter((node) => node.category === category.key);
+    return (
+      <section key={category.key} style={fishboneCauseBranchStyle(category.side, category.color)}>
+        <div style={{ ...fishboneCategoryStyle, background: category.color }}>{category.title}</div>
+        <div style={fishboneBranchLineStyle(category.side, category.color)} aria-hidden="true" />
+        <div style={fishboneCauseListStyle}>
+          {branchNodes.map((node) => (
+            <AnalysisNodeCard key={node.id} caseId={caseId} modelId={model.id} node={node} />
+          ))}
+          {branchNodes.length === 0 && <div style={fishboneEmptyStyle}>Add a testable cause</div>}
+        </div>
+      </section>
+    );
+  };
   return (
     <>
-      <div style={fishboneGridStyle}>
-        {categories.map((category) => (
-          <div key={category} style={fishboneBranchStyle}>
-            <strong>{label(category)}</strong>
-            <div style={{ display: "grid", gap: "8px", marginTop: "10px" }}>
-              {nodes.filter((node) => node.category === category).map((node) => (
-                <AnalysisNodeCard key={node.id} caseId={caseId} modelId={model.id} node={node} />
-              ))}
+      <div style={fishboneViewportStyle}>
+        <div style={fishboneDiagramStyle}>
+          <div style={fishboneTopRowStyle}>{categories.filter((item) => item.side === "top").map(branch)}</div>
+          <div style={fishboneSpineRowStyle}>
+            <div style={fishboneTailStyle} aria-hidden="true">CAUSES</div>
+            <div style={fishboneSpineStyle} aria-hidden="true" />
+            <div style={fishboneHeadStyle}>
+              <div style={{ fontSize: "11px", fontWeight: 900, letterSpacing: ".06em" }}>PROBLEM / EFFECT</div>
+              <div style={{ marginTop: "7px", fontWeight: 800, lineHeight: 1.35 }}>
+                {problemStatement || "Define the controlled problem statement in D2"}
+              </div>
             </div>
           </div>
-        ))}
+          <div style={fishboneBottomRowStyle}>{categories.filter((item) => item.side === "bottom").map(branch)}</div>
+        </div>
+        <div style={fishboneLegendStyle}>Select any cause card to inspect evidence, validation status and the human review decision.</div>
       </div>
       <AnalysisNodeForm caseId={caseId} model={model} nodes={nodes} mode="ishikawa" />
     </>
@@ -1965,20 +1994,20 @@ const workbenchStyle = {
   borderTop: "1px solid #dce4ee",
 };
 
-const fishboneGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-  gap: "12px",
-  marginTop: "18px",
-};
-
-const fishboneBranchStyle = {
-  minHeight: "130px",
-  padding: "16px",
-  borderLeft: "5px solid #155eef",
-  borderRadius: "12px",
-  background: "#f5f8fd",
-};
+const fishboneViewportStyle = { overflowX: "auto", marginTop: "18px", paddingBottom: "5px" };
+const fishboneDiagramStyle = { minWidth: "1180px", padding: "22px", border: "1px solid #cdd9e8", borderRadius: "18px", background: "linear-gradient(180deg,#ffffff 0%,#f7faff 100%)" };
+const fishboneTopRowStyle = { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", padding: "0 180px 0 100px", alignItems: "end" };
+const fishboneBottomRowStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "22px", padding: "0 240px 0 170px", alignItems: "start" };
+const fishboneSpineRowStyle = { height: "92px", display: "grid", gridTemplateColumns: "110px 1fr 250px", alignItems: "center", margin: "-2px 0" };
+const fishboneTailStyle = { display: "grid", placeItems: "center", width: "88px", height: "70px", color: "white", background: "#12335c", fontWeight: 900, fontSize: "12px", letterSpacing: ".06em", clipPath: "polygon(0 50%, 34% 0, 100% 0, 100% 100%, 34% 100%)" };
+const fishboneSpineStyle = { height: "5px", background: "#12335c", boxShadow: "0 2px 0 rgba(18,51,92,.1)" };
+const fishboneHeadStyle = { minHeight: "92px", display: "flex", flexDirection: "column", justifyContent: "center", padding: "17px 28px 17px 38px", color: "white", background: "linear-gradient(135deg,#12335c,#155eef)", clipPath: "polygon(0 0, 82% 0, 100% 50%, 82% 100%, 0 100%, 13% 50%)", textAlign: "center" };
+const fishboneCauseBranchStyle = (side, color) => ({ position: "relative", minHeight: "190px", display: "flex", flexDirection: side === "top" ? "column" : "column-reverse", justifyContent: "flex-end", padding: side === "top" ? "0 10px 34px" : "34px 10px 0", borderRadius: "14px", background: "rgba(247,250,255,.72)", border: `1px solid ${color}33` });
+const fishboneCategoryStyle = { position: "relative", zIndex: 2, alignSelf: "center", minWidth: "130px", maxWidth: "210px", padding: "9px 12px", borderRadius: "9px", color: "white", fontWeight: 900, textAlign: "center", boxShadow: "0 5px 12px rgba(18,51,92,.14)" };
+const fishboneBranchLineStyle = (side, color) => ({ position: "absolute", zIndex: 0, left: "50%", width: "4px", height: "92px", background: color, transformOrigin: side === "top" ? "bottom" : "top", transform: side === "top" ? "rotate(38deg)" : "rotate(-38deg)", bottom: side === "top" ? "-3px" : "auto", top: side === "bottom" ? "-3px" : "auto", opacity: .9 });
+const fishboneCauseListStyle = { position: "relative", zIndex: 2, display: "grid", gap: "8px", margin: "10px 0", maxHeight: "290px", overflowY: "auto" };
+const fishboneEmptyStyle = { padding: "10px", border: "1px dashed #9eb0c6", borderRadius: "9px", background: "rgba(255,255,255,.9)", color: "#607089", fontSize: "12px", textAlign: "center" };
+const fishboneLegendStyle = { marginTop: "8px", color: "#607089", fontSize: "12px", textAlign: "center" };
 
 const hazardBannerStyle = {
   marginTop: "16px",
