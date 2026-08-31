@@ -945,14 +945,14 @@ export default async function SecureRcaCasePage({
                 {selected === 3 && !discipline?.no_action_required && (
                 <form action={addCorrectiveAction} style={{ marginTop: "16px" }}>
                   <input type="hidden" name="case_id" value={id} />
+                  <input type="hidden" name="action_type" value="containment" />
                   <div style={formGrid}>
-                    <select name="action_type" defaultValue={selected === 3 ? "containment" : "corrective"} style={fieldStyle}>
-                      <option value="containment">Containment</option>
-                      <option value="correction">Correction</option>
-                      <option value="corrective">Corrective action</option>
-                      <option value="preventive">Preventive action</option>
-                      <option value="systemic">Systemic action</option>
-                    </select>
+                    <div style={{ ...fieldStyle, background: "#f4f7fb" }}>
+                      <strong>Interim containment action</strong>
+                      <div style={{ marginTop: "5px", color: "#607089", fontSize: "13px" }}>
+                        Permanent corrective actions are selected in D5 after root-cause validation.
+                      </div>
+                    </div>
                     <select name="cause_id" defaultValue="" style={fieldStyle}>
                       <option value="">No linked cause yet</option>
                       {causes.map((cause) => (
