@@ -606,7 +606,7 @@ export async function submitD6ActionForVerification(formData) {
     .select("id", { count: "exact", head: true }).eq("case_id", caseId).eq("owner_id", user.id)
     .eq("discipline", 6).eq("action_id", actionId);
   if (evidenceError) throw new Error(evidenceError.message);
-  if (!evidenceCount) throw new Error("Attach objective evidence to this corrective action before notifying the auditor.");
+  if (!evidenceCount) redirect(`/portal/rca/${caseId}?d=6&error=d6_action_evidence_required&action=${encodeURIComponent(actionId)}`);
   const now = new Date().toISOString();
   const { data: action, error } = await supabase.from("rca_actions").update({
     implementation_result: implementationResult, implementation_evidence_reference: evidenceReference,
