@@ -285,6 +285,17 @@ export async function saveDiscipline(formData) {
     }
   }
 
+  if (intent === "approve" && discipline === 6) {
+    const { data: verifiedActions, error: verifiedActionsError } = await supabase.from("rca_actions")
+      .select("id, effectiveness_result").eq("case_id", caseId).eq("owner_id", user.id)
+      .eq("discipline", 5).eq("selection_status", "selected");
+    if (verifiedActionsError) throw new Error(verifiedActionsError.message);
+    const actions = verifiedActions ?? [];
+    if (actions.length === 0 || actions.some((action) => action.effectiveness_result !== "effective_verified")) {
+      redirect(`/portal/rca/${caseId}?d=6&error=d6_effectiveness_incomplete`);
+    }
+  }
+
   const approved = intent === "approve";
   const status = approved
     ? "approved"
@@ -578,6 +589,35 @@ export async function addCorrectiveAction(formData) {
   if (error) throw new Error(error.message);
   revalidatePath(`/portal/rca/${caseId}`);
   redirect(`/portal/rca/${caseId}?d=${discipline}`);
+}
+
+export async function submitD6ActionForVerification(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const actionId = clean(formData.get("action_id"));
+  const implementationResult = clean(formData.get("implementation_result"));
+  const evidenceReference = clean(formData.get("implementation_evidence_reference"));
+  if (!caseId || !actionId || !implementationResult || !evidenceReference || formData.get("implementation_confirmation") !== "on") {
+    throw new Error("Implementation details, evidence reference and owner confirmation are required.");
+  }
+  await getOwnedCase(supabase, user.id, caseId);
+  await assertDisciplineUnlocked(supabase, user.id, caseId, 6);
+  const now = new Date().toISOString();
+  const { data: action, error } = await supabase.from("rca_actions").update({
+    implementation_result: implementationResult, implementation_evidence_reference: evidenceReference,
+    d6_submitted_at: now, effectiveness_result: "awaiting_verification", status: "completed", updated_at: now,
+  }).eq("id", actionId).eq("case_id", caseId).eq("owner_id", user.id).eq("discipline", 5)
+    .eq("selection_status", "selected").select("id, title").maybeSingle();
+  if (error || !action) throw new Error(error?.message || "Selected corrective action not found.");
+  const { error: accessError } = await supabase.from("internal_audit_action_access").update({
+    d6_verification_requested_at: now, d6_verification_completed_at: null, updated_at: now,
+  }).eq("rca_case_id", caseId).eq("owner_id", user.id);
+  if (accessError) throw new Error(accessError.message);
+  await supabase.from("rca_case_events").insert({ case_id: caseId, owner_id: user.id,
+    event_type: "d6_action_submitted", discipline: 6,
+    summary: `${action.title} submitted for auditor effectiveness verification`, event_data: { action_id: action.id } });
+  revalidatePath(`/portal/rca/${caseId}`);
+  redirect(`/portal/rca/${caseId}?d=6&saved=verification_requested`);
 }
 
 export async function decideCorrectiveActionCandidate(formData) {
