@@ -2202,9 +2202,11 @@ export async function verifyAuditFindingEffectiveness(
       .maybeSingle(),
     supabase
       .from("rca_actions")
-      .select("id, status")
+      .select("id, status, effectiveness_result")
       .eq("case_id", finding.linked_rca_case_id)
-      .eq("owner_id", user.id),
+      .eq("owner_id", user.id)
+      .eq("discipline", 5)
+      .eq("selection_status", "selected"),
   ]);
 
   if (rcaResult.error || !rcaResult.data || actionsResult.error) {
@@ -2218,9 +2220,7 @@ export async function verifyAuditFindingEffectiveness(
   const actions = actionsResult.data ?? [];
   const allActionsComplete =
     actions.length > 0 &&
-    actions.every((action) =>
-      ["completed", "verified"].includes(action.status)
-    );
+    actions.every((action) => action.effectiveness_result === "effective_verified" && action.status === "verified");
   const rcaAtEffectivenessGate =
     Number(rcaResult.data.current_discipline) >= 8 ||
     ["effectiveness_review", "closed"].includes(rcaResult.data.status);
@@ -2295,6 +2295,66 @@ export async function verifyAuditFindingEffectiveness(
   });
 
   returnTo(auditId, "closing", "effectiveness");
+}
+
+export async function verifyD6CorrectiveAction(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  const findingId = clean(formData.get("finding_id"));
+  const accessId = clean(formData.get("action_access_id"));
+  const actionId = clean(formData.get("action_id"));
+  const result = clean(formData.get("effectiveness_result"));
+  const residualRisk = clean(formData.get("residual_risk"));
+  const verificationMethod = clean(formData.get("effectiveness_verification_method"));
+  const conclusion = clean(formData.get("effectiveness_verification_conclusion"));
+  const allowedResults = ["effective_verified", "partially_effective", "not_effective", "unable_to_verify"];
+  if (!auditId || !findingId || !accessId || !actionId || !allowedResults.includes(result) || !["low", "medium", "high", "critical"].includes(residualRisk) || !verificationMethod || !conclusion || formData.get("independent_verification") !== "on") {
+    throw new Error("A complete independent D6 effectiveness decision is required.");
+  }
+  const { supabase, user } = await context(auditId);
+  const { data: finding, error: findingError } = await supabase.from("internal_audit_findings")
+    .select("id, finding_reference, linked_rca_case_id").eq("id", findingId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+  if (findingError || !finding?.linked_rca_case_id) throw new Error(findingError?.message || "Linked CAPA–8D case not found.");
+  const { data: access, error: accessError } = await supabase.from("internal_audit_action_access")
+    .select("id, rca_case_id").eq("id", accessId).eq("audit_id", auditId).eq("finding_id", findingId).eq("owner_id", user.id).maybeSingle();
+  if (accessError || !access || access.rca_case_id !== finding.linked_rca_case_id) throw new Error(accessError?.message || "D6 verification request not found.");
+  const now = new Date().toISOString();
+  const effective = result === "effective_verified";
+  const { data: action, error: actionError } = await supabase.from("rca_actions").update({
+    effectiveness_result: result,
+    residual_risk: residualRisk,
+    effectiveness_verification_method: verificationMethod,
+    effectiveness_verification_conclusion: conclusion,
+    verified_by: user.id,
+    verified_at: now,
+    status: effective ? "verified" : "open",
+    updated_at: now,
+  }).eq("id", actionId).eq("case_id", finding.linked_rca_case_id).eq("owner_id", user.id)
+    .eq("discipline", 5).eq("selection_status", "selected").select("id, title").maybeSingle();
+  if (actionError || !action) throw new Error(actionError?.message || "Selected D6 corrective action not found.");
+  const { data: selectedActions, error: selectedError } = await supabase.from("rca_actions").select("id, effectiveness_result")
+    .eq("case_id", finding.linked_rca_case_id).eq("owner_id", user.id).eq("discipline", 5).eq("selection_status", "selected");
+  if (selectedError) throw new Error(selectedError.message);
+  const allEffective = (selectedActions ?? []).length > 0 && (selectedActions ?? []).every((item) => item.effectiveness_result === "effective_verified");
+  const { error: disciplineError } = await supabase.from("rca_8d_disciplines").update(allEffective ? {
+    status: "approved", completion_score: 100, human_approved: true, approved_by: user.id, approved_at: now,
+  } : { status: "in_progress", completion_score: 60, human_approved: false, approved_by: null, approved_at: null })
+    .eq("case_id", finding.linked_rca_case_id).eq("owner_id", user.id).eq("discipline", 6);
+  if (disciplineError) throw new Error(disciplineError.message);
+  const { error: caseError } = await supabase.from("rca_cases").update({ current_discipline: allEffective ? 7 : 6, status: "active", updated_at: now })
+    .eq("id", finding.linked_rca_case_id).eq("owner_id", user.id);
+  if (caseError) throw new Error(caseError.message);
+  const { error: accessUpdateError } = await supabase.from("internal_audit_action_access").update({
+    d6_verification_completed_at: allEffective ? now : null, updated_at: now,
+  }).eq("id", accessId).eq("owner_id", user.id);
+  if (accessUpdateError) throw new Error(accessUpdateError.message);
+  await supabase.from("rca_case_events").insert({ case_id: finding.linked_rca_case_id, owner_id: user.id,
+    event_type: "d6_effectiveness_decision", discipline: 6,
+    summary: `${action.title}: ${result.replaceAll("_", " ")}`,
+    event_data: { action_id: action.id, finding_id: findingId, result, residual_risk: residualRisk, all_actions_effective: allEffective } });
+  await supabase.from("internal_audit_events").insert({ owner_id: user.id, audit_id: auditId,
+    event_type: "d6_action_effectiveness_decided", summary: `${finding.finding_reference}: ${action.title} — ${result.replaceAll("_", " ")}`,
+    event_data: { finding_id: findingId, action_id: action.id, result, all_actions_effective: allEffective }, created_by: user.id });
+  returnTo(auditId, "actions", "d6_verification");
 }
 
 export async function saveAuditReport(formData) {
