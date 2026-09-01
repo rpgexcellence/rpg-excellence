@@ -1348,7 +1348,7 @@ function BowTieWorkspace({ caseId, model, nodes }) {
             </div>
           </section>
           <div style={bowTiePhaseLabelsStyle}>
-            <span>BEFORE THE TOP EVENT · PREVENTION</span><span>AFTER THE TOP EVENT · RECOVERY</span>
+            <span>BEFORE THE TOP EVENT · PREVENTION</span><span aria-hidden="true" /><span>AFTER THE TOP EVENT · RECOVERY</span>
           </div>
           <div style={bowTieCoreGridStyle}>
             <div style={bowTiePathsStyle}>
@@ -1384,7 +1384,7 @@ function BowTieWorkspace({ caseId, model, nodes }) {
               })}
             </div>
           </div>
-          <div style={bowTieBarrierLabelsStyle}><span>Preventive barriers</span><span>Recovery barriers</span></div>
+          <div style={bowTieBarrierLabelsStyle}><span>Preventive barriers</span><span aria-hidden="true" /><span>Recovery barriers</span></div>
           <section style={bowTieEscalationStyle}>
             <div><div style={bowTieEyebrowStyle}>ESCALATION FACTORS & CONTROLS</div><p style={{ margin: "5px 0 0", color: "#607089", fontSize: "12px" }}>Conditions that could defeat a barrier and the controls protecting barrier performance.</p></div>
             <div style={bowTieEscalationGridStyle}>
@@ -2057,23 +2057,23 @@ const hazardBannerStyle = {
 };
 
 const bowTieViewportStyle = { overflowX: "auto", marginTop: "16px", paddingBottom: "5px" };
-const bowTieDiagramStyle = { width: "1760px", minWidth: "1760px", maxWidth: "none", padding: "30px", border: "1px solid #cbd8e8", borderRadius: "20px", background: "linear-gradient(180deg,#f9fbfe 0%,#eef4fa 100%)", boxShadow: "inset 0 1px 0 white" };
+const bowTieDiagramStyle = { width: "100%", minWidth: "1240px", boxSizing: "border-box", padding: "26px", border: "1px solid #cbd8e8", borderRadius: "20px", background: "linear-gradient(180deg,#f9fbfe 0%,#eef4fa 100%)", boxShadow: "inset 0 1px 0 white" };
 const bowTieHazardStyle = { width: "420px", margin: "0 auto 14px", padding: "14px", border: "2px solid #d97706", borderRadius: "14px", background: "#fff7e8", textAlign: "center" };
 const bowTieEyebrowStyle = { color: "#155eef", fontSize: "11px", fontWeight: 900, letterSpacing: ".08em" };
-const bowTiePhaseLabelsStyle = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "240px", marginBottom: "10px", color: "#52677f", fontSize: "11px", fontWeight: 900, letterSpacing: ".06em", textAlign: "center" };
-const bowTieCoreGridStyle = { display: "grid", gridTemplateColumns: "720px 280px 720px", gap: "20px", alignItems: "center" };
+const bowTiePhaseLabelsStyle = { display: "grid", gridTemplateColumns: "1fr 250px 1fr", gap: "18px", marginBottom: "10px", color: "#52677f", fontSize: "11px", fontWeight: 900, letterSpacing: ".04em", textAlign: "center" };
+const bowTieCoreGridStyle = { display: "grid", gridTemplateColumns: "minmax(430px,1fr) 250px minmax(430px,1fr)", gap: "18px", alignItems: "center" };
 const bowTiePathsStyle = { display: "grid", gap: "24px", alignContent: "center", minWidth: 0 };
-const bowTieLeftPathStyle = { display: "grid", gridTemplateColumns: "320px 1fr", gap: "16px", alignItems: "center", minWidth: 0 };
-const bowTieRightPathStyle = { display: "grid", gridTemplateColumns: "1fr 320px", gap: "16px", alignItems: "center", minWidth: 0 };
+const bowTieLeftPathStyle = { display: "grid", gridTemplateColumns: "240px minmax(190px,1fr)", gap: "14px", alignItems: "center", minWidth: 0 };
+const bowTieRightPathStyle = { display: "grid", gridTemplateColumns: "minmax(190px,1fr) 240px", gap: "14px", alignItems: "center", minWidth: 0 };
 const bowTieThreatBoxStyle = { minWidth: 0, padding: "14px", border: "2px solid #d97706", borderRadius: "12px", background: "#fff7e8", fontWeight: 800, textAlign: "left" };
 const bowTieConsequenceBoxStyle = { minWidth: 0, padding: "14px", border: "2px solid #dc4b3e", borderRadius: "12px", background: "#fff1f0", fontWeight: 800, textAlign: "left" };
 const bowTieBarrierTrackStyle = { position: "relative", minHeight: "76px", display: "grid", placeItems: "center", padding: "5px 20px" };
 const bowTieConnectorStyle = { position: "absolute", left: 0, right: 0, top: "50%", height: "3px", background: "#294765" };
 const bowTieBarrierRackStyle = { position: "relative", zIndex: 2, width: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "10px", alignItems: "center", textAlign: "left" };
 const bowTieArrowHeadStyle = { position: "absolute", zIndex: 3, right: 0, top: "calc(50% - 10px)", color: "#294765", fontSize: "17px" };
-const bowTieTopEventStyle = { minHeight: "280px", width: "280px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "30px", border: "5px solid #102f50", borderRadius: "50%", background: "linear-gradient(145deg,#ffffff,#e8f0f8)", boxShadow: "0 14px 30px rgba(16,47,80,.2)", textAlign: "left" };
+const bowTieTopEventStyle = { minHeight: "250px", width: "250px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "26px", border: "5px solid #102f50", borderRadius: "50%", background: "linear-gradient(145deg,#ffffff,#e8f0f8)", boxShadow: "0 14px 30px rgba(16,47,80,.2)", textAlign: "left" };
 const bowTieTopEventLabelStyle = { fontSize: "20px", fontWeight: 900, letterSpacing: ".05em", color: "#102f50" };
-const bowTieBarrierLabelsStyle = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "260px", padding: "8px 205px 0", color: "#067647", fontSize: "12px", fontWeight: 900, textAlign: "center" };
+const bowTieBarrierLabelsStyle = { display: "grid", gridTemplateColumns: "1fr 250px 1fr", gap: "18px", padding: "8px 0 0", color: "#067647", fontSize: "12px", fontWeight: 900, textAlign: "center" };
 const bowTieEscalationStyle = { marginTop: "24px", padding: "16px", border: "1px solid #f2b45f", borderRadius: "14px", background: "#fffaf2" };
 const bowTieEscalationGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: "10px", marginTop: "12px" };
 const bowTieEscalationCardStyle = { padding: "10px", border: "1px solid #e4b56f", borderRadius: "12px", background: "white" };
