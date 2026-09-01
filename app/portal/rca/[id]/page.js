@@ -2057,21 +2057,21 @@ const hazardBannerStyle = {
 };
 
 const bowTieViewportStyle = { overflowX: "auto", marginTop: "16px", paddingBottom: "5px" };
-const bowTieDiagramStyle = { minWidth: "1220px", padding: "24px", border: "1px solid #cbd8e8", borderRadius: "20px", background: "linear-gradient(180deg,#f9fbfe 0%,#eef4fa 100%)", boxShadow: "inset 0 1px 0 white" };
+const bowTieDiagramStyle = { width: "1760px", minWidth: "1760px", maxWidth: "none", padding: "30px", border: "1px solid #cbd8e8", borderRadius: "20px", background: "linear-gradient(180deg,#f9fbfe 0%,#eef4fa 100%)", boxShadow: "inset 0 1px 0 white" };
 const bowTieHazardStyle = { width: "420px", margin: "0 auto 14px", padding: "14px", border: "2px solid #d97706", borderRadius: "14px", background: "#fff7e8", textAlign: "center" };
 const bowTieEyebrowStyle = { color: "#155eef", fontSize: "11px", fontWeight: 900, letterSpacing: ".08em" };
 const bowTiePhaseLabelsStyle = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "240px", marginBottom: "10px", color: "#52677f", fontSize: "11px", fontWeight: 900, letterSpacing: ".06em", textAlign: "center" };
-const bowTieCoreGridStyle = { display: "grid", gridTemplateColumns: "1fr 220px 1fr", gap: "18px", alignItems: "center" };
-const bowTiePathsStyle = { display: "grid", gap: "18px", alignContent: "center" };
-const bowTieLeftPathStyle = { display: "grid", gridTemplateColumns: "190px 1fr", gap: "10px", alignItems: "center" };
-const bowTieRightPathStyle = { display: "grid", gridTemplateColumns: "1fr 190px", gap: "10px", alignItems: "center" };
-const bowTieThreatBoxStyle = { padding: "11px", border: "2px solid #d97706", borderRadius: "12px", background: "#fff7e8", fontWeight: 800 };
-const bowTieConsequenceBoxStyle = { padding: "11px", border: "2px solid #dc4b3e", borderRadius: "12px", background: "#fff1f0", fontWeight: 800 };
+const bowTieCoreGridStyle = { display: "grid", gridTemplateColumns: "720px 280px 720px", gap: "20px", alignItems: "center" };
+const bowTiePathsStyle = { display: "grid", gap: "24px", alignContent: "center", minWidth: 0 };
+const bowTieLeftPathStyle = { display: "grid", gridTemplateColumns: "320px 1fr", gap: "16px", alignItems: "center", minWidth: 0 };
+const bowTieRightPathStyle = { display: "grid", gridTemplateColumns: "1fr 320px", gap: "16px", alignItems: "center", minWidth: 0 };
+const bowTieThreatBoxStyle = { minWidth: 0, padding: "14px", border: "2px solid #d97706", borderRadius: "12px", background: "#fff7e8", fontWeight: 800, textAlign: "left" };
+const bowTieConsequenceBoxStyle = { minWidth: 0, padding: "14px", border: "2px solid #dc4b3e", borderRadius: "12px", background: "#fff1f0", fontWeight: 800, textAlign: "left" };
 const bowTieBarrierTrackStyle = { position: "relative", minHeight: "76px", display: "grid", placeItems: "center", padding: "5px 20px" };
 const bowTieConnectorStyle = { position: "absolute", left: 0, right: 0, top: "50%", height: "3px", background: "#294765" };
-const bowTieBarrierRackStyle = { position: "relative", zIndex: 2, width: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(92px,1fr))", gap: "7px", alignItems: "center" };
+const bowTieBarrierRackStyle = { position: "relative", zIndex: 2, width: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "10px", alignItems: "center", textAlign: "left" };
 const bowTieArrowHeadStyle = { position: "absolute", zIndex: 3, right: 0, top: "calc(50% - 10px)", color: "#294765", fontSize: "17px" };
-const bowTieTopEventStyle = { minHeight: "220px", width: "220px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", border: "5px solid #102f50", borderRadius: "50%", background: "linear-gradient(145deg,#ffffff,#e8f0f8)", boxShadow: "0 14px 30px rgba(16,47,80,.2)", textAlign: "center" };
+const bowTieTopEventStyle = { minHeight: "280px", width: "280px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "30px", border: "5px solid #102f50", borderRadius: "50%", background: "linear-gradient(145deg,#ffffff,#e8f0f8)", boxShadow: "0 14px 30px rgba(16,47,80,.2)", textAlign: "left" };
 const bowTieTopEventLabelStyle = { fontSize: "20px", fontWeight: 900, letterSpacing: ".05em", color: "#102f50" };
 const bowTieBarrierLabelsStyle = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "260px", padding: "8px 205px 0", color: "#067647", fontSize: "12px", fontWeight: 900, textAlign: "center" };
 const bowTieEscalationStyle = { marginTop: "24px", padding: "16px", border: "1px solid #f2b45f", borderRadius: "14px", background: "#fffaf2" };
@@ -2082,6 +2082,8 @@ const bowTieEmptyStyle = { padding: "10px", border: "1px dashed #ba8952", border
 const bowTieLegendStyle = { marginTop: "8px", color: "#607089", fontSize: "12px", textAlign: "center" };
 
 const analysisNodeStyle = (status) => ({
+  width: "100%",
+  minWidth: 0,
   padding: "11px",
   borderRadius: "10px",
   border:
@@ -2096,6 +2098,8 @@ const analysisNodeStyle = (status) => ({
       : status === "rejected"
         ? "#fff0ee"
         : "white",
+  textAlign: "left",
+  overflowWrap: "break-word",
 });
 
 const itemStyle = {
