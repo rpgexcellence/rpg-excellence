@@ -602,6 +602,11 @@ export async function submitD6ActionForVerification(formData) {
   }
   await getOwnedCase(supabase, user.id, caseId);
   await assertDisciplineUnlocked(supabase, user.id, caseId, 6);
+  const { count: evidenceCount, error: evidenceError } = await supabase.from("rca_evidence")
+    .select("id", { count: "exact", head: true }).eq("case_id", caseId).eq("owner_id", user.id)
+    .eq("discipline", 6).eq("action_id", actionId);
+  if (evidenceError) throw new Error(evidenceError.message);
+  if (!evidenceCount) throw new Error("Attach objective evidence to this corrective action before notifying the auditor.");
   const now = new Date().toISOString();
   const { data: action, error } = await supabase.from("rca_actions").update({
     implementation_result: implementationResult, implementation_evidence_reference: evidenceReference,
@@ -761,6 +766,7 @@ export async function addObjectiveEvidence(formData) {
   const { supabase, user } = await context();
   const caseId = clean(formData.get("case_id"));
   const discipline = Number(formData.get("discipline"));
+  const actionId = clean(formData.get("action_id"));
   const description = clean(formData.get("description"));
   const reference = clean(formData.get("reference"));
   const strength = clean(formData.get("strength"));
@@ -802,6 +808,14 @@ export async function addObjectiveEvidence(formData) {
     discipline
   );
 
+  if (discipline === 6) {
+    if (!actionId) throw new Error("D6 evidence must be attached to a specific corrective action.");
+    const { data: linkedAction, error: linkedActionError } = await supabase.from("rca_actions").select("id")
+      .eq("id", actionId).eq("case_id", caseId).eq("owner_id", user.id).eq("discipline", 5)
+      .eq("selection_status", "selected").maybeSingle();
+    if (linkedActionError || !linkedAction) throw new Error(linkedActionError?.message || "Selected corrective action not found.");
+  }
+
   const uploadedPaths = [];
   const evidenceRows = [];
 
@@ -819,6 +833,7 @@ export async function addObjectiveEvidence(formData) {
         user.id,
         caseId,
         `D${discipline}`,
+        ...(discipline === 6 ? [actionId] : []),
         `${crypto.randomUUID()}-${safeFileName(file.name)}`,
       ].join("/");
 
@@ -835,6 +850,7 @@ export async function addObjectiveEvidence(formData) {
         case_id: caseId,
         owner_id: user.id,
         discipline,
+        action_id: discipline === 6 ? actionId : null,
         evidence_type: "document",
         reference: reference || file.name,
         description,
@@ -863,10 +879,11 @@ export async function addObjectiveEvidence(formData) {
     owner_id: user.id,
     event_type: "objective_evidence_added",
     discipline,
-    summary: `${evidenceRows.length} objective evidence file(s) added to D${discipline}`,
+    summary: `${evidenceRows.length} objective evidence file(s) added to ${discipline === 6 ? "a D6 corrective action" : `D${discipline}`}`,
     event_data: {
       evidence_count: evidenceRows.length,
       references: evidenceRows.map((row) => row.reference),
+      action_id: discipline === 6 ? actionId : null,
     },
   });
 
