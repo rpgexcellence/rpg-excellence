@@ -23,6 +23,7 @@ import {
   issueAuditReport,
   assignAuditActionOwner,
   reviewAuditActionResponse,
+  verifyD6CorrectiveAction,
   verifyAuditFindingEffectiveness,
 } from "./actions";
 
@@ -214,20 +215,34 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     }
   }
   const linkedRcaIds = [...new Set(findings.map((finding) => finding.linked_rca_case_id).filter(Boolean))];
-  const [rcaCasesResult, rcaActionsResult] = linkedRcaIds.length
+  const [rcaCasesResult, rcaActionsResult, rcaD6EvidenceResult] = linkedRcaIds.length
     ? await Promise.all([
         supabase.from("rca_cases").select("id, case_reference, status, current_discipline, target_close_date, closed_at").in("id", linkedRcaIds).eq("owner_id", user.id),
-        supabase.from("rca_actions").select("id, case_id, status, title, due_date, effectiveness_result").in("case_id", linkedRcaIds).eq("owner_id", user.id),
+        supabase.from("rca_actions").select("*").in("case_id", linkedRcaIds).eq("owner_id", user.id),
+        supabase.from("rca_evidence").select("*").in("case_id", linkedRcaIds).eq("owner_id", user.id).eq("discipline", 6).order("created_at", { ascending: false }),
       ])
-    : [{ data: [], error: null }, { data: [], error: null }];
+    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
   if (rcaCasesResult.error) throw new Error(rcaCasesResult.error.message);
   if (rcaActionsResult.error) throw new Error(rcaActionsResult.error.message);
+  if (rcaD6EvidenceResult.error) throw new Error(rcaD6EvidenceResult.error.message);
   const rcaCasesById = new Map((rcaCasesResult.data ?? []).map((rcaCase) => [rcaCase.id, rcaCase]));
   const rcaActionsByCase = new Map();
   for (const action of rcaActionsResult.data ?? []) {
     const current = rcaActionsByCase.get(action.case_id) ?? [];
     current.push(action);
     rcaActionsByCase.set(action.case_id, current);
+  }
+  const d6EvidenceUrls = new Map();
+  const d6EvidenceByCase = new Map();
+  const d6Evidence = rcaD6EvidenceResult.data ?? [];
+  if (d6Evidence.length) {
+    const { data: signedD6Evidence } = await supabase.storage.from("rca-evidence").createSignedUrls(d6Evidence.map((item) => item.storage_path), 3600);
+    for (const item of signedD6Evidence ?? []) if (item.path && item.signedUrl) d6EvidenceUrls.set(item.path, item.signedUrl);
+  }
+  for (const item of d6Evidence) {
+    const current = d6EvidenceByCase.get(item.case_id) ?? [];
+    current.push(item);
+    d6EvidenceByCase.set(item.case_id, current);
   }
   const nonconformities = findings.filter((finding) => ["major_nc", "minor_nc"].includes(finding.finding_type));
   const advisoryFindings = findings.filter((finding) => !["major_nc", "minor_nc"].includes(finding.finding_type));
@@ -661,11 +676,12 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
               <div className="panelKicker">Gate 06 · Nonconformity response and corrective action</div><h2>Manage action-owner responses</h2>
               <p className="panelLead">Action owners may respond through a portal account or a restricted, expiring link. The original finding statement, classification, requirement and objective evidence remain auditor-controlled.</p>
               {query?.action_token ? <div className="notice" role="status"><strong>Secure owner link created.</strong><br /><code>{`${applicationOrigin}/audit-actions/${query.action_token}`}</code><br />Send this restricted link only to the named action owner. It expires after 14 days.</div> : null}
-              <div className="grid4" style={{marginBottom:24}}><div className="metricCard"><strong>{nonconformities.length}</strong><span>Controlled NCs</span></div><div className="metricCard"><strong>{actionAccess.length}</strong><span>Assigned owners</span></div><div className="metricCard"><strong>{actionAccess.filter((item) => item.status === "submitted").length}</strong><span>Awaiting review</span></div><div className="metricCard"><strong>{unresolvedNonconformities.length}</strong><span>Awaiting effectiveness closure</span></div></div>
+              <div className="grid4" style={{marginBottom:24}}><div className="metricCard"><strong>{nonconformities.length}</strong><span>Controlled NCs</span></div><div className="metricCard"><strong>{actionAccess.length}</strong><span>Assigned owners</span></div><div className="metricCard"><strong>{actionAccess.filter((item) => item.status === "submitted" || (item.d6_verification_requested_at && !item.d6_verification_completed_at)).length}</strong><span>Auditor notifications</span></div><div className="metricCard"><strong>{unresolvedNonconformities.length}</strong><span>Awaiting effectiveness closure</span></div></div>
               <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">01 · Assigned nonconformities</span><h3>Action-owner register</h3><p>Assign access, review submitted responses and continue detailed root-cause work in the linked CAPA–8D case.</p></div><span className="countBadge">{nonconformities.length} NCs</span></div>
-                {nonconformities.length ? <div className="findingList">{nonconformities.map((finding) => { const access = actionAccessByFinding.get(finding.id); const ownerEvidence = access?.status === "submitted" ? actionEvidenceByAccess.get(access.id) ?? [] : []; const rcaCase = rcaCasesById.get(finding.linked_rca_case_id); return <article id={`action-${finding.id}`} className={`findingCard ${finding.finding_type}`} key={finding.id} style={{display:"block"}}><div><b>{finding.finding_reference}</b><h4>{finding.title}</h4><p>{finding.failure_statement || finding.objective_evidence}</p></div>
+                {nonconformities.length ? <div className="findingList">{nonconformities.map((finding) => { const access = actionAccessByFinding.get(finding.id); const ownerEvidence = access?.status === "submitted" ? actionEvidenceByAccess.get(access.id) ?? [] : []; const rcaCase = rcaCasesById.get(finding.linked_rca_case_id); const d6Actions = (rcaActionsByCase.get(finding.linked_rca_case_id) ?? []).filter((action) => action.discipline === 5 && action.selection_status === "selected"); const d6EvidenceForCase = d6EvidenceByCase.get(finding.linked_rca_case_id) ?? []; return <article id={`action-${finding.id}`} className={`findingCard ${finding.finding_type}`} key={finding.id} style={{display:"block"}}><div><b>{finding.finding_reference}</b><h4>{finding.title}</h4><p>{finding.failure_statement || finding.objective_evidence}</p></div>
                   {access ? <div className="coming"><strong>{access.assignee_name}</strong> · {access.assignee_email}<br />Response status: {access.status.replaceAll("_", " ")}{access.submitted_at ? ` · submitted ${displayDate(access.submitted_at)}` : ""}<br />{access.correction_and_containment ? <><strong>Correction / containment:</strong> {access.correction_and_containment}<br /></> : null}{access.root_cause_response ? <><strong>Root cause:</strong> {access.root_cause_response}<br /></> : null}{access.corrective_action_plan ? <><strong>Corrective-action plan:</strong> {access.corrective_action_plan}<br /></> : null}{ownerEvidence.length ? <><strong>Implementation evidence:</strong> {ownerEvidence.map((item, index) => <span key={item.id}>{index ? " · " : ""}<a href={actionEvidenceUrls.get(item.storage_path) || "#"} target="_blank" rel="noreferrer">{item.original_file_name}</a></span>)}</> : null}</div> : null}
                   <form action={assignAuditActionOwner} style={{marginTop:16}}><input type="hidden" name="audit_id" value={id} /><input type="hidden" name="finding_id" value={finding.id} /><div className="grid2"><label className="field"><span>Action-owner name *</span><input name="assignee_name" required defaultValue={access?.assignee_name || finding.responsible_owner_name || ""} /></label><label className="field"><span>Action-owner email *</span><input name="assignee_email" type="email" required defaultValue={access?.assignee_email || finding.responsible_owner_email || ""} /><small>If this email belongs to a portal account, the action appears automatically in My Internal Audit Actions. The secure link works for external owners.</small></label></div><div className="compactAction"><button className="button secondary">{access ? "Refresh Access & Secure Link" : "Assign Owner & Create Secure Link"}</button></div></form>
+                  {access?.d6_verification_requested_at ? <D6AuditorVerificationPanel auditId={id} finding={finding} access={access} actions={d6Actions} evidence={d6EvidenceForCase} evidenceUrls={d6EvidenceUrls} /> : null}
                   {access?.status === "submitted" ? <><div className="notice" style={{marginTop:14}}><strong>Final D0–D8 response ready for review.</strong> Review the validated root cause, corrective-action plan and consolidated objective evidence in this record and the linked controlled CAPA–8D case.</div><form action={reviewAuditActionResponse} style={{marginTop:16}}><input type="hidden" name="audit_id" value={id}/><input type="hidden" name="action_access_id" value={access.id}/><div className="grid3"><label className="field"><span>Auditor decision</span><select name="decision"><option value="accepted">Accept final RCA and corrective-action plan</option><option value="returned">Return complete 8D for revision</option></select></label><label className="field span2"><span>Auditor decision and rationale *</span><textarea name="auditor_response" required placeholder="Record the evidence reviewed, adequacy conclusion and any conditions for effectiveness verification."/></label></div><div className="compactAction"><button className="button approve">Record Final 8D Decision</button></div></form></> : null}
                   {rcaCase && access?.status === "submitted" ? <div style={{marginTop:14}}><Link className="button primary" href={`/portal/rca/${rcaCase.id}`}>Review Final Controlled CAPA–8D →</Link></div> : rcaCase && access ? <div className="coming" style={{marginTop:14}}><strong>8D investigation in progress.</strong><br />The final root cause, corrective-action plan and objective evidence will be released for auditor review after the action owner submits D8.</div> : null}
                 </article>; })}</div> : <div className="emptyState">No Major or Minor nonconformities require action-owner assignment.</div>}
@@ -693,4 +709,22 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
       </div>
     </main>
   );
+}
+
+function D6AuditorVerificationPanel({ auditId, finding, access, actions, evidence, evidenceUrls }) {
+  const pending = actions.filter((action) => action.d6_submitted_at && action.effectiveness_result !== "effective_verified").length;
+  return <section className="fieldworkModule" style={{ marginTop: 18 }}>
+    <div className="fieldworkHead"><div><span className="panelKicker">D6 · Auditor notification</span><h3>Corrective-action effectiveness verification</h3><p>The action owner has requested independent verification. Assess every selected action separately against its D5 criteria and the submitted D6 objective evidence.</p></div><span className="countBadge">{pending} requiring decision</span></div>
+    {evidence.length ? <div className="coming" style={{ marginBottom: 16 }}><strong>D6 objective evidence</strong><br />{evidence.map((item, index) => <span key={item.id}>{index ? " · " : ""}<a href={evidenceUrls.get(item.storage_path) || "#"} target="_blank" rel="noreferrer">{item.reference || "Evidence record"}</a></span>)}</div> : <div className="notice error" style={{ marginBottom: 16 }}>No D6 evidence file is currently available. Use “Unable to verify—insufficient evidence” where the record cannot support a conclusion.</div>}
+    <div className="findingList">{actions.map((action) => <article className="findingCard" key={action.id} style={{ display: "block" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}><div><b>{action.title}</b><p>{action.description || "No action description recorded."}</p></div><span className="countBadge">{(action.effectiveness_result || "implementation open").replaceAll("_", " ")}</span></div>
+      <div className="coming"><strong>D5 acceptance criteria:</strong> {action.effectiveness_criteria || "Not defined"}<br /><strong>Owner implementation result:</strong> {action.implementation_result || "Not submitted"}<br /><strong>Evidence reference:</strong> {action.implementation_evidence_reference || "Not submitted"}{action.d6_submitted_at ? <><br /><strong>Verification requested:</strong> {displayDate(action.d6_submitted_at)}</> : null}</div>
+      {action.d6_submitted_at ? <form action={verifyD6CorrectiveAction} style={{ marginTop: 16 }}>
+        <input type="hidden" name="audit_id" value={auditId} /><input type="hidden" name="finding_id" value={finding.id} /><input type="hidden" name="action_access_id" value={access.id} /><input type="hidden" name="action_id" value={action.id} />
+        <div className="grid3"><label className="field"><span>Auditor effectiveness decision *</span><select name="effectiveness_result" required defaultValue={action.effectiveness_result === "effective_verified" ? "effective_verified" : ""}><option value="" disabled>Select decision</option><option value="effective_verified">Effective—verified</option><option value="partially_effective">Partially effective—further action required</option><option value="not_effective">Not effective—reopen corrective action</option><option value="unable_to_verify">Unable to verify—insufficient evidence</option></select></label><label className="field"><span>Residual risk *</span><select name="residual_risk" required defaultValue={action.residual_risk || ""}><option value="" disabled>Select risk</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label><label className="field"><span>Verification method *</span><textarea name="effectiveness_verification_method" required defaultValue={action.effectiveness_verification_method || ""} placeholder="Record sample, observation, test, interview or performance-trend review" /></label></div>
+        <label className="field"><span>Auditor conclusion and objective result *</span><textarea name="effectiveness_verification_conclusion" required defaultValue={action.effectiveness_verification_conclusion || ""} placeholder="Compare the evidence and actual result with the D5 acceptance criteria; explain the decision and required follow-up." /></label>
+        <label className="check"><input type="checkbox" name="independent_verification" required /><span><strong>Independent auditor verification</strong><br />I reviewed the implementation record and objective evidence and take responsibility for this action-level conclusion.</span></label><div className="compactAction"><button className="button approve">Record D6 Effectiveness Decision</button></div>
+      </form> : <div className="notice" style={{ marginTop: 12 }}>Waiting for the action owner to submit implementation and evidence.</div>}
+    </article>)}</div>
+  </section>;
 }
