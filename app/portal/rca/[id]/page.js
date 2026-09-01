@@ -718,7 +718,7 @@ export default async function RcaCasePage({
               </form>
             </section>
 
-            {selected >= 2 && (
+            {selected >= 2 && selected !== 6 && (
               <section style={cardStyle}>
                 <div
                   style={{
@@ -902,7 +902,7 @@ export default async function RcaCasePage({
             )}
 
             {selected === 6 && (
-              <D6EffectivenessWorkbench caseId={id} actions={actions.filter((action) => action.discipline === 5 && action.selection_status === "selected")} />
+              <D6EffectivenessWorkbench caseId={id} actions={actions.filter((action) => action.discipline === 5 && action.selection_status === "selected")} evidenceRecords={evidenceRecords.filter((record) => record.discipline === 6)} />
             )}
 
             {[3, 7].includes(selected) && (
@@ -999,7 +999,7 @@ export default async function RcaCasePage({
   );
 }
 
-function D6EffectivenessWorkbench({ caseId, actions }) {
+function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
   const effectiveCount = actions.filter((action) => action.effectiveness_result === "effective_verified").length;
   const submittedCount = actions.filter((action) => Boolean(action.d6_submitted_at)).length;
   return (
@@ -1013,22 +1013,30 @@ function D6EffectivenessWorkbench({ caseId, actions }) {
         <div style={d5SummaryCardStyle}><strong>{effectiveCount}</strong><span>Effective—verified</span></div>
       </div>
       <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
-        {actions.map((action) => (
+        {actions.map((action) => {
+          const actionEvidence = evidenceRecords.filter((record) => record.action_id === action.id);
+          return (
           <article key={action.id} style={candidateCardStyle(action.effectiveness_result === "effective_verified" ? "selected" : "candidate")}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
               <div><strong style={{ fontSize: "18px" }}>{action.title}</strong><div style={{ marginTop: "5px", color: "#607089" }}>Owner: {action.action_owner || "Unassigned"} · Due: {action.due_date || "Not set"}</div></div>
               <span style={selectionBadgeStyle(action.effectiveness_result === "effective_verified" ? "selected" : "candidate")}>{label(action.effectiveness_result || (action.d6_submitted_at ? "awaiting auditor verification" : "implementation open"))}</span>
             </div>
             <div style={{ marginTop: "12px", padding: "12px", borderRadius: "10px", background: "#f4f7fb" }}><strong>D5 effectiveness criteria:</strong><div style={{ marginTop: "5px" }}>{action.effectiveness_criteria || "Not defined"}</div></div>
+            <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #cbd8ea", borderRadius: "12px", background: "#f8fbff" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" }}><div><strong>Objective evidence for this action</strong><div style={{ color: "#607089", fontSize: "13px", marginTop: "4px" }}>Only evidence attached here will be released to the auditor for this action-level decision.</div></div><span style={evidenceCountStyle}>{actionEvidence.length} file{actionEvidence.length === 1 ? "" : "s"}</span></div>
+              {actionEvidence.length > 0 && <div style={{ display: "grid", gap: "8px", marginTop: "12px" }}>{actionEvidence.map((record) => <div key={record.id} style={itemStyle}><div><strong>{record.reference || "Evidence file"}</strong><div style={{ color: "#607089", marginTop: "4px" }}>{record.description}</div><div style={{ color: "#607089", fontSize: "13px", marginTop: "4px" }}>Strength: {label(record.strength || "not rated")}{record.evidence_date ? ` · Evidence date: ${record.evidence_date}` : ""}</div></div>{record.download_url ? <a href={record.download_url} target="_blank" rel="noopener noreferrer" style={downloadButton}>Open file</a> : null}</div>)}</div>}
+              <form action={addObjectiveEvidence} encType="multipart/form-data" style={{ marginTop: "14px" }}><input type="hidden" name="case_id" value={caseId} /><input type="hidden" name="discipline" value="6" /><input type="hidden" name="action_id" value={action.id} /><label style={dropZoneStyle}><strong>Attach evidence to this action</strong><span style={{ color: "#607089", fontSize: "13px" }}>PDF, Word, Excel, CSV, text or images · maximum 10 files · 10 MB each</span><input type="file" name="evidence_files" multiple required accept=".pdf,.docx,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.webp" style={{ marginTop: "10px" }} /></label><div style={formGrid}><input name="reference" placeholder="Evidence reference (optional)" style={fieldStyle} /><input type="date" name="evidence_date" style={fieldStyle} /><select name="strength" defaultValue="medium" style={fieldStyle}><option value="low">Low evidence strength</option><option value="medium">Medium evidence strength</option><option value="high">High evidence strength</option></select></div><textarea name="description" required rows={3} placeholder="Describe what this evidence demonstrates for this corrective action and its effectiveness criteria." style={{ ...fieldStyle, marginTop: "12px", resize: "vertical" }} /><button type="submit" style={{ ...primaryButton, marginTop: "12px" }}>Add Evidence to This Action</button></form>
+            </div>
             <form action={submitD6ActionForVerification} style={{ marginTop: "14px" }}>
               <input type="hidden" name="case_id" value={caseId} /><input type="hidden" name="action_id" value={action.id} />
               <textarea name="implementation_result" required rows={3} defaultValue={action.implementation_result || ""} placeholder="What was implemented, when, and any deviation from the approved D5 plan" style={{ ...fieldStyle, marginTop: "12px" }} />
-              <textarea name="implementation_evidence_reference" required rows={2} defaultValue={action.implementation_evidence_reference || ""} placeholder="Reference the supporting D6 files uploaded in the evidence repository and explain what they demonstrate" style={{ ...fieldStyle, marginTop: "12px" }} />
+              <textarea name="implementation_evidence_reference" required rows={2} defaultValue={action.implementation_evidence_reference || ""} placeholder="Summarise how the evidence attached to this action demonstrates implementation and the expected result" style={{ ...fieldStyle, marginTop: "12px" }} />
               <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginTop: "12px", lineHeight: 1.45 }}><input type="checkbox" name="implementation_confirmation" required /><span>I confirm this action has been implemented and the referenced evidence is ready for independent auditor verification.</span></label>
               <button type="submit" style={{ ...primaryButton, marginTop: "12px" }}>{action.d6_submitted_at ? "Resubmit and Notify Auditor" : "Submit Action and Notify Auditor"}</button>
             </form>
           </article>
-        ))}
+          );
+        })}
         {actions.length === 0 && <div style={emptyWorkbenchStyle}>No selected D5 corrective actions are available for D6 verification.</div>}
       </div>
     </section>
