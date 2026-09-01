@@ -475,6 +475,11 @@ export default async function SecureRcaCasePage({
                     </div>
                   </div>
                 )}
+                {pageError === "d6_action_evidence_required" && (
+                  <div style={errorNoticeStyle}>
+                    <strong>Objective evidence required.</strong> Attach at least one file to the relevant corrective action before notifying the auditor.
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",
@@ -1046,7 +1051,8 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
               <textarea name="implementation_result" required rows={3} defaultValue={action.implementation_result || ""} placeholder="What was implemented, when, and any deviation from the approved D5 plan" style={{ ...fieldStyle, marginTop: "12px" }} />
               <textarea name="implementation_evidence_reference" required rows={2} defaultValue={action.implementation_evidence_reference || ""} placeholder="Summarise how the evidence attached to this action demonstrates implementation and the expected result" style={{ ...fieldStyle, marginTop: "12px" }} />
               <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginTop: "12px", lineHeight: 1.45 }}><input type="checkbox" name="implementation_confirmation" required /><span>I confirm this action has been implemented and the referenced evidence is ready for independent auditor verification.</span></label>
-              <button type="submit" style={{ ...primaryButton, marginTop: "12px" }}>{action.d6_submitted_at ? "Resubmit and Notify Auditor" : "Submit Action and Notify Auditor"}</button>
+              {actionEvidence.length === 0 && <div style={{ ...errorNoticeStyle, marginTop: "12px" }}><strong>Submission blocked:</strong> attach objective evidence to this action first.</div>}
+              <button type="submit" disabled={actionEvidence.length === 0} style={{ ...primaryButton, marginTop: "12px", opacity: actionEvidence.length === 0 ? 0.55 : 1, cursor: actionEvidence.length === 0 ? "not-allowed" : "pointer" }}>{action.d6_submitted_at ? "Resubmit and Notify Auditor" : "Submit Action and Notify Auditor"}</button>
             </form>
           </article>
           );
