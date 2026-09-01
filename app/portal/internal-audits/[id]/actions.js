@@ -2317,6 +2317,13 @@ export async function verifyD6CorrectiveAction(formData) {
   const { data: access, error: accessError } = await supabase.from("internal_audit_action_access")
     .select("id, rca_case_id").eq("id", accessId).eq("audit_id", auditId).eq("finding_id", findingId).eq("owner_id", user.id).maybeSingle();
   if (accessError || !access || access.rca_case_id !== finding.linked_rca_case_id) throw new Error(accessError?.message || "D6 verification request not found.");
+  const { count: linkedEvidenceCount, error: linkedEvidenceError } = await supabase.from("rca_evidence")
+    .select("id", { count: "exact", head: true }).eq("case_id", finding.linked_rca_case_id)
+    .eq("owner_id", user.id).eq("discipline", 6).eq("action_id", actionId);
+  if (linkedEvidenceError) throw new Error(linkedEvidenceError.message);
+  if (result === "effective_verified" && !linkedEvidenceCount) {
+    throw new Error("This action cannot be confirmed effective because no objective evidence is linked to it.");
+  }
   const now = new Date().toISOString();
   const effective = result === "effective_verified";
   const { data: action, error: actionError } = await supabase.from("rca_actions").update({
