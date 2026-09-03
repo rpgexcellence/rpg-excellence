@@ -315,7 +315,7 @@ export async function saveDiscipline(formData) {
       .eq("selection_status", "selected");
     if (verifiedActionsError) throw new Error(verifiedActionsError.message);
     const actions = verifiedActions ?? [];
-    if (actions.length === 0 || actions.some((action) => action.effectiveness_result !== "effective_verified")) {
+    if (actions.length === 0 || actions.some((action) => !["effective", "effective_verified"].includes(action.effectiveness_result))) {
       redirect(await secureCasePath(caseId, "?d=6&error=d6_effectiveness_incomplete"));
     }
   }
