@@ -666,7 +666,8 @@ export async function submitD6ActionForVerification(formData) {
     implementation_evidence_reference: evidenceReference,
     d6_submitted_at: now,
     effectiveness_result: "awaiting_verification",
-    status: "completed",
+    // Keep the controlled action open until the auditor verifies effectiveness.
+    status: "open",
     updated_at: now,
   }).eq("id", actionId).eq("case_id", caseId).eq("owner_id", user.id)
     .eq("discipline", 5).eq("selection_status", "selected").select("id, title").maybeSingle();
