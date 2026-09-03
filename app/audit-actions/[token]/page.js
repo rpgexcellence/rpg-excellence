@@ -20,7 +20,7 @@ import {
   submitD6ActionForVerification,
 } from "./actions";
 const label = (value) =>
-  String(value ?? "")
+  String(value === "effective" ? "effective_verified" : value ?? "")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
@@ -1005,7 +1005,7 @@ export default async function SecureRcaCasePage({
 }
 
 function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
-  const effectiveCount = actions.filter((action) => action.effectiveness_result === "effective_verified").length;
+  const effectiveCount = actions.filter((action) => ["effective", "effective_verified"].includes(action.effectiveness_result)).length;
   const submittedCount = actions.filter((action) => Boolean(action.d6_submitted_at)).length;
   const implementationPending = actions.filter((action) => !action.d6_submitted_at);
   const awaitingAssessment = actions.filter((action) => action.effectiveness_result === "awaiting_verification");
@@ -1018,7 +1018,7 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
     { label: "Submitted for review", value: submittedCount, detail: "Cumulative owner submissions", items: actions.filter((action) => action.d6_submitted_at), color: "#6941c6", background: "#f4f3ff" },
     { label: "Awaiting auditor assessment", value: awaitingAssessment.length, detail: "Notification issued; decision outstanding", items: awaitingAssessment, color: "#026aa2", background: "#f0f9ff" },
     { label: "Auditor assessed", value: assessedActions.length, detail: "Independent decision recorded", items: assessedActions, color: "#344054", background: "#f2f4f7" },
-    { label: "Effective—verified", value: effectiveCount, detail: "Acceptance criteria achieved", items: actions.filter((action) => action.effectiveness_result === "effective_verified"), color: "#067647", background: "#ecfdf3" },
+    { label: "Effective—verified", value: effectiveCount, detail: "Acceptance criteria achieved", items: actions.filter((action) => ["effective", "effective_verified"].includes(action.effectiveness_result)), color: "#067647", background: "#ecfdf3" },
     { label: "Further action required", value: furtherAction.length, detail: "Partial, ineffective or insufficient evidence", items: furtherAction, color: "#b42318", background: "#fff1f0" },
   ];
   return (
@@ -1039,10 +1039,10 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
         {actions.map((action) => {
           const actionEvidence = evidenceRecords.filter((record) => record.action_id === action.id);
           return (
-          <article id={`d6-action-${action.id}`} key={action.id} style={{ ...candidateCardStyle(action.effectiveness_result === "effective_verified" ? "selected" : "candidate"), scrollMarginTop: "24px" }}>
+          <article id={`d6-action-${action.id}`} key={action.id} style={{ ...candidateCardStyle(["effective", "effective_verified"].includes(action.effectiveness_result) ? "selected" : "candidate"), scrollMarginTop: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
               <div><strong style={{ fontSize: "18px" }}>{action.title}</strong><div style={{ marginTop: "5px", color: "#607089" }}>Owner: {action.action_owner || "Unassigned"} · Due: {action.due_date || "Not set"}</div></div>
-              <span style={selectionBadgeStyle(action.effectiveness_result === "effective_verified" ? "selected" : "candidate")}>{label(action.effectiveness_result || (action.d6_submitted_at ? "awaiting auditor verification" : "implementation open"))}</span>
+              <span style={selectionBadgeStyle(["effective", "effective_verified"].includes(action.effectiveness_result) ? "selected" : "candidate")}>{label(action.effectiveness_result || (action.d6_submitted_at ? "awaiting auditor verification" : "implementation open"))}</span>
             </div>
             <div style={{ marginTop: "12px", padding: "12px", borderRadius: "10px", background: "#f4f7fb" }}><strong>D5 effectiveness criteria:</strong><div style={{ marginTop: "5px" }}>{action.effectiveness_criteria || "Not defined"}</div></div>
             <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #cbd8ea", borderRadius: "12px", background: "#f8fbff" }}>
