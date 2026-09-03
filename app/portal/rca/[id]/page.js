@@ -2188,6 +2188,15 @@ const primaryButton = {
   cursor: "pointer",
 };
 
+const errorNoticeStyle = {
+  padding: "12px 14px",
+  border: "1px solid #fda29b",
+  borderRadius: "10px",
+  background: "#fff1f0",
+  color: "#b42318",
+  lineHeight: 1.5,
+};
+
 const secondaryButton = {
   ...primaryButton,
   background: "#e9eff8",
