@@ -651,15 +651,22 @@ export async function submitD6ActionForVerification(formData) {
   }
   await getOwnedCase(supabase, user.id, caseId);
   await assertDisciplineUnlocked(supabase, user.id, caseId, 6);
-  const { count: evidenceCount, error: evidenceError } = await supabase
+  const { data: existingAction, error: existingActionError } = await supabase.from("rca_actions")
+    .select("id, effectiveness_result, verified_at").eq("id", actionId).eq("case_id", caseId)
+    .eq("owner_id", user.id).eq("discipline", 5).eq("selection_status", "selected").maybeSingle();
+  if (existingActionError || !existingAction) throw new Error(existingActionError?.message || "Selected corrective action not found.");
+  const requiresNewEvidence = ["partially_effective", "not_effective", "unable_to_verify"].includes(existingAction.effectiveness_result);
+  let evidenceQuery = supabase
     .from("rca_evidence")
     .select("id", { count: "exact", head: true })
     .eq("case_id", caseId)
     .eq("owner_id", user.id)
     .eq("discipline", 6)
     .eq("action_id", actionId);
+  if (requiresNewEvidence && existingAction.verified_at) evidenceQuery = evidenceQuery.gt("created_at", existingAction.verified_at);
+  const { count: evidenceCount, error: evidenceError } = await evidenceQuery;
   if (evidenceError) throw new Error(evidenceError.message);
-  if (!evidenceCount) redirect(await secureCasePath(caseId, `?d=6&error=d6_action_evidence_required&action=${encodeURIComponent(actionId)}`));
+  if (!evidenceCount) redirect(await secureCasePath(caseId, `?d=6&error=${requiresNewEvidence ? "d6_new_evidence_required" : "d6_action_evidence_required"}&action=${encodeURIComponent(actionId)}`));
   const now = new Date().toISOString();
   const { data: action, error } = await supabase.from("rca_actions").update({
     implementation_result: implementationResult,
@@ -667,6 +674,10 @@ export async function submitD6ActionForVerification(formData) {
     implementation_evidence: evidenceReference,
     d6_submitted_at: now,
     effectiveness_result: "awaiting_verification",
+    effectiveness_verification_method: null,
+    effectiveness_verification_conclusion: null,
+    verified_by: null,
+    verified_at: null,
     // Keep the controlled action open until the auditor verifies effectiveness.
     status: "open",
     updated_at: now,
