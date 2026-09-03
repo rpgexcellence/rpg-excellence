@@ -2303,11 +2303,10 @@ export async function verifyD6CorrectiveAction(formData) {
   const accessId = clean(formData.get("action_access_id"));
   const actionId = clean(formData.get("action_id"));
   const result = clean(formData.get("effectiveness_result"));
-  const residualRisk = clean(formData.get("residual_risk"));
   const verificationMethod = clean(formData.get("effectiveness_verification_method"));
   const conclusion = clean(formData.get("effectiveness_verification_conclusion"));
   const allowedResults = ["effective_verified", "partially_effective", "not_effective", "unable_to_verify"];
-  if (!auditId || !findingId || !accessId || !actionId || !allowedResults.includes(result) || !["low", "medium", "high", "critical"].includes(residualRisk) || !verificationMethod || !conclusion || formData.get("independent_verification") !== "on") {
+  if (!auditId || !findingId || !accessId || !actionId || !allowedResults.includes(result) || !verificationMethod || !conclusion || formData.get("independent_verification") !== "on") {
     throw new Error("A complete independent D6 effectiveness decision is required.");
   }
   const { supabase, user } = await context(auditId);
@@ -2332,7 +2331,6 @@ export async function verifyD6CorrectiveAction(formData) {
   const { data: action, error: actionError } = await supabase.from("rca_actions").update({
     effectiveness_result: storedEffectivenessResult,
     implementation_evidence: "Objective evidence linked to this corrective action in the controlled D6 evidence repository.",
-    residual_risk: residualRisk,
     effectiveness_verification_method: verificationMethod,
     effectiveness_verification_conclusion: conclusion,
     verified_by: user.id,
@@ -2378,7 +2376,7 @@ export async function verifyD6CorrectiveAction(formData) {
   await supabase.from("rca_case_events").insert({ case_id: finding.linked_rca_case_id, owner_id: user.id,
     event_type: "d6_effectiveness_decision", discipline: 6,
     summary: `${action.title}: ${result.replaceAll("_", " ")}`,
-    event_data: { action_id: action.id, finding_id: findingId, result, residual_risk: residualRisk, all_actions_effective: allEffective } });
+    event_data: { action_id: action.id, finding_id: findingId, result, all_actions_effective: allEffective } });
   await supabase.from("internal_audit_events").insert({ owner_id: user.id, audit_id: auditId,
     event_type: "d6_action_effectiveness_decided", summary: `${finding.finding_reference}: ${action.title} — ${result.replaceAll("_", " ")}`,
     event_data: { finding_id: findingId, action_id: action.id, result, all_actions_effective: allEffective }, created_by: user.id });
