@@ -664,6 +664,7 @@ export async function submitD6ActionForVerification(formData) {
   const { data: action, error } = await supabase.from("rca_actions").update({
     implementation_result: implementationResult,
     implementation_evidence_reference: evidenceReference,
+    implementation_evidence: evidenceReference,
     d6_submitted_at: now,
     effectiveness_result: "awaiting_verification",
     // Keep the controlled action open until the auditor verifies effectiveness.
