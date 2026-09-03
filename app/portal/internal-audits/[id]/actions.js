@@ -2495,8 +2495,24 @@ export async function reviewAuditActionResponse(formData) {
   const { supabase, user } = await context(auditId);
   const now = new Date().toISOString();
   const { data: access, error: accessLookupError } = await supabase.from("internal_audit_action_access")
-    .select("id, rca_case_id").eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+    .select("id, finding_id, rca_case_id").eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
   if (accessLookupError || !access) throw new Error(accessLookupError?.message || "Assigned 8D response not found.");
+  if (decision === "accepted" && access.rca_case_id) {
+    const { data: selectedActions, error: selectedActionsError } = await supabase.from("rca_actions")
+      .select("id, effectiveness_result, status, verified_by, verified_at")
+      .eq("case_id", access.rca_case_id).eq("owner_id", user.id)
+      .eq("discipline", 5).eq("selection_status", "selected");
+    if (selectedActionsError) throw new Error(selectedActionsError.message);
+    const allIndependentlyVerified = (selectedActions ?? []).length > 0 && (selectedActions ?? []).every((action) =>
+      action.effectiveness_result === "effective_verified" &&
+      action.status === "verified" &&
+      action.verified_by &&
+      action.verified_at
+    );
+    if (!allIndependentlyVerified) {
+      redirect(`/portal/internal-audits/${auditId}?gate=actions&action_error=d6_verification_required#action-${access.finding_id}`);
+    }
+  }
   const { error } = await supabase.from("internal_audit_action_access").update({
     status: decision, auditor_response: response, auditor_response_at: now,
     auditor_response_by: user.id, updated_at: now,
