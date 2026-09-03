@@ -480,6 +480,11 @@ export default async function SecureRcaCasePage({
                     <strong>Objective evidence required.</strong> Attach at least one file to the relevant corrective action before notifying the auditor.
                   </div>
                 )}
+                {pageError === "d6_new_evidence_required" && (
+                  <div style={errorNoticeStyle}>
+                    <strong>New evidence required.</strong> The previous evidence has already been assessed. Attach a new objective-evidence record addressing the auditor’s decision before resubmitting.
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",
@@ -1006,16 +1011,20 @@ export default async function SecureRcaCasePage({
 
 function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
   const effectiveCount = actions.filter((action) => ["effective", "effective_verified"].includes(action.effectiveness_result)).length;
-  const submittedCount = actions.filter((action) => Boolean(action.d6_submitted_at)).length;
+  const submittedActions = actions.filter((action) => action.effectiveness_result === "awaiting_verification");
+  const closedActions = actions.filter((action) => ["effective", "effective_verified"].includes(action.effectiveness_result));
+  const reworkActions = actions.filter((action) => ["partially_effective", "not_effective", "unable_to_verify"].includes(action.effectiveness_result));
+  const activeActions = actions.filter((action) => !submittedActions.includes(action) && !closedActions.includes(action));
+  const submittedCount = submittedActions.length;
   const implementationPending = actions.filter((action) => !action.d6_submitted_at);
-  const awaitingAssessment = actions.filter((action) => action.effectiveness_result === "awaiting_verification");
-  const assessedActions = actions.filter((action) => ["effective_verified", "partially_effective", "not_effective", "unable_to_verify"].includes(action.effectiveness_result));
-  const furtherAction = actions.filter((action) => ["partially_effective", "not_effective", "unable_to_verify"].includes(action.effectiveness_result));
+  const awaitingAssessment = submittedActions;
+  const assessedActions = actions.filter((action) => ["effective", "effective_verified", "partially_effective", "not_effective", "unable_to_verify"].includes(action.effectiveness_result));
+  const furtherAction = reworkActions;
   const completionPercentage = actions.length ? Math.round((effectiveCount / actions.length) * 100) : 0;
   const dashboardMetrics = [
     { label: "Total controlled actions", value: actions.length, detail: "D5 actions selected for implementation", items: actions, color: "#155eef", background: "#eef4ff" },
     { label: "Effectiveness pending", value: implementationPending.length, detail: "Implementation or evidence not submitted", items: implementationPending, color: "#b54708", background: "#fff7ed" },
-    { label: "Submitted for review", value: submittedCount, detail: "Cumulative owner submissions", items: actions.filter((action) => action.d6_submitted_at), color: "#6941c6", background: "#f4f3ff" },
+    { label: "Submitted for review", value: submittedCount, detail: "Removed from your active queue", items: submittedActions, color: "#6941c6", background: "#f4f3ff" },
     { label: "Awaiting auditor assessment", value: awaitingAssessment.length, detail: "Notification issued; decision outstanding", items: awaitingAssessment, color: "#026aa2", background: "#f0f9ff" },
     { label: "Auditor assessed", value: assessedActions.length, detail: "Independent decision recorded", items: assessedActions, color: "#344054", background: "#f2f4f7" },
     { label: "Effective—verified", value: effectiveCount, detail: "Acceptance criteria achieved", items: actions.filter((action) => ["effective", "effective_verified"].includes(action.effectiveness_result)), color: "#067647", background: "#ecfdf3" },
@@ -1036,8 +1045,11 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
         <div style={d6DashboardGridStyle}>{dashboardMetrics.map((metric) => <a key={metric.label} href={metric.items.length ? `#d6-action-${metric.items[0].id}` : "#d6-actions"} style={{ ...d6MetricCardStyle, background: metric.background, borderColor: `${metric.color}55` }}><div style={{ ...d6MetricIconStyle, background: metric.color }} aria-hidden="true" /><div><div style={{ color: metric.color, fontSize: "30px", fontWeight: 900, lineHeight: 1 }}>{metric.value}</div><strong style={{ display: "block", color: "#102f50", marginTop: "8px" }}>{metric.label}</strong><span style={{ display: "block", color: "#607089", fontSize: "12px", lineHeight: 1.4, marginTop: "4px" }}>{metric.detail}</span></div><span style={{ color: metric.color, fontWeight: 900, marginLeft: "auto" }}>→</span></a>)}</div>
       </div>
       <div id="d6-actions" style={{ display: "grid", gap: "16px", marginTop: "20px", scrollMarginTop: "24px" }}>
-        {actions.map((action) => {
+        {activeActions.map((action) => {
           const actionEvidence = evidenceRecords.filter((record) => record.action_id === action.id);
+          const requiresRework = ["partially_effective", "not_effective", "unable_to_verify"].includes(action.effectiveness_result);
+          const newReworkEvidence = requiresRework && action.verified_at ? actionEvidence.filter((record) => new Date(record.created_at).getTime() > new Date(action.verified_at).getTime()) : actionEvidence;
+          const evidenceReady = requiresRework ? newReworkEvidence.length > 0 : actionEvidence.length > 0;
           return (
           <article id={`d6-action-${action.id}`} key={action.id} style={{ ...candidateCardStyle(["effective", "effective_verified"].includes(action.effectiveness_result) ? "selected" : "candidate"), scrollMarginTop: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
@@ -1045,6 +1057,7 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
               <span style={selectionBadgeStyle(["effective", "effective_verified"].includes(action.effectiveness_result) ? "selected" : "candidate")}>{label(action.effectiveness_result || (action.d6_submitted_at ? "awaiting auditor verification" : "implementation open"))}</span>
             </div>
             <div style={{ marginTop: "12px", padding: "12px", borderRadius: "10px", background: "#f4f7fb" }}><strong>D5 effectiveness criteria:</strong><div style={{ marginTop: "5px" }}>{action.effectiveness_criteria || "Not defined"}</div></div>
+            {requiresRework && <div style={{ marginTop: "14px", padding: "16px", border: "1px solid #f1a7a0", borderLeft: "5px solid #d92d20", borderRadius: "12px", background: "#fff3f2" }}><div style={{ color: "#b42318", fontSize: "12px", fontWeight: 900, textTransform: "uppercase", letterSpacing: ".06em" }}>Auditor decision · rework required</div><strong style={{ display: "block", marginTop: "7px", fontSize: "17px" }}>{label(action.effectiveness_result)}</strong>{action.effectiveness_verification_conclusion ? <p style={{ margin: "8px 0 0", color: "#7a271a", lineHeight: 1.55 }}>{action.effectiveness_verification_conclusion}</p> : null}{action.effectiveness_verification_method ? <div style={{ marginTop: "8px", color: "#912018", fontSize: "13px" }}><strong>Verification method:</strong> {action.effectiveness_verification_method}</div> : null}</div>}
             <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #cbd8ea", borderRadius: "12px", background: "#f8fbff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                 <div><strong>Objective evidence for this action</strong><div style={{ color: "#607089", fontSize: "13px", marginTop: "4px" }}>Only evidence attached here will be released to the auditor for this action-level decision.</div></div>
@@ -1064,17 +1077,20 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
             <form action={submitD6ActionForVerification} style={{ marginTop: "14px" }}>
               <input type="hidden" name="case_id" value={caseId} />
               <input type="hidden" name="action_id" value={action.id} />
-              <textarea name="implementation_result" required rows={3} defaultValue={action.implementation_result || ""} placeholder="What was implemented, when, and any deviation from the approved D5 plan" style={{ ...fieldStyle, marginTop: "12px" }} />
-              <textarea name="implementation_evidence_reference" required rows={2} defaultValue={action.implementation_evidence_reference || ""} placeholder="Summarise how the evidence attached to this action demonstrates implementation and the expected result" style={{ ...fieldStyle, marginTop: "12px" }} />
+              {requiresRework && <div style={{ color: "#155eef", fontSize: "12px", fontWeight: 900, textTransform: "uppercase", marginBottom: "8px" }}>Corrective-action rework response</div>}
+              <label style={{ display: "grid", gap: "6px", fontWeight: 800 }}>Revised implementation result *<textarea name="implementation_result" required rows={3} defaultValue={action.implementation_result || ""} placeholder="Describe the additional or corrected action, who completed it, when it was completed and what changed" style={fieldStyle} /></label>
+              <label style={{ display: "grid", gap: "6px", marginTop: "12px", fontWeight: 800 }}>New evidence summary *<textarea name="implementation_evidence_reference" required rows={2} defaultValue={action.implementation_evidence_reference || ""} placeholder="Explain how the newly attached evidence addresses the auditor’s decision and demonstrates the revised result" style={fieldStyle} /></label>
               <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginTop: "12px", lineHeight: 1.45 }}><input type="checkbox" name="implementation_confirmation" required /><span>I confirm this action has been implemented and the referenced evidence is ready for independent auditor verification.</span></label>
-              {actionEvidence.length === 0 && <div style={{ ...errorNoticeStyle, marginTop: "12px" }}><strong>Submission blocked:</strong> attach objective evidence to this action first.</div>}
-              <button type="submit" disabled={actionEvidence.length === 0} style={{ ...primaryButton, marginTop: "12px", opacity: actionEvidence.length === 0 ? 0.55 : 1, cursor: actionEvidence.length === 0 ? "not-allowed" : "pointer" }}>{action.d6_submitted_at ? "Resubmit and Notify Auditor" : "Submit Action and Notify Auditor"}</button>
+              {!evidenceReady && <div style={{ ...errorNoticeStyle, marginTop: "12px" }}><strong>Submission blocked:</strong> {requiresRework ? "attach new objective evidence created after the auditor’s decision." : "attach objective evidence to this action first."}</div>}
+              <button type="submit" disabled={!evidenceReady} style={{ ...primaryButton, marginTop: "12px", opacity: evidenceReady ? 1 : 0.55, cursor: evidenceReady ? "pointer" : "not-allowed" }}>{requiresRework ? "Resubmit for Auditor Verification" : "Submit Action and Notify Auditor"}</button>
             </form>
           </article>
           );
         })}
-        {actions.length === 0 && <div style={emptyWorkbenchStyle}>No selected D5 corrective actions are available for D6 verification.</div>}
+        {activeActions.length === 0 && <div style={{ ...emptyWorkbenchStyle, borderColor: "#9ed8bd", background: "#f0faf5", color: "#05603a" }}><strong>No action is currently required from you.</strong><div style={{ marginTop: "6px" }}>{submittedActions.length ? "Your corrective action has been submitted and is awaiting independent auditor verification." : closedActions.length ? "All corrective actions have been verified effective." : "No selected D5 corrective actions are available for D6 verification."}</div></div>}
       </div>
+      <details style={{ marginTop: "18px", padding: "16px 18px", border: "1px solid #cbd8ea", borderRadius: "14px", background: "#f8fbff" }}><summary style={{ cursor: "pointer", fontWeight: 900, color: "#102f50" }}>Submitted / awaiting auditor ({submittedActions.length})</summary>{submittedActions.length ? <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>{submittedActions.map((action) => <div key={action.id} style={itemStyle}><div><strong>{action.title}</strong><div style={{ color: "#607089", marginTop: "4px" }}>Submitted {action.d6_submitted_at ? displayDate(action.d6_submitted_at) : ""}</div></div><span style={{ ...selectionBadgeStyle("candidate"), whiteSpace: "nowrap" }}>Awaiting verification</span></div>)}</div> : <p style={{ color: "#607089" }}>No actions are awaiting auditor verification.</p>}</details>
+      <details style={{ marginTop: "12px", padding: "16px 18px", border: "1px solid #9ed8bd", borderRadius: "14px", background: "#f4fbf7" }}><summary style={{ cursor: "pointer", fontWeight: 900, color: "#05603a" }}>Verified effective / closed ({closedActions.length})</summary>{closedActions.length ? <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>{closedActions.map((action) => <div key={action.id} style={itemStyle}><strong>{action.title}</strong><span style={selectionBadgeStyle("selected")}>Effective—verified</span></div>)}</div> : <p style={{ color: "#607089" }}>No actions have been closed yet.</p>}</details>
     </section>
   );
 }
