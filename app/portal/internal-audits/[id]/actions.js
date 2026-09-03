@@ -2350,9 +2350,25 @@ export async function verifyD6CorrectiveAction(formData) {
   const { error: caseError } = await supabase.from("rca_cases").update({ current_discipline: allEffective ? 7 : 6, status: "active", updated_at: now })
     .eq("id", finding.linked_rca_case_id).eq("owner_id", user.id);
   if (caseError) throw new Error(caseError.message);
-  const { error: accessUpdateError } = await supabase.from("internal_audit_action_access").update({
-    d6_verification_completed_at: allEffective ? now : null, updated_at: now,
-  }).eq("id", accessId).eq("owner_id", user.id);
+  const accessVerificationUpdate = allEffective ? {
+    status: "verified_effective",
+    effectiveness_result: "effective",
+    verification_method: "Independent action-by-action D6 effectiveness verification",
+    verification_evidence: "Every selected corrective action is recorded as Effective—verified against its linked objective evidence.",
+    verified_at: now,
+    verified_by: user.id,
+    d6_verification_completed_at: now,
+    updated_at: now,
+  } : {
+    status: "verification_requested",
+    effectiveness_result: null,
+    verified_at: null,
+    verified_by: null,
+    d6_verification_completed_at: null,
+    updated_at: now,
+  };
+  const { error: accessUpdateError } = await supabase.from("internal_audit_action_access").update(accessVerificationUpdate)
+    .eq("id", accessId).eq("owner_id", user.id);
   if (accessUpdateError) throw new Error(accessUpdateError.message);
   await supabase.from("rca_case_events").insert({ case_id: finding.linked_rca_case_id, owner_id: user.id,
     event_type: "d6_effectiveness_decision", discipline: 6,
@@ -2495,7 +2511,7 @@ export async function reviewAuditActionResponse(formData) {
   const { supabase, user } = await context(auditId);
   const now = new Date().toISOString();
   const { data: access, error: accessLookupError } = await supabase.from("internal_audit_action_access")
-    .select("id, finding_id, rca_case_id").eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+    .select("id, finding_id, rca_case_id, status").eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
   if (accessLookupError || !access) throw new Error(accessLookupError?.message || "Assigned 8D response not found.");
   if (decision === "accepted" && access.rca_case_id) {
     const { data: selectedActions, error: selectedActionsError } = await supabase.from("rca_actions")
@@ -2513,10 +2529,26 @@ export async function reviewAuditActionResponse(formData) {
       redirect(`/portal/internal-audits/${auditId}?gate=actions&action_error=d6_verification_required#action-${access.finding_id}`);
     }
   }
-  const { error } = await supabase.from("internal_audit_action_access").update({
-    status: decision, auditor_response: response, auditor_response_at: now,
-    auditor_response_by: user.id, updated_at: now,
-  }).eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id);
+  const reviewUpdate = decision === "accepted" ? {
+    status: "verified_effective",
+    effectiveness_result: "effective",
+    verification_method: "Independent action-by-action D6 effectiveness verification",
+    verification_evidence: response,
+    verified_at: now,
+    verified_by: user.id,
+    auditor_response: response,
+    auditor_response_at: now,
+    auditor_response_by: user.id,
+    updated_at: now,
+  } : {
+    status: "returned",
+    auditor_response: response,
+    auditor_response_at: now,
+    auditor_response_by: user.id,
+    updated_at: now,
+  };
+  const { error } = await supabase.from("internal_audit_action_access").update(reviewUpdate)
+    .eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
   if (access.rca_case_id) {
     const stageUpdate = decision === "accepted"
