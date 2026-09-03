@@ -127,7 +127,7 @@ export async function GET(_request, { params }) {
   section(7, "Report control and distribution");
   keyValue("Confidentiality", label(report.confidentiality_classification)); keyValue("Distribution", report.distribution_list);
   keyValue("Evidence records retained", String((evidenceResult.data || []).length)); keyValue("Lead auditor", report.lead_auditor_name);
-  drawText("This report is generated from the controlled audit record. AI-assisted narrative, where used, remains subject to lead-auditor review and approval. Findings, classifications, criteria results and objective-evidence records are reproduced from controlled source data.", { size: 8.5, color: colours.grey, after: 8 });
+  drawText("This report is generated from the controlled audit record. Guided narrative remains subject to lead-auditor review and approval. Findings, classifications, criteria results and objective-evidence records are reproduced from controlled source data.", { size: 8.5, color: colours.grey, after: 8 });
 
   const pages = pdf.getPages();
   pages.forEach((currentPage, index) => {
