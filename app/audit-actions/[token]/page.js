@@ -1007,6 +1007,20 @@ export default async function SecureRcaCasePage({
 function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
   const effectiveCount = actions.filter((action) => action.effectiveness_result === "effective_verified").length;
   const submittedCount = actions.filter((action) => Boolean(action.d6_submitted_at)).length;
+  const implementationPending = actions.filter((action) => !action.d6_submitted_at);
+  const awaitingAssessment = actions.filter((action) => action.effectiveness_result === "awaiting_verification");
+  const assessedActions = actions.filter((action) => ["effective_verified", "partially_effective", "not_effective", "unable_to_verify"].includes(action.effectiveness_result));
+  const furtherAction = actions.filter((action) => ["partially_effective", "not_effective", "unable_to_verify"].includes(action.effectiveness_result));
+  const completionPercentage = actions.length ? Math.round((effectiveCount / actions.length) * 100) : 0;
+  const dashboardMetrics = [
+    { label: "Total controlled actions", value: actions.length, detail: "D5 actions selected for implementation", items: actions, color: "#155eef", background: "#eef4ff" },
+    { label: "Effectiveness pending", value: implementationPending.length, detail: "Implementation or evidence not submitted", items: implementationPending, color: "#b54708", background: "#fff7ed" },
+    { label: "Submitted for review", value: submittedCount, detail: "Cumulative owner submissions", items: actions.filter((action) => action.d6_submitted_at), color: "#6941c6", background: "#f4f3ff" },
+    { label: "Awaiting auditor assessment", value: awaitingAssessment.length, detail: "Notification issued; decision outstanding", items: awaitingAssessment, color: "#026aa2", background: "#f0f9ff" },
+    { label: "Auditor assessed", value: assessedActions.length, detail: "Independent decision recorded", items: assessedActions, color: "#344054", background: "#f2f4f7" },
+    { label: "Effective—verified", value: effectiveCount, detail: "Acceptance criteria achieved", items: actions.filter((action) => action.effectiveness_result === "effective_verified"), color: "#067647", background: "#ecfdf3" },
+    { label: "Further action required", value: furtherAction.length, detail: "Partial, ineffective or insufficient evidence", items: furtherAction, color: "#b42318", background: "#fff1f0" },
+  ];
   return (
     <section style={cardStyle}>
       <div style={{ color: "#155eef", fontSize: "12px", fontWeight: 800, textTransform: "uppercase" }}>D6 Implementation and Effectiveness Verification</div>
@@ -1014,16 +1028,18 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
       <p style={{ color: "#607089", lineHeight: 1.6 }}>
         The action owner records implementation and objective evidence here. The auditor is then notified and makes the independent effectiveness decision. D7 remains locked until every selected action is confirmed Effective—verified.
       </p>
-      <div style={d5SummaryGridStyle}>
-        <div style={d5SummaryCardStyle}><strong>{actions.length}</strong><span>Selected actions</span></div>
-        <div style={d5SummaryCardStyle}><strong>{submittedCount}</strong><span>Submitted to auditor</span></div>
-        <div style={d5SummaryCardStyle}><strong>{effectiveCount}</strong><span>Effective—verified</span></div>
+      <div style={d6DashboardShellStyle}>
+        <div style={d6DashboardHeaderStyle}>
+          <div><div style={d6DashboardKickerStyle}>LIVE D6 CONTROL DASHBOARD</div><h3 style={{ margin: "5px 0 6px", fontSize: "24px" }}>Action effectiveness status</h3><div style={{ color: "#b9c9df" }}>Select any block to jump directly to the relevant corrective action.</div></div>
+          <div style={{ ...d6ProgressRingStyle, background: `conic-gradient(#32d583 ${completionPercentage * 3.6}deg, #28486f 0deg)` }}><div style={d6ProgressRingInnerStyle}><strong>{completionPercentage}%</strong><span>verified</span></div></div>
+        </div>
+        <div style={d6DashboardGridStyle}>{dashboardMetrics.map((metric) => <a key={metric.label} href={metric.items.length ? `#d6-action-${metric.items[0].id}` : "#d6-actions"} style={{ ...d6MetricCardStyle, background: metric.background, borderColor: `${metric.color}55` }}><div style={{ ...d6MetricIconStyle, background: metric.color }} aria-hidden="true" /><div><div style={{ color: metric.color, fontSize: "30px", fontWeight: 900, lineHeight: 1 }}>{metric.value}</div><strong style={{ display: "block", color: "#102f50", marginTop: "8px" }}>{metric.label}</strong><span style={{ display: "block", color: "#607089", fontSize: "12px", lineHeight: 1.4, marginTop: "4px" }}>{metric.detail}</span></div><span style={{ color: metric.color, fontWeight: 900, marginLeft: "auto" }}>→</span></a>)}</div>
       </div>
-      <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
+      <div id="d6-actions" style={{ display: "grid", gap: "16px", marginTop: "20px", scrollMarginTop: "24px" }}>
         {actions.map((action) => {
           const actionEvidence = evidenceRecords.filter((record) => record.action_id === action.id);
           return (
-          <article key={action.id} style={candidateCardStyle(action.effectiveness_result === "effective_verified" ? "selected" : "candidate")}>
+          <article id={`d6-action-${action.id}`} key={action.id} style={{ ...candidateCardStyle(action.effectiveness_result === "effective_verified" ? "selected" : "candidate"), scrollMarginTop: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
               <div><strong style={{ fontSize: "18px" }}>{action.title}</strong><div style={{ marginTop: "5px", color: "#607089" }}>Owner: {action.action_owner || "Unassigned"} · Due: {action.due_date || "Not set"}</div></div>
               <span style={selectionBadgeStyle(action.effectiveness_result === "effective_verified" ? "selected" : "candidate")}>{label(action.effectiveness_result || (action.d6_submitted_at ? "awaiting auditor verification" : "implementation open"))}</span>
@@ -2212,6 +2228,15 @@ const errorNoticeStyle = {
   color: "#b42318",
   lineHeight: 1.5,
 };
+
+const d6DashboardShellStyle = { marginTop: "22px", padding: "22px", borderRadius: "20px", background: "linear-gradient(135deg, #071d3a 0%, #123b69 100%)", boxShadow: "0 18px 45px rgba(16, 47, 80, 0.22)" };
+const d6DashboardHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "20px", flexWrap: "wrap", color: "white", marginBottom: "18px" };
+const d6DashboardKickerStyle = { color: "#5eead4", fontSize: "11px", fontWeight: 900, letterSpacing: ".1em" };
+const d6DashboardGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "12px" };
+const d6MetricCardStyle = { minHeight: "122px", display: "flex", alignItems: "flex-start", gap: "12px", padding: "17px", border: "1px solid", borderRadius: "15px", textDecoration: "none", boxShadow: "0 8px 22px rgba(5, 25, 50, 0.12)" };
+const d6MetricIconStyle = { width: "7px", minHeight: "88px", flexShrink: 0, borderRadius: "999px" };
+const d6ProgressRingStyle = { width: "112px", height: "112px", display: "grid", placeItems: "center", flexShrink: 0, borderRadius: "50%" };
+const d6ProgressRingInnerStyle = { width: "82px", height: "82px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#0b284d", color: "white" };
 
 const secondaryButton = {
   ...primaryButton,
