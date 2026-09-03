@@ -2331,6 +2331,7 @@ export async function verifyD6CorrectiveAction(formData) {
   const storedEffectivenessResult = effective ? "effective" : result;
   const { data: action, error: actionError } = await supabase.from("rca_actions").update({
     effectiveness_result: storedEffectivenessResult,
+    implementation_evidence: "Objective evidence linked to this corrective action in the controlled D6 evidence repository.",
     residual_risk: residualRisk,
     effectiveness_verification_method: verificationMethod,
     effectiveness_verification_conclusion: conclusion,
