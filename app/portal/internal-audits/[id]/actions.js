@@ -2436,7 +2436,7 @@ export async function generateAuditReportAiDraft(formData) {
     supabase.from("internal_audit_report_controls").select("*").eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
     supabase.from("internal_audit_answers").select("result, conclusion, auditor_notes, risk_level, confidence_level, not_applicable_justification, internal_audit_questions(question_code, clause, process_area, question_text)").eq("audit_id", auditId).eq("owner_id", user.id).neq("result", "not_assessed"),
     supabase.from("internal_audit_findings").select("finding_reference, finding_type, risk_level, title, failure_statement, criteria, objective_evidence, process_area, status").eq("audit_id", auditId).eq("owner_id", user.id),
-    supabase.from("internal_audit_evidence").select("evidence_reference, evidence_type, description, confidence, source, collected_at").eq("audit_id", auditId).eq("owner_id", user.id),
+    supabase.from("internal_audit_evidence").select("evidence_reference, evidence_type, title, description, source_name, source_date, evidence_owner, process_area, confidentiality, reliability").eq("audit_id", auditId).eq("owner_id", user.id),
     supabase.from("internal_audit_team_members").select("member_name, audit_role").eq("audit_id", auditId).eq("owner_id", user.id),
   ]);
   for (const result of [reportResult, answersResult, findingsResult, evidenceResult, teamResult]) {
