@@ -2424,13 +2424,10 @@ export async function saveAuditReport(formData) {
   returnTo(auditId, "report", "report");
 }
 
-export async function generateAuditReportAiDraft(formData) {
+export async function generateAuditReportGuidedDraft(formData) {
   const auditId = clean(formData.get("audit_id"));
   const replaceExisting = formData.get("replace_existing") === "on";
   if (!auditId) throw new Error("Audit reference is required.");
-  if (!process.env.OPENAI_API_KEY) {
-    redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_not_configured`);
-  }
   const { supabase, user, audit } = await context(auditId);
   const [reportResult, answersResult, findingsResult, evidenceResult, teamResult] = await Promise.all([
     supabase.from("internal_audit_report_controls").select("*").eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
@@ -2443,41 +2440,33 @@ export async function generateAuditReportAiDraft(formData) {
     if (result.error) throw new Error(result.error.message);
   }
   const answers = answersResult.data ?? [];
-  if (!answers.length) redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_insufficient_evidence`);
-  const sourceRecord = {
-    audit: { reference: audit.audit_reference, title: audit.title, scope: audit.scope_statement, sites: audit.sites, processes: audit.processes, planned_start_at: audit.planned_start_at, planned_end_at: audit.planned_end_at },
-    team: teamResult.data ?? [],
-    assessed_criteria: answers.slice(0, 250),
-    controlled_findings: (findingsResult.data ?? []).slice(0, 100),
-    evidence_register: (evidenceResult.data ?? []).slice(0, 150),
-    auditor_recorded_limitations: reportResult.data?.limitations_and_exclusions || null,
-    auditor_recorded_unresolved_differences: reportResult.data?.unresolved_differences || null,
+  if (!answers.length) redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=guided_insufficient_evidence`);
+  const findings = findingsResult.data ?? [];
+  const evidence = evidenceResult.data ?? [];
+  const team = teamResult.data ?? [];
+  const tally = (records, field, value) => records.filter((record) => record[field] === value).length;
+  const assessed = answers.length;
+  const conformity = tally(answers, "result", "conformity");
+  const major = Math.max(tally(answers, "result", "major_nc"), tally(findings, "finding_type", "major_nc"));
+  const minor = Math.max(tally(answers, "result", "minor_nc"), tally(findings, "finding_type", "minor_nc"));
+  const observations = Math.max(tally(answers, "result", "observation"), tally(findings, "finding_type", "observation"));
+  const opportunities = Math.max(tally(answers, "result", "ofi"), tally(findings, "finding_type", "ofi"));
+  const positives = Math.max(tally(answers, "result", "positive_practice"), tally(findings, "finding_type", "positive_practice"));
+  const unable = tally(answers, "result", "unable_to_verify");
+  const notApplicable = tally(answers, "result", "not_applicable");
+  const lowConfidence = answers.filter((answer) => answer.confidence_level === "low");
+  const processAreas = [...new Set(answers.map((answer) => answer.internal_audit_questions?.process_area).filter(Boolean))];
+  const evidenceTypes = [...new Set(evidence.map((item) => item.evidence_type).filter(Boolean))].map((item) => item.replaceAll("_", " "));
+  const findingReferences = findings.filter((item) => ["major_nc", "minor_nc"].includes(item.finding_type)).map((item) => item.finding_reference).filter(Boolean);
+  const scope = audit.scope_statement || audit.processes || "the approved audit scope";
+  const sites = audit.sites ? ` at ${audit.sites}` : "";
+  const resultSummary = `${conformity} conformity result(s), ${major} major nonconformity(ies), ${minor} minor nonconformity(ies), ${observations} observation(s), ${opportunities} opportunity(ies) for improvement and ${positives} positive practice item(s)`;
+  const draft = {
+    executive_summary: `This internal audit assessed ${scope}${sites}. ${assessed} criterion assessment(s) were completed and ${evidence.length} item(s) were recorded in the objective-evidence register. The controlled results comprise ${resultSummary}. ${findingReferences.length ? `Formal corrective-action follow-up is required for ${findingReferences.join(", ")}.` : "No Major or Minor nonconformity requiring formal corrective-action follow-up was recorded."} This narrative is generated directly from the controlled audit record and must be reviewed by the lead auditor before approval.`,
+    methodology_and_sampling: `The audit was performed by ${team.length || 1} assigned audit team member(s) against the approved scope and question bank. Work covered ${processAreas.length ? processAreas.join(", ") : audit.processes || "the recorded process areas"}. Conclusions were recorded criterion by criterion and supported by ${evidence.length} registered evidence item(s)${evidenceTypes.length ? `, including ${evidenceTypes.join(", ")}` : ""}. Sampling provides assurance only for the activities, records, people, sites and time period actually examined; it does not constitute exhaustive verification of every transaction or control.`,
+    limitations_and_exclusions: unable || lowConfidence.length || notApplicable ? `${unable ? `${unable} criterion assessment(s) could not be verified from the evidence available. ` : ""}${lowConfidence.length ? `${lowConfidence.length} assessment(s) were recorded with low evidence confidence and require particular attention during review. ` : ""}${notApplicable ? `${notApplicable} criterion assessment(s) were recorded as not applicable with the justification retained in the controlled record. ` : ""}The lead auditor must confirm that these limitations do not invalidate the overall conclusion and add any access, time, sampling or scope restrictions not captured here.` : "No unable-to-verify or low-confidence assessment was identified in the controlled results. The lead auditor must nevertheless confirm whether any access, time, sampling or scope restriction affected the audit.",
+    overall_conclusion: major ? `The audit identified ${major} Major nonconformity(ies), demonstrating a significant failure requiring prompt containment, root-cause analysis, corrective action and independent effectiveness verification. ${minor ? `${minor} Minor nonconformity(ies) were also recorded. ` : ""}The management system cannot be considered fully effective within the audited scope until the controlled actions are implemented and verified. This conclusion must be confirmed by the lead auditor against the complete evidence trail.` : minor ? `The management system was found to be implemented across the audited scope, but ${minor} Minor nonconformity(ies) require controlled correction, root-cause analysis and corrective action. No Major nonconformity was recorded. Effectiveness should be confirmed only after the relevant actions and objective evidence have been independently verified by the auditor.` : unable ? `No Major or Minor nonconformity was recorded; however, ${unable} criterion assessment(s) could not be verified. Assurance is therefore qualified until sufficient objective evidence is obtained and the outstanding criteria are concluded by the auditor.` : `Within the approved scope and subject to the stated sampling limitations, the recorded evidence supports implementation of the management system. No Major or Minor nonconformity was recorded. ${observations || opportunities ? "The observations and opportunities for improvement should be considered to strengthen performance and prevent deterioration." : "Any recorded improvement opportunities and positive practices should be reviewed through normal management-system arrangements."} Final approval remains the responsibility of the lead auditor.`,
   };
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: process.env.OPENAI_AUDIT_MODEL || "gpt-5-mini",
-      store: false,
-      max_output_tokens: 1800,
-      instructions: "You draft internal-audit report narrative for an accountable lead auditor. Use only the supplied controlled record. Do not invent evidence, interviews, samples, conformity, causes, effectiveness or closure. Distinguish fact from limitation. Never change finding classifications. Use concise professional British English. The output is an AI-assisted draft requiring human review and approval.",
-      input: `Prepare four controlled report sections from this audit record:\n${JSON.stringify(sourceRecord)}`,
-      text: { format: { type: "json_schema", name: "audit_report_draft", strict: true, schema: { type: "object", additionalProperties: false, properties: {
-        executive_summary: { type: "string" },
-        methodology_and_sampling: { type: "string" },
-        limitations_and_exclusions: { type: "string" },
-        overall_conclusion: { type: "string" },
-      }, required: ["executive_summary", "methodology_and_sampling", "limitations_and_exclusions", "overall_conclusion"] } } },
-    }),
-  });
-  if (!response.ok) {
-    console.error("Audit report AI draft failed", response.status, await response.text());
-    redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_failed`);
-  }
-  const aiResponse = await response.json();
-  const outputText = aiResponse.output_text || aiResponse.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
-  let draft;
-  try { draft = JSON.parse(outputText); } catch { redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_failed`); }
   const existing = reportResult.data;
   const choose = (field) => replaceExisting || !clean(existing?.[field]) ? clean(draft[field]) : existing[field];
   const payload = {
@@ -2497,9 +2486,9 @@ export async function generateAuditReportAiDraft(formData) {
   };
   const { error: saveError } = await supabase.from("internal_audit_report_controls").upsert(payload, { onConflict: "audit_id" });
   if (saveError) throw new Error(saveError.message);
-  await supabase.from("internal_audit_events").insert({ owner_id: user.id, audit_id: auditId, event_type: "report_ai_draft_generated", summary: "AI-assisted report narrative generated for lead-auditor review", event_data: { model: process.env.OPENAI_AUDIT_MODEL || "gpt-5-mini", replaced_existing: replaceExisting }, created_by: user.id });
+  await supabase.from("internal_audit_events").insert({ owner_id: user.id, audit_id: auditId, event_type: "report_guided_draft_generated", summary: "Guided report narrative generated from the controlled audit record", event_data: { replaced_existing: replaceExisting, assessed_criteria: assessed, evidence_records: evidence.length, findings: findings.length }, created_by: user.id });
   revalidatePath(`/portal/internal-audits/${auditId}`);
-  redirect(`/portal/internal-audits/${auditId}?gate=report&saved=ai_draft`);
+  redirect(`/portal/internal-audits/${auditId}?gate=report&saved=guided_draft`);
 }
 
 export async function approveAuditReport(formData) {
