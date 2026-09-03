@@ -56,7 +56,7 @@ async function context(caseId) {
   } = await supabase
     .from("internal_audits")
     .select(
-      "id, audit_reference, organization_id, title, current_gate, status, scope_approved, plan_approved, planned_start_at, planned_end_at, auditee_contact_name, auditee_contact_email, sites, processes"
+      "id, audit_reference, organization_id, title, current_gate, status, scope_approved, plan_approved, planned_start_at, planned_end_at, auditee_contact_name, auditee_contact_email, scope_statement, sites, processes"
     )
     .eq("id", caseId)
     .eq("owner_id", user.id)
@@ -2422,6 +2422,84 @@ export async function saveAuditReport(formData) {
   }).eq("id", auditId).eq("owner_id", user.id);
   if (auditError) throw new Error(auditError.message);
   returnTo(auditId, "report", "report");
+}
+
+export async function generateAuditReportAiDraft(formData) {
+  const auditId = clean(formData.get("audit_id"));
+  const replaceExisting = formData.get("replace_existing") === "on";
+  if (!auditId) throw new Error("Audit reference is required.");
+  if (!process.env.OPENAI_API_KEY) {
+    redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_not_configured`);
+  }
+  const { supabase, user, audit } = await context(auditId);
+  const [reportResult, answersResult, findingsResult, evidenceResult, teamResult] = await Promise.all([
+    supabase.from("internal_audit_report_controls").select("*").eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
+    supabase.from("internal_audit_answers").select("result, conclusion, auditor_notes, risk_level, confidence_level, not_applicable_justification, internal_audit_questions(question_code, clause, process_area, question_text)").eq("audit_id", auditId).eq("owner_id", user.id).neq("result", "not_assessed"),
+    supabase.from("internal_audit_findings").select("finding_reference, finding_type, risk_level, title, failure_statement, criteria, objective_evidence, process_area, status").eq("audit_id", auditId).eq("owner_id", user.id),
+    supabase.from("internal_audit_evidence").select("evidence_reference, evidence_type, description, confidence, source, collected_at").eq("audit_id", auditId).eq("owner_id", user.id),
+    supabase.from("internal_audit_team_members").select("member_name, audit_role").eq("audit_id", auditId).eq("owner_id", user.id),
+  ]);
+  for (const result of [reportResult, answersResult, findingsResult, evidenceResult, teamResult]) {
+    if (result.error) throw new Error(result.error.message);
+  }
+  const answers = answersResult.data ?? [];
+  if (!answers.length) redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_insufficient_evidence`);
+  const sourceRecord = {
+    audit: { reference: audit.audit_reference, title: audit.title, scope: audit.scope_statement, sites: audit.sites, processes: audit.processes, planned_start_at: audit.planned_start_at, planned_end_at: audit.planned_end_at },
+    team: teamResult.data ?? [],
+    assessed_criteria: answers.slice(0, 250),
+    controlled_findings: (findingsResult.data ?? []).slice(0, 100),
+    evidence_register: (evidenceResult.data ?? []).slice(0, 150),
+    auditor_recorded_limitations: reportResult.data?.limitations_and_exclusions || null,
+    auditor_recorded_unresolved_differences: reportResult.data?.unresolved_differences || null,
+  };
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: process.env.OPENAI_AUDIT_MODEL || "gpt-5-mini",
+      store: false,
+      max_output_tokens: 1800,
+      instructions: "You draft internal-audit report narrative for an accountable lead auditor. Use only the supplied controlled record. Do not invent evidence, interviews, samples, conformity, causes, effectiveness or closure. Distinguish fact from limitation. Never change finding classifications. Use concise professional British English. The output is an AI-assisted draft requiring human review and approval.",
+      input: `Prepare four controlled report sections from this audit record:\n${JSON.stringify(sourceRecord)}`,
+      text: { format: { type: "json_schema", name: "audit_report_draft", strict: true, schema: { type: "object", additionalProperties: false, properties: {
+        executive_summary: { type: "string" },
+        methodology_and_sampling: { type: "string" },
+        limitations_and_exclusions: { type: "string" },
+        overall_conclusion: { type: "string" },
+      }, required: ["executive_summary", "methodology_and_sampling", "limitations_and_exclusions", "overall_conclusion"] } } },
+    }),
+  });
+  if (!response.ok) {
+    console.error("Audit report AI draft failed", response.status, await response.text());
+    redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_failed`);
+  }
+  const aiResponse = await response.json();
+  const outputText = aiResponse.output_text || aiResponse.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
+  let draft;
+  try { draft = JSON.parse(outputText); } catch { redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=ai_failed`); }
+  const existing = reportResult.data;
+  const choose = (field) => replaceExisting || !clean(existing?.[field]) ? clean(draft[field]) : existing[field];
+  const payload = {
+    owner_id: user.id, audit_id: auditId,
+    report_reference: existing?.report_reference || `${audit.audit_reference}-RPT`,
+    report_version: existing?.report_version || 1,
+    executive_summary: choose("executive_summary"),
+    methodology_and_sampling: choose("methodology_and_sampling"),
+    limitations_and_exclusions: choose("limitations_and_exclusions"),
+    unresolved_differences: existing?.unresolved_differences || null,
+    overall_conclusion: choose("overall_conclusion"),
+    confidentiality_classification: existing?.confidentiality_classification || "controlled",
+    distribution_list: existing?.distribution_list || null,
+    lead_auditor_name: existing?.lead_auditor_name || (teamResult.data ?? []).find((member) => member.audit_role === "lead_auditor")?.member_name || null,
+    status: "draft", approved_at: null, approved_by: null, issued_at: null, issued_by: null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error: saveError } = await supabase.from("internal_audit_report_controls").upsert(payload, { onConflict: "audit_id" });
+  if (saveError) throw new Error(saveError.message);
+  await supabase.from("internal_audit_events").insert({ owner_id: user.id, audit_id: auditId, event_type: "report_ai_draft_generated", summary: "AI-assisted report narrative generated for lead-auditor review", event_data: { model: process.env.OPENAI_AUDIT_MODEL || "gpt-5-mini", replaced_existing: replaceExisting }, created_by: user.id });
+  revalidatePath(`/portal/internal-audits/${auditId}`);
+  redirect(`/portal/internal-audits/${auditId}?gate=report&saved=ai_draft`);
 }
 
 export async function approveAuditReport(formData) {
