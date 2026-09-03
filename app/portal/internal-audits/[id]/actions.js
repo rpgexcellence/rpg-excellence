@@ -2220,7 +2220,7 @@ export async function verifyAuditFindingEffectiveness(
   const actions = actionsResult.data ?? [];
   const allActionsComplete =
     actions.length > 0 &&
-    actions.every((action) => action.effectiveness_result === "effective_verified" && action.status === "verified");
+    actions.every((action) => ["effective", "effective_verified"].includes(action.effectiveness_result) && action.status === "verified");
   const rcaAtEffectivenessGate =
     Number(rcaResult.data.current_discipline) >= 8 ||
     ["effectiveness_review", "closed"].includes(rcaResult.data.status);
@@ -2326,8 +2326,11 @@ export async function verifyD6CorrectiveAction(formData) {
   }
   const now = new Date().toISOString();
   const effective = result === "effective_verified";
+  // The existing accountable-human trigger uses the canonical value
+  // "effective". The form/event retain the clearer "effective_verified" label.
+  const storedEffectivenessResult = effective ? "effective" : result;
   const { data: action, error: actionError } = await supabase.from("rca_actions").update({
-    effectiveness_result: result,
+    effectiveness_result: storedEffectivenessResult,
     residual_risk: residualRisk,
     effectiveness_verification_method: verificationMethod,
     effectiveness_verification_conclusion: conclusion,
@@ -2341,7 +2344,7 @@ export async function verifyD6CorrectiveAction(formData) {
   const { data: selectedActions, error: selectedError } = await supabase.from("rca_actions").select("id, effectiveness_result")
     .eq("case_id", finding.linked_rca_case_id).eq("owner_id", user.id).eq("discipline", 5).eq("selection_status", "selected");
   if (selectedError) throw new Error(selectedError.message);
-  const allEffective = (selectedActions ?? []).length > 0 && (selectedActions ?? []).every((item) => item.effectiveness_result === "effective_verified");
+  const allEffective = (selectedActions ?? []).length > 0 && (selectedActions ?? []).every((item) => ["effective", "effective_verified"].includes(item.effectiveness_result));
   const { error: disciplineError } = await supabase.from("rca_8d_disciplines").update(allEffective ? {
     status: "approved", completion_score: 100, human_approved: true, approved_by: user.id, approved_at: now,
   } : { status: "in_progress", completion_score: 60, human_approved: false, approved_by: null, approved_at: null })
@@ -2520,7 +2523,7 @@ export async function reviewAuditActionResponse(formData) {
       .eq("discipline", 5).eq("selection_status", "selected");
     if (selectedActionsError) throw new Error(selectedActionsError.message);
     const allIndependentlyVerified = (selectedActions ?? []).length > 0 && (selectedActions ?? []).every((action) =>
-      action.effectiveness_result === "effective_verified" &&
+      ["effective", "effective_verified"].includes(action.effectiveness_result) &&
       action.status === "verified" &&
       action.verified_by &&
       action.verified_at
