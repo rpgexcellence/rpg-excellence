@@ -426,7 +426,7 @@ export default async function SecureRcaCasePage({
                   <div style={validationNoticeStyle}>
                     <strong>D4 cannot be completed yet.</strong>
                     <div style={{ marginTop: "6px" }}>
-                      Complete and human-validate the following cause classifications: {missingCauseTypes.join(", ") || "Occurrence, Escape and Systemic"}.
+                      Complete and human-validate the occurrence cause. Escape and systemic causes are added only where the evidence demonstrates that a separate causal stream exists.
                     </div>
                     <div style={{ marginTop: "6px" }}>
                       Saving a causal chain creates a hypothesis. Open each hypothesis and record its validation method and objective result before completing D4.
@@ -1304,7 +1304,7 @@ function AnalysisWorkbench({ caseId, problemStatement, models, activeModel, node
         <div style={workbenchStyle}>
           <h3>3 × 5 Whys Cause Architecture</h3>
           <p style={{ color: "#607089" }}>
-            Complete separate occurrence, escape and systemic chains. Test every final causal statement before validation.
+            Start with the occurrence cause. Add escape or systemic chains only where a separate control or management-system failure exists. Stop at the causal depth supported by evidence; five questions are guidance, not a mandatory quota.
           </p>
           <CauseCards caseId={caseId} modelId={activeModel.id} causes={causes} />
           <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
@@ -1625,18 +1625,21 @@ function CauseStreamForm({ caseId, causeType, title }) {
             <input
               key={`${causeType}-why-${number}`}
               name={`why_${number}`}
-              required
-              placeholder={`Why ${number}?`}
+              required={number === 1}
+              placeholder={`Why ${number}?${number === 1 ? " (required)" : " (optional if root cause already reached)"}`}
               style={fieldStyle}
             />
           ))}
         </div>
+        <p style={{ color: "#607089", margin: "10px 0 0", fontSize: "14px" }}>
+          Stop when the evidence-supported root cause is reached. Do not invent additional Why levels merely to reach five.
+        </p>
         <div style={formGrid}>
           <textarea name="evidence_for" rows={3} placeholder="Objective evidence supporting the causal chain" style={fieldStyle} />
           <textarea name="evidence_against" rows={3} placeholder="Contradictory evidence, uncertainty or missing tests" style={fieldStyle} />
         </div>
         <button style={{ ...primaryButton, marginTop: "14px" }}>
-          Add {label(causeType)} 5-Why Hypothesis
+          Add {label(causeType)} Causal Hypothesis
         </button>
       </form>
     </details>
@@ -1774,25 +1777,27 @@ function buildEvidenceChallenge({
       "Summarise the causal logic, competing hypotheses, contradictory evidence and the basis for the validated conclusions."
     );
     requireEvidence("Attach objective evidence used to test and validate the causal conclusions.");
-    const requiredTypes = ["occurrence", "escape", "systemic"];
-    for (const type of requiredTypes) {
+    const assessedTypes = ["occurrence", "escape", "systemic"];
+    for (const type of assessedTypes) {
       const typeCauses = causes.filter((cause) => cause.cause_type === type);
       const completeChain = typeCauses.some(
-        (cause) => Array.isArray(cause.why_chain) && cause.why_chain.length === 5
+        (cause) => Array.isArray(cause.why_chain) && cause.why_chain.length >= 1
       );
       const validated = typeCauses.some((cause) => cause.status === "validated");
       const modelCoverage = (analysisNodes ?? []).some(
         (node) => node.cause_type === type || node.branch_key === type
       );
-      if (!completeChain && !modelCoverage) {
+      if (type === "occurrence" && !completeChain && !modelCoverage) {
         missingEvidence.push(
-          `Analyse the ${type} cause using a complete 5-Why chain or another documented workbench method.`
+          "Analyse the occurrence cause to the evidence-supported causal depth using sequential Whys or another documented workbench method."
         );
       }
-      if (!validated) {
+      if (type === "occurrence" && !validated) {
         challenges.push(
-          `The ${type} cause has not been validated against objective evidence.`
+          "The occurrence cause has not been validated against objective evidence."
         );
+      } else if (type !== "occurrence" && typeCauses.length > 0 && !validated) {
+        challenges.push(`The recorded ${type} hypothesis must be validated or rejected before D4 approval.`);
       }
     }
     requiredVerification.push(
