@@ -254,9 +254,10 @@ export async function saveDiscipline(formData) {
     const validatedTypes = new Set(
       (validatedCauses ?? []).map((cause) => cause.cause_type)
     );
-    const missingTypes = ["occurrence", "escape", "systemic"].filter(
-      (type) => !validatedTypes.has(type)
-    );
+    // A separate escape or systemic cause does not exist in every event.
+    // D4 therefore requires a validated occurrence cause; any additional
+    // causal streams remain optional but must be validated if relied upon.
+    const missingTypes = validatedTypes.has("occurrence") ? [] : ["occurrence"];
 
     if (missingTypes.length > 0) {
       const modelQuery = modelId ? `&model=${encodeURIComponent(modelId)}` : "";
@@ -468,11 +469,14 @@ export async function addCauseHypothesis(formData) {
     clean(formData.get(`why_${number}`))
   );
 
-  if (
-    ["occurrence", "escape", "systemic"].includes(causeType) &&
-    whyChain.some((why) => !why)
-  ) {
-    throw new Error(`Complete all five Whys for the ${causeType} cause.`);
+  const completedWhys = whyChain.filter(Boolean);
+  const firstGap = whyChain.findIndex((why) => !why);
+  const hasAnswerAfterGap = firstGap >= 0 && whyChain.slice(firstGap + 1).some(Boolean);
+  if (["occurrence", "escape", "systemic"].includes(causeType) && completedWhys.length === 0) {
+    throw new Error(`Record at least one evidence-based Why for the ${causeType} cause.`);
+  }
+  if (hasAnswerAfterGap) {
+    throw new Error("Complete the Why sequence in order without leaving gaps.");
   }
 
   const { error } = await supabase
@@ -488,7 +492,7 @@ export async function addCauseHypothesis(formData) {
       evidence_against: clean(
         formData.get("evidence_against")
       ),
-      why_chain: whyChain.filter(Boolean),
+      why_chain: completedWhys,
       status: "hypothesis",
       proposed_by_ai: false,
     });
