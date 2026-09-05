@@ -54,20 +54,17 @@ async function assertDisciplineUnlocked(
 ) {
   if (discipline === 0) return;
 
-  const { count, error } = await supabase
+  const { data: preceding, error } = await supabase
     .from("rca_8d_disciplines")
-    .select("id", { count: "exact", head: true })
+    .select("discipline, status")
     .eq("case_id", caseId)
     .eq("owner_id", userId)
     .lt("discipline", discipline)
-    .neq("status", "approved");
+    .order("discipline");
 
   if (error) throw new Error(error.message);
-  if ((count ?? 0) > 0) {
-    throw new Error(
-      `D${discipline} is locked. Complete and approve every preceding discipline first.`
-    );
-  }
+  const blocker = (preceding ?? []).find((item) => item.status !== "approved");
+  if (blocker) redirect(`/portal/rca/${caseId}?d=${blocker.discipline}&locked=1`);
 }
 
 async function context() {
@@ -137,12 +134,16 @@ export async function saveDiscipline(formData) {
     caseId
   );
 
-  await assertDisciplineUnlocked(
-    supabase,
-    user.id,
-    caseId,
-    discipline
-  );
+  // Draft work may be saved in a later discipline without falsely approving
+  // the preceding gates. Sequential approval is enforced only on submission.
+  if (intent === "approve") {
+    await assertDisciplineUnlocked(
+      supabase,
+      user.id,
+      caseId,
+      discipline
+    );
+  }
 
   if (!narrative && discipline === 3) {
     const { data: d3Decision, error: d3DecisionError } = await supabase
