@@ -24,7 +24,21 @@ const severityColour = {
   low: "#175cd3",
 };
 
-export default async function RcaCommandCentre() {
+export default async function RcaCommandCentre({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const requestedView =
+    typeof resolvedSearchParams?.view === "string"
+      ? resolvedSearchParams.view
+      : "register";
+  const activeView = [
+    "register",
+    "management-board",
+    "open",
+    "verification",
+    "closed",
+  ].includes(requestedView)
+    ? requestedView
+    : "register";
   const supabase = await createClient();
 
   const {
@@ -91,6 +105,25 @@ export default async function RcaCommandCentre() {
   const closedCases = cases.filter(
     (item) => item.status === "closed"
   ).length;
+  const visibleCases =
+    activeView === "open"
+      ? openCases
+      : activeView === "verification"
+        ? cases.filter(
+            (item) =>
+              item.status === "effectiveness_review" ||
+              item.current_discipline === 6
+          )
+        : activeView === "closed"
+          ? cases.filter((item) => item.status === "closed")
+          : cases;
+  const portfolioTitle = {
+    register: "All CAPA-8D cases",
+    "management-board": "CAPA management portfolio",
+    open: "Open CAPA-8D cases",
+    verification: "Cases awaiting effectiveness verification",
+    closed: "Closed CAPA-8D cases",
+  }[activeView];
 
   return (
     <main
@@ -162,9 +195,10 @@ export default async function RcaCommandCentre() {
                 lineHeight: 1.6,
               }}
             >
-              Evidence-led root cause analysis,
-              containment and corrective action—usable
-              independently or connected to an ISO finding.
+              Every recurring problem leaves a pattern. The
+              controlled 8D workflow turns that pattern into
+              evidence—protecting operations now, proving the
+              root cause and preventing the problem from returning.
             </p>
           </div>
 
@@ -231,9 +265,10 @@ export default async function RcaCommandCentre() {
                   lineHeight: 1.6,
                 }}
               >
-                AI can propose hypotheses and expose missing
-                evidence. Only accountable people can validate
-                causes, approve disciplines or verify actions.
+                Move beyond closing actions. Challenge assumptions,
+                distinguish occurrence, escape and systemic causes,
+                and demonstrate sustained effectiveness. AI may
+                expose gaps; accountable people retain every decision.
               </p>
             </div>
             <div
@@ -463,12 +498,12 @@ export default async function RcaCommandCentre() {
                 Investigation portfolio
               </div>
               <h2 style={{ margin: "6px 0" }}>
-                8D cases
+                {portfolioTitle}
               </h2>
             </div>
           </div>
 
-          {cases.length === 0 ? (
+          {visibleCases.length === 0 ? (
             <div
               style={{
                 marginTop: "16px",
@@ -479,8 +514,7 @@ export default async function RcaCommandCentre() {
                 color: "#607089",
               }}
             >
-              No 8D cases yet. Create the first investigation
-              above.
+              No cases match this view.
             </div>
           ) : (
             <div
@@ -490,7 +524,7 @@ export default async function RcaCommandCentre() {
                 marginTop: "16px",
               }}
             >
-              {cases.map((item) => (
+              {visibleCases.map((item) => (
                 <Link
                   href={`/portal/rca/${item.id}`}
                   key={item.id}
