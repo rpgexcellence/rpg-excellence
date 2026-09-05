@@ -28,7 +28,12 @@ function formatDate(value) {
   );
 }
 
-export default async function DocumentRegisterPage() {
+export default async function DocumentRegisterPage({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const requestedFamily =
+    typeof resolvedSearchParams?.family === "string"
+      ? resolvedSearchParams.family
+      : null;
   const supabase =
     await createClient();
 
@@ -109,12 +114,34 @@ export default async function DocumentRegisterPage() {
   const documents =
     documentsData ?? [];
 
+  const availableFamilies = Array.from(
+    new Set(
+      documents.map(
+        (document) =>
+          document.standard || "RPG General"
+      )
+    )
+  );
+
+  const selectedFamily =
+    availableFamilies.includes(requestedFamily)
+      ? requestedFamily
+      : null;
+
+  const visibleDocuments = selectedFamily
+    ? documents.filter(
+        (document) =>
+          (document.standard || "RPG General") ===
+          selectedFamily
+      )
+    : documents;
+
   const admin =
     createAdminClient();
 
   const documentsWithAccess =
     await Promise.all(
-      documents.map(
+      visibleDocuments.map(
         async (document) => {
           if (
             !document.file_path
@@ -451,6 +478,33 @@ export default async function DocumentRegisterPage() {
           generated for signed-in users and
           expire automatically.
         </div>
+
+        <nav
+          aria-label="Document families"
+          style={{
+            display: "flex",
+            gap: "9px",
+            flexWrap: "wrap",
+            marginBottom: "24px",
+          }}
+        >
+          <Link
+            href="/portal/documents"
+            style={familyFilterStyle(!selectedFamily)}
+          >
+            All families
+          </Link>
+
+          {availableFamilies.map((family) => (
+            <Link
+              key={family}
+              href={`/portal/documents?family=${encodeURIComponent(family)}`}
+              style={familyFilterStyle(selectedFamily === family)}
+            >
+              {family}
+            </Link>
+          ))}
+        </nav>
 
         <section
           style={{
@@ -941,4 +995,26 @@ export default async function DocumentRegisterPage() {
       </section>
     </main>
   );
+}
+
+function familyFilterStyle(active) {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "42px",
+    padding: "10px 15px",
+    borderRadius: "10px",
+    border: active
+      ? "1px solid #1762ef"
+      : "1px solid #d7e2ee",
+    background: active
+      ? "#1762ef"
+      : "#ffffff",
+    color: active
+      ? "#ffffff"
+      : "#12385f",
+    textDecoration: "none",
+    fontSize: "14px",
+    fontWeight: 800,
+  };
 }
