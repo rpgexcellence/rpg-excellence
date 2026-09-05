@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -37,6 +36,10 @@ function formatDate(value) {
 
 function StatCard({ label, value, detail, tone = "blue", href }) {
   return <Link href={href} className="iaStat" aria-label={`${label}: ${value}`}><i className={tone} /><span>{label}</span><strong>{value}</strong><small>{detail}</small><b aria-hidden="true">→</b></Link>;
+}
+
+function SideLink({ href, children, active = false }) {
+  return <Link href={href} className={active ? "iaSideLink active" : "iaSideLink"}><i />{children}</Link>;
 }
 
 export default async function InternalAuditCommandCentre({ searchParams }) {
@@ -96,17 +99,39 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
         .iaPortfolio{padding:28px 32px 20px}.iaAudit{display:grid;grid-template-columns:minmax(270px,1.5fr) minmax(200px,1fr) 150px 140px;gap:20px;align-items:center;padding:22px 32px;border-top:1px solid #e5ebf2;transition:.18s}.iaAudit:hover{background:#f8faff}.iaAuditTitle{display:block;margin-bottom:5px;color:var(--navy);font-size:17px;font-weight:900;text-decoration:none}.iaAuditTitle:hover{color:var(--blue)}.iaOpenAudit{display:inline-flex;padding:10px 13px;border-radius:10px;background:#1761e8;color:#fff;font-size:13px;font-weight:900;text-decoration:none;white-space:nowrap}.iaMuted{color:var(--muted);font-size:13px;line-height:1.45}.iaCriteria{color:#3b526e;font-size:14px;line-height:1.45}.iaStatus{display:inline-block;padding:7px 10px;border-radius:999px;background:#eaf1ff;color:#1455c8;font-size:12px;font-weight:900}.iaNoAudits{padding:32px;border-top:1px solid #e5ebf2;color:var(--muted)}
         @media(max-width:1100px){#rpgIaWelcomeBanner{grid-template-columns:1fr!important}.iaAssurance{min-height:150px}.iaStats{grid-template-columns:repeat(2,1fr)}.iaLifecycle{grid-template-columns:repeat(5,220px);overflow-x:auto}.iaCreate{grid-template-columns:1fr}.iaRail{display:none}.iaGrid3{grid-template-columns:repeat(2,1fr)}.iaAudit{grid-template-columns:1fr 1fr}}
         @media(max-width:720px){.auditPage{padding:20px 14px 70px}#rpgIaWelcomeBanner{gap:24px!important;padding:30px 24px!important;border-radius:22px!important}#rpgIaWelcomeTitle{font-size:42px!important}.iaStats,.iaGrid2,.iaGrid3,.iaStandardGrid,.iaAudit{grid-template-columns:1fr}.iaPanelHead,.iaForm{padding:24px 20px}.iaActionBar{align-items:stretch;flex-direction:column}.iaSubmit{width:100%}.iaLogo{width:190px;height:auto}.iaBack{font-size:13px}}
+
+        /* Dashboard rebuild */
+        .auditPage{padding:0;background:#edf3fa}.iaShell{max-width:none;min-height:100vh;display:grid;grid-template-columns:238px minmax(0,1fr);margin:0}.iaSidebar{position:sticky;top:0;height:100vh;padding:28px 20px 22px;background:linear-gradient(180deg,#06264d,#071c38);color:#d9e6f5;display:flex;flex-direction:column}.iaBrand{display:block;margin:0 10px 35px;color:#fff;font-size:25px;font-weight:950;text-decoration:none}.iaBrand span{font-weight:400}.iaSideCaption{margin:0 13px 12px;color:#7797b9;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.iaSideNav{display:grid;gap:7px}.iaSideLink{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;color:#c9d9ea;text-decoration:none;font-size:14px;font-weight:760;transition:.18s}.iaSideLink:hover,.iaSideLink.active{background:#174e86;color:#fff}.iaSideLink i{width:12px;height:12px;border:1px solid currentColor;border-radius:3px}.iaSideLink.active i{background:#58e0d1;border-color:#58e0d1;box-shadow:inset 0 0 0 3px #174e86}.iaSideStandard{margin-top:auto;padding:18px;border:1px solid #ffffff1c;border-radius:14px;background:#ffffff09}.iaSideStandard span,.iaSideStandard strong,.iaSideStandard small{display:block}.iaSideStandard span{color:#84a2c1;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.iaSideStandard strong{margin:5px 0;font-size:22px;color:#fff}.iaSideStandard small{color:#a9bed4}.iaWorkspace{min-width:0;padding:28px clamp(20px,3vw,48px) 70px}.iaTop{margin:0 0 23px;align-items:flex-start}.iaTop h1{margin:3px 0 5px;font-size:31px;letter-spacing:-.03em}.iaTop p{margin:0;color:#687c93}.iaPageEyebrow{color:#1761e8;font-size:11px;font-weight:950;letter-spacing:.12em}.iaBack{box-shadow:none}
+        #rpgIaWelcomeBanner{grid-template-columns:minmax(0,1.4fr) minmax(330px,.6fr)!important;padding:31px 36px!important;border-radius:20px!important;background:linear-gradient(120deg,#061d3b,#0a376b)!important;box-shadow:0 15px 38px #061a3518!important}#rpgIaWelcomeTitle{margin:7px 0 10px!important;font-size:clamp(30px,3.5vw,45px)!important}#rpgIaWelcomeCopy{font-size:16px!important;max-width:720px!important}.iaHeroAction{display:flex;min-height:142px;flex-direction:column;justify-content:center;padding:23px;border:1px solid #ffffff25;border-radius:16px;background:#ffffff12;color:#fff;text-decoration:none;transition:.18s}.iaHeroAction:hover{transform:translateY(-3px);background:#ffffff19}.iaHeroAction span{color:#61e3d8;font-size:10px;font-weight:950;letter-spacing:.1em}.iaHeroAction strong{margin:7px 0 5px;font-size:19px}.iaHeroAction small{color:#cfdded;line-height:1.4}
+        .iaStats{margin:16px 0}.iaStat{min-height:142px;border-radius:15px;box-shadow:0 8px 25px #061a3509}.iaLifecycle{border-radius:15px;box-shadow:none}.iaLife{min-height:82px;padding:16px}.iaPanel{border-radius:18px;box-shadow:0 12px 34px #061a350b}.iaPanelHead{padding:26px 30px}.iaPanelHead h2,.iaPortfolio h2{font-size:25px}.iaCreate{grid-template-columns:220px minmax(0,1fr)}.iaRail{padding:27px 21px}.iaForm{padding:29px 30px 34px}.iaActionBar{background:linear-gradient(120deg,#061d3b,#0a376b)}
+        @media(max-width:1050px){.iaShell{grid-template-columns:78px minmax(0,1fr)}.iaSidebar{padding:24px 10px}.iaBrand{font-size:0;margin:0 0 28px;text-align:center}.iaBrand:first-letter{font-size:24px}.iaSideCaption,.iaSideStandard{display:none}.iaSideLink{justify-content:center;font-size:0}.iaSideLink i{width:15px;height:15px}.iaWorkspace{padding:24px 20px 60px}}
+        @media(max-width:720px){.iaShell{display:block}.iaSidebar{position:static;width:100%;height:auto;padding:16px 20px}.iaBrand{margin:0;text-align:left;font-size:21px}.iaBrand:first-letter{font-size:inherit}.iaSideNav,.iaSideCaption,.iaSideStandard{display:none}.iaWorkspace{padding:20px 14px 60px}.iaTop{align-items:flex-start}.iaTop>div:last-child{display:none}#rpgIaWelcomeBanner{grid-template-columns:1fr!important;padding:25px 22px!important}.iaHeroAction{min-height:110px}.iaStats{grid-template-columns:repeat(2,minmax(0,1fr))}.iaStat{min-height:125px;padding:18px 40px 18px 20px}.iaStat strong{font-size:31px}.iaLifecycle{grid-template-columns:repeat(5,195px)}.iaPanelHead{align-items:flex-start;flex-direction:column}.iaBadge{align-self:flex-start}}
       `}</style>
 
       <div className="iaShell">
+        <aside className="iaSidebar">
+          <Link href="/portal" className="iaBrand">RPG <span>Excellence</span></Link>
+          <div className="iaSideCaption">Assurance workspace</div>
+          <nav className="iaSideNav" aria-label="Customer portal navigation">
+            <SideLink href="/portal">Dashboard</SideLink>
+            <SideLink href="/portal/history">Assessments</SideLink>
+            <SideLink href="/portal/internal-audits" active>Internal Audits</SideLink>
+            <SideLink href="/portal/internal-audit-actions">Findings & Actions</SideLink>
+            <SideLink href="/portal/rca">CAPA-8D</SideLink>
+            <SideLink href="/portal/documents">Evidence</SideLink>
+            <SideLink href="/portal/reports">Reports</SideLink>
+          </nav>
+          <div className="iaSideStandard"><span>Governance framework</span><strong>ISO 19011</strong><small>Evidence-based assurance</small></div>
+        </aside>
+        <div className="iaWorkspace">
         <div className="iaTop">
-          <Link href="/portal" aria-label="RPG Excellence portal"><Image className="iaLogo" src="/rpg-excellence-logo.png" alt="RPG Excellence" width={250} height={68} priority /></Link>
+          <div><span className="iaPageEyebrow">AUDIT INTELLIGENCE</span><h1>Internal Audit Command Centre</h1><p>Plan, deliver and close every audit from one controlled workspace.</p></div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><Link href="/portal/internal-audit-actions" className="iaBack">My Audit Actions</Link><Link href="/portal" className="iaBack">← Customer Portal</Link></div>
         </div>
 
         <div id="rpgIaWelcomeBanner" aria-labelledby="rpgIaWelcomeTitle">
-          <div><div className="iaKicker">RPG Audit Intelligence</div><div id="rpgIaWelcomeTitle" role="heading" aria-level="1">Internal Audit Command Centre</div><p id="rpgIaWelcomeCopy">Replace disconnected spreadsheets with one governed workspace for risk-based planning, competent audit teams, objective evidence, findings, CAPA and accountable closure.</p></div>
-          <div className="iaAssurance"><span>Audit governance framework</span><strong>ISO 19011</strong><small>Independence · evidence-based decisions · due professional care · confidentiality · risk-based assurance</small></div>
+          <div><div className="iaKicker">Live audit portfolio</div><div id="rpgIaWelcomeTitle" role="heading" aria-level="2">Assurance at a glance</div><p id="rpgIaWelcomeCopy">See what is scheduled, what is in fieldwork, where findings remain open and what needs your attention next.</p></div>
+          <Link href="#audit-mandate" className="iaHeroAction"><span>START A CONTROLLED AUDIT</span><strong>Build a new audit mandate</strong><small>Define scope, criteria, timing and governance →</small></Link>
         </div>
 
         {params?.created ? <div className="iaSuccess">✓ Audit created. The controlled scope record is ready for review.</div> : null}
@@ -173,6 +198,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
             return <article className="iaAudit" key={audit.id}><div><Link href={`/portal/internal-audits/${audit.id}`} className="iaAuditTitle">{audit.audit_reference} · {audit.title}</Link><span className="iaMuted">{TYPE_LABELS[audit.audit_type] ?? audit.audit_type} · {audit.audit_method}</span></div><div className="iaCriteria">{criteria.join(" · ") || "Criteria awaiting confirmation"}</div><div><span className="iaStatus">{STATUS_LABELS[audit.status] ?? audit.status}</span><div className="iaMuted" style={{marginTop:"6px"}}>Gate: {audit.current_gate}</div></div><div><Link href={`/portal/internal-audits/${audit.id}`} className="iaOpenAudit">Open Audit →</Link><div className="iaMuted" style={{marginTop:"6px"}}>{formatDate(audit.planned_start_at)}</div></div></article>;
           })}
         </section>
+        </div>
       </div>
     </main>
   );
