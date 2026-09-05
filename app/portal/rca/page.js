@@ -3,615 +3,70 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import { createRcaCase } from "./actions";
 
-const label = (value) =>
-  String(value ?? "")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+export const dynamic = "force-dynamic";
 
-const formatDate = (value) => {
-  if (!value) return "Not set";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
-};
+const safe = (value, fallback = "Not recorded") => typeof value === "string" && value.trim() ? value.trim() : fallback;
+const label = (value) => safe(value, "open").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatDate = (value) => value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)) : "No target date";
+const daysBetween = (start, end = new Date()) => start ? Math.max(0, Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 86400000)) : 0;
+const average = (values) => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
 
-const severityColour = {
-  critical: "#b42318",
-  high: "#c4320a",
-  medium: "#b54708",
-  low: "#175cd3",
-};
+function SideLink({ href, children, active = false }) {
+  return <Link href={href} className={active ? "capaSideLink active" : "capaSideLink"}><i />{children}</Link>;
+}
+function SubLink({ href, children, active = false }) {
+  return <Link href={href} className={active ? "capaSubLink active" : "capaSubLink"}>{children}</Link>;
+}
+function Metric({ value, title, detail, tone, href }) {
+  return <Link href={href} className={`capaMetric ${tone}`}><strong>{value}</strong><span>{title}</span><small>{detail}</small><b>→</b></Link>;
+}
+function caseState(item) {
+  if (item.status === "closed") return { name: "Closed — verified", tone: "green" };
+  if (item.status === "effectiveness_review" || item.current_discipline === 6) return { name: "Awaiting verification", tone: "amber" };
+  if (item.status === "cancelled") return { name: "Cancelled", tone: "grey" };
+  return { name: `D${item.current_discipline} · ${label(item.status)}`, tone: "blue" };
+}
 
-export default async function RcaCommandCentre({ searchParams }) {
-  const resolvedSearchParams = await searchParams;
-  const requestedView =
-    typeof resolvedSearchParams?.view === "string"
-      ? resolvedSearchParams.view
-      : "register";
-  const activeView = [
-    "register",
-    "management-board",
-    "open",
-    "verification",
-    "closed",
-  ].includes(requestedView)
-    ? requestedView
-    : "register";
+export default async function RcaRegister({ searchParams }) {
+  const query = await searchParams;
+  const requestedView = typeof query?.view === "string" ? query.view : "register";
+  const activeView = ["register", "management-board", "open", "verification", "closed"].includes(requestedView) ? requestedView : "register";
+  const managementView = activeView === "management-board";
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/portal/login?next=/portal/rca");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/portal/login");
-  }
-
-  const [organizationsResult, casesResult] =
-    await Promise.all([
-      supabase
-        .from("organizations")
-        .select("id, name")
-        .eq("owner_id", user.id)
-        .order("name"),
-      supabase
-        .from("rca_cases")
-        .select(
-          `
-            id,
-            case_reference,
-            title,
-            source_type,
-            severity,
-            status,
-            current_discipline,
-            target_close_date,
-            updated_at,
-            organization_id
-          `
-        )
-        .eq("owner_id", user.id)
-        .order("updated_at", { ascending: false }),
-    ]);
-
-  if (organizationsResult.error) {
-    throw new Error(organizationsResult.error.message);
-  }
-
-  if (casesResult.error) {
-    throw new Error(casesResult.error.message);
-  }
+  const [organizationsResult, casesResult] = await Promise.all([
+    supabase.from("organizations").select("id,name").eq("owner_id", user.id).order("name"),
+    supabase.from("rca_cases").select("id,case_reference,title,source_type,severity,status,current_discipline,target_close_date,created_at,closed_at,updated_at,organization_id").eq("owner_id", user.id).order("updated_at", { ascending: false }),
+  ]);
+  if (organizationsResult.error) throw new Error(organizationsResult.error.message);
+  if (casesResult.error) throw new Error(casesResult.error.message);
 
   const organizations = organizationsResult.data ?? [];
   const cases = casesResult.data ?? [];
-  const organizationNames = new Map(
-    organizations.map((organization) => [
-      organization.id,
-      organization.name,
-    ])
-  );
-  const openCases = cases.filter(
-    (item) =>
-      !["closed", "cancelled"].includes(item.status)
-  );
-  const criticalOpen = openCases.filter(
-    (item) => item.severity === "critical"
-  ).length;
-  const effectivenessReview = cases.filter(
-    (item) => item.status === "effectiveness_review"
-  ).length;
-  const closedCases = cases.filter(
-    (item) => item.status === "closed"
-  ).length;
-  const visibleCases =
-    activeView === "open"
-      ? openCases
-      : activeView === "verification"
-        ? cases.filter(
-            (item) =>
-              item.status === "effectiveness_review" ||
-              item.current_discipline === 6
-          )
-        : activeView === "closed"
-          ? cases.filter((item) => item.status === "closed")
-          : cases;
-  const portfolioTitle = {
-    register: "All CAPA-8D cases",
-    "management-board": "CAPA management portfolio",
-    open: "Open CAPA-8D cases",
-    verification: "Cases awaiting effectiveness verification",
-    closed: "Closed CAPA-8D cases",
-  }[activeView];
+  const organizationNames = new Map(organizations.map((organization) => [organization.id, organization.name]));
+  const openCases = cases.filter((item) => !["closed", "cancelled"].includes(item.status));
+  const verificationCases = cases.filter((item) => item.status === "effectiveness_review" || item.current_discipline === 6);
+  const closedCases = cases.filter((item) => item.status === "closed");
+  const overdueCases = openCases.filter((item) => item.target_close_date && new Date(item.target_close_date) < new Date());
+  const criticalCases = openCases.filter((item) => ["critical", "high"].includes(item.severity));
+  const openAges = openCases.map((item) => daysBetween(item.created_at));
+  const closureTimes = closedCases.map((item) => daysBetween(item.created_at, item.closed_at || item.updated_at));
+  const closureRate = cases.length ? Math.round((closedCases.length / cases.length) * 100) : 0;
+  const visibleCases = activeView === "open" ? openCases : activeView === "verification" ? verificationCases : activeView === "closed" ? closedCases : cases;
+  const viewTitle = { register: "CAPA-8D Register", "management-board": "CAPA Management Board", open: "Open CAPA-8D Cases", verification: "Awaiting Verification", closed: "Closed CAPA-8D Cases" }[activeView];
+  const viewDescription = managementView ? "Performance, ageing and closure intelligence across the corrective-action portfolio." : "Every controlled root-cause investigation, corrective action and effectiveness decision in one place.";
 
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f3f6fa",
-        color: "#061a35",
-        padding: "48px 24px 80px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1440px",
-          margin: "0 auto",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: "24px",
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <Link
-              href="/en"
-              aria-label="RPG Excellence home"
-              style={{
-                width: "260px",
-                height: "70px",
-                display: "flex",
-                alignItems: "center",
-                overflow: "hidden",
-                textDecoration: "none",
-                marginBottom: "22px",
-              }}
-            >
-              <img
-                src="/rpg-excellence-logo.png"
-                alt="RPG Excellence"
-                style={{
-                  display: "block",
-                  width: "260px",
-                  maxWidth: "260px",
-                  height: "70px",
-                  maxHeight: "70px",
-                  objectFit: "contain",
-                  objectPosition: "left center",
-                }}
-              />
-            </Link>
-
-            <h1
-              style={{
-                margin: "0 0 8px",
-                fontSize: "clamp(34px, 5vw, 56px)",
-              }}
-            >
-              8D Command Centre
-            </h1>
-            <p
-              style={{
-                margin: 0,
-                maxWidth: "800px",
-                color: "#52657f",
-                fontSize: "19px",
-                lineHeight: 1.6,
-              }}
-            >
-              Every recurring problem leaves a pattern. The
-              controlled 8D workflow turns that pattern into
-              evidence—protecting operations now, proving the
-              root cause and preventing the problem from returning.
-            </p>
-          </div>
-
-          <Link
-            href="/portal"
-            style={{
-              padding: "15px 20px",
-              border: "1px solid #d5deea",
-              borderRadius: "12px",
-              color: "#061a35",
-              background: "white",
-              fontWeight: 800,
-              textDecoration: "none",
-            }}
-          >
-            ← Customer Portal
-          </Link>
-        </div>
-
-        <section
-          style={{
-            marginTop: "34px",
-            background: "#061a35",
-            color: "white",
-            borderRadius: "24px",
-            padding: "32px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "24px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  color: "#9fb2cb",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  fontSize: "13px",
-                }}
-              >
-                Corrective Action Intelligence
-              </div>
-              <h2
-                style={{
-                  margin: "8px 0 6px",
-                  fontSize: "30px",
-                }}
-              >
-                Challenge assumptions. Prove causes.
-                Verify effectiveness.
-              </h2>
-              <p
-                style={{
-                  margin: 0,
-                  color: "#c7d4e5",
-                  maxWidth: "850px",
-                  lineHeight: 1.6,
-                }}
-              >
-                Move beyond closing actions. Challenge assumptions,
-                distinguish occurrence, escape and systemic causes,
-                and demonstrate sustained effectiveness. AI may
-                expose gaps; accountable people retain every decision.
-              </p>
-            </div>
-            <div
-              style={{
-                fontSize: "72px",
-                fontWeight: 900,
-                lineHeight: 1,
-              }}
-            >
-              8D
-            </div>
-          </div>
-        </section>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(210px, 1fr))",
-            gap: "16px",
-            marginTop: "24px",
-          }}
-        >
-          {[
-            ["Open cases", openCases.length],
-            ["Critical open", criticalOpen],
-            ["Effectiveness review", effectivenessReview],
-            ["Closed", closedCases],
-          ].map(([title, value]) => (
-            <div
-              key={title}
-              style={{
-                background: "white",
-                border: "1px solid #dce4ee",
-                borderRadius: "16px",
-                padding: "22px",
-              }}
-            >
-              <div
-                style={{
-                  color: "#607089",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                }}
-              >
-                {title}
-              </div>
-              <strong
-                style={{
-                  display: "block",
-                  marginTop: "8px",
-                  fontSize: "34px",
-                }}
-              >
-                {value}
-              </strong>
-            </div>
-          ))}
-        </div>
-
-        <section
-          style={{
-            marginTop: "28px",
-            background: "white",
-            border: "1px solid #dce4ee",
-            borderRadius: "20px",
-            padding: "28px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "20px",
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  color: "#155eef",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                }}
-              >
-                New investigation
-              </div>
-              <h2 style={{ margin: "6px 0" }}>
-                Start a standalone 8D case
-              </h2>
-            </div>
-          </div>
-
-          {organizations.length === 0 ? (
-            <div
-              style={{
-                marginTop: "18px",
-                padding: "18px",
-                borderRadius: "12px",
-                background: "#fff7e8",
-                color: "#7a4e00",
-              }}
-            >
-              Create an organisation in the customer portal
-              before starting an 8D case. {" "}
-              <Link href="/portal">Open portal →</Link>
-            </div>
-          ) : (
-            <form action={createRcaCase}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(230px, 1fr))",
-                  gap: "14px",
-                  marginTop: "20px",
-                }}
-              >
-                <select
-                  name="organization_id"
-                  required
-                  defaultValue=""
-                  style={fieldStyle}
-                >
-                  <option value="" disabled>
-                    Select organisation
-                  </option>
-                  {organizations.map((organization) => (
-                    <option
-                      value={organization.id}
-                      key={organization.id}
-                    >
-                      {organization.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  name="source_type"
-                  defaultValue="standalone"
-                  style={fieldStyle}
-                >
-                  <option value="standalone">
-                    Standalone problem
-                  </option>
-                  <option value="audit">Audit</option>
-                  <option value="complaint">
-                    Complaint
-                  </option>
-                  <option value="incident">Incident</option>
-                  <option value="defect">Defect</option>
-                  <option value="supplier">
-                    Supplier issue
-                  </option>
-                </select>
-
-                <select
-                  name="severity"
-                  defaultValue="medium"
-                  style={fieldStyle}
-                >
-                  <option value="critical">Critical</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-
-              <input
-                name="title"
-                required
-                placeholder="Short problem title"
-                style={{ ...fieldStyle, marginTop: "14px" }}
-              />
-
-              <textarea
-                name="problem_statement"
-                rows={4}
-                placeholder="What happened? State only the known facts; D2 will develop the verified problem definition."
-                style={{
-                  ...fieldStyle,
-                  marginTop: "14px",
-                  resize: "vertical",
-                }}
-              />
-
-              <button
-                type="submit"
-                style={{
-                  marginTop: "16px",
-                  border: 0,
-                  borderRadius: "12px",
-                  background: "#155eef",
-                  color: "white",
-                  padding: "15px 22px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Create 8D Case
-              </button>
-            </form>
-          )}
-        </section>
-
-        <section style={{ marginTop: "30px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "16px",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  color: "#155eef",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                }}
-              >
-                Investigation portfolio
-              </div>
-              <h2 style={{ margin: "6px 0" }}>
-                {portfolioTitle}
-              </h2>
-            </div>
-          </div>
-
-          {visibleCases.length === 0 ? (
-            <div
-              style={{
-                marginTop: "16px",
-                background: "white",
-                border: "1px solid #dce4ee",
-                borderRadius: "18px",
-                padding: "32px",
-                color: "#607089",
-              }}
-            >
-              No cases match this view.
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gap: "14px",
-                marginTop: "16px",
-              }}
-            >
-              {visibleCases.map((item) => (
-                <Link
-                  href={`/portal/rca/${item.id}`}
-                  key={item.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "minmax(0, 1fr) auto",
-                    gap: "18px",
-                    alignItems: "center",
-                    padding: "22px",
-                    background: "white",
-                    border: "1px solid #dce4ee",
-                    borderRadius: "16px",
-                    color: "inherit",
-                    textDecoration: "none",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "10px",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <strong style={{ fontSize: "20px" }}>
-                        {item.case_reference} · {item.title}
-                      </strong>
-                      <span
-                        style={{
-                          color:
-                            severityColour[item.severity] ??
-                            "#607089",
-                          fontWeight: 800,
-                        }}
-                      >
-                        {label(item.severity)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: "8px",
-                        color: "#607089",
-                      }}
-                    >
-                      {organizationNames.get(
-                        item.organization_id
-                      ) ??
-                        "Organisation"}
-                      {" · "}
-                      {label(item.source_type)}
-                      {" · "}
-                      Updated {formatDate(item.updated_at)}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <strong
-                      style={{
-                        display: "block",
-                        color: "#155eef",
-                        fontSize: "20px",
-                      }}
-                    >
-                      D{item.current_discipline}
-                    </strong>
-                    <span style={{ color: "#607089" }}>
-                      {label(item.status)} →
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-    </main>
-  );
+  return <main className="capaPage"><style>{`
+    *{box-sizing:border-box}.capaPage{min-height:100vh;background:#edf3fa;color:#061a35}.capaShell{display:grid;grid-template-columns:238px minmax(0,1fr);min-height:100vh}.capaSide{position:sticky;top:0;height:100vh;padding:28px 20px 22px;background:linear-gradient(180deg,#06264d,#071c38);color:#d7e5f4;display:flex;flex-direction:column}.capaBrand{margin:0 10px 35px;color:#fff;font-size:25px;font-weight:950;text-decoration:none}.capaBrand span{font-weight:400}.capaCaption{margin:0 13px 12px;color:#7899ba;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.capaNav{display:grid;gap:7px}.capaSideLink{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;color:#c9d9ea;text-decoration:none;font-size:14px;font-weight:760}.capaSideLink:hover,.capaSideLink.active{background:#174e86;color:#fff}.capaSideLink i{width:12px;height:12px;border:1px solid currentColor;border-radius:3px}.capaSideLink.active i{background:#55ded2;border-color:#55ded2;box-shadow:inset 0 0 0 3px #174e86}.capaSubNav{margin:-2px 0 5px 29px;padding-left:13px;border-left:1px solid #55728f}.capaSubLink{display:block;padding:8px 10px;border-radius:8px;color:#9fbad3;text-decoration:none;font-size:12px;font-weight:800}.capaSubLink:hover,.capaSubLink.active{background:#0d3968;color:#62e1d7}.capaSideNote{margin-top:auto;padding:18px;border:1px solid #ffffff1d;border-radius:14px;background:#ffffff09}.capaSideNote strong,.capaSideNote small{display:block}.capaSideNote small{margin-top:5px;color:#9eb4cb}.capaWork{min-width:0;padding:28px clamp(20px,3vw,48px) 70px}.capaTop{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:22px}.capaTop span{color:#1761e8;font-size:11px;font-weight:950;letter-spacing:.12em}.capaTop h1{margin:4px 0 5px;font-size:32px;letter-spacing:-.035em}.capaTop p{margin:0;color:#667b93}.capaButton{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border:1px solid #ccd8e6;border-radius:10px;background:#fff;color:#061a35;text-decoration:none;font-weight:900;white-space:nowrap}.capaHero{display:grid;grid-template-columns:1.25fr .75fr;gap:28px;align-items:center;padding:31px 34px;border-radius:20px;background:linear-gradient(120deg,#061d3b,#0b3d73);color:#fff;box-shadow:0 16px 40px #061a3518}.capaHero small{color:#55e0d6;font-weight:950;letter-spacing:.1em}.capaHero h2{margin:7px 0 9px;color:#fff;font-size:34px}.capaHero p{max-width:760px;margin:0;color:#d4e2f1;line-height:1.55}.capaHeroCount{padding:21px;border:1px solid #ffffff26;border-radius:15px;background:#ffffff10}.capaHeroCount strong,.capaHeroCount span{display:block}.capaHeroCount strong{font-size:20px}.capaHeroCount span{margin-top:6px;color:#ccdbeb;font-size:13px;line-height:1.45}.capaMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:16px 0}.capaMetric{position:relative;min-height:137px;padding:20px;border:1px solid #d6e1ec;border-top:4px solid #1761e8;border-radius:15px;background:#fff;color:#061a35;text-decoration:none;box-shadow:0 8px 25px #061a3509;transition:.18s}.capaMetric:hover{transform:translateY(-3px);box-shadow:0 15px 34px #061a3515}.capaMetric.red{border-top-color:#d53434}.capaMetric.amber{border-top-color:#dc8c00}.capaMetric.green{border-top-color:#09935d}.capaMetric strong,.capaMetric span,.capaMetric small{display:block}.capaMetric strong{font-size:34px}.capaMetric span{margin:5px 0;font-weight:900}.capaMetric small{color:#73869b}.capaMetric b{position:absolute;right:18px;top:18px;color:#1761e8}.capaPanel{overflow:hidden;border:1px solid #d7e2ed;border-radius:18px;background:#fff;box-shadow:0 12px 32px #061a350a}.capaPanelHead{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:25px 28px;border-bottom:1px solid #e3eaf2;background:linear-gradient(115deg,#fff,#f4f8fd)}.capaPanelHead small{color:#1761e8;font-weight:950;letter-spacing:.1em}.capaPanelHead h2{margin:5px 0 3px}.capaPanelHead p{margin:0;color:#6d8096}.capaCount{padding:8px 11px;border-radius:999px;background:#e9f1ff;color:#1557c8;font-size:12px;font-weight:900}.capaList{display:grid}.capaRow{display:grid;grid-template-columns:minmax(280px,1.3fr) minmax(180px,.75fr) minmax(150px,.6fr) 145px;gap:18px;align-items:center;padding:20px 27px;border-top:1px solid #e8edf3}.capaRow:first-child{border-top:0}.capaRow:hover{background:#f8faff}.capaRef{display:block;color:#061a35;text-decoration:none;font-size:15px;font-weight:950}.capaTitle{margin:4px 0;color:#334b65;font-size:14px}.capaMeta{color:#75889c;font-size:12px}.capaStatus{display:inline-block;padding:7px 10px;border-radius:999px;background:#edf3ff;color:#1556c5;font-size:11px;font-weight:900}.capaStatus.green{background:#e8f8ef;color:#087047}.capaStatus.amber{background:#fff4df;color:#9b6000}.capaStatus.grey{background:#eef1f4;color:#5f6f7f}.capaOpen{display:inline-flex;padding:10px 13px;border-radius:9px;background:#1761e8;color:#fff;text-decoration:none;font-size:12px;font-weight:900}.capaEmpty{padding:40px;text-align:center;color:#6c8096}.capaManagement{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px}.capaInsight{padding:24px;border:1px solid #d7e2ed;border-radius:18px;background:#fff}.capaInsight h3{margin:0 0 5px}.capaInsight p{margin:0 0 18px;color:#6b8097}.capaBreakdown{display:grid;grid-template-columns:1fr 1fr;gap:12px}.capaBreakdown div{padding:17px;border-radius:13px;background:#f3f7fc}.capaBreakdown strong,.capaBreakdown span{display:block}.capaBreakdown strong{font-size:28px}.capaBreakdown span{margin-top:5px;color:#667c94;font-size:13px}.capaCreate{margin-top:18px}.capaCreate details{padding:22px}.capaCreate summary{cursor:pointer;font-weight:950}.capaForm{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:18px}.capaField{width:100%;padding:12px;border:1px solid #cbd8e6;border-radius:9px;background:#fff;font:inherit}.capaWide{grid-column:1/-1}.capaSubmit{justify-self:start;padding:13px 18px;border:0;border-radius:9px;background:#1761e8;color:#fff;font-weight:900;cursor:pointer}@media(max-width:1050px){.capaShell{grid-template-columns:78px 1fr}.capaSide{padding:24px 10px}.capaBrand{font-size:0;margin:0 0 26px;text-align:center}.capaBrand:first-letter{font-size:24px}.capaCaption,.capaSideNote,.capaSubNav{display:none}.capaSideLink{justify-content:center;font-size:0}.capaMetrics{grid-template-columns:repeat(2,1fr)}.capaRow{grid-template-columns:1fr 1fr}.capaRow>div:nth-child(3){display:none}}@media(max-width:700px){.capaShell{display:block}.capaSide{position:static;height:auto;padding:16px 20px}.capaBrand{font-size:21px;text-align:left;margin:0}.capaBrand:first-letter{font-size:inherit}.capaNav,.capaCaption,.capaSideNote{display:none}.capaWork{padding:20px 14px 60px}.capaTop .capaButton{display:none}.capaHero{grid-template-columns:1fr;padding:25px 22px}.capaMetrics,.capaManagement{grid-template-columns:1fr 1fr}.capaRow,.capaForm{grid-template-columns:1fr}.capaWide{grid-column:auto}}
+  `}</style><div className="capaShell">
+    <aside className="capaSide"><Link href="/portal" className="capaBrand">RPG <span>Excellence</span></Link><div className="capaCaption">Assurance workspace</div><nav className="capaNav"><SideLink href="/portal">Dashboard</SideLink><SideLink href="/portal/history">Assessments</SideLink><SideLink href="/portal/internal-audits">Internal Audits</SideLink><SideLink href="/portal/internal-audit-actions">NC Register</SideLink><SideLink href="/portal/rca" active>CAPA-8D</SideLink><div className="capaSubNav"><SubLink href="/portal/rca" active={activeView === "register"}>CAPA-8D Register</SubLink><SubLink href="/portal/rca?view=management-board" active={managementView}>CAPA Management Board</SubLink><SubLink href="/portal/rca?view=open" active={activeView === "open"}>Open Cases</SubLink><SubLink href="/portal/rca?view=verification" active={activeView === "verification"}>Awaiting Verification</SubLink><SubLink href="/portal/rca?view=closed" active={activeView === "closed"}>Closed Cases</SubLink></div><SideLink href="/portal/documents">Evidence</SideLink><SideLink href="/portal/reports">Reports</SideLink></nav><div className="capaSideNote"><strong>Controlled CAPA-8D register</strong><small>From immediate containment to verified prevention of recurrence.</small></div></aside>
+    <div className="capaWork"><header className="capaTop"><div><span>CORRECTIVE ACTION CONTROL CENTRE</span><h1>{viewTitle}</h1><p>{viewDescription}</p></div><Link href="#new-case" className="capaButton">Start CAPA-8D Case →</Link></header>
+      <section className="capaHero"><div><small>{managementView ? "LIVE MANAGEMENT INTELLIGENCE" : "LIVE CONTROLLED REGISTER"}</small><h2>{managementView ? "See where corrective action is slowing down" : "One view from problem to proven prevention"}</h2><p>{managementView ? "Focus leadership attention on ageing, overdue cases and verification bottlenecks while preserving independent effectiveness decisions." : "Every recurring problem leaves a pattern. Capture the facts, challenge assumptions, prove the root cause and verify that the problem cannot return."}</p></div><div className="capaHeroCount"><strong>{cases.length} controlled CAPA-8D cases</strong><span>{openCases.length} currently open · {verificationCases.length} awaiting verification · {closedCases.length} verified closed</span></div></section>
+      {managementView ? <><section className="capaMetrics"><Metric value={`${average(openAges)}d`} title="Average open age" detail="Current unresolved cases" tone="red" href="#portfolio"/><Metric value={`${average(closureTimes)}d`} title="Average closure time" detail="Creation to verified closure" tone="blue" href="#portfolio"/><Metric value={overdueCases.length} title="Overdue cases" detail="Past target close date" tone="amber" href="#portfolio"/><Metric value={`${closureRate}%`} title="Closure rate" detail="Verified closed / total" tone="green" href="#portfolio"/></section><section className="capaManagement"><div className="capaInsight"><h3>Management attention</h3><p>Cases needing prompt intervention.</p><div className="capaBreakdown"><div><strong>{criticalCases.length}</strong><span>Critical or high open</span></div><div><strong>{overdueCases.length}</strong><span>Overdue</span></div><div><strong>{verificationCases.length}</strong><span>Awaiting verification</span></div><div><strong>{openCases.filter((item) => item.current_discipline < 4).length}</strong><span>Before root-cause validation</span></div></div></div><div className="capaInsight"><h3>Portfolio position</h3><p>Current progress through the controlled lifecycle.</p><div className="capaBreakdown"><div><strong>{openCases.length}</strong><span>Open investigations</span></div><div><strong>{cases.filter((item) => item.current_discipline === 4).length}</strong><span>Root-cause validation</span></div><div><strong>{cases.filter((item) => [5,6].includes(item.current_discipline)).length}</strong><span>Action and verification</span></div><div><strong>{closedCases.length}</strong><span>Verified closed</span></div></div></div></section></> : <section className="capaMetrics"><Metric value={cases.length} title="All cases" detail="Permanent controlled register" tone="blue" href="/portal/rca"/><Metric value={openCases.length} title="Open" detail="Investigation or action active" tone="red" href="/portal/rca?view=open"/><Metric value={verificationCases.length} title="Awaiting verification" detail="Independent decision outstanding" tone="amber" href="/portal/rca?view=verification"/><Metric value={closedCases.length} title="Closed" detail="Effectiveness verified" tone="green" href="/portal/rca?view=closed"/></section>}
+      <section className="capaPanel" id="portfolio"><div className="capaPanelHead"><div><small>01 · CONTROLLED PORTFOLIO</small><h2>{viewTitle}</h2><p>Open and closed investigations remain visible for complete traceability.</p></div><span className="capaCount">{visibleCases.length} cases</span></div>{visibleCases.length ? <div className="capaList">{visibleCases.map((item) => { const state = caseState(item); return <article className="capaRow" key={item.id}><div><Link className="capaRef" href={`/portal/rca/${item.id}`}>{safe(item.case_reference, "Reference pending")}</Link><div className="capaTitle">{safe(item.title, "Corrective-action investigation")}</div><div className="capaMeta">{organizationNames.get(item.organization_id) || "Organisation"} · {label(item.source_type)}</div></div><div><span className={`capaStatus ${state.tone}`}>{state.name}</span><div className="capaMeta" style={{marginTop:7}}>Updated {formatDate(item.updated_at)}</div></div><div><strong>{label(item.severity)}</strong><div className="capaMeta" style={{marginTop:5}}>Target {formatDate(item.target_close_date)}</div></div><div><Link className="capaOpen" href={`/portal/rca/${item.id}`}>Open case →</Link></div></article>; })}</div> : <div className="capaEmpty">No CAPA-8D cases match this view.</div>}</section>
+      <section className="capaPanel capaCreate" id="new-case"><details><summary>Start a new standalone CAPA-8D case</summary>{organizations.length ? <form action={createRcaCase} className="capaForm"><select name="organization_id" required defaultValue="" className="capaField"><option value="" disabled>Select organisation</option>{organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}</select><select name="source_type" defaultValue="standalone" className="capaField"><option value="standalone">Standalone problem</option><option value="audit">Audit</option><option value="complaint">Complaint</option><option value="incident">Incident</option><option value="defect">Defect</option><option value="supplier">Supplier issue</option></select><select name="severity" defaultValue="medium" className="capaField"><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><input name="title" required placeholder="Short problem title" className="capaField capaWide"/><textarea name="problem_statement" rows={4} placeholder="State the known facts. D2 will develop and verify the full problem definition." className="capaField capaWide"/><button type="submit" className="capaSubmit">Create CAPA-8D Case</button></form> : <p>Create an organisation before starting a CAPA-8D case.</p>}</details></section>
+    </div>
+  </div></main>;
 }
-
-const fieldStyle = {
-  width: "100%",
-  boxSizing: "border-box",
-  border: "1px solid #cfdae8",
-  borderRadius: "10px",
-  background: "white",
-  color: "#061a35",
-  padding: "14px 15px",
-  font: "inherit",
-};
