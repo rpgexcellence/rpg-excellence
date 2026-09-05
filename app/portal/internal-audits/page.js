@@ -35,8 +35,8 @@ function formatDate(value) {
     .format(new Date(value));
 }
 
-function StatCard({ label, value, detail, tone = "blue" }) {
-  return <div className="iaStat"><i className={tone} /><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>;
+function StatCard({ label, value, detail, tone = "blue", href }) {
+  return <Link href={href} className="iaStat" aria-label={`${label}: ${value}`}><i className={tone} /><span>{label}</span><strong>{value}</strong><small>{detail}</small><b aria-hidden="true">→</b></Link>;
 }
 
 export default async function InternalAuditCommandCentre({ searchParams }) {
@@ -85,8 +85,8 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
         .iaKicker{color:#52e5da!important;font-size:12px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}#rpgIaWelcomeTitle{display:block!important;max-width:920px!important;margin:12px 0 16px!important;padding:0!important;border:0!important;background:transparent!important;color:#fff!important;-webkit-text-fill-color:#fff!important;opacity:1!important;font-family:inherit!important;font-size:clamp(42px,5vw,68px)!important;font-weight:900!important;line-height:1.02!important;letter-spacing:-.045em!important;text-shadow:none!important}#rpgIaWelcomeCopy{max-width:900px!important;margin:0!important;padding:0!important;color:#d8e5f5!important;-webkit-text-fill-color:#d8e5f5!important;font-size:18px!important;line-height:1.58!important}
         .iaAssurance{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:space-between;padding:24px;border:1px solid #ffffff24;border-radius:20px;background:#ffffff12;backdrop-filter:blur(10px)}.iaAssurance span{color:#b8cae1;font-size:12px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.iaAssurance strong{font-size:46px}.iaAssurance small{color:#e3edf9;line-height:1.5}
         .iaSuccess,.iaError{margin-top:20px;padding:16px 20px;border:1px solid #a5ddc0;border-radius:14px;background:#e9f8ef;color:#075d36;font-weight:800}.iaError{border-color:#efbd74;background:#fff7e8;color:#7c4700}.iaError strong{display:block;margin-bottom:3px}
-        .iaStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:22px 0}.iaStat{position:relative;overflow:hidden;padding:22px 24px;border:1px solid var(--line);border-radius:19px;background:#fff;box-shadow:0 12px 36px #061a350e}.iaStat i{position:absolute;inset:0 auto 0 0;width:5px;background:var(--blue)}.iaStat i.cyan{background:#16b8b0}.iaStat i.amber{background:#f0a51a}.iaStat i.red{background:#e05252}.iaStat span{display:block;color:#607089;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.iaStat strong{display:block;margin-top:4px;font-size:38px;line-height:1.1}.iaStat small{color:#7a899d}
-        .iaLifecycle{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;overflow:hidden;margin-bottom:22px;border:1px solid var(--line);border-radius:19px;background:var(--line);box-shadow:0 12px 34px #061a350a}.iaLife{display:flex;gap:13px;min-height:92px;padding:19px;background:#fff}.iaLife b{display:flex;width:34px;height:34px;flex:0 0 34px;align-items:center;justify-content:center;border-radius:50%;background:#eaf1ff;color:var(--blue);font-size:11px}.iaLife strong,.iaLife small{display:block}.iaLife strong{margin:2px 0 4px}.iaLife small{color:var(--muted);line-height:1.35}
+        .iaStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:22px 0}.iaStat{position:relative;overflow:hidden;padding:22px 52px 22px 24px;border:1px solid var(--line);border-radius:19px;background:#fff;color:var(--navy);text-decoration:none;box-shadow:0 12px 36px #061a350e;transition:transform .18s,border-color .18s,box-shadow .18s}.iaStat:hover,.iaStat:focus-visible{transform:translateY(-3px);border-color:#9ab6dc;box-shadow:0 18px 42px #061a3518;outline:0}.iaStat>b{position:absolute;right:20px;top:50%;transform:translateY(-50%);color:#1761e8;font-size:20px}.iaStat i{position:absolute;inset:0 auto 0 0;width:5px;background:var(--blue)}.iaStat i.cyan{background:#16b8b0}.iaStat i.amber{background:#f0a51a}.iaStat i.red{background:#e05252}.iaStat span{display:block;color:#607089;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.iaStat strong{display:block;margin-top:4px;font-size:38px;line-height:1.1}.iaStat small{color:#7a899d}
+        .iaLifecycle{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;overflow:hidden;margin-bottom:22px;border:1px solid var(--line);border-radius:19px;background:var(--line);box-shadow:0 12px 34px #061a350a}.iaLife{display:flex;gap:13px;min-height:92px;padding:19px;background:#fff;color:var(--navy);text-decoration:none;transition:background .18s,transform .18s}.iaLife:hover,.iaLife:focus-visible{position:relative;z-index:1;background:#f1f6ff;outline:2px solid #1761e8;outline-offset:-2px}.iaLife b{display:flex;width:34px;height:34px;flex:0 0 34px;align-items:center;justify-content:center;border-radius:50%;background:#eaf1ff;color:var(--blue);font-size:11px}.iaLife strong,.iaLife small{display:block}.iaLife strong{margin:2px 0 4px}.iaLife small{color:var(--muted);line-height:1.35}
         .iaPanel{overflow:hidden;margin-bottom:24px;border:1px solid var(--line);border-radius:25px;background:#fff;box-shadow:0 18px 55px #061a3511}.iaPanelHead{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:30px 34px;border-bottom:1px solid #e7edf4;background:linear-gradient(110deg,#fff,#f7faff)}.iaPanelHead .iaMini,.iaPortfolio .iaMini{color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.iaPanelHead h2,.iaPortfolio h2{margin:7px 0 5px;font-size:30px;letter-spacing:-.025em}.iaPanelHead p{margin:0;color:var(--muted)}.iaBadge{padding:9px 13px;border-radius:999px;background:#eaf8f6;color:#08736c;font-size:12px;font-weight:900;white-space:nowrap}
         .iaCreate{display:grid;grid-template-columns:250px minmax(0,1fr)}.iaRail{padding:30px 24px;border-right:1px solid #e6edf5;background:#f7f9fc}.iaRailTitle{margin-bottom:19px;color:#708096;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.iaRailItem{display:flex;gap:12px;margin-bottom:20px;color:#6b7c91}.iaRailItem:first-of-type{color:var(--navy)}.iaRailNo{display:flex;width:26px;height:26px;flex:0 0 26px;align-items:center;justify-content:center;border:1px solid #ccd8e6;border-radius:50%;background:#fff;font-size:11px;font-weight:900}.iaRailItem:first-of-type .iaRailNo{border-color:var(--blue);background:var(--blue);color:#fff;box-shadow:0 0 0 5px #e5eeff}.iaRailItem strong,.iaRailItem small{display:block}.iaRailItem strong{font-size:14px}.iaRailItem small{margin-top:2px;font-size:12px;line-height:1.35}
         .iaForm{padding:32px 34px 36px}.iaSectionTitle{display:flex;align-items:center;gap:12px;margin:4px 0 18px;font-size:17px;font-weight:900}.iaSectionTitle b{display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:8px;background:#e9f0ff;color:var(--blue);font-size:12px}.iaGrid2,.iaGrid3{display:grid;gap:17px}.iaGrid2{grid-template-columns:repeat(2,minmax(0,1fr))}.iaGrid3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -114,14 +114,14 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
         {params?.create_error === "invalid_dates" ? <div className="iaError" role="alert"><strong>Planned dates are required.</strong>Enter a valid planned start and planned end date and time.</div> : null}
 
         <section className="iaStats">
-          <StatCard label="Active audits" value={activeAudits} detail="Across the controlled lifecycle" />
-          <StatCard label="Scheduled" value={scheduledAudits} detail="Approved and awaiting delivery" tone="cyan" />
-          <StatCard label="Fieldwork" value={fieldworkAudits} detail="Evidence gathering and review" tone="amber" />
-          <StatCard label="Open findings" value={openFindings.length} detail="Requiring controlled resolution" tone="red" />
+          <StatCard label="Active audits" value={activeAudits} detail="Across the controlled lifecycle" href="#audit-portfolio" />
+          <StatCard label="Scheduled" value={scheduledAudits} detail="Approved and awaiting delivery" tone="cyan" href="#audit-portfolio" />
+          <StatCard label="Fieldwork" value={fieldworkAudits} detail="Evidence gathering and review" tone="amber" href="#audit-portfolio" />
+          <StatCard label="Open findings" value={openFindings.length} detail="Requiring controlled resolution" tone="red" href="/portal/internal-audit-actions" />
         </section>
 
         <section className="iaLifecycle" aria-label="Internal audit lifecycle">
-          {LIFECYCLE.map(([n, title, detail]) => <div className="iaLife" key={n}><b>{n}</b><div><strong>{title}</strong><small>{detail}</small></div></div>)}
+          {LIFECYCLE.map(([n, title, detail]) => <Link className="iaLife" href={n === "01" ? "#audit-mandate" : "#audit-portfolio"} key={n}><b>{n}</b><div><strong>{title}</strong><small>{detail}</small></div></Link>)}
         </section>
 
         <section className="iaPanel" id="audit-mandate">
@@ -166,7 +166,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
           )}
         </section>
 
-        <section className="iaPanel">
+        <section className="iaPanel" id="audit-portfolio">
           <div className="iaPortfolio"><div className="iaMini">Live assurance portfolio</div><h2>Recent audits</h2></div>
           {audits.length === 0 ? <div className="iaNoAudits">No internal audits have been created yet. Your first governed audit will appear here.</div> : audits.map((audit) => {
             const criteria = (audit.internal_audit_selected_standards ?? []).map((row) => row.internal_audit_standard_catalogue?.display_name).filter(Boolean);
