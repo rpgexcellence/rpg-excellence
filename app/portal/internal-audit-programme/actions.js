@@ -22,7 +22,13 @@ async function ownedProgramme(supabase, userId, programmeId) {
     .select("*").eq("id", programmeId).eq("owner_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Three-year audit programme not found.");
-  return data;
+  return {
+    ...data,
+    cycle_start: data.cycle_start || data.start_date,
+    cycle_end: data.cycle_end || data.end_date,
+    lead_auditor_name: data.lead_auditor_name || data.programme_owner_name,
+    lead_auditor_email: data.lead_auditor_email || data.programme_owner_email,
+  };
 }
 
 function programmeReference() {
@@ -60,11 +66,15 @@ export async function createProgramme(formData) {
     .in("id", standardIds).eq("active", true);
   if (standardsError) throw new Error(standardsError.message);
   if ((standards || []).length !== 5) throw new Error("One or more programme standards are unavailable.");
+  const cycleEnd = end.toISOString().slice(0, 10);
+  const contextAndChange = clean(formData.get("context_and_change"));
   const { data: programme, error } = await supabase.from("internal_audit_programmes").insert({
     owner_id: user.id, organization_id: organizationId, programme_reference: programmeReference(),
-    title, cycle_start: cycleStart, cycle_end: end.toISOString().slice(0, 10),
+    title, description: objectives, cycle_start: cycleStart, cycle_end: cycleEnd,
+    start_date: cycleStart, end_date: cycleEnd,
     lead_auditor_name: leadAuditorName, lead_auditor_email: leadAuditorEmail,
-    objectives, context_and_change: clean(formData.get("context_and_change")), status: "draft",
+    programme_owner_name: leadAuditorName, programme_owner_email: leadAuditorEmail,
+    objectives, context_and_change: contextAndChange, context_and_priorities: contextAndChange, status: "draft",
     site_structure: siteStructure, system_model: systemModel, central_functions: clean(formData.get("central_functions")),
     multisite_sampling_method: samplingMethod,
   }).select("id").single();
@@ -76,7 +86,7 @@ export async function createProgramme(formData) {
   await supabase.from("internal_audit_programme_events").insert({
     owner_id: user.id, programme_id: programme.id, event_type: "programme_created",
     summary: "Three-year internal audit programme created", created_by: user.id,
-    event_data: { standards: standards || [], cycle_start: cycleStart, cycle_end: end.toISOString().slice(0, 10) },
+    event_data: { standards: standards || [], cycle_start: cycleStart, cycle_end: cycleEnd },
   });
   revalidatePath("/portal/internal-audit-programme");
   redirect(`/portal/internal-audit-programme?programme=${programme.id}&created=1`);
