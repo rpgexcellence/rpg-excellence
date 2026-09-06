@@ -122,17 +122,17 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <Link className="iapButton ghost" href="/portal">Portal</Link>
 </div>
 </header>
-    {params?.created && <div className="iapNotice">Programme created. Build the FMEA risk universe and convert priorities into the three-year schedule.</div>}{params?.updated && <div className="iapNotice">Programme mandate and five-standard scope updated.</div>}{params?.approved && <div className="iapNotice">Programme approved by the administering lead auditor.</div>}
+    {params?.created && <div className="iapNotice">Programme created. Build the FMEA risk universe and convert priorities into the three-year schedule.</div>}{params?.updated && <div className="iapNotice">Programme mandate and selected-standard scope updated.</div>}{params?.approved && <div className="iapNotice">Programme approved by the administering lead auditor.</div>}
     {programmes.length > 0 && <nav className="iapProgrammeTabs">{programmes.map((item) => <Link key={item.id} className={item.id === programme?.id ? "active" : ""} href={`/portal/internal-audit-programme?programme=${item.id}`}>{item.programme_reference} · {item.status}</Link>)}</nav>}
     {!programme ? <>
 <section className="iapHero">
 <div>
 <span>CONTROLLED THREE-YEAR CYCLE</span>
 <h2>Build assurance around risk—not calendar habit.</h2>
-<p>The lead auditor defines the programme, selects the five standards and uses process FMEA to determine audit priority, frequency, timing and clause coverage.</p>
+<p>The lead auditor selects the applicable standards and uses process FMEA to determine audit priority, frequency, timing and clause coverage.</p>
 </div>
 <div className="iapCycle">
-<strong>5 standards · 3 years</strong>
+<strong>1–5 standards · 3 years</strong>
 <small>One controlled plan linked to live audit delivery.</small>
 </div>
 </section>
@@ -199,7 +199,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <textarea name="context_and_change" placeholder="Strategic change, incidents, complaints, previous findings, certification priorities and emerging risks." />
 </label>
 </div>
-<h3>Five-standard programme scope</h3>
+<h3>Select the applicable programme standards</h3>
 <div className="iapStandardGrid">{standards.map((standard) => <label className="iapCheck" key={standard.id}>
 <input type="checkbox" name="standard_ids" value={standard.id} defaultChecked />
 <span>
@@ -226,7 +226,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 </div>
 </section>
       <details className="iapPanel" open={selectedStandards.length === 0}>
-<summary className="iapPanelHead" style={{cursor:"pointer"}}><div><small>PROGRAMME GOVERNANCE · CONTROLLED CHANGE</small><h2>Edit programme mandate</h2><p>Revise structure, ownership, cycle, integrated-system model and five-standard scope. Changes are recorded in the audit trail.</p></div><span className="iapPill">{selectedStandards.length}/5 standards linked</span></summary>
+<summary className="iapPanelHead" style={{cursor:"pointer"}}><div><small>PROGRAMME GOVERNANCE · CONTROLLED CHANGE</small><h2>Edit programme mandate</h2><p>Revise structure, ownership, cycle, integrated-system model and selected-standard scope. Changes are recorded in the audit trail.</p></div><span className="iapPill">{selectedStandards.length} standard(s) linked</span></summary>
 <form className="iapBody" action={updateProgramme}>
 <input type="hidden" name="programme_id" value={programme.id} />
 <div className="iapGrid3">
@@ -243,7 +243,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <label className="iapField"><span>Central functions and shared controls</span><textarea name="central_functions" defaultValue={programme.central_functions || ""} /></label>
 <label className="iapField"><span>Multisite sampling and rotation method</span><textarea name="multisite_sampling_method" defaultValue={programme.multisite_sampling_method || ""} placeholder="Required for a multisite programme." /></label>
 </div>
-<h3>Controlled five-standard scope *</h3>
+<h3>Controlled programme-standard scope — select at least one *</h3>
 <div className="iapStandardGrid">{standards.map((standard) => <label className="iapCheck" key={standard.id}><input type="checkbox" name="standard_ids" value={standard.id} defaultChecked={selectedStandards.length === 0 || selectedStandards.some((row) => row.standard_id === standard.id)} /><span><strong>{standard.display_name}</strong><br/><small>{standard.edition_label || standard.standard_code}</small></span></label>)}</div>
 <div className="iapAction"><button className="iapSubmit">Save Programme Mandate</button></div>
 </form>
@@ -259,7 +259,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <div className="iapPanelHead">
 <div>
 <small>DASHBOARD · STANDARD COVERAGE</small>
-<h2>Five-standard clause coverage</h2>
+<h2>Selected-standard clause coverage</h2>
 <p>Coverage is earned only when a clause is assigned to a planned audit.</p>
 </div>
 <span className="iapPill">{coverage}% overall</span>
@@ -373,7 +373,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <td>{label(site.site_type)}<br/>
 <small>{site.business_unit || "—"}</small>
 </td>
-<td>{siteStandards.filter((row) => row.site_id === site.id).length} of 5</td>
+<td>{siteStandards.filter((row) => row.site_id === site.id).length} of {selectedStandards.length}</td>
 <td>Every {site.minimum_frequency_months} months</td>
 <td>
 <span className={`iapPill ${auditedSiteIds.has(site.id) ? "" : "high"}`}>{auditedSiteIds.has(site.id) ? "Scheduled" : "Gap"}</span>
@@ -662,7 +662,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 </div>}<form className="iapApprove" action={approveProgramme}>
 <input type="hidden" name="programme_id" value={programme.id} />
 <p>
-<strong>Lead-auditor approval:</strong> confirm the programme reflects FMEA priority, five-standard clause coverage, organisational change and available audit resources.</p>
+<strong>Lead-auditor approval:</strong> confirm the programme reflects FMEA priority, selected-standard clause coverage, organisational change and available audit resources.</p>
 <button className="iapSubmit" disabled={programme.status === "active"}>{programme.status === "active" ? "Programme Active" : "Approve 3-Year Programme"}</button>
 </form>
 </section>
