@@ -1329,7 +1329,11 @@ function CauseCards({ caseId, modelId, causes }) {
             <span style={causeStatusStyle(cause.status)}>{label(cause.status)}</span>
           </div>
           <div style={{ marginTop: "8px", fontWeight: 700 }}>{cause.statement}</div>
-          {cause.profile_code ? (
+          {cause.status === "rejected" ? (
+            <div style={{ ...profileMissingStyle, borderColor: "#fda29b", background: "#fff5f4", color: "#b42318" }}>
+              Cause rejected — an RCA profile is not required. The rejected hypothesis remains visible for traceability.
+            </div>
+          ) : cause.profile_code ? (
             <div style={profileSummaryStyle}>
               <div>
                 <span style={profileCodeStyle}>{cause.profile_code}</span>
@@ -1349,7 +1353,7 @@ function CauseCards({ caseId, modelId, causes }) {
           ) : (
             <div style={profileMissingStyle}>Legacy category and RCA profile not yet recorded.</div>
           )}
-          <details style={{ ...causeBuilderStyle, marginTop: "12px", background: "#fff" }} open={!cause.profile_code}>
+          {cause.status !== "rejected" && <details style={{ ...causeBuilderStyle, marginTop: "12px", background: "#fff" }} open={!cause.profile_code}>
             <summary style={{ cursor: "pointer", fontWeight: 800 }}>
               {cause.profile_code ? "Review / change RCA profile" : "Complete required RCA profile"}
             </summary>
@@ -1365,7 +1369,7 @@ function CauseCards({ caseId, modelId, causes }) {
               )}
               <button type="submit" style={{ ...primaryButton, marginTop: 12 }}>Save RCA Profile</button>
             </form>
-          </details>
+          </details>}
           {cause.status === "validated" && !cause.profile_code && ["escape", "systemic"].includes(cause.cause_type) && (
             <form action={reviewCauseHypothesis} style={{ ...validationNoticeStyle, marginTop: "12px" }}>
               <input type="hidden" name="case_id" value={caseId} />
