@@ -38,10 +38,14 @@ export async function createProgramme(formData) {
   const leadAuditorName = clean(formData.get("lead_auditor_name"));
   const leadAuditorEmail = clean(formData.get("lead_auditor_email"));
   const objectives = clean(formData.get("objectives"));
+  const siteStructure = clean(formData.get("site_structure"));
+  const systemModel = clean(formData.get("system_model"));
+  const samplingMethod = clean(formData.get("multisite_sampling_method"));
   const standardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
-  if (!organizationId || !title || !cycleStart || !leadAuditorName || !objectives) {
-    throw new Error("Organisation, title, cycle start, lead auditor and objectives are required.");
+  if (!organizationId || !title || !cycleStart || !leadAuditorName || !objectives || !["single_site", "multisite"].includes(siteStructure) || !["integrated", "separate", "hybrid"].includes(systemModel)) {
+    throw new Error("Organisation, programme structure, system model, title, cycle start, lead auditor and objectives are required.");
   }
+  if (siteStructure === "multisite" && !samplingMethod) throw new Error("Define the multisite sampling and three-year rotation method.");
   if (standardIds.length !== 5) throw new Error("Select the five controlled programme standards.");
   const start = new Date(`${cycleStart}T00:00:00Z`);
   if (Number.isNaN(start.getTime())) throw new Error("Enter a valid programme start date.");
@@ -61,8 +65,8 @@ export async function createProgramme(formData) {
     title, cycle_start: cycleStart, cycle_end: end.toISOString().slice(0, 10),
     lead_auditor_name: leadAuditorName, lead_auditor_email: leadAuditorEmail,
     objectives, context_and_change: clean(formData.get("context_and_change")), status: "draft",
-    system_model: "integrated", central_functions: clean(formData.get("central_functions")),
-    multisite_sampling_method: clean(formData.get("multisite_sampling_method")),
+    site_structure: siteStructure, system_model: systemModel, central_functions: clean(formData.get("central_functions")),
+    multisite_sampling_method: samplingMethod,
   }).select("id").single();
   if (error || !programme) throw new Error(error?.message || "Unable to create the programme.");
   const { error: linkError } = await supabase.from("internal_audit_programme_standards").insert(
