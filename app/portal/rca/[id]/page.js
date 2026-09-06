@@ -1366,6 +1366,19 @@ function CauseCards({ caseId, modelId, causes }) {
               <button type="submit" style={{ ...primaryButton, marginTop: 12 }}>Save RCA Profile</button>
             </form>
           </details>
+          {cause.status === "validated" && !cause.profile_code && ["escape", "systemic"].includes(cause.cause_type) && (
+            <form action={reviewCauseHypothesis} style={{ ...validationNoticeStyle, marginTop: "12px" }}>
+              <input type="hidden" name="case_id" value={caseId} />
+              <input type="hidden" name="cause_id" value={cause.id} />
+              <input type="hidden" name="model_id" value={modelId} />
+              <input type="hidden" name="decision" value="reject" />
+              <strong>This additional causal leg is optional when it is not supported by the evidence.</strong>
+              <div style={{ marginTop: "6px" }}>
+                Reject it instead of assigning an artificial profile. The decision remains in the controlled audit trail.
+              </div>
+              <button type="submit" style={{ ...rejectButton, marginTop: "10px" }}>Reject unsupported cause</button>
+            </form>
+          )}
           {Array.isArray(cause.why_chain) && cause.why_chain.length > 0 && (
             <ol style={{ margin: "12px 0 0", paddingLeft: "24px", lineHeight: 1.55 }}>
               {cause.why_chain.map((why, index) => (
