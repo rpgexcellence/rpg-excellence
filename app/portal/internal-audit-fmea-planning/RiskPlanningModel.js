@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 
-const STANDARDS = ["ISO 9001", "ISO 14001", "ISO 45001", "ISO/IEC 27001", "ISO/IEC 17024"];
 const CONSEQUENCES = [
   ["quality", "Quality / customer", "Product, service, conformity, customer or contractual impact"],
   ["legal", "Legal / regulatory", "Breach, enforcement, licence, accreditation or statutory exposure"],
@@ -30,7 +29,9 @@ function ScoreSelect({ value, onChange, label, name }) {
   return <label className="rpmField"><span>{label}</span><select name={name} value={value} onChange={(event) => onChange(Number(event.target.value))}>{SCALE.map((score) => <option value={score} key={score}>{score}</option>)}</select></label>;
 }
 
-export default function RiskPlanningModel({ saveAction }) {
+export default function RiskPlanningModel({ saveAction, programmes = [] }) {
+  const [programmeId, setProgrammeId] = useState(programmes[0]?.id || "");
+  const [siteId, setSiteId] = useState("");
   const [consequences, setConsequences] = useState(Object.fromEntries(CONSEQUENCES.map(([key]) => [key, 1])));
   const [likelihood, setLikelihood] = useState(1);
   const [detectability, setDetectability] = useState(1);
@@ -42,6 +43,9 @@ export default function RiskPlanningModel({ saveAction }) {
   const adjustment = modifiers.reduce((sum, key) => sum + (MODIFIERS.find((item) => item[0] === key)?.[2] || 0), 0);
   const finalScore = Math.max(1, baseScore + adjustment);
   const recommendation = useMemo(() => bandFor(finalScore), [finalScore]);
+  const selectedProgramme = programmes.find((programme) => programme.id === programmeId);
+  const programmeSites = selectedProgramme?.sites || [];
+  const programmeStandards = selectedProgramme?.standards || [];
 
   function toggleModifier(key) {
     setModifiers((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
@@ -52,12 +56,14 @@ export default function RiskPlanningModel({ saveAction }) {
     <section className="rpmPanel">
       <div className="rpmHead"><div><small>INTERACTIVE MODEL · STEP 1</small><h2>Define the auditable process</h2><p>Record the decision context before scoring. A score without evidence is not a defensible audit-programme decision.</p></div></div>
       <div className="rpmBody rpmGrid2">
+        <label className="rpmField"><span>Controlled 3-year programme *</span><select name="programme_id" required value={programmeId} onChange={(event) => { setProgrammeId(event.target.value); setSiteId(""); setConfirmed(false); }}><option value="" disabled>Select programme</option>{programmes.map((programme) => <option value={programme.id} key={programme.id}>{programme.programme_reference} · {programme.title}</option>)}</select></label>
+        <label className="rpmField"><span>Controlled location</span><select name="site_id" value={siteId} onChange={(event) => { setSiteId(event.target.value); setConfirmed(false); }}><option value="">Enterprise / all relevant locations</option>{programmeSites.map((site) => <option value={site.id} key={site.id}>{site.site_code} · {site.site_name}</option>)}</select></label>
         <label className="rpmField"><span>Process / activity *</span><input name="process_area" required placeholder="e.g. Supplier approval and monitoring" /></label>
-        <label className="rpmField"><span>Site / central function</span><input name="site_or_function" placeholder="e.g. Port Talbot / Group IT" /></label>
+        <label className="rpmField"><span>Site / central function description</span><input name="site_or_function" placeholder="e.g. Group IT or shared purchasing function" /></label>
         <label className="rpmField"><span>Credible failure mode *</span><textarea name="failure_mode" required placeholder="Describe how the process or control could fail—not merely the observed symptom." /></label>
         <label className="rpmField"><span>Credible effects *</span><textarea name="credible_effects" required placeholder="Describe potential effects on customers, compliance, people, environment, security, continuity or certification integrity." /></label>
         <label className="rpmField rpmWide"><span>Existing preventive and detective controls *</span><textarea name="current_controls" required placeholder="Identify current controls, their owners, monitoring frequency and the evidence that they operate effectively." /></label>
-        <label className="rpmField rpmWide"><span>Applicable standards *</span><div className="rpmChecks">{STANDARDS.map((standard) => <label key={standard}><input type="checkbox" name="standard_codes" value={standard} /> {standard}</label>)}</div></label>
+        <label className="rpmField rpmWide"><span>Applicable programme standards *</span><div className="rpmChecks" key={programmeId}>{programmeStandards.length ? programmeStandards.map((standard) => <label key={standard.id}><input type="checkbox" name="standard_codes" value={standard.label || standard.code} /> {standard.label || standard.code}</label>) : <small>Select a programme containing at least one controlled standard.</small>}</div></label>
         <label className="rpmField rpmWide"><span>Evidence considered *</span><textarea name="evidence" required placeholder="Reference KPIs, previous audits, findings, incidents, complaints, legal obligations, changes, risk registers and management concerns." /></label>
       </div>
     </section>
