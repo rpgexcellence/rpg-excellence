@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import FmeaScoreFields from "./FmeaScoreFields";
-import { addFmeaRisk, addPlannedAudit, addProgrammeSite, approveProgramme, createProgramme } from "./actions";
+import { addFmeaRisk, addPlannedAudit, addProgrammeSite, approveProgramme, createProgramme, updateProgramme } from "./actions";
 
 const FIVE_STANDARDS = ["ISO 9001", "ISO 14001", "ISO 45001", "ISO/IEC 27001", "ISO/IEC 17024"];
 const norm = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -33,7 +33,13 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
   for (const result of [organizationsResult, catalogueResult, programmesResult]) if (result.error) throw new Error(result.error.message);
   const organizations = organizationsResult.data || [];
   const standards = (catalogueResult.data || []).filter(isProgrammeStandard).filter((item, index, list) => index === list.findIndex((other) => norm(other.standard_code) === norm(item.standard_code)));
-  const programmes = programmesResult.data || [];
+  const programmes = (programmesResult.data || []).map((item) => ({
+    ...item,
+    cycle_start: item.cycle_start || item.start_date,
+    cycle_end: item.cycle_end || item.end_date,
+    lead_auditor_name: item.lead_auditor_name || item.programme_owner_name || "Not assigned",
+    lead_auditor_email: item.lead_auditor_email || item.programme_owner_email,
+  }));
   const programmeId = params?.programme || programmes[0]?.id || null;
   const programme = programmes.find((item) => item.id === programmeId) || null;
 
@@ -115,7 +121,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <Link className="iapButton ghost" href="/portal">Portal</Link>
 </div>
 </header>
-    {params?.created && <div className="iapNotice">Programme created. Build the FMEA risk universe and convert priorities into the three-year schedule.</div>}{params?.approved && <div className="iapNotice">Programme approved by the administering lead auditor.</div>}
+    {params?.created && <div className="iapNotice">Programme created. Build the FMEA risk universe and convert priorities into the three-year schedule.</div>}{params?.updated && <div className="iapNotice">Programme mandate and five-standard scope updated.</div>}{params?.approved && <div className="iapNotice">Programme approved by the administering lead auditor.</div>}
     {programmes.length > 0 && <nav className="iapProgrammeTabs">{programmes.map((item) => <Link key={item.id} className={item.id === programme?.id ? "active" : ""} href={`/portal/internal-audit-programme?programme=${item.id}`}>{item.programme_reference} · {item.status}</Link>)}</nav>}
     {!programme ? <>
 <section className="iapHero">
@@ -218,6 +224,29 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <small>Three controlled programme years</small>
 </div>
 </section>
+      <details className="iapPanel" open={selectedStandards.length === 0}>
+<summary className="iapPanelHead" style={{cursor:"pointer"}}><div><small>PROGRAMME GOVERNANCE · CONTROLLED CHANGE</small><h2>Edit programme mandate</h2><p>Revise structure, ownership, cycle, integrated-system model and five-standard scope. Changes are recorded in the audit trail.</p></div><span className="iapPill">{selectedStandards.length}/5 standards linked</span></summary>
+<form className="iapBody" action={updateProgramme}>
+<input type="hidden" name="programme_id" value={programme.id} />
+<div className="iapGrid3">
+<label className="iapField"><span>Programme title *</span><input name="title" required defaultValue={programme.title} /></label>
+<label className="iapField"><span>Cycle start *</span><input name="cycle_start" type="date" required defaultValue={programme.cycle_start} /></label>
+<label className="iapField"><span>Administering lead auditor *</span><input name="lead_auditor_name" required defaultValue={programme.lead_auditor_name} /></label>
+<label className="iapField"><span>Lead auditor email</span><input name="lead_auditor_email" type="email" defaultValue={programme.lead_auditor_email || ""} /></label>
+<label className="iapField"><span>Programme site structure *</span><select name="site_structure" required defaultValue={programme.site_structure || "single_site"}><option value="single_site">Single-site organisation</option><option value="multisite">Multisite organisation</option></select></label>
+<label className="iapField"><span>Management-system model *</span><select name="system_model" required defaultValue={programme.system_model || "integrated"}><option value="integrated">Integrated management system</option><option value="separate">Separate management systems</option><option value="hybrid">Hybrid / partly integrated</option></select></label>
+</div>
+<div className="iapGrid2" style={{marginTop:14}}>
+<label className="iapField"><span>Programme objectives *</span><textarea name="objectives" required defaultValue={programme.objectives || programme.description || ""} /></label>
+<label className="iapField"><span>Context, changes and prior performance</span><textarea name="context_and_change" defaultValue={programme.context_and_change || programme.context_and_priorities || ""} /></label>
+<label className="iapField"><span>Central functions and shared controls</span><textarea name="central_functions" defaultValue={programme.central_functions || ""} /></label>
+<label className="iapField"><span>Multisite sampling and rotation method</span><textarea name="multisite_sampling_method" defaultValue={programme.multisite_sampling_method || ""} placeholder="Required for a multisite programme." /></label>
+</div>
+<h3>Controlled five-standard scope *</h3>
+<div className="iapStandardGrid">{standards.map((standard) => <label className="iapCheck" key={standard.id}><input type="checkbox" name="standard_ids" value={standard.id} defaultChecked={selectedStandards.length === 0 || selectedStandards.some((row) => row.standard_id === standard.id)} /><span><strong>{standard.display_name}</strong><br/><small>{standard.edition_label || standard.standard_code}</small></span></label>)}</div>
+<div className="iapAction"><button className="iapSubmit">Save Programme Mandate</button></div>
+</form>
+</details>
       <section className="iapMetrics">
 <Metric value={sites.length} title="Controlled locations" detail={`${uncoveredSites.length} not yet scheduled`} tone={uncoveredSites.length ? "red" : "green"} />
 <Metric value={risks.length} title="FMEA risks" detail={`${highRisks.length} high or critical`} />
