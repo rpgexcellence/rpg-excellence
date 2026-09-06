@@ -199,6 +199,64 @@ export async function addProgrammeSite(formData) {
   redirect(`/portal/internal-audit-programme?programme=${programmeId}&saved=site#sites`);
 }
 
+export async function updateProgrammeSite(formData) {
+  const { supabase, user } = await context();
+  const programmeId = clean(formData.get("programme_id"));
+  const siteId = clean(formData.get("site_id"));
+  await ownedProgramme(supabase, user.id, programmeId);
+  const { data: existingSite, error: existingError } = await supabase.from("internal_audit_programme_sites")
+    .select("id,site_name").eq("id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id).maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  if (!existingSite) throw new Error("Controlled programme location not found.");
+  const siteCode = clean(formData.get("site_code"));
+  const siteName = clean(formData.get("site_name"));
+  const scopeSummary = clean(formData.get("scope_summary"));
+  const standardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
+  if (!siteCode || !siteName || !scopeSummary || !standardIds.length) {
+    throw new Error("Site code, site name, scope and at least one applicable standard are required.");
+  }
+  const { data: allowedRows, error: allowedError } = await supabase.from("internal_audit_programme_standards")
+    .select("standard_id").eq("programme_id", programmeId).eq("owner_id", user.id);
+  if (allowedError) throw new Error(allowedError.message);
+  const allowed = new Set((allowedRows || []).map((row) => row.standard_id));
+  if (standardIds.some((id) => !allowed.has(id))) throw new Error("A selected standard is outside this programme.");
+  const frequency = numberInRange(formData.get("minimum_frequency_months"), 3, 36);
+  if (![3, 6, 12, 18, 24, 36].includes(frequency)) throw new Error("Select a controlled audit frequency.");
+  const { error } = await supabase.from("internal_audit_programme_sites").update({
+    site_code: siteCode, site_name: siteName, country: clean(formData.get("country")),
+    business_unit: clean(formData.get("business_unit")), scope_summary: scopeSummary,
+    site_type: clean(formData.get("site_type")) || "operational",
+    sampling_status: clean(formData.get("sampling_status")) || "in_scope",
+    sampling_rationale: clean(formData.get("sampling_rationale")),
+    minimum_frequency_months: frequency, updated_at: new Date().toISOString(),
+  }).eq("id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  const { data: existingStandards, error: existingStandardsError } = await supabase
+    .from("internal_audit_programme_site_standards").select("standard_id")
+    .eq("site_id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id);
+  if (existingStandardsError) throw new Error(existingStandardsError.message);
+  const removedStandardIds = (existingStandards || [])
+    .map((row) => row.standard_id).filter((standardId) => !standardIds.includes(standardId));
+  if (removedStandardIds.length) {
+    const { error: removeError } = await supabase.from("internal_audit_programme_site_standards")
+      .delete().eq("site_id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id)
+      .in("standard_id", removedStandardIds);
+    if (removeError) throw new Error(removeError.message);
+  }
+  const { error: standardsError } = await supabase.from("internal_audit_programme_site_standards").upsert(
+    standardIds.map((standardId) => ({ owner_id: user.id, programme_id: programmeId, site_id: siteId, standard_id: standardId })),
+    { onConflict: "site_id,standard_id" }
+  );
+  if (standardsError) throw new Error(standardsError.message);
+  await supabase.from("internal_audit_programme_events").insert({
+    owner_id: user.id, programme_id: programmeId, event_type: "programme_site_updated",
+    summary: `${siteName} multisite scope updated`, created_by: user.id,
+    event_data: { site_id: siteId, previous_name: existingSite.site_name, standards: standardIds, frequency_months: frequency },
+  });
+  revalidatePath("/portal/internal-audit-programme");
+  redirect(`/portal/internal-audit-programme?programme=${programmeId}&saved=site-updated#sites`);
+}
+
 export async function addFmeaRisk(formData) {
   const { supabase, user } = await context();
   const programmeId = clean(formData.get("programme_id"));
