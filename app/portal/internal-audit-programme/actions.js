@@ -9,6 +9,7 @@ const numberInRange = (value, min, max) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : null;
 };
+const recommendedFrequency = (score) => score >= 300 ? 12 : score >= 200 ? 18 : 36;
 
 async function context() {
   const supabase = await createClient();
@@ -212,21 +213,35 @@ export async function addFmeaRisk(formData) {
   const severity = numberInRange(formData.get("severity"), 1, 10);
   const occurrence = numberInRange(formData.get("occurrence"), 1, 10);
   const detection = numberInRange(formData.get("detection"), 1, 10);
+  const regulatoryExposure = numberInRange(formData.get("regulatory_exposure"), 1, 5);
+  const processFailureImpact = numberInRange(formData.get("process_failure_impact"), 1, 5);
+  const customerImpactProbability = numberInRange(formData.get("customer_impact_probability"), 1, 5);
+  const failureDetectability = numberInRange(formData.get("failure_detectability"), 1, 5);
+  const frequency = Number(formData.get("required_frequency_months"));
   const processArea = clean(formData.get("process_area"));
   const failureMode = clean(formData.get("failure_mode"));
   const potentialEffect = clean(formData.get("potential_effect"));
   const potentialCause = clean(formData.get("potential_cause"));
-  if (!processArea || !failureMode || !potentialEffect || !potentialCause || !severity || !occurrence || !detection) {
-    throw new Error("Complete the FMEA process, failure mode, effect, cause and all three scores.");
+  if (!processArea || !failureMode || !potentialEffect || !potentialCause || !severity || !occurrence || !detection || !regulatoryExposure || !processFailureImpact || !customerImpactProbability || !failureDetectability) {
+    throw new Error("Complete the process, failure mode, effect, cause and all four 1–5 audit-priority scores.");
+  }
+  if (![3, 6, 12, 18, 24, 36].includes(frequency)) throw new Error("Select a controlled audit frequency.");
+  const auditPriority = regulatoryExposure * processFailureImpact * customerImpactProbability * failureDetectability;
+  const rationale = clean(formData.get("rationale"));
+  const priorityOverride = clean(formData.get("priority_override"));
+  if ((frequency !== recommendedFrequency(auditPriority) || priorityOverride) && !rationale) {
+    throw new Error("Record the Lead Auditor rationale for overriding the calculated priority or recommended frequency.");
   }
   const { error } = await supabase.from("internal_audit_programme_risks").insert({
     owner_id: user.id, programme_id: programmeId, process_area: processArea,
     site_or_function: clean(formData.get("site_or_function")), failure_mode: failureMode,
     potential_effect: potentialEffect, potential_cause: potentialCause,
     current_controls: clean(formData.get("current_controls")), severity, occurrence, detection,
-    priority_override: clean(formData.get("priority_override")), rationale: clean(formData.get("rationale")),
+    priority_override: priorityOverride, rationale,
     site_id: siteId, scope_level: clean(formData.get("scope_level")) || "process",
-    required_frequency_months: Number(formData.get("required_frequency_months")) || 36,
+    required_frequency_months: frequency, regulatory_exposure: regulatoryExposure,
+    process_failure_impact: processFailureImpact, customer_impact_probability: customerImpactProbability,
+    failure_detectability: failureDetectability,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/portal/internal-audit-programme");
