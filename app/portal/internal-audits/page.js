@@ -116,7 +116,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
             <SideLink href="/portal">Dashboard</SideLink>
             <SideLink href="/portal/history">Assessments</SideLink>
             <SideLink href="/portal/internal-audits" active>Internal Audits</SideLink>
-            <div className="iaAuditSub"><Link href="/portal/internal-audits">Audit Command Centre</Link><Link href="/portal/internal-audit-programme">3-Year Audit Programme</Link></div>
+            <div className="iaAuditSub"><Link href="/portal/internal-audits">Audit Command Centre</Link><Link href="/portal/internal-audit-programme">3-Year Audit Programme</Link><Link href="/portal/internal-audit-fmea-planning">FMEA Risk Planning</Link></div>
             <SideLink href="/portal/internal-audit-actions">Findings & Actions</SideLink>
             <SideLink href="/portal/rca">CAPA-8D</SideLink>
             <SideLink href="/portal/documents">Evidence</SideLink>
