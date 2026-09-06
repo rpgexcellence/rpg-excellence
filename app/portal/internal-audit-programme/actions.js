@@ -61,6 +61,8 @@ export async function createProgramme(formData) {
     title, cycle_start: cycleStart, cycle_end: end.toISOString().slice(0, 10),
     lead_auditor_name: leadAuditorName, lead_auditor_email: leadAuditorEmail,
     objectives, context_and_change: clean(formData.get("context_and_change")), status: "draft",
+    system_model: "integrated", central_functions: clean(formData.get("central_functions")),
+    multisite_sampling_method: clean(formData.get("multisite_sampling_method")),
   }).select("id").single();
   if (error || !programme) throw new Error(error?.message || "Unable to create the programme.");
   const { error: linkError } = await supabase.from("internal_audit_programme_standards").insert(
@@ -76,10 +78,56 @@ export async function createProgramme(formData) {
   redirect(`/portal/internal-audit-programme?programme=${programme.id}&created=1`);
 }
 
+export async function addProgrammeSite(formData) {
+  const { supabase, user } = await context();
+  const programmeId = clean(formData.get("programme_id"));
+  await ownedProgramme(supabase, user.id, programmeId);
+  const siteCode = clean(formData.get("site_code"));
+  const siteName = clean(formData.get("site_name"));
+  const scopeSummary = clean(formData.get("scope_summary"));
+  const standardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
+  if (!siteCode || !siteName || !scopeSummary || !standardIds.length) {
+    throw new Error("Site code, site name, scope and at least one applicable standard are required.");
+  }
+  const { data: allowedRows, error: allowedError } = await supabase.from("internal_audit_programme_standards")
+    .select("standard_id").eq("programme_id", programmeId).eq("owner_id", user.id);
+  if (allowedError) throw new Error(allowedError.message);
+  const allowed = new Set((allowedRows || []).map((row) => row.standard_id));
+  if (standardIds.some((id) => !allowed.has(id))) throw new Error("A selected standard is outside this programme.");
+  const frequency = numberInRange(formData.get("minimum_frequency_months"), 3, 36);
+  if (![3, 6, 12, 18, 24, 36].includes(frequency)) throw new Error("Select a controlled audit frequency.");
+  const { data: site, error } = await supabase.from("internal_audit_programme_sites").insert({
+    owner_id: user.id, programme_id: programmeId, site_code: siteCode, site_name: siteName,
+    country: clean(formData.get("country")), business_unit: clean(formData.get("business_unit")),
+    scope_summary: scopeSummary, site_type: clean(formData.get("site_type")) || "operational",
+    sampling_status: clean(formData.get("sampling_status")) || "in_scope",
+    sampling_rationale: clean(formData.get("sampling_rationale")), minimum_frequency_months: frequency,
+  }).select("id").single();
+  if (error || !site) throw new Error(error?.message || "Unable to add the programme location.");
+  const { error: standardsError } = await supabase.from("internal_audit_programme_site_standards").insert(
+    standardIds.map((standardId) => ({ owner_id: user.id, programme_id: programmeId, site_id: site.id, standard_id: standardId }))
+  );
+  if (standardsError) throw new Error(standardsError.message);
+  await supabase.from("internal_audit_programme_events").insert({
+    owner_id: user.id, programme_id: programmeId, event_type: "programme_site_added",
+    summary: `${siteName} added to the multisite audit universe`, created_by: user.id,
+    event_data: { site_id: site.id, standards: standardIds, frequency_months: frequency },
+  });
+  revalidatePath("/portal/internal-audit-programme");
+  redirect(`/portal/internal-audit-programme?programme=${programmeId}&saved=site#sites`);
+}
+
 export async function addFmeaRisk(formData) {
   const { supabase, user } = await context();
   const programmeId = clean(formData.get("programme_id"));
   await ownedProgramme(supabase, user.id, programmeId);
+  const siteId = clean(formData.get("site_id"));
+  if (siteId) {
+    const { data: site, error: siteError } = await supabase.from("internal_audit_programme_sites")
+      .select("id").eq("id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id).maybeSingle();
+    if (siteError) throw new Error(siteError.message);
+    if (!site) throw new Error("The selected location is outside this programme.");
+  }
   const severity = numberInRange(formData.get("severity"), 1, 10);
   const occurrence = numberInRange(formData.get("occurrence"), 1, 10);
   const detection = numberInRange(formData.get("detection"), 1, 10);
@@ -96,6 +144,8 @@ export async function addFmeaRisk(formData) {
     potential_effect: potentialEffect, potential_cause: potentialCause,
     current_controls: clean(formData.get("current_controls")), severity, occurrence, detection,
     priority_override: clean(formData.get("priority_override")), rationale: clean(formData.get("rationale")),
+    site_id: siteId, scope_level: clean(formData.get("scope_level")) || "process",
+    required_frequency_months: Number(formData.get("required_frequency_months")) || 36,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/portal/internal-audit-programme");
@@ -153,6 +203,12 @@ export async function addPlannedAudit(formData) {
     if (riskError) throw new Error(riskError.message);
     if (!ownedRisk) throw new Error("The selected FMEA risk does not belong to this programme.");
   }
+  const siteIds = [...new Set(formData.getAll("site_ids").map(clean).filter(Boolean))];
+  if (!siteIds.length) throw new Error("Select at least one controlled programme location.");
+  const { data: ownedSites, error: siteError } = await supabase.from("internal_audit_programme_sites")
+    .select("id").eq("programme_id", programmeId).eq("owner_id", user.id).in("id", siteIds);
+  if (siteError) throw new Error(siteError.message);
+  if ((ownedSites || []).length !== siteIds.length) throw new Error("One or more selected locations are outside this programme.");
   const { data: plannedAudit, error } = await supabase.from("internal_audit_programme_audits").insert({
     owner_id: user.id, programme_id: programmeId, risk_id: riskId,
     title, process_area: processArea, site_or_function: clean(formData.get("site_or_function")),
@@ -161,12 +217,21 @@ export async function addPlannedAudit(formData) {
     priority: clean(formData.get("priority")) || "medium", status: "planned",
     lead_auditor_name: clean(formData.get("lead_auditor_name")) || programme.lead_auditor_name,
     rationale, estimated_days: Number(formData.get("estimated_days")) || 1,
+    integrated_audit: formData.get("integrated_audit") === "on",
+    scope_type: clean(formData.get("scope_type")) || "site_and_process",
+    audit_team: clean(formData.get("audit_team")),
+    site_sampling_rationale: clean(formData.get("site_sampling_rationale")),
+    central_control_review: formData.get("central_control_review") === "on",
   }).select("id").single();
   if (error || !plannedAudit) throw new Error(error?.message || "Unable to add the planned audit.");
   const { error: clauseError } = await supabase.from("internal_audit_programme_audit_clauses").insert(
     parsedClauses.map((row) => ({ owner_id: user.id, programme_id: programmeId, programme_audit_id: plannedAudit.id, ...row }))
   );
   if (clauseError) throw new Error(clauseError.message);
+  const { error: auditSitesError } = await supabase.from("internal_audit_programme_audit_sites").insert(
+    siteIds.map((siteId) => ({ owner_id: user.id, programme_id: programmeId, programme_audit_id: plannedAudit.id, site_id: siteId, sample_reason: clean(formData.get("site_sampling_rationale")) }))
+  );
+  if (auditSitesError) throw new Error(auditSitesError.message);
   await supabase.from("internal_audit_programme_events").insert({
     owner_id: user.id, programme_id: programmeId, event_type: "audit_planned",
     summary: `${title} added to Year ${yearNo}`, created_by: user.id,
@@ -180,12 +245,18 @@ export async function approveProgramme(formData) {
   const { supabase, user } = await context();
   const programmeId = clean(formData.get("programme_id"));
   await ownedProgramme(supabase, user.id, programmeId);
-  const [{ count: riskCount }, { count: auditCount }, { count: clauseCount }] = await Promise.all([
+  const [{ count: riskCount }, { count: auditCount }, { count: clauseCount }, { data: sites }, { data: auditSites }] = await Promise.all([
     supabase.from("internal_audit_programme_risks").select("id", { count: "exact", head: true }).eq("programme_id", programmeId).eq("owner_id", user.id),
     supabase.from("internal_audit_programme_audits").select("id", { count: "exact", head: true }).eq("programme_id", programmeId).eq("owner_id", user.id),
     supabase.from("internal_audit_programme_audit_clauses").select("id", { count: "exact", head: true }).eq("programme_id", programmeId).eq("owner_id", user.id),
+    supabase.from("internal_audit_programme_sites").select("id,sampling_status").eq("programme_id", programmeId).eq("owner_id", user.id),
+    supabase.from("internal_audit_programme_audit_sites").select("site_id").eq("programme_id", programmeId).eq("owner_id", user.id),
   ]);
   if (!riskCount || !auditCount || !clauseCount) throw new Error("Record FMEA risks, planned audits and clause coverage before approval.");
+  if (!(sites || []).length) throw new Error("Register the programme sites and central functions before approval.");
+  const scheduledSiteIds = new Set((auditSites || []).map((row) => row.site_id));
+  const uncovered = (sites || []).filter((site) => ["in_scope", "sampled"].includes(site.sampling_status) && !scheduledSiteIds.has(site.id));
+  if (uncovered.length) throw new Error("Every in-scope or sampled location must be allocated to at least one planned audit.");
   const now = new Date().toISOString();
   const { error } = await supabase.from("internal_audit_programmes").update({ status: "active", approved_at: now, updated_at: now })
     .eq("id", programmeId).eq("owner_id", user.id);
