@@ -10,7 +10,8 @@ const norm = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, 
 const isProgrammeStandard = (standard) => FIVE_STANDARDS.some((code) => norm(standard.standard_code).startsWith(norm(code)) || norm(standard.display_name).startsWith(norm(code)));
 const date = (value) => value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T00:00:00Z`)) : "—";
 const label = (value) => String(value || "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-const riskBand = (risk) => risk.priority_override || (risk.rpn >= 300 ? "critical" : risk.rpn >= 160 ? "high" : risk.rpn >= 80 ? "medium" : "low");
+const riskScore = (risk) => risk.audit_priority ?? risk.rpn ?? 0;
+const riskBand = (risk) => risk.priority_override || (riskScore(risk) >= 300 ? "critical" : riskScore(risk) >= 200 ? "high" : riskScore(risk) >= 100 ? "medium" : "low");
 
 function SideLink({ href, children, active = false }) { return <Link href={href} className={active ? "iapSideLink active" : "iapSideLink"}>
 <i />{children}</Link>; }
@@ -48,7 +49,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
   if (programme) {
     const [selectedResult, riskResult, auditResult, clauseResult, sitesResult, siteStandardsResult, auditSitesResult] = await Promise.all([
       supabase.from("internal_audit_programme_standards").select("standard_id,target_coverage,internal_audit_standard_catalogue(standard_code,display_name)").eq("programme_id", programme.id).eq("owner_id", user.id),
-      supabase.from("internal_audit_programme_risks").select("*").eq("programme_id", programme.id).eq("owner_id", user.id).order("rpn", { ascending: false }),
+      supabase.from("internal_audit_programme_risks").select("*").eq("programme_id", programme.id).eq("owner_id", user.id).order("audit_priority", { ascending: false, nullsFirst: false }),
       supabase.from("internal_audit_programme_audits").select("*").eq("programme_id", programme.id).eq("owner_id", user.id).order("planned_start"),
       supabase.from("internal_audit_programme_audit_clauses").select("*").eq("programme_id", programme.id).eq("owner_id", user.id),
       supabase.from("internal_audit_programme_sites").select("*").eq("programme_id", programme.id).eq("owner_id", user.id).order("site_name"),
@@ -388,7 +389,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <h2>Risk-based audit universe</h2>
 <p>Profile enterprise, site and process risks to determine audit frequency and priority.</p>
 </div>
-<span className="iapPill">RPN = S × O × D</span>
+<span className="iapPill">Priority = R × I × C × D</span>
 </div>
 <form className="iapBody" action={addFmeaRisk}>
 <input type="hidden" name="programme_id" value={programme.id} />
@@ -409,17 +410,6 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <option value="site">Site</option>
 <option value="process">Process</option>
 <option value="standard">Standard-specific</option>
-</select>
-</label>
-<label className="iapField">
-<span>Required audit frequency</span>
-<select name="required_frequency_months" defaultValue="36">
-<option value="3">Quarterly</option>
-<option value="6">6 months</option>
-<option value="12">Annual</option>
-<option value="18">18 months</option>
-<option value="24">24 months</option>
-<option value="36">Once per cycle</option>
 </select>
 </label>
 <label className="iapField">
@@ -448,7 +438,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <label className="iapField">
 <span>Priority override</span>
 <select name="priority_override" defaultValue="">
-<option value="">Use calculated RPN band</option>
+<option value="">Use calculated audit-priority band</option>
 <option value="low">Low</option>
 <option value="medium">Medium</option>
 <option value="high">High</option>
@@ -468,11 +458,13 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <thead>
 <tr>
 <th>Process / risk</th>
-<th>S</th>
-<th>O</th>
-<th>D</th>
-<th>RPN</th>
+<th>Reg.</th>
+<th>Impact</th>
+<th>Customer</th>
+<th>Detect.</th>
+<th>Score</th>
 <th>Priority</th>
+<th>Frequency</th>
 <th>Scheduled</th>
 </tr>
 </thead>
@@ -482,15 +474,17 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <br />
 <small>{risk.failure_mode}</small>
 </td>
-<td>{risk.severity}</td>
-<td>{risk.occurrence}</td>
-<td>{risk.detection}</td>
+<td>{risk.regulatory_exposure ?? "Legacy"}</td>
+<td>{risk.process_failure_impact ?? risk.severity}</td>
+<td>{risk.customer_impact_probability ?? risk.occurrence}</td>
+<td>{risk.failure_detectability ?? risk.detection}</td>
 <td>
-<strong>{risk.rpn}</strong>
+<strong>{riskScore(risk)}</strong>
 </td>
 <td>
 <span className={`iapPill ${riskBand(risk)}`}>{label(riskBand(risk))}</span>
 </td>
+<td>Every {risk.required_frequency_months || 36} months</td>
 <td>{scheduledRiskIds.has(risk.id) ? "Yes" : "No"}</td>
 </tr>)}</tbody>
 </table>
@@ -526,7 +520,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <label className="iapField">
 <span>FMEA risk basis</span>
 <select name="risk_id" defaultValue="">
-<option value="">Programme judgement / no single risk</option>{risks.map((risk) => <option value={risk.id} key={risk.id}>RPN {risk.rpn} · {risk.process_area} · {risk.failure_mode}</option>)}</select>
+<option value="">Programme judgement / no single risk</option>{risks.map((risk) => <option value={risk.id} key={risk.id}>Priority {riskScore(risk)} · {risk.process_area} · {risk.failure_mode}</option>)}</select>
 </label>
 <label className="iapField">
 <span>Planned start *</span>
