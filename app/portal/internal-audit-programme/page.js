@@ -102,6 +102,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <div className="iapSub">
 <Link href="/portal/internal-audits">Audit Command Centre</Link>
 <Link href="/portal/internal-audit-programme" className="active">3-Year Audit Programme</Link>
+<Link href="/portal/internal-audit-fmea-planning">FMEA Risk Planning</Link>
 </div>
 <SideLink href="/portal/internal-audit-actions">Findings & Actions</SideLink>
 <SideLink href="/portal/rca">CAPA-8D</SideLink>
@@ -396,7 +397,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <h2>Risk-based audit universe</h2>
 <p>Profile enterprise, site and process risks to determine audit frequency and priority.</p>
 </div>
-<span className="iapPill">Priority = R × I × C × D</span>
+<div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}><span className="iapPill">Priority = R × I × C × D</span><Link className="iapButton ghost" href="/portal/internal-audit-fmea-planning">Definitions & scoring guide</Link></div>
 </div>
 <form className="iapBody" action={addFmeaRisk}>
 <input type="hidden" name="programme_id" value={programme.id} />
