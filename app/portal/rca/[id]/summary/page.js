@@ -153,7 +153,15 @@ export default async function RcaExecutiveSummary({ params }) {
                 <div key={type} style={subCardStyle}>
                   <strong>{label(type)} cause</strong>
                   {validatedCauses.filter((cause) => cause.cause_type === type).map((cause) => (
-                    <p key={cause.id} style={{ lineHeight: 1.55 }}>{cause.statement}</p>
+                    <div key={cause.id} style={{ marginTop: "12px", lineHeight: 1.55 }}>
+                      {cause.profile_code && (
+                        <div style={{ color: "#155eef", fontWeight: 900 }}>
+                          {cause.profile_code} — {cause.profile_title}
+                        </div>
+                      )}
+                      <p style={{ margin: "4px 0" }}>{cause.statement}</p>
+                      {cause.profile_rationale && <small style={{ color: "#607089" }}>{cause.profile_rationale}</small>}
+                    </div>
                   ))}
                   {!validatedCauses.some((cause) => cause.cause_type === type) && (
                     <p style={{ color: "#607089" }}>Not yet validated.</p>
