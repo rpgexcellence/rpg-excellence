@@ -10,7 +10,7 @@ const norm = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, 
 const isProgrammeStandard = (standard) => FIVE_STANDARDS.some((code) => norm(standard.standard_code).startsWith(norm(code)) || norm(standard.display_name).startsWith(norm(code)));
 const date = (value) => value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T00:00:00Z`)) : "—";
 const label = (value) => String(value || "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-const riskScore = (risk) => risk.audit_priority ?? risk.rpn ?? 0;
+const riskScore = (risk) => risk.planning_score ?? risk.audit_priority ?? risk.rpn ?? 0;
 const riskBand = (risk) => risk.priority_override || (riskScore(risk) >= 300 ? "critical" : riskScore(risk) >= 200 ? "high" : riskScore(risk) >= 100 ? "medium" : "low");
 
 function SideLink({ href, children, active = false }) { return <Link href={href} className={active ? "iapSideLink active" : "iapSideLink"}>
@@ -57,7 +57,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
       supabase.from("internal_audit_programme_audit_sites").select("*").eq("programme_id", programme.id).eq("owner_id", user.id),
     ]);
     for (const result of [selectedResult, riskResult, auditResult, clauseResult, sitesResult, siteStandardsResult, auditSitesResult]) if (result.error) throw new Error(result.error.message);
-    selectedStandards = selectedResult.data || []; risks = riskResult.data || []; plannedAudits = auditResult.data || []; plannedClauses = clauseResult.data || []; sites = sitesResult.data || []; siteStandards = siteStandardsResult.data || []; auditSites = auditSitesResult.data || [];
+    selectedStandards = selectedResult.data || []; risks = (riskResult.data || []).sort((a, b) => riskScore(b) - riskScore(a)); plannedAudits = auditResult.data || []; plannedClauses = clauseResult.data || []; sites = sitesResult.data || []; siteStandards = siteStandardsResult.data || []; auditSites = auditSitesResult.data || [];
     const selectedIds = selectedStandards.map((row) => row.standard_id);
     if (selectedIds.length) {
       const linksResult = await supabase.from("internal_audit_question_scope_links").select("standard_id,clause,requirement_summary,internal_audit_standard_catalogue(standard_code,display_name)").in("standard_id", selectedIds).not("clause", "is", null);
@@ -126,7 +126,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <Link className="iapButton ghost" href="/portal">Portal</Link>
 </div>
 </header>
-    {params?.created && <div className="iapNotice">Programme created. Build the FMEA risk universe and convert priorities into the three-year schedule.</div>}{params?.updated && <div className="iapNotice">Programme mandate and selected-standard scope updated.</div>}{params?.approved && <div className="iapNotice">Programme approved by the administering lead auditor.</div>}
+    {params?.created && <div className="iapNotice">Programme created. Build the FMEA risk universe and convert priorities into the three-year schedule.</div>}{params?.updated && <div className="iapNotice">Programme mandate and selected-standard scope updated.</div>}{params?.approved && <div className="iapNotice">Programme approved by the administering lead auditor.</div>}{params?.saved === "fmea" && <div className="iapNotice">FMEA assessment {params?.fmea || ""} saved and added to this programme’s Step 3 risk universe.</div>}
     {programmes.length > 0 && <nav className="iapProgrammeTabs">{programmes.map((item) => <Link key={item.id} className={item.id === programme?.id ? "active" : ""} href={`/portal/internal-audit-programme?programme=${item.id}`}>{item.programme_reference} · {item.status}</Link>)}</nav>}
     {!programme ? <>
 <section className="iapHero">
