@@ -145,6 +145,23 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <option value="" disabled>Select organisation</option>{organizations.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
 </label>
 <label className="iapField">
+<span>Programme site structure *</span>
+<select name="site_structure" required defaultValue="">
+<option value="" disabled>Select structure</option>
+<option value="single_site">Single-site organisation</option>
+<option value="multisite">Multisite organisation</option>
+</select>
+<small>Multisite programmes require controlled location sampling and rotation.</small>
+</label>
+<label className="iapField">
+<span>Management-system model *</span>
+<select name="system_model" required defaultValue="integrated">
+<option value="integrated">Integrated management system</option>
+<option value="separate">Separate management systems</option>
+<option value="hybrid">Hybrid / partly integrated</option>
+</select>
+</label>
+<label className="iapField">
 <span>Programme title *</span>
 <input name="title" required placeholder="e.g. Integrated Assurance Programme 2027–2029" />
 </label>
@@ -160,6 +177,10 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <span>Lead auditor email</span>
 <input name="lead_auditor_email" type="email" />
 </label>
+</div>
+<div className="iapGrid2" style={{marginTop:14}}>
+<label className="iapField"><span>Central functions and shared controls</span><textarea name="central_functions" placeholder="Leadership, document control, HR, IT, procurement, risk, compliance or other controls operated centrally for multiple sites." /></label>
+<label className="iapField"><span>Multisite sampling and rotation method</span><textarea name="multisite_sampling_method" placeholder="Describe risk-based site selection, previous performance, material differences, mandatory visits and rotation across Years 1–3. Enter N/A for a single-site programme." /></label>
 </div>
 <div className="iapGrid2" style={{marginTop:14}}>
 <label className="iapField">
