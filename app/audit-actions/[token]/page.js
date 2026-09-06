@@ -15,10 +15,12 @@ import {
   recordNoContainmentRequired,
   reviewAnalysisNode,
   reviewCauseHypothesis,
+  saveCauseProfile,
   saveCaseOverview,
   saveDiscipline,
   submitD6ActionForVerification,
 } from "./actions";
+import RcaLegacyProfileFields from "../../portal/rca/[id]/RcaLegacyProfileFields";
 const label = (value) =>
   String(value === "effective" ? "effective_verified" : value ?? "")
     .replaceAll("_", " ")
@@ -181,7 +183,7 @@ export default async function SecureRcaCasePage({
     })
   );
   const firstIncomplete = disciplines.find(
-    (item) => Number(item.completion_score || 0) < 100
+    (item) => item.status !== "approved"
   );
   const highestUnlocked = firstIncomplete
     ? firstIncomplete.discipline
@@ -196,7 +198,7 @@ export default async function SecureRcaCasePage({
     (item) => item.discipline === selected
   );
   const approvedCount = disciplines.filter(
-    (item) => Number(item.completion_score || 0) >= 100
+    (item) => item.status === "approved"
   ).length;
   const openActions = actions.filter(
     (item) => !["verified", "cancelled"].includes(item.status)
@@ -372,7 +374,7 @@ export default async function SecureRcaCasePage({
                 const active = item.discipline === selected;
                 const locked = item.discipline > highestUnlocked;
                 const statusMark =
-                  Number(item.completion_score || 0) >= 100
+                  item.status === "approved"
                     ? "✓ Owner completed"
                     : locked
                       ? "🔒 Locked"
@@ -439,6 +441,18 @@ export default async function SecureRcaCasePage({
                     <div style={{ marginTop: "6px" }}>
                       Enter both the validation method or test performed and the objective validation result before selecting Human Validate Cause.
                     </div>
+                  </div>
+                )}
+                {pageError === "cause_profile_required" && (
+                  <div style={validationNoticeStyle}>
+                    <strong>RCA profile required.</strong>
+                    <div style={{ marginTop: "6px" }}>Choose the legacy category and detailed code, then complete the profile before validating this cause.</div>
+                  </div>
+                )}
+                {pageError === "missing_cause_profiles" && (
+                  <div style={validationNoticeStyle}>
+                    <strong>D4 profiling is incomplete.</strong>
+                    <div style={{ marginTop: "6px" }}>Every validated cause must have a saved legacy code and evidence-based profile rationale before D4 completion.</div>
                   </div>
                 )}
                 {pageError === "node_validation_required" && (
@@ -524,17 +538,17 @@ export default async function SecureRcaCasePage({
                       padding: "8px 12px",
                       borderRadius: "999px",
                       background:
-                        Number(discipline.completion_score || 0) >= 100
+                        discipline.status === "approved"
                           ? "#e8f8ef"
                           : "#eef4ff",
                       color:
-                        Number(discipline.completion_score || 0) >= 100
+                        discipline.status === "approved"
                           ? "#067647"
                           : "#175cd3",
                       fontWeight: 800,
                     }}
                   >
-                    {Number(discipline.completion_score || 0) >= 100 ? "Owner Completed" : label(discipline.status)}
+                    {discipline.status === "approved" ? "Owner Completed" : label(discipline.status)}
                   </span>
                 </div>
 
@@ -623,7 +637,7 @@ export default async function SecureRcaCasePage({
                     <button name="intent" value="save" style={primaryButton} disabled={frozen}>
                       Save Progress
                     </button>
-                    {Number(discipline.completion_score || 0) < 100 && !frozen && <button name="intent" value="approve" style={approveButton}>{selected === 8 ? "Submit Final D0–D8 to Auditor" : `Complete D${selected} & Continue`}</button>}
+                    {discipline.status !== "approved" && !frozen && <button name="intent" value="approve" style={approveButton}>{selected === 8 ? "Submit Final D0–D8 to Auditor" : `Complete D${selected} & Continue`}</button>}
                   </div>
                 </form>
               </section>
@@ -1348,6 +1362,32 @@ function CauseCards({ caseId, modelId, causes }) {
             <span style={causeStatusStyle(cause.status)}>{label(cause.status)}</span>
           </div>
           <div style={{ marginTop: "8px", fontWeight: 700 }}>{cause.statement}</div>
+          {cause.profile_code ? (
+            <div style={profileSummaryStyle}>
+              <div><span style={profileCodeStyle}>{cause.profile_code}</span><strong>{cause.profile_title}</strong></div>
+              <div style={profileMetaGridStyle}>
+                <span><strong>Category:</strong> {cause.profile_category}</span>
+                <span><strong>Mechanism:</strong> {label(cause.failure_mechanism)}</span>
+                <span><strong>Extent:</strong> {label(cause.profile_extent)}</span>
+                <span><strong>Control layer:</strong> {label(cause.control_layer)}</span>
+                <span><strong>Recurrence:</strong> {label(cause.recurrence_relationship)}</span>
+                <span><strong>System owner:</strong> {cause.accountable_system_owner}</span>
+              </div>
+              <div style={{ marginTop: 8 }}><strong>Profile rationale:</strong> {cause.profile_rationale}</div>
+              <div style={{ marginTop: 6 }}><strong>Standards:</strong> {(cause.applicable_standards || []).map(label).join(", ") || "Not recorded"}</div>
+            </div>
+          ) : <div style={profileMissingStyle}>Legacy category and RCA profile not yet recorded.</div>}
+          <details style={{ ...causeBuilderStyle, marginTop: "12px", background: "#fff" }} open={!cause.profile_code}>
+            <summary style={{ cursor: "pointer", fontWeight: 800 }}>{cause.profile_code ? "Review / change RCA profile" : "Complete required RCA profile"}</summary>
+            <form action={saveCauseProfile}>
+              <input type="hidden" name="case_id" value={caseId} />
+              <input type="hidden" name="cause_id" value={cause.id} />
+              <input type="hidden" name="model_id" value={modelId} />
+              <RcaLegacyProfileFields defaults={cause} compact />
+              {cause.status === "validated" && <div style={{ ...validationNoticeStyle, margin: "12px 0 0" }}>Changing a validated profile will reopen this cause for human validation and preserve the change in the audit trail.</div>}
+              <button type="submit" style={{ ...primaryButton, marginTop: 12 }}>Save RCA Profile</button>
+            </form>
+          </details>
           {Array.isArray(cause.why_chain) && cause.why_chain.length > 0 && (
             <ol style={{ margin: "12px 0 0", paddingLeft: "24px", lineHeight: 1.55 }}>
               {cause.why_chain.map((why, index) => (
@@ -1603,15 +1643,16 @@ function CauseStreamForm({ caseId, causeType, title }) {
       <form action={addCauseHypothesis} style={{ marginTop: "16px" }}>
         <input type="hidden" name="case_id" value={caseId} />
         <input type="hidden" name="cause_type" value={causeType} />
-        <div style={formGrid}>
+        <RcaLegacyProfileFields />
+        <div style={{ ...formGrid, marginTop: "16px" }}>
           <select name="fishbone_category" defaultValue="process" style={fieldStyle}>
-            <option value="people">People</option>
-            <option value="process">Process</option>
-            <option value="equipment">Equipment</option>
-            <option value="material">Material</option>
-            <option value="measurement">Measurement</option>
-            <option value="environment">Environment</option>
-            <option value="management">Management</option>
+            <option value="people">Fishbone branch: People</option>
+            <option value="process">Fishbone branch: Process</option>
+            <option value="equipment">Fishbone branch: Equipment</option>
+            <option value="material">Fishbone branch: Material</option>
+            <option value="measurement">Fishbone branch: Measurement</option>
+            <option value="environment">Fishbone branch: Environment</option>
+            <option value="management">Fishbone branch: Management</option>
           </select>
           <input
             name="statement"
@@ -1784,6 +1825,9 @@ function buildEvidenceChallenge({
         (cause) => Array.isArray(cause.why_chain) && cause.why_chain.length >= 1
       );
       const validated = typeCauses.some((cause) => cause.status === "validated");
+      const unprofiled = typeCauses.some(
+        (cause) => cause.status === "validated" && (!cause.profile_code || !cause.profile_rationale)
+      );
       const modelCoverage = (analysisNodes ?? []).some(
         (node) => node.cause_type === type || node.branch_key === type
       );
@@ -1799,6 +1843,7 @@ function buildEvidenceChallenge({
       } else if (type !== "occurrence" && typeCauses.length > 0 && !validated) {
         challenges.push(`The recorded ${type} hypothesis must be validated or rejected before D4 approval.`);
       }
+      if (unprofiled) challenges.push(`The validated ${type} cause needs a legacy category, detailed code and profile rationale.`);
     }
     requiredVerification.push(
       "Attempt to disprove each causal chain and record the validation method, result and contradictory evidence."
@@ -2365,6 +2410,24 @@ const causeEvidenceGrid = {
   marginTop: "14px",
   color: "#607089",
   lineHeight: 1.5,
+};
+
+const profileSummaryStyle = {
+  marginTop: "12px", padding: "14px", border: "1px solid #9fbbff",
+  borderRadius: "12px", background: "#f4f7ff", color: "#17345e", lineHeight: 1.45,
+};
+const profileCodeStyle = {
+  display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "38px",
+  marginRight: "9px", padding: "5px 8px", borderRadius: "8px", background: "#2f5bea",
+  color: "#fff", fontWeight: 900,
+};
+const profileMetaGridStyle = {
+  display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: "6px 14px", marginTop: "11px", fontSize: "13px",
+};
+const profileMissingStyle = {
+  marginTop: "12px", padding: "11px 13px", border: "1px solid #f2c86b",
+  borderRadius: "10px", background: "#fff8e7", color: "#7a4d00", fontWeight: 800,
 };
 
 function causeStatusStyle(status) {
