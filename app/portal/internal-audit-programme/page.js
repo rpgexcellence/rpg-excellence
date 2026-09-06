@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import FmeaScoreFields from "./FmeaScoreFields";
+import AuditScheduleFields from "./AuditScheduleFields";
 import { addFmeaRisk, addPlannedAudit, addProgrammeSite, approveProgramme, createProgramme, updateProgramme, updateProgrammeSite } from "./actions";
 
 const FIVE_STANDARDS = ["ISO 9001", "ISO 14001", "ISO 45001", "ISO/IEC 27001", "ISO/IEC 17024"];
@@ -507,67 +508,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 </div>
 <form className="iapBody" action={addPlannedAudit}>
 <input type="hidden" name="programme_id" value={programme.id} />
-<div className="iapGrid3">
-<label className="iapField">
-<span>Audit title *</span>
-<input name="title" required />
-</label>
-<label className="iapField">
-<span>Process area *</span>
-<input name="process_area" required />
-</label>
-<label className="iapField">
-<span>Scope type</span>
-<select name="scope_type" defaultValue="site_and_process">
-<option value="site_and_process">Site and process</option>
-<option value="central_function">Central function</option>
-<option value="cross_site">Cross-site process</option>
-<option value="system_wide">System-wide integrated audit</option>
-</select>
-</label>
-<label className="iapField">
-<span>FMEA risk basis</span>
-<select name="risk_id" defaultValue="">
-<option value="">Programme judgement / no single risk</option>{risks.map((risk) => <option value={risk.id} key={risk.id}>Priority {riskScore(risk)} · {risk.process_area} · {risk.failure_mode}</option>)}</select>
-</label>
-<label className="iapField">
-<span>Planned start *</span>
-<input name="planned_start" type="date" required min={programme.cycle_start} max={programme.cycle_end} />
-</label>
-<label className="iapField">
-<span>Planned end *</span>
-<input name="planned_end" type="date" required min={programme.cycle_start} max={programme.cycle_end} />
-</label>
-<label className="iapField">
-<span>Method</span>
-<select name="audit_method" defaultValue="onsite">
-<option value="onsite">On-site</option>
-<option value="remote">Remote</option>
-<option value="hybrid">Hybrid</option>
-</select>
-</label>
-<label className="iapField">
-<span>Priority</span>
-<select name="priority" defaultValue="medium">
-<option value="low">Low</option>
-<option value="medium">Medium</option>
-<option value="high">High</option>
-<option value="critical">Critical</option>
-</select>
-</label>
-<label className="iapField">
-<span>Estimated audit days</span>
-<input name="estimated_days" type="number" min="0.5" step="0.5" defaultValue="1" />
-</label>
-<label className="iapField">
-<span>Lead auditor</span>
-<input name="lead_auditor_name" defaultValue={programme.lead_auditor_name} />
-</label>
-<label className="iapField">
-<span>Audit team</span>
-<input name="audit_team" placeholder="Auditors, technical experts and observers" />
-</label>
-</div>
+<AuditScheduleFields risks={risks} cycleStart={programme.cycle_start} cycleEnd={programme.cycle_end} leadAuditor={programme.lead_auditor_name} />
 <h3>Sites included in this audit *</h3>
 <div className="iapStandardGrid">{sites.map((site) => <label className="iapCheck" key={site.id}>
 <input type="checkbox" name="site_ids" value={site.id} />
@@ -577,10 +518,6 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <label className="iapField"><span>Site sampling / rotation rationale</span><textarea name="site_sampling_rationale" placeholder="Explain why these locations were selected and how remaining locations rotate through the cycle." /></label>
 <div><label className="iapCheck"><input type="checkbox" name="integrated_audit" defaultChecked /><span><strong>Integrated audit</strong><br/><small>Cover two or more management-system standards through shared processes.</small></span></label><label className="iapCheck" style={{marginTop:10}}><input type="checkbox" name="central_control_review" /><span><strong>Review central controls</strong><br/><small>Test governance or controls operated centrally on behalf of selected sites.</small></span></label></div>
 </div>
-<label className="iapField" style={{marginTop:14}}>
-<span>Risk-based scheduling rationale *</span>
-<textarea name="rationale" required placeholder="Explain timing, frequency, priority, sampling and relationship to prior performance or change." />
-</label>
 <h3>Clause coverage selected by the programme lead auditor *</h3>
 <div className="iapClauseGrid">{selectedStandards.map((selected) => <fieldset key={selected.standard_id} style={{border:"1px solid #d7e2ee",borderRadius:11,padding:14}}>
 <legend>
