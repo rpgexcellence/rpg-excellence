@@ -35,7 +35,7 @@ const FAILURE_MECHANISMS = new Set([
   "not_understood", "unavailable", "obsolete_after_change", "degraded",
   "monitoring_failed", "escalation_failed", "prior_action_ineffective",
 ]);
-const PROFILE_STANDARDS = new Set(["iso_9001", "iso_14001", "iso_45001", "iso_27001"]);
+const PROFILE_STANDARDS = new Set(["iso_9001", "iso_14001", "iso_45001", "iso_22301", "iso_27001", "iso_17024", "as9100"]);
 
 function parseCauseProfile(formData) {
   const profileCategory = clean(formData.get("profile_category"));
