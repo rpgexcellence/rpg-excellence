@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import FmeaScoreFields from "./FmeaScoreFields";
 import AuditScheduleFields from "./AuditScheduleFields";
-import { addFmeaRisk, addPlannedAudit, addProgrammeSite, approveProgramme, createProgramme, updateProgramme, updateProgrammeSite } from "./actions";
+import { addFmeaRisk, addPlannedAudit, addProgrammeSite, approveProgramme, createProgramme, launchProgrammeAudit, updateProgramme, updateProgrammeSite } from "./actions";
 
 const FIVE_STANDARDS = ["ISO 9001", "ISO 14001", "ISO 45001", "ISO/IEC 27001", "ISO/IEC 17024"];
 const COUNTRIES = "Afghanistan|Albania|Algeria|Andorra|Angola|Antigua and Barbuda|Argentina|Armenia|Australia|Austria|Azerbaijan|Bahamas|Bahrain|Bangladesh|Barbados|Belarus|Belgium|Belize|Benin|Bhutan|Bolivia|Bosnia and Herzegovina|Botswana|Brazil|Brunei|Bulgaria|Burkina Faso|Burundi|Cabo Verde|Cambodia|Cameroon|Canada|Central African Republic|Chad|Chile|China|Colombia|Comoros|Congo|Costa Rica|Croatia|Cuba|Cyprus|Czechia|Democratic Republic of the Congo|Denmark|Djibouti|Dominica|Dominican Republic|Ecuador|Egypt|El Salvador|Equatorial Guinea|Eritrea|Estonia|Eswatini|Ethiopia|Fiji|Finland|France|Gabon|Gambia|Georgia|Germany|Ghana|Greece|Grenada|Guatemala|Guinea|Guinea-Bissau|Guyana|Haiti|Honduras|Hungary|Iceland|India|Indonesia|Iran|Iraq|Ireland|Israel|Italy|Ivory Coast|Jamaica|Japan|Jordan|Kazakhstan|Kenya|Kiribati|Kuwait|Kyrgyzstan|Laos|Latvia|Lebanon|Lesotho|Liberia|Libya|Liechtenstein|Lithuania|Luxembourg|Madagascar|Malawi|Malaysia|Maldives|Mali|Malta|Marshall Islands|Mauritania|Mauritius|Mexico|Micronesia|Moldova|Monaco|Mongolia|Montenegro|Morocco|Mozambique|Myanmar|Namibia|Nauru|Nepal|Netherlands|New Zealand|Nicaragua|Niger|Nigeria|North Korea|North Macedonia|Norway|Oman|Pakistan|Palau|Panama|Papua New Guinea|Paraguay|Peru|Philippines|Poland|Portugal|Qatar|Romania|Russia|Rwanda|Saint Kitts and Nevis|Saint Lucia|Saint Vincent and the Grenadines|Samoa|San Marino|Sao Tome and Principe|Saudi Arabia|Senegal|Serbia|Seychelles|Sierra Leone|Singapore|Slovakia|Slovenia|Solomon Islands|Somalia|South Africa|South Korea|South Sudan|Spain|Sri Lanka|Sudan|Suriname|Sweden|Switzerland|Syria|Taiwan|Tajikistan|Tanzania|Thailand|Timor-Leste|Togo|Tonga|Trinidad and Tobago|Tunisia|Turkey|Turkmenistan|Tuvalu|Uganda|Ukraine|United Arab Emirates|United Kingdom|United States|Uruguay|Uzbekistan|Vanuatu|Vatican City|Venezuela|Vietnam|Yemen|Zambia|Zimbabwe".split("|");
@@ -577,6 +577,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <th>Clauses</th>
 <th>Status</th>
 <th>Lead</th>
+<th>Actions</th>
 </tr>
 </thead>
 <tbody>{plannedAudits.map((audit) => <tr key={audit.id}>
@@ -594,6 +595,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <td>{plannedClauses.filter((row) => row.programme_audit_id === audit.id).length}</td>
 <td>{label(audit.status)}</td>
 <td>{audit.lead_auditor_name}</td>
+<td>{audit.linked_audit_id ? <Link className="iapButton ghost" href={`/portal/internal-audits/${audit.linked_audit_id}`}>Open Audit</Link> : programme.status === "active" ? <form action={launchProgrammeAudit}><input type="hidden" name="programme_id" value={programme.id} /><input type="hidden" name="programme_audit_id" value={audit.id} /><button className="iapSubmit">Launch Audit</button></form> : <span className="iapPill medium">Approve programme first</span>}</td>
 </tr>)}</tbody>
 </table>
 </div> : <div className="iapBody">
