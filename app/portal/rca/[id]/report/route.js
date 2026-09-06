@@ -200,7 +200,11 @@ export async function GET(_request, { params }) {
   for (const type of ["occurrence", "escape", "systemic"]) {
     const typeCauses = validatedCauses.filter((cause) => cause.cause_type === type);
     paragraph(`${cleanLabel(type)} cause`, { bold: true, after: 2 });
-    if (typeCauses.length) typeCauses.forEach((cause) => bullet(cause.statement));
+    if (typeCauses.length) typeCauses.forEach((cause) => {
+      const profile = cause.profile_code ? `${cause.profile_code} — ${cause.profile_title}: ` : "";
+      bullet(`${profile}${cause.statement}`);
+      if (cause.profile_rationale) paragraph(`Profile rationale: ${cause.profile_rationale}`, { color: grey, after: 4 });
+    });
     else paragraph("Not yet validated.", { color: grey });
   }
 
