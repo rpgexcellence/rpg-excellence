@@ -52,7 +52,7 @@ export async function createProgramme(formData) {
     throw new Error("Organisation, programme structure, system model, title, cycle start, lead auditor and objectives are required.");
   }
   if (siteStructure === "multisite" && !samplingMethod) throw new Error("Define the multisite sampling and three-year rotation method.");
-  if (standardIds.length !== 5) throw new Error("Select the five controlled programme standards.");
+  if (standardIds.length < 1 || standardIds.length > 5) throw new Error("Select between one and five controlled programme standards.");
   const start = new Date(`${cycleStart}T00:00:00Z`);
   if (Number.isNaN(start.getTime())) throw new Error("Enter a valid programme start date.");
   const end = new Date(start);
@@ -65,7 +65,7 @@ export async function createProgramme(formData) {
     .from("internal_audit_standard_catalogue").select("id,standard_code,display_name")
     .in("id", standardIds).eq("active", true);
   if (standardsError) throw new Error(standardsError.message);
-  if ((standards || []).length !== 5) throw new Error("One or more programme standards are unavailable.");
+  if ((standards || []).length !== standardIds.length) throw new Error("One or more programme standards are unavailable.");
   const cycleEnd = end.toISOString().slice(0, 10);
   const contextAndChange = clean(formData.get("context_and_change"));
   const { data: programme, error } = await supabase.from("internal_audit_programmes").insert({
@@ -110,7 +110,7 @@ export async function updateProgramme(formData) {
     throw new Error("Complete all required programme-mandate fields.");
   }
   if (siteStructure === "multisite" && !samplingMethod) throw new Error("Define the multisite sampling and three-year rotation method.");
-  if (standardIds.length !== 5) throw new Error("Select the five controlled programme standards.");
+  if (standardIds.length < 1 || standardIds.length > 5) throw new Error("Select between one and five controlled programme standards.");
   const start = new Date(`${cycleStart}T00:00:00Z`);
   if (Number.isNaN(start.getTime())) throw new Error("Enter a valid programme start date.");
   const end = new Date(start); end.setUTCFullYear(end.getUTCFullYear() + 3); end.setUTCDate(end.getUTCDate() - 1);
@@ -118,7 +118,23 @@ export async function updateProgramme(formData) {
   const { data: validStandards, error: validError } = await supabase.from("internal_audit_standard_catalogue")
     .select("id").in("id", standardIds).eq("active", true);
   if (validError) throw new Error(validError.message);
-  if ((validStandards || []).length !== 5) throw new Error("One or more programme standards are unavailable.");
+  if ((validStandards || []).length !== standardIds.length) throw new Error("One or more programme standards are unavailable.");
+  const { data: currentLinks, error: currentLinksError } = await supabase.from("internal_audit_programme_standards")
+    .select("standard_id").eq("programme_id", programmeId).eq("owner_id", user.id);
+  if (currentLinksError) throw new Error(currentLinksError.message);
+  const removedStandardIds = (currentLinks || []).map((row) => row.standard_id).filter((id) => !standardIds.includes(id));
+  if (removedStandardIds.length) {
+    const { count: allocatedClauses, error: clauseCheckError } = await supabase.from("internal_audit_programme_audit_clauses")
+      .select("id", { count: "exact", head: true }).eq("programme_id", programmeId).eq("owner_id", user.id).in("standard_id", removedStandardIds);
+    if (clauseCheckError) throw new Error(clauseCheckError.message);
+    if (allocatedClauses) throw new Error("A removed standard is already allocated to a planned audit. Revise that audit before changing programme scope.");
+    const { error: siteStandardDeleteError } = await supabase.from("internal_audit_programme_site_standards")
+      .delete().eq("programme_id", programmeId).eq("owner_id", user.id).in("standard_id", removedStandardIds);
+    if (siteStandardDeleteError) throw new Error(siteStandardDeleteError.message);
+    const { error: programmeStandardDeleteError } = await supabase.from("internal_audit_programme_standards")
+      .delete().eq("programme_id", programmeId).eq("owner_id", user.id).in("standard_id", removedStandardIds);
+    if (programmeStandardDeleteError) throw new Error(programmeStandardDeleteError.message);
+  }
   const { error } = await supabase.from("internal_audit_programmes").update({
     title, description: objectives, objectives, cycle_start: cycleStart, cycle_end: cycleEnd,
     start_date: cycleStart, end_date: cycleEnd, lead_auditor_name: leadAuditorName,
