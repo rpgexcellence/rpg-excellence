@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import FmeaScoreFields from "./FmeaScoreFields";
-import { addFmeaRisk, addPlannedAudit, addProgrammeSite, approveProgramme, createProgramme, updateProgramme } from "./actions";
+import { addFmeaRisk, addPlannedAudit, addProgrammeSite, approveProgramme, createProgramme, updateProgramme, updateProgrammeSite } from "./actions";
 
 const FIVE_STANDARDS = ["ISO 9001", "ISO 14001", "ISO 45001", "ISO/IEC 27001", "ISO/IEC 17024"];
 const COUNTRIES = "Afghanistan|Albania|Algeria|Andorra|Angola|Antigua and Barbuda|Argentina|Armenia|Australia|Austria|Azerbaijan|Bahamas|Bahrain|Bangladesh|Barbados|Belarus|Belgium|Belize|Benin|Bhutan|Bolivia|Bosnia and Herzegovina|Botswana|Brazil|Brunei|Bulgaria|Burkina Faso|Burundi|Cabo Verde|Cambodia|Cameroon|Canada|Central African Republic|Chad|Chile|China|Colombia|Comoros|Congo|Costa Rica|Croatia|Cuba|Cyprus|Czechia|Democratic Republic of the Congo|Denmark|Djibouti|Dominica|Dominican Republic|Ecuador|Egypt|El Salvador|Equatorial Guinea|Eritrea|Estonia|Eswatini|Ethiopia|Fiji|Finland|France|Gabon|Gambia|Georgia|Germany|Ghana|Greece|Grenada|Guatemala|Guinea|Guinea-Bissau|Guyana|Haiti|Honduras|Hungary|Iceland|India|Indonesia|Iran|Iraq|Ireland|Israel|Italy|Ivory Coast|Jamaica|Japan|Jordan|Kazakhstan|Kenya|Kiribati|Kuwait|Kyrgyzstan|Laos|Latvia|Lebanon|Lesotho|Liberia|Libya|Liechtenstein|Lithuania|Luxembourg|Madagascar|Malawi|Malaysia|Maldives|Mali|Malta|Marshall Islands|Mauritania|Mauritius|Mexico|Micronesia|Moldova|Monaco|Mongolia|Montenegro|Morocco|Mozambique|Myanmar|Namibia|Nauru|Nepal|Netherlands|New Zealand|Nicaragua|Niger|Nigeria|North Korea|North Macedonia|Norway|Oman|Pakistan|Palau|Panama|Papua New Guinea|Paraguay|Peru|Philippines|Poland|Portugal|Qatar|Romania|Russia|Rwanda|Saint Kitts and Nevis|Saint Lucia|Saint Vincent and the Grenadines|Samoa|San Marino|Sao Tome and Principe|Saudi Arabia|Senegal|Serbia|Seychelles|Sierra Leone|Singapore|Slovakia|Slovenia|Solomon Islands|Somalia|South Africa|South Korea|South Sudan|Spain|Sri Lanka|Sudan|Suriname|Sweden|Switzerland|Syria|Taiwan|Tajikistan|Tanzania|Thailand|Timor-Leste|Togo|Tonga|Trinidad and Tobago|Tunisia|Turkey|Turkmenistan|Tuvalu|Uganda|Ukraine|United Arab Emirates|United Kingdom|United States|Uruguay|Uzbekistan|Vanuatu|Vatican City|Venezuela|Vietnam|Yemen|Zambia|Zimbabwe".split("|");
@@ -82,6 +82,8 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
     const covered = available.filter((link) => coveredKeys.has(`${link.standard_id}:${link.clause}`)).length;
     return { ...row, available: available.length, covered, percent: available.length ? Math.round((covered / available.length) * 100) : 0 };
   });
+  const editSite = sites.find((site) => site.id === params?.editSite) || null;
+  const editSiteStandardIds = new Set(siteStandards.filter((row) => row.site_id === editSite?.id).map((row) => row.standard_id));
 
   return <main className="iapPage">
 <style>{`
@@ -282,30 +284,32 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 </div>
 <span className="iapPill">{sites.length} location(s)</span>
 </div>
-<form className="iapBody" action={addProgrammeSite}>
+<form className="iapBody" action={editSite ? updateProgrammeSite : addProgrammeSite}>
 <input type="hidden" name="programme_id" value={programme.id} />
+{editSite && <input type="hidden" name="site_id" value={editSite.id} />}
+{editSite && <div className="iapNotice">Editing {editSite.site_code} · {editSite.site_name}. Save the changes below or cancel to keep the current record.</div>}
 <div className="iapGrid3">
 <label className="iapField">
 <span>Site code *</span>
-<input name="site_code" required placeholder="e.g. UK-CAM" />
+<input name="site_code" required placeholder="e.g. UK-CAM" defaultValue={editSite?.site_code || ""} />
 </label>
 <label className="iapField">
 <span>Site / function name *</span>
-<input name="site_name" required />
+<input name="site_name" required defaultValue={editSite?.site_name || ""} />
 </label>
 <label className="iapField">
 <span>Country</span>
-<input name="country" list="iap-country-list" autoComplete="off" placeholder="Search and select country" />
+<input name="country" list="iap-country-list" autoComplete="off" placeholder="Search and select country" defaultValue={editSite?.country || ""} />
 <datalist id="iap-country-list">{COUNTRIES.map((country) => <option key={country} value={country} />)}</datalist>
 <small>Click the field or type to search.</small>
 </label>
 <label className="iapField">
 <span>Business unit</span>
-<input name="business_unit" />
+<input name="business_unit" defaultValue={editSite?.business_unit || ""} />
 </label>
 <label className="iapField">
 <span>Location type</span>
-<select name="site_type" defaultValue="operational">
+<select name="site_type" defaultValue={editSite?.site_type || "operational"}>
 <option value="head_office">Head office</option>
 <option value="central_function">Central function</option>
 <option value="operational">Operational site</option>
@@ -315,7 +319,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 </label>
 <label className="iapField">
 <span>Minimum frequency</span>
-<select name="minimum_frequency_months" defaultValue="36">
+<select name="minimum_frequency_months" defaultValue={String(editSite?.minimum_frequency_months || 36)}>
 <option value="3">Quarterly</option>
 <option value="6">6 months</option>
 <option value="12">Annual</option>
@@ -326,7 +330,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 </label>
 <label className="iapField">
 <span>Sampling status</span>
-<select name="sampling_status" defaultValue="in_scope">
+<select name="sampling_status" defaultValue={editSite?.sampling_status || "in_scope"}>
 <option value="in_scope">In scope</option>
 <option value="sampled">Selected in sample</option>
 <option value="not_sampled">Not selected this cycle</option>
@@ -337,22 +341,23 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <div className="iapGrid2" style={{marginTop:14}}>
 <label className="iapField">
 <span>Site scope and activities *</span>
-<textarea name="scope_summary" required />
+<textarea name="scope_summary" required defaultValue={editSite?.scope_summary || ""} />
 </label>
 <label className="iapField">
 <span>Sampling / rotation rationale</span>
-<textarea name="sampling_rationale" placeholder="Explain selection, exclusions, central controls, risk, previous performance and rotation over three years." />
+<textarea name="sampling_rationale" placeholder="Explain selection, exclusions, central controls, risk, previous performance and rotation over three years." defaultValue={editSite?.sampling_rationale || ""} />
 </label>
 </div>
 <h3>Standards applicable at this location *</h3>
 <div className="iapStandardGrid">{selectedStandards.map((selected) => <label className="iapCheck" key={selected.standard_id}>
-<input type="checkbox" name="standard_ids" value={selected.standard_id} />
+<input type="checkbox" name="standard_ids" value={selected.standard_id} defaultChecked={editSiteStandardIds.has(selected.standard_id)} />
 <span>
 <strong>{selected.internal_audit_standard_catalogue?.display_name}</strong>
 </span>
 </label>)}</div>
 <div className="iapAction">
-<button className="iapSubmit">Add Controlled Location</button>
+{editSite && <Link className="iapButton ghost" href={`/portal/internal-audit-programme?programme=${programme.id}#sites`} style={{marginRight:10}}>Cancel</Link>}
+<button className="iapSubmit">{editSite ? "Save Location Changes" : "Add Controlled Location"}</button>
 </div>
 </form>{sites.length ? <div className="iapBody" style={{paddingTop:0}}>
 <table className="iapAuditTable">
@@ -363,6 +368,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <th>Applicable standards</th>
 <th>Frequency</th>
 <th>3-year coverage</th>
+<th>Actions</th>
 </tr>
 </thead>
 <tbody>{sites.map((site) => <tr key={site.id}>
@@ -374,11 +380,12 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <td>{label(site.site_type)}<br/>
 <small>{site.business_unit || "—"}</small>
 </td>
-<td>{siteStandards.filter((row) => row.site_id === site.id).length} of {selectedStandards.length}</td>
+<td>{siteStandards.filter((row) => row.site_id === site.id).map((row) => selectedStandards.find((selected) => selected.standard_id === row.standard_id)?.internal_audit_standard_catalogue?.display_name).filter(Boolean).join(", ") || "None recorded"}</td>
 <td>Every {site.minimum_frequency_months} months</td>
 <td>
 <span className={`iapPill ${auditedSiteIds.has(site.id) ? "" : "high"}`}>{auditedSiteIds.has(site.id) ? "Scheduled" : "Gap"}</span>
 </td>
+<td><Link className="iapButton ghost" href={`/portal/internal-audit-programme?programme=${programme.id}&editSite=${site.id}#sites`}>Edit</Link></td>
 </tr>)}</tbody>
 </table>
 </div> : null}</section>
