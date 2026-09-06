@@ -37,6 +37,11 @@ function programmeReference() {
   return `IAP-${year}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
 }
 
+function liveAuditReference() {
+  const stamp = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  return `IA-${stamp}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+}
+
 export async function createProgramme(formData) {
   const { supabase, user } = await context();
   const organizationId = clean(formData.get("organization_id"));
@@ -396,6 +401,107 @@ export async function addPlannedAudit(formData) {
   });
   revalidatePath("/portal/internal-audit-programme");
   redirect(`/portal/internal-audit-programme?programme=${programmeId}&saved=audit#gantt`);
+}
+
+export async function launchProgrammeAudit(formData) {
+  const { supabase, user } = await context();
+  const programmeId = clean(formData.get("programme_id"));
+  const programmeAuditId = clean(formData.get("programme_audit_id"));
+  const programme = await ownedProgramme(supabase, user.id, programmeId);
+  if (programme.status !== "active") throw new Error("Approve the three-year audit programme before launching a live audit.");
+  const { data: plannedAudit, error: plannedError } = await supabase.from("internal_audit_programme_audits")
+    .select("*").eq("id", programmeAuditId).eq("programme_id", programmeId).eq("owner_id", user.id).maybeSingle();
+  if (plannedError) throw new Error(plannedError.message);
+  if (!plannedAudit) throw new Error("The selected planned audit was not found.");
+  if (plannedAudit.linked_audit_id) redirect(`/portal/internal-audits/${plannedAudit.linked_audit_id}`);
+
+  const [clausesResult, auditSitesResult, sitesResult, riskResult] = await Promise.all([
+    supabase.from("internal_audit_programme_audit_clauses").select("standard_id,clause,requirement_summary")
+      .eq("programme_audit_id", programmeAuditId).eq("programme_id", programmeId).eq("owner_id", user.id),
+    supabase.from("internal_audit_programme_audit_sites").select("site_id")
+      .eq("programme_audit_id", programmeAuditId).eq("programme_id", programmeId).eq("owner_id", user.id),
+    supabase.from("internal_audit_programme_sites").select("id,site_code,site_name,country,scope_summary")
+      .eq("programme_id", programmeId).eq("owner_id", user.id),
+    plannedAudit.risk_id ? supabase.from("internal_audit_programme_risks").select("source_fmea_reference,failure_mode,rationale,planning_score")
+      .eq("id", plannedAudit.risk_id).eq("programme_id", programmeId).eq("owner_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+  ]);
+  for (const result of [clausesResult, auditSitesResult, sitesResult, riskResult]) if (result.error) throw new Error(result.error.message);
+  const clauses = clausesResult.data || [];
+  const standardIds = [...new Set(clauses.map((row) => row.standard_id).filter(Boolean))];
+  if (!standardIds.length) throw new Error("Allocate at least one controlled standard clause before launching this audit.");
+  const siteIds = new Set((auditSitesResult.data || []).map((row) => row.site_id));
+  const selectedSites = (sitesResult.data || []).filter((site) => siteIds.has(site.id));
+  if (!selectedSites.length) throw new Error("Allocate at least one controlled location before launching this audit.");
+
+  const reference = liveAuditReference();
+  const startAt = `${plannedAudit.planned_start}T09:00:00.000Z`;
+  const endAt = `${plannedAudit.planned_end}T17:00:00.000Z`;
+  const clauseSummary = clauses.map((row) => `${row.clause}${row.requirement_summary ? ` — ${row.requirement_summary}` : ""}`).join("\n");
+  const siteSummary = selectedSites.map((site) => `${site.site_code} · ${site.site_name}`).join("\n");
+  const risk = riskResult.data;
+  const knownRisk = [
+    risk?.source_fmea_reference ? `FMEA source: ${risk.source_fmea_reference}` : null,
+    risk?.planning_score != null ? `Planning score: ${risk.planning_score}` : null,
+    risk?.failure_mode ? `Failure mode: ${risk.failure_mode}` : null,
+    plannedAudit.rationale ? `Scheduling rationale: ${plannedAudit.rationale}` : null,
+  ].filter(Boolean).join("\n");
+
+  const { data: liveAudit, error: liveError } = await supabase.from("internal_audits").insert({
+    owner_id: user.id,
+    organization_id: programme.organization_id,
+    audit_reference: reference,
+    title: plannedAudit.title,
+    audit_type: plannedAudit.integrated_audit ? "integrated" : "internal_process",
+    audit_method: plannedAudit.audit_method || "onsite",
+    status: "draft",
+    current_gate: "scope",
+    purpose: `Deliver the approved ${programme.programme_reference} risk-based audit plan and obtain evidence against the selected criteria.`,
+    objectives: programme.objectives || `Evaluate the effectiveness and conformity of ${plannedAudit.process_area}.`,
+    scope_statement: `${plannedAudit.process_area}\n\nLocations:\n${siteSummary}\n\nPlanned criteria:\n${clauseSummary}`,
+    sites: siteSummary,
+    departments: plannedAudit.process_area,
+    processes: plannedAudit.process_area,
+    known_risks_changes: knownRisk,
+    planned_start_at: startAt,
+    planned_end_at: endAt,
+  }).select("id").single();
+  if (liveError || !liveAudit) throw new Error(liveError?.message || "Unable to launch the live audit workspace.");
+
+  const { error: standardsError } = await supabase.from("internal_audit_selected_standards").insert(
+    standardIds.map((standardId) => ({ owner_id: user.id, audit_id: liveAudit.id, standard_id: standardId, full_or_partial: "partial" }))
+  );
+  if (standardsError) {
+    await supabase.from("internal_audits").delete().eq("id", liveAudit.id).eq("owner_id", user.id);
+    throw new Error(standardsError.message);
+  }
+
+  await supabase.from("internal_audit_events").insert({
+    owner_id: user.id,
+    audit_id: liveAudit.id,
+    event_type: "audit_created_from_programme",
+    summary: `${reference} launched from ${programme.programme_reference}`,
+    event_data: { programme_id: programmeId, programme_audit_id: programmeAuditId, fmea_reference: risk?.source_fmea_reference || null, clause_count: clauses.length, site_count: selectedSites.length },
+    created_by: user.id,
+  });
+  const { error: linkError } = await supabase.from("internal_audit_programme_audits").update({
+    linked_audit_id: liveAudit.id,
+    status: "scheduled",
+    updated_at: new Date().toISOString(),
+  }).eq("id", programmeAuditId).eq("programme_id", programmeId).eq("owner_id", user.id);
+  if (linkError) throw new Error(linkError.message);
+  await supabase.from("internal_audit_programme_events").insert({
+    owner_id: user.id,
+    programme_id: programmeId,
+    event_type: "audit_launched",
+    summary: `${plannedAudit.title} launched as ${reference}`,
+    event_data: { programme_audit_id: programmeAuditId, linked_audit_id: liveAudit.id, audit_reference: reference },
+    created_by: user.id,
+  });
+
+  revalidatePath("/portal/internal-audit-programme");
+  revalidatePath("/portal/internal-audits");
+  revalidatePath(`/portal/internal-audits/${liveAudit.id}`);
+  redirect(`/portal/internal-audits/${liveAudit.id}?launched=programme`);
 }
 
 export async function approveProgramme(formData) {
