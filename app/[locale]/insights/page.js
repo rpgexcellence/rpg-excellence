@@ -18,6 +18,22 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "008",
+      title:
+        "From Audit Schedule to Accountable Closure: The RPG Intelligence Internal Audit Module",
+      description:
+        "A governed ISO 19011-aligned workspace connecting audit mandate, competence, risk-based planning, objective evidence, findings, CAPA follow-up and controlled closure.",
+      href: "internal-audit-module",
+    },
+    {
+      number: "007",
+      title:
+        "From Root Cause to Organisational Insight: Structured D4 Profiling",
+      description:
+        "How RPG Intelligence combines legacy RCA coding, evidence-led profiling and human validation to produce consistent causal data without forcing unsupported escape or systemic causes.",
+      href: "structured-rca-profiling",
+    },
+    {
       number: "006",
       title:
         "RPG Intelligence Releases ISO/IEC 17024:2026 Readiness Assessment",
