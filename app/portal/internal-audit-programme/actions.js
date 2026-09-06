@@ -92,6 +92,57 @@ export async function createProgramme(formData) {
   redirect(`/portal/internal-audit-programme?programme=${programme.id}&created=1`);
 }
 
+export async function updateProgramme(formData) {
+  const { supabase, user } = await context();
+  const programmeId = clean(formData.get("programme_id"));
+  const existing = await ownedProgramme(supabase, user.id, programmeId);
+  const title = clean(formData.get("title"));
+  const cycleStart = clean(formData.get("cycle_start"));
+  const leadAuditorName = clean(formData.get("lead_auditor_name"));
+  const leadAuditorEmail = clean(formData.get("lead_auditor_email"));
+  const objectives = clean(formData.get("objectives"));
+  const contextAndChange = clean(formData.get("context_and_change"));
+  const siteStructure = clean(formData.get("site_structure"));
+  const systemModel = clean(formData.get("system_model"));
+  const samplingMethod = clean(formData.get("multisite_sampling_method"));
+  const standardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
+  if (!title || !cycleStart || !leadAuditorName || !objectives || !["single_site", "multisite"].includes(siteStructure) || !["integrated", "separate", "hybrid"].includes(systemModel)) {
+    throw new Error("Complete all required programme-mandate fields.");
+  }
+  if (siteStructure === "multisite" && !samplingMethod) throw new Error("Define the multisite sampling and three-year rotation method.");
+  if (standardIds.length !== 5) throw new Error("Select the five controlled programme standards.");
+  const start = new Date(`${cycleStart}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) throw new Error("Enter a valid programme start date.");
+  const end = new Date(start); end.setUTCFullYear(end.getUTCFullYear() + 3); end.setUTCDate(end.getUTCDate() - 1);
+  const cycleEnd = end.toISOString().slice(0, 10);
+  const { data: validStandards, error: validError } = await supabase.from("internal_audit_standard_catalogue")
+    .select("id").in("id", standardIds).eq("active", true);
+  if (validError) throw new Error(validError.message);
+  if ((validStandards || []).length !== 5) throw new Error("One or more programme standards are unavailable.");
+  const { error } = await supabase.from("internal_audit_programmes").update({
+    title, description: objectives, objectives, cycle_start: cycleStart, cycle_end: cycleEnd,
+    start_date: cycleStart, end_date: cycleEnd, lead_auditor_name: leadAuditorName,
+    lead_auditor_email: leadAuditorEmail, programme_owner_name: leadAuditorName,
+    programme_owner_email: leadAuditorEmail, context_and_change: contextAndChange,
+    context_and_priorities: contextAndChange, site_structure: siteStructure, system_model: systemModel,
+    central_functions: clean(formData.get("central_functions")), multisite_sampling_method: samplingMethod,
+    updated_at: new Date().toISOString(),
+  }).eq("id", programmeId).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  const { error: linkError } = await supabase.from("internal_audit_programme_standards").upsert(
+    standardIds.map((standardId) => ({ owner_id: user.id, programme_id: programmeId, standard_id: standardId })),
+    { onConflict: "programme_id,standard_id" }
+  );
+  if (linkError) throw new Error(linkError.message);
+  await supabase.from("internal_audit_programme_events").insert({
+    owner_id: user.id, programme_id: programmeId, event_type: "programme_mandate_updated",
+    summary: "Programme mandate and controlled scope updated by the lead auditor", created_by: user.id,
+    event_data: { previous_structure: existing.site_structure, site_structure: siteStructure, system_model: systemModel, standards: standardIds },
+  });
+  revalidatePath("/portal/internal-audit-programme");
+  redirect(`/portal/internal-audit-programme?programme=${programmeId}&updated=1`);
+}
+
 export async function addProgrammeSite(formData) {
   const { supabase, user } = await context();
   const programmeId = clean(formData.get("programme_id"));
