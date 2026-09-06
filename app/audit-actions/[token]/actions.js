@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "../../../lib/supabase/admin";
+import { RCA_PROFILE_BY_CODE } from "../../../lib/rca-profile-catalog";
 
 const clean = (value) =>
   typeof value === "string" && value.trim()
@@ -23,6 +24,42 @@ const ALLOWED_EVIDENCE_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
+
+const PROFILE_EXTENTS = new Set(["isolated", "process_wide", "site_wide", "organisation_wide", "external_interface"]);
+const CONTROL_LAYERS = new Set(["prevention", "detection", "response", "recovery"]);
+const RECURRENCE_RELATIONSHIPS = new Set(["first_occurrence", "similar_previous", "confirmed_recurrence", "unknown"]);
+const FAILURE_MECHANISMS = new Set([
+  "absent", "inadequate_design", "not_implemented", "inconsistent", "bypassed", "not_understood",
+  "unavailable", "obsolete_after_change", "degraded", "monitoring_failed", "escalation_failed", "prior_action_ineffective",
+]);
+const PROFILE_STANDARDS = new Set(["iso_9001", "iso_14001", "iso_45001", "iso_27001"]);
+
+function parseCauseProfile(formData) {
+  const profileCategory = clean(formData.get("profile_category"));
+  const profileCode = clean(formData.get("profile_code"));
+  const selected = profileCode ? RCA_PROFILE_BY_CODE.get(profileCode) : null;
+  const failureMechanism = clean(formData.get("failure_mechanism"));
+  const affectedProcess = clean(formData.get("affected_process"));
+  const profileExtent = clean(formData.get("profile_extent"));
+  const controlLayer = clean(formData.get("control_layer"));
+  const recurrenceRelationship = clean(formData.get("recurrence_relationship"));
+  const accountableSystemOwner = clean(formData.get("accountable_system_owner"));
+  const profileRationale = clean(formData.get("profile_rationale"));
+  const applicableStandards = [...new Set(formData.getAll("applicable_standards").map(clean).filter((item) => PROFILE_STANDARDS.has(item)))];
+  if (!selected || selected.category !== profileCategory || !FAILURE_MECHANISMS.has(failureMechanism) ||
+      !affectedProcess || !PROFILE_EXTENTS.has(profileExtent) || !CONTROL_LAYERS.has(controlLayer) ||
+      !RECURRENCE_RELATIONSHIPS.has(recurrenceRelationship) || !accountableSystemOwner || !profileRationale ||
+      applicableStandards.length === 0) {
+    throw new Error("Choose a valid legacy code and complete every required RCA profile field.");
+  }
+  return {
+    profile_category: selected.category, profile_code: selected.code, profile_title: selected.title,
+    failure_mechanism: failureMechanism, affected_process: affectedProcess, profile_extent: profileExtent,
+    control_layer: controlLayer, recurrence_relationship: recurrenceRelationship,
+    accountable_system_owner: accountableSystemOwner, applicable_standards: applicableStandards,
+    profile_rationale: profileRationale,
+  };
+}
 
 function safeFileName(name) {
   return String(name || "evidence")
@@ -64,20 +101,17 @@ async function assertDisciplineUnlocked(
 ) {
   if (discipline === 0) return;
 
-  const { count, error } = await supabase
+  const { data: preceding, error } = await supabase
     .from("rca_8d_disciplines")
-    .select("id", { count: "exact", head: true })
+    .select("discipline, status")
     .eq("case_id", caseId)
     .eq("owner_id", userId)
     .lt("discipline", discipline)
-    .lt("completion_score", 100);
+    .order("discipline");
 
   if (error) throw new Error(error.message);
-  if ((count ?? 0) > 0) {
-    throw new Error(
-      `D${discipline} is locked. Complete and approve every preceding discipline first.`
-    );
-  }
+  const blocker = (preceding ?? []).find((item) => item.status !== "approved");
+  if (blocker) redirect(await secureCasePath(caseId, `?d=${blocker.discipline}&locked=1`));
 }
 
 const tokenHash = (token) => createHash("sha256").update(token).digest("hex");
@@ -202,7 +236,7 @@ export async function saveDiscipline(formData) {
       .select("id", { count: "exact", head: true })
       .eq("case_id", caseId)
       .lt("discipline", discipline)
-      .lt("completion_score", 100);
+      .neq("status", "approved");
 
     if (priorError) throw new Error(priorError.message);
     if ((count ?? 0) > 0) {
@@ -244,7 +278,7 @@ export async function saveDiscipline(formData) {
   if (intent === "approve" && discipline === 4) {
     const { data: validatedCauses, error: causesError } = await supabase
       .from("rca_causes")
-      .select("cause_type")
+      .select("id, cause_type, profile_code, profile_rationale")
       .eq("case_id", caseId)
       .eq("owner_id", user.id)
       .eq("status", "validated")
@@ -262,6 +296,9 @@ export async function saveDiscipline(formData) {
     if (missingTypes.length > 0) {
       const modelQuery = modelId ? `&model=${encodeURIComponent(modelId)}` : "";
       redirect(await secureCasePath(caseId, `?d=4${modelQuery}&error=missing_validated_causes&missing=${encodeURIComponent(missingTypes.join(","))}`));
+    }
+    if ((validatedCauses ?? []).some((cause) => !cause.profile_code || !cause.profile_rationale)) {
+      redirect(await secureCasePath(caseId, "?d=4&error=missing_cause_profiles"));
     }
   }
 
@@ -364,12 +401,12 @@ export async function saveDiscipline(formData) {
 
     if (discipline === 8) {
       const { data: completedStages, error: completedStagesError } = await supabase
-        .from("rca_8d_disciplines").select("discipline, narrative, completion_score")
+        .from("rca_8d_disciplines").select("discipline, narrative, status")
         .eq("case_id", caseId).eq("owner_id", user.id).order("discipline");
       if (completedStagesError) throw new Error(completedStagesError.message);
       const byNumber = new Map((completedStages ?? []).map((item) => [item.discipline, item]));
       const missing = Array.from({ length: 9 }, (_, number) => number)
-        .filter((number) => Number(byNumber.get(number)?.completion_score || 0) < 100 || !byNumber.get(number)?.narrative?.trim());
+        .filter((number) => byNumber.get(number)?.status !== "approved" || !byNumber.get(number)?.narrative?.trim());
       if (missing.length) {
         redirect(await secureCasePath(caseId, `?d=8&error=incomplete_8d&missing=${missing.join(",")}`));
       }
@@ -465,6 +502,7 @@ export async function addCauseHypothesis(formData) {
 
   await getOwnedCase(supabase, user.id, caseId);
   await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
+  const profile = parseCauseProfile(formData);
   const whyChain = [1, 2, 3, 4, 5].map((number) =>
     clean(formData.get(`why_${number}`))
   );
@@ -495,6 +533,7 @@ export async function addCauseHypothesis(formData) {
       why_chain: completedWhys,
       status: "hypothesis",
       proposed_by_ai: false,
+      ...profile,
     });
 
   if (error) throw new Error(error.message);
@@ -522,6 +561,17 @@ export async function reviewCauseHypothesis(formData) {
 
   await getOwnedCase(supabase, user.id, caseId);
   await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
+
+  if (decision === "validate") {
+    const { data: profiledCause, error: profileError } = await supabase
+      .from("rca_causes")
+      .select("profile_code, profile_rationale")
+      .eq("id", causeId).eq("case_id", caseId).eq("owner_id", user.id).maybeSingle();
+    if (profileError) throw new Error(profileError.message);
+    if (!profiledCause?.profile_code || !profiledCause?.profile_rationale) {
+      redirect(await secureCasePath(caseId, `?d=4&error=cause_profile_required&cause=${encodeURIComponent(causeId)}`));
+    }
+  }
 
   const validated = decision === "validate";
   const now = new Date().toISOString();
@@ -556,6 +606,39 @@ export async function reviewCauseHypothesis(formData) {
     },
   });
 
+  revalidatePath(`/portal/rca/${caseId}`);
+  const modelQuery = modelId ? `&model=${encodeURIComponent(modelId)}` : "";
+  redirect(await secureCasePath(caseId, `?d=4${modelQuery}`));
+}
+
+export async function saveCauseProfile(formData) {
+  const { supabase, user } = await context();
+  const caseId = clean(formData.get("case_id"));
+  const causeId = clean(formData.get("cause_id"));
+  const modelId = clean(formData.get("model_id"));
+  if (!caseId || !causeId) throw new Error("Missing RCA cause profile reference.");
+  await getOwnedCase(supabase, user.id, caseId);
+  await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
+  const profile = parseCauseProfile(formData);
+  const { data: cause, error: causeError } = await supabase
+    .from("rca_causes").select("id, cause_type, status")
+    .eq("id", causeId).eq("case_id", caseId).eq("owner_id", user.id).maybeSingle();
+  if (causeError) throw new Error(causeError.message);
+  if (!cause) throw new Error("Cause hypothesis not found.");
+  const wasValidated = cause.status === "validated";
+  const update = { ...profile };
+  if (wasValidated) Object.assign(update, {
+    status: "under_test", validation_method: null, validation_result: null,
+    validated_by: null, validated_at: null,
+  });
+  const { error } = await supabase.from("rca_causes").update(update)
+    .eq("id", causeId).eq("case_id", caseId).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  await supabase.from("rca_case_events").insert({
+    case_id: caseId, owner_id: user.id, event_type: "cause_profile_saved", discipline: 4,
+    summary: `${cause.cause_type} cause profiled as ${profile.profile_code}`,
+    event_data: { cause_id: causeId, ...profile, validation_reopened: wasValidated },
+  });
   revalidatePath(`/portal/rca/${caseId}`);
   const modelQuery = modelId ? `&model=${encodeURIComponent(modelId)}` : "";
   redirect(await secureCasePath(caseId, `?d=4${modelQuery}`));
