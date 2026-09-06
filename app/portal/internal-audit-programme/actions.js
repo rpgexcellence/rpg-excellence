@@ -205,13 +205,20 @@ export async function updateProgrammeSite(formData) {
   const siteId = clean(formData.get("site_id"));
   await ownedProgramme(supabase, user.id, programmeId);
   const { data: existingSite, error: existingError } = await supabase.from("internal_audit_programme_sites")
-    .select("id,site_name").eq("id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id).maybeSingle();
+    .select("id,site_code,site_name,scope_summary").eq("id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id).maybeSingle();
   if (existingError) throw new Error(existingError.message);
   if (!existingSite) throw new Error("Controlled programme location not found.");
-  const siteCode = clean(formData.get("site_code"));
-  const siteName = clean(formData.get("site_name"));
-  const scopeSummary = clean(formData.get("scope_summary"));
-  const standardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
+  const { data: existingStandards, error: existingStandardsError } = await supabase
+    .from("internal_audit_programme_site_standards").select("standard_id")
+    .eq("site_id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id);
+  if (existingStandardsError) throw new Error(existingStandardsError.message);
+  const siteCode = clean(formData.get("site_code")) || existingSite.site_code;
+  const siteName = clean(formData.get("site_name")) || existingSite.site_name;
+  const scopeSummary = clean(formData.get("scope_summary")) || existingSite.scope_summary;
+  const submittedStandardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
+  const standardIds = submittedStandardIds.length
+    ? submittedStandardIds
+    : (existingStandards || []).map((row) => row.standard_id);
   if (!siteCode || !siteName || !scopeSummary || !standardIds.length) {
     throw new Error("Site code, site name, scope and at least one applicable standard are required.");
   }
@@ -231,10 +238,6 @@ export async function updateProgrammeSite(formData) {
     minimum_frequency_months: frequency, updated_at: new Date().toISOString(),
   }).eq("id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
-  const { data: existingStandards, error: existingStandardsError } = await supabase
-    .from("internal_audit_programme_site_standards").select("standard_id")
-    .eq("site_id", siteId).eq("programme_id", programmeId).eq("owner_id", user.id);
-  if (existingStandardsError) throw new Error(existingStandardsError.message);
   const removedStandardIds = (existingStandards || [])
     .map((row) => row.standard_id).filter((standardId) => !standardIds.includes(standardId));
   if (removedStandardIds.length) {
