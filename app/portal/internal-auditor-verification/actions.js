@@ -112,8 +112,8 @@ export async function saveVerificationAssessment(formData) {
     const raw = clean(formData.get(`score_${criterion.number}`));
     const notes = clean(formData.get(`notes_${criterion.number}`));
     if (!raw || !["0", "1", "2", "na"].includes(raw)) throw new Error(`Score criterion ${criterion.number}.`);
+    if (!notes) throw new Error(`Record objective evidence and assessor rationale for criterion ${criterion.number}.`);
     if (raw === "na") {
-      if (!notes) throw new Error(`Criterion ${criterion.number} is N/A; record the justification.`);
       return { ...criterion, score: "na", notes };
     }
     const score = Number(raw); total += score * criterion.weight; maximum += 2 * criterion.weight;
@@ -151,4 +151,3 @@ export async function saveVerificationAssessment(formData) {
   revalidatePath("/portal/internal-auditor-verification");
   redirect(`/portal/internal-auditor-verification?saved=assessment&assessment=${assessment.id}`);
 }
-
