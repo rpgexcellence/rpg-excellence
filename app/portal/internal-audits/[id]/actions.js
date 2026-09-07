@@ -315,21 +315,14 @@ export async function addAuditTeamMember(
     formData.get("audit_id")
   );
 
-  const memberName = clean(
-    formData.get("member_name")
-  );
-
-  const email = clean(
-    formData.get("email")
-  );
+  const auditorRegisterId = clean(formData.get("auditor_register_id"));
 
   if (
     !auditId ||
-    !memberName ||
-    !email
+    !auditorRegisterId
   ) {
     throw new Error(
-      "Team member name and email are required."
+      "Select a verified internal auditor."
     );
   }
 
@@ -344,6 +337,21 @@ export async function addAuditTeamMember(
       "Approve the audit scope before assigning the audit team."
     );
   }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: controlledAuditor, error: auditorError }, { data: selectedStandards, error: standardsError }] = await Promise.all([
+    supabase.from("internal_auditor_register").select("id, full_name, email, verification_status, verified_until, active, standards_competence:internal_auditor_standard_authorisations(standard_id, authorisation_status, authorised_until)").eq("id", auditorRegisterId).eq("owner_id", user.id).eq("organization_id", audit.organization_id).maybeSingle(),
+    supabase.from("internal_audit_selected_standards").select("standard_id").eq("audit_id", auditId).eq("owner_id", user.id),
+  ]);
+  if (auditorError || standardsError) throw new Error(auditorError?.message || standardsError?.message);
+  if (!controlledAuditor || !controlledAuditor.active || controlledAuditor.verification_status !== "verified" || !controlledAuditor.verified_until || controlledAuditor.verified_until < today) {
+    throw new Error("This person is not currently verified and confirmed for audit assignment.");
+  }
+  const authorised = new Set((controlledAuditor.standards_competence || []).filter((item) => item.authorisation_status === "authorised" && (!item.authorised_until || item.authorised_until >= today)).map((item) => item.standard_id));
+  const missingStandards = (selectedStandards || []).filter((item) => !authorised.has(item.standard_id));
+  if (missingStandards.length) throw new Error("The selected auditor is not authorised for every standard in this audit. Adjust the audit role/scope or complete competence verification first.");
+  const memberName = controlledAuditor.full_name;
+  const email = controlledAuditor.email;
 
   const auditRole =
     clean(
@@ -382,6 +390,9 @@ export async function addAuditTeamMember(
       audit_id:
         auditId,
 
+      auditor_register_id:
+        auditorRegisterId,
+
       member_name:
         memberName,
 
@@ -418,10 +429,7 @@ export async function addAuditTeamMember(
           )
         ),
 
-      competence_confirmed:
-        formData.get(
-          "competence_confirmed"
-        ) === "on",
+      competence_confirmed: true,
 
       independence_confirmed:
         formData.get(
