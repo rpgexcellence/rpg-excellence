@@ -1,22 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AUDITOR_ASSESSMENT_CRITERIA, SCORE_GUIDANCE } from "./assessmentModel";
+import { AUDITOR_ASSESSMENT_CRITERIA, SCORE_GUIDANCE, calculateAuditorAssessment } from "./assessmentModel";
 
 export default function VerificationAssessmentForm({ action, auditors, audits, organizationId, selectedAuditorId, quarterly }) {
   const [scores, setScores] = useState(Object.fromEntries(AUDITOR_ASSESSMENT_CRITERIA.map((item) => [item.number, ""])))
-  const calculation = useMemo(() => {
-    let total = 0; let maximum = 0; let criticalZeros = 0; let complete = true;
-    for (const criterion of AUDITOR_ASSESSMENT_CRITERIA) {
-      const score = scores[criterion.number];
-      if (score === "") complete = false;
-      if (score !== "" && score !== "na") { total += Number(score) * criterion.weight; maximum += 2 * criterion.weight; }
-      if (criterion.critical && score === "0") criticalZeros += 1;
-    }
-    const percentage = maximum ? Math.round((total / maximum) * 1000) / 10 : 0;
-    const outcome = complete ? percentage >= 50 && criticalZeros === 0 ? "verified" : percentage >= 50 ? "conditional" : "not_verified" : "pending";
-    return { total, maximum, percentage, criticalZeros, outcome, complete };
-  }, [scores]);
+  const calculation = useMemo(() => calculateAuditorAssessment(scores), [scores]);
 
   return <form action={action} className="avAssessment">
     <input type="hidden" name="organization_id" value={organizationId} />
@@ -46,6 +35,11 @@ export default function VerificationAssessmentForm({ action, auditors, audits, o
       </article>)}
     </div>
     <section className={`avResult ${calculation.outcome}`}><div><small>Controlled result</small><strong>{calculation.complete ? `${calculation.percentage}% · ${calculation.outcome.replace("_", " ")}` : "Complete all 18 criteria"}</strong></div><div><small>Weighted score</small><strong>{calculation.total} / {calculation.maximum}</strong></div><div><small>Critical zeros</small><strong>{calculation.criticalZeros}</strong></div></section>
+    <section style={{padding:"18px 20px",border:"1px solid #b9cce2",borderLeft:"5px solid #1761e8",borderRadius:12,background:"#f7faff"}} aria-live="polite">
+      <small style={{display:"block",marginBottom:8,color:"#1761e8",fontWeight:900,letterSpacing:".08em"}}>AUTOMATED SCORE EXPLANATION</small>
+      <p style={{margin:0,whiteSpace:"pre-line",color:"#29445f",fontSize:14,lineHeight:1.65}}>{calculation.explanation}</p>
+      <input type="hidden" name="automated_score_explanation" value={calculation.explanation} />
+    </section>
     <div className="avGrid2">
       <label><span>Evidence reviewed *</span><textarea name="evidence_reviewed" required placeholder="Audit plan, agenda, completed checklist, evidence records, findings, report and meeting records." /></label>
       <label><span>Lead-auditor conclusion *</span><textarea name="assessor_conclusion" required placeholder="Explain why the evidence supports the decision and any competence limitations." /></label>
