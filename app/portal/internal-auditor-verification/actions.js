@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
-import { AUDITOR_ASSESSMENT_CRITERIA } from "./assessmentModel";
+import { AUDITOR_ASSESSMENT_CRITERIA, calculateAuditorAssessment } from "./assessmentModel";
 
 const clean = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
 const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || "");
@@ -123,6 +123,7 @@ export async function saveVerificationAssessment(formData) {
   const percentage = maximum ? Number(((total / maximum) * 100).toFixed(2)) : 0;
   const requestedOutcome = clean(formData.get("outcome"));
   const calculatedOutcome = percentage >= 50 && criticalZeros === 0 ? "verified" : percentage >= 50 ? "conditional" : "not_verified";
+  const automated = calculateAuditorAssessment(Object.fromEntries(results.map((item) => [item.number, item.score])));
   if (requestedOutcome !== calculatedOutcome) throw new Error(`The controlled result is ${calculatedOutcome.replace("_", " ")} (${percentage}%, ${criticalZeros} critical zero(s)). Refresh and confirm that outcome.`);
   const assessmentDate = new Date().toISOString().slice(0, 10);
   const validUntil = new Date(); validUntil.setUTCMonth(validUntil.getUTCMonth() + validityMonths);
@@ -131,7 +132,7 @@ export async function saveVerificationAssessment(formData) {
     assessment_reference: reference("IAVA"), selection_type: selectionType, quarter_key: selectionType === "quarterly_random" ? quarterKey() : null,
     assessor_name: assessorName, assessment_date: assessmentDate, criteria_results: results, weighted_score: total,
     maximum_score: maximum, percentage_score: percentage, critical_zero_count: criticalZeros,
-    evidence_reviewed: evidence, assessor_conclusion: conclusion, coaching_actions: clean(formData.get("coaching_actions")),
+    evidence_reviewed: evidence, assessor_conclusion: `${conclusion}\n\nAutomated score explanation:\n${automated.explanation}`, coaching_actions: clean(formData.get("coaching_actions")),
     outcome: calculatedOutcome, validity_months: validityMonths, confirmed_by_lead_auditor: true, confirmed_at: new Date().toISOString(),
   }).select("id").single();
   if (error) throw new Error(error.message);
