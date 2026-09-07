@@ -1,0 +1,49 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { AUDITOR_ASSESSMENT_CRITERIA, SCORE_GUIDANCE } from "./assessmentModel";
+
+export default function VerificationAssessmentForm({ action, auditors, audits, organizationId, selectedAuditorId, quarterly }) {
+  const [scores, setScores] = useState(Object.fromEntries(AUDITOR_ASSESSMENT_CRITERIA.map((item) => [item.number, ""])))
+  const calculation = useMemo(() => {
+    let total = 0; let maximum = 0; let criticalZeros = 0; let complete = true;
+    for (const criterion of AUDITOR_ASSESSMENT_CRITERIA) {
+      const score = scores[criterion.number];
+      if (score === "") complete = false;
+      if (score !== "" && score !== "na") { total += Number(score) * criterion.weight; maximum += 2 * criterion.weight; }
+      if (criterion.critical && score === "0") criticalZeros += 1;
+    }
+    const percentage = maximum ? Math.round((total / maximum) * 1000) / 10 : 0;
+    const outcome = complete ? percentage >= 50 && criticalZeros === 0 ? "verified" : percentage >= 50 ? "conditional" : "not_verified" : "pending";
+    return { total, maximum, percentage, criticalZeros, outcome, complete };
+  }, [scores]);
+
+  return <form action={action} className="avAssessment">
+    <input type="hidden" name="organization_id" value={organizationId} />
+    <input type="hidden" name="selection_type" value={quarterly ? "quarterly_random" : "manual"} />
+    <input type="hidden" name="outcome" value={calculation.outcome} />
+    <div className="avGrid3">
+      <label><span>Auditor being assessed *</span><select name="auditor_id" required defaultValue={selectedAuditorId || ""}><option value="">Select auditor</option>{auditors.map((auditor) => <option key={auditor.id} value={auditor.id}>{auditor.full_name} · {auditor.auditor_reference}</option>)}</select></label>
+      <label><span>Completed audit sampled *</span><select name="sampled_audit_id" required defaultValue=""><option value="">Select completed audit</option>{audits.map((audit) => <option key={audit.id} value={audit.id}>{audit.audit_reference} · {audit.title}</option>)}</select></label>
+      <label><span>Assessing lead auditor *</span><input name="assessor_name" required /></label>
+    </div>
+    <div className="avScoreGuide"><b>Scoring:</b>{Object.entries(SCORE_GUIDANCE).map(([score, text]) => <span key={score}><strong>{score.toUpperCase()}</strong> {text}</span>)}</div>
+    <div className="avCriteria">
+      {AUDITOR_ASSESSMENT_CRITERIA.map((criterion) => <article key={criterion.number} className={criterion.critical ? "critical" : ""}>
+        <div className="avCriterionTitle"><b>{String(criterion.number).padStart(2, "0")}</b><div><strong>{criterion.title}</strong><small>Weight {criterion.weight}{criterion.critical ? " · Critical control" : ""}</small></div></div>
+        <label><span>Score *</span><select name={`score_${criterion.number}`} required value={scores[criterion.number]} onChange={(event) => setScores((current) => ({ ...current, [criterion.number]: event.target.value }))}><option value="">Select</option><option value="2">2 — demonstrated</option><option value="1">1 — partial</option><option value="0">0 — not demonstrated</option><option value="na">N/A — justified</option></select></label>
+        <label><span>Objective evidence / assessor note{scores[criterion.number] === "na" ? " *" : ""}</span><textarea name={`notes_${criterion.number}`} required={scores[criterion.number] === "na"} rows={2} /></label>
+      </article>)}
+    </div>
+    <section className={`avResult ${calculation.outcome}`}><div><small>Controlled result</small><strong>{calculation.complete ? `${calculation.percentage}% · ${calculation.outcome.replace("_", " ")}` : "Complete all 18 criteria"}</strong></div><div><small>Weighted score</small><strong>{calculation.total} / {calculation.maximum}</strong></div><div><small>Critical zeros</small><strong>{calculation.criticalZeros}</strong></div></section>
+    <div className="avGrid2">
+      <label><span>Evidence reviewed *</span><textarea name="evidence_reviewed" required placeholder="Audit plan, agenda, completed checklist, evidence records, findings, report and meeting records." /></label>
+      <label><span>Lead-auditor conclusion *</span><textarea name="assessor_conclusion" required placeholder="Explain why the evidence supports the decision and any competence limitations." /></label>
+      <label><span>Coaching, mentoring or restrictions</span><textarea name="coaching_actions" placeholder="Required for a failed or conditional result and any critical zero." /></label>
+      <label><span>Verification validity</span><select name="validity_months" defaultValue="12"><option value="6">6 months</option><option value="12">12 months</option><option value="24">24 months</option><option value="36">36 months</option></select></label>
+    </div>
+    <label className="avConfirm"><input type="checkbox" name="lead_confirmation" required /><span>I confirm I reviewed the sampled audit record and objective evidence, applied the controlled scoring criteria, considered independence and accept accountability for this verification decision.</span></label>
+    <button className="avPrimary" disabled={!calculation.complete || calculation.outcome === "pending"}>Record Controlled Verification</button>
+  </form>;
+}
+
