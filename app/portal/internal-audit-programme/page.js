@@ -104,6 +104,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <Link href="/portal/internal-audits">Audit Command Centre</Link>
 <Link href="/portal/internal-audit-programme" className="active">3-Year Audit Programme</Link>
 <Link href="/portal/internal-audit-fmea-planning">FMEA Risk Planning</Link>
+<Link href="/portal/internal-auditor-verification">Auditor Verification</Link>
 </div>
 <SideLink href="/portal/internal-audit-actions">Findings & Actions</SideLink>
 <SideLink href="/portal/rca">CAPA-8D</SideLink>
