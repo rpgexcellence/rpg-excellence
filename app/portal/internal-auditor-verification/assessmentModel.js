@@ -119,3 +119,59 @@ export const SCORE_GUIDANCE = {
   0: "Not demonstrated, incorrect or unsupported",
   na: "Only where genuinely inapplicable; justification is mandatory",
 };
+
+export function calculateAuditorAssessment(scores) {
+  let total = 0;
+  let maximum = 0;
+  let criticalZeros = 0;
+  let complete = true;
+  const strengths = [];
+  const partial = [];
+  const failed = [];
+  const excluded = [];
+
+  for (const item of AUDITOR_ASSESSMENT_CRITERIA) {
+    const score = scores[item.number];
+    if (score === undefined || score === null || score === "") complete = false;
+    if (score === "na") {
+      excluded.push(item.title);
+      continue;
+    }
+    if (score !== undefined && score !== null && score !== "") {
+      const numeric = Number(score);
+      total += numeric * item.weight;
+      maximum += 2 * item.weight;
+      if (numeric === 2) strengths.push(item.title);
+      if (numeric === 1) partial.push(item.title);
+      if (numeric === 0) failed.push(item.title);
+      if (item.critical && numeric === 0) criticalZeros += 1;
+    }
+  }
+
+  const percentage = maximum ? Math.round((total / maximum) * 1000) / 10 : 0;
+  const outcome = complete
+    ? percentage >= 50 && criticalZeros === 0
+      ? "verified"
+      : percentage >= 50
+        ? "conditional"
+        : "not_verified"
+    : "pending";
+  const thresholdMargin = Math.round((percentage - 50) * 10) / 10;
+  const list = (items) => items.length ? items.join("; ") : "None";
+  const explanation = complete
+    ? [
+        `The weighted result is ${percentage}% (${total} of ${maximum}), ${Math.abs(thresholdMargin)} percentage point${Math.abs(thresholdMargin) === 1 ? "" : "s"} ${thresholdMargin >= 0 ? "above" : "below"} the 50% minimum.`,
+        outcome === "verified"
+          ? "The calculated outcome is Verified because the minimum score is achieved and no applicable critical criterion scored zero."
+          : outcome === "conditional"
+            ? `The calculated outcome is Conditional because ${criticalZeros} applicable critical criterion${criticalZeros === 1 ? " has" : "s have"} scored zero; coaching, restriction and reassessment are required before unrestricted assignment.`
+            : "The calculated outcome is Not verified because the weighted score is below the minimum requirement.",
+        `Fully demonstrated controls: ${list(strengths)}.`,
+        `Partially demonstrated controls requiring improvement: ${list(partial)}.`,
+        `Controls not demonstrated: ${list(failed)}.`,
+        `Criteria excluded as N/A: ${list(excluded)}.`,
+      ].join("\n")
+    : "Complete all 18 criteria to generate the controlled score explanation.";
+
+  return { total, maximum, percentage, criticalZeros, outcome, complete, strengths, partial, failed, excluded, explanation };
+}
