@@ -30,9 +30,19 @@ export default function VerificationAssessmentForm({ action, auditors, audits, o
     <div className="avScoreGuide"><b>Scoring:</b>{Object.entries(SCORE_GUIDANCE).map(([score, text]) => <span key={score}><strong>{score.toUpperCase()}</strong> {text}</span>)}</div>
     <div className="avCriteria">
       {AUDITOR_ASSESSMENT_CRITERIA.map((criterion) => <article key={criterion.number} className={criterion.critical ? "critical" : ""}>
-        <div className="avCriterionTitle"><b>{String(criterion.number).padStart(2, "0")}</b><div><strong>{criterion.title}</strong><small>Weight {criterion.weight}{criterion.critical ? " · Critical control" : ""}</small></div></div>
+        <div className="avCriterionContext">
+          <div className="avCriterionTitle"><b>{String(criterion.number).padStart(2, "0")}</b><div><strong>{criterion.title}</strong><small>Weight {criterion.weight}{criterion.critical ? " · Critical control" : ""}</small></div></div>
+          <p className="avCriterionPrompt"><strong>Assess:</strong> {criterion.criteria}</p>
+          <p className="avEvidenceExpected"><strong>Evidence expected:</strong> {criterion.evidence}</p>
+          <div className="avSpecificScores" aria-label={`Scoring guidance for ${criterion.title}`}>
+            <p><b>2</b><span>{criterion.scores[2]}</span></p>
+            <p><b>1</b><span>{criterion.scores[1]}</span></p>
+            <p><b>0</b><span>{criterion.scores[0]}</span></p>
+            <p><b>N/A</b><span>Use only when this activity genuinely did not arise within the sampled audit; explain why exclusion does not weaken the assessment.</span></p>
+          </div>
+        </div>
         <label><span>Score *</span><select name={`score_${criterion.number}`} required value={scores[criterion.number]} onChange={(event) => setScores((current) => ({ ...current, [criterion.number]: event.target.value }))}><option value="">Select</option><option value="2">2 — demonstrated</option><option value="1">1 — partial</option><option value="0">0 — not demonstrated</option><option value="na">N/A — justified</option></select></label>
-        <label><span>Objective evidence / assessor note{scores[criterion.number] === "na" ? " *" : ""}</span><textarea name={`notes_${criterion.number}`} required={scores[criterion.number] === "na"} rows={2} /></label>
+        <label><span>Objective evidence / assessor rationale *</span><textarea name={`notes_${criterion.number}`} required rows={3} placeholder={scores[criterion.number] === "na" ? "Explain why this criterion did not arise and why exclusion does not weaken the assessment." : "Reference the records sampled and explain why they support the selected score."} /></label>
       </article>)}
     </div>
     <section className={`avResult ${calculation.outcome}`}><div><small>Controlled result</small><strong>{calculation.complete ? `${calculation.percentage}% · ${calculation.outcome.replace("_", " ")}` : "Complete all 18 criteria"}</strong></div><div><small>Weighted score</small><strong>{calculation.total} / {calculation.maximum}</strong></div><div><small>Critical zeros</small><strong>{calculation.criticalZeros}</strong></div></section>
@@ -46,4 +56,3 @@ export default function VerificationAssessmentForm({ action, auditors, audits, o
     <button className="avPrimary" disabled={!calculation.complete || calculation.outcome === "pending"}>Record Controlled Verification</button>
   </form>;
 }
-
