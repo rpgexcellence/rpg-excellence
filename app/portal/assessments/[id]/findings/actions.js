@@ -15,6 +15,7 @@ import {
 import {
   createAdminClient,
 } from "../../../../../lib/supabase/admin";
+import { requireAssessmentWriteAccess } from "../../../../../lib/assessment-access";
 
 const FINDING_STATUSES = [
   "open",
@@ -84,6 +85,8 @@ async function getOwnedAssessment({
       "Assessment not found."
     );
   }
+
+  await requireAssessmentWriteAccess(userId, assessmentId);
 
   return assessment;
 }
