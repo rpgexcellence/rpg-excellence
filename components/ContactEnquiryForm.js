@@ -47,8 +47,13 @@ const initialForm = {
   website: "",
 };
 
-export default function ContactEnquiryForm({ locale = "en", source = "contact-page" }) {
-  const [form, setForm] = useState(initialForm);
+export default function ContactEnquiryForm({ locale = "en", source = "contact-page", initialStandard = "", initialTopic = "" }) {
+  const startingForm = {
+    ...initialForm,
+    topic: initialTopic || "",
+    standards: initialStandard && standards.includes(initialStandard) ? [initialStandard] : [],
+  };
+  const [form, setForm] = useState(startingForm);
   const [status, setStatus] = useState("idle");
   const [notice, setNotice] = useState("");
 
@@ -81,7 +86,7 @@ export default function ContactEnquiryForm({ locale = "en", source = "contact-pa
       if (!response.ok) throw new Error(result?.error || "Unable to send your enquiry.");
       setStatus("success");
       setNotice(`Thank you. Your enquiry reference is ${result.reference}. We will respond using your preferred contact method.`);
-      setForm(initialForm);
+      setForm(startingForm);
     } catch (error) {
       setStatus("error");
       setNotice(error?.message || "Unable to send your enquiry. Please email info@rpgexcellence.com.");
