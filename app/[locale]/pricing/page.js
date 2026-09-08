@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import PageShell from "../../../components/PageShell";
 import SubscribeButton from "../../../components/SubscribeButton";
+import SingleAssessmentButton from "../../../components/SingleAssessmentButton";
 import { locales } from "../../../lib/i18n";
 
 export const metadata = {
@@ -137,6 +138,14 @@ export default async function Pricing({
               </div>
             </div>
           </div>
+
+          <section className="priceCard" style={{marginTop:32,maxWidth:820,marginInline:"auto",border:"2px solid #2d63eb"}}>
+            <span>ONE-OFF ACCESS</span>
+            <h2 style={{margin:"10px 0"}}>Single ISO Assessment · £129</h2>
+            <p>Complete one structured assessment without starting a subscription. Includes one organisation, one selected standard, 30 days to complete and continued read-only access to the retained result.</p>
+            <ul><li>One assessment against the standard selected at checkout</li><li>Executive assessment result and evidence trail</li><li>No recurring payment</li><li>Internal Audit, CAPA-8D and programme modules require a subscription</li></ul>
+            <SingleAssessmentButton />
+          </section>
 
           <p
             style={{
