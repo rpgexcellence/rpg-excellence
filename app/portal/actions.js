@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
 import {
   getUserSubscription,
+  getAvailableAssessmentPasses,
   hasActiveSubscription,
 } from "../../lib/subscription";
 
@@ -100,15 +101,7 @@ export async function createAssessment(formData) {
       user.id
     );
 
-  if (
-    !hasActiveSubscription(
-      subscription
-    )
-  ) {
-    redirect(
-      "/en/pricing?subscription=required"
-    );
-  }
+  const subscribed = hasActiveSubscription(subscription);
 
   // --------------------------------------------------
   // READ AND VALIDATE FORM VALUES
@@ -154,6 +147,10 @@ export async function createAssessment(formData) {
       "The selected ISO standard is not available."
     );
   }
+
+  const passes = subscribed ? [] : await getAvailableAssessmentPasses(user.id);
+  const pass = passes.find((item) => item.standard === standard) ?? null;
+  if (!subscribed && !pass) redirect(`/en/pricing?assessment=required&standard=${encodeURIComponent(standard)}`);
 
   // --------------------------------------------------
   // VERIFY ORGANISATION OWNERSHIP
@@ -207,6 +204,19 @@ export async function createAssessment(formData) {
     throw new Error(
       error.message
     );
+  }
+
+  if (pass) {
+    const { createAdminClient } = await import("../../lib/supabase/admin");
+    const admin = createAdminClient();
+    const now = new Date().toISOString();
+    const { data: claimed, error: claimError } = await admin.from("assessment_passes")
+      .update({ status: "redeemed", assessment_id: data.id, organization_id: organizationId, redeemed_at: now, updated_at: now })
+      .eq("id", pass.id).eq("owner_id", user.id).eq("status", "available").gt("access_expires_at", now).select("id").maybeSingle();
+    if (claimError || !claimed) {
+      await admin.from("assessments").delete().eq("id", data.id).eq("owner_id", user.id);
+      throw new Error("This assessment purchase has already been used or has expired.");
+    }
   }
 
   redirect(
