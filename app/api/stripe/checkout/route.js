@@ -1,9 +1,7 @@
 import Stripe from "stripe";
 import { createClient } from "../../../../lib/supabase/server";
 
-const stripe = new Stripe(
-  process.env.STRIPE_SECRET_KEY
-);
+function getStripe() { return new Stripe(process.env.STRIPE_SECRET_KEY); }
 
 const PRICE_IDS = {
   starter:
@@ -15,9 +13,11 @@ const PRICE_IDS = {
   consultant:
     "price_1U5WmuD5EtNcxgfB5KYndk8X",
 };
+const ASSESSMENT_STANDARDS = ["ISO 9001:2015/Amd 1:2024", "ISO 14001:2026", "ISO 45001:2018", "ISO/IEC 17024:2026"];
 
 export async function POST(request) {
   try {
+    const stripe = getStripe();
     // -----------------------------------------------
     // VERIFY SIGNED-IN USER
     // -----------------------------------------------
@@ -50,6 +50,8 @@ export async function POST(request) {
     const body =
       await request.json();
 
+    const purchaseType = body?.purchaseType === "single_assessment" ? "single_assessment" : "subscription";
+
     const plan =
       typeof body?.plan === "string"
         ? body.plan
@@ -60,7 +62,13 @@ export async function POST(request) {
     const priceId =
       PRICE_IDS[plan];
 
-    if (!priceId) {
+    const standard = typeof body?.standard === "string" ? body.standard.trim() : "";
+
+    if (purchaseType === "single_assessment" && !ASSESSMENT_STANDARDS.includes(standard)) {
+      return Response.json({ error: "Invalid assessment standard." }, { status: 400 });
+    }
+
+    if (purchaseType === "subscription" && !priceId) {
       return Response.json(
         {
           error:
@@ -112,15 +120,24 @@ export async function POST(request) {
     // CREATE STRIPE CHECKOUT SESSION
     // -----------------------------------------------
 
-    const session =
-      await stripe.checkout.sessions.create({
+    const shared = {
+      customer_email: user.email ?? undefined,
+      client_reference_id: user.id,
+      success_url: `${origin}/portal/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/en/pricing?checkout=cancelled`,
+      billing_address_collection: "auto",
+    };
+
+    const session = purchaseType === "single_assessment"
+      ? await stripe.checkout.sessions.create({
+        ...shared,
+        mode: "payment",
+        line_items: [{ price_data: { currency: "gbp", unit_amount: 12900, product_data: { name: `RPG Intelligence ${standard} Assessment`, description: "One assessment with 30-day completion access and retained read-only results." } }, quantity: 1 }],
+        metadata: { purchase_type: "single_assessment", owner_id: user.id, organization_id: organization?.id ?? "", standard },
+      })
+      : await stripe.checkout.sessions.create({
+        ...shared,
         mode: "subscription",
-
-        customer_email:
-          user.email ?? undefined,
-
-        client_reference_id:
-          user.id,
 
         line_items: [
           {
@@ -130,6 +147,7 @@ export async function POST(request) {
         ],
 
         metadata: {
+          purchase_type: "subscription",
           owner_id: user.id,
           plan,
           price_id: priceId,
@@ -151,17 +169,9 @@ export async function POST(request) {
           },
         },
 
-        success_url:
-          `${origin}/portal/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-
-        cancel_url:
-          `${origin}/en/pricing?checkout=cancelled`,
-
         allow_promotion_codes:
           true,
 
-        billing_address_collection:
-          "auto",
       });
 
     if (!session.url) {
