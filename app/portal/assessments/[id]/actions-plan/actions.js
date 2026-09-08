@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { requireAssessmentWriteAccess } from "../../../../../lib/assessment-access";
 
 const PRIORITIES = [
   "critical",
@@ -110,6 +111,8 @@ export async function updateManagementAction(
       "Assessment not found."
     );
   }
+
+  await requireAssessmentWriteAccess(user.id, assessmentId);
 
   const admin = createAdminClient();
 
