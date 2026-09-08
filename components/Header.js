@@ -43,6 +43,7 @@ export default function Header({ locale, nav, variant = "default" }) {
           <a href={`/${locale}#solutions`}>Solutions</a>
           <Link href={`/${locale}/insights`}>Resources</Link>
           <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
+          <a href={`/${locale}#contact`}>{nav.contact}</a>
         </> : <>
           <Link href={`/${locale}`}>{nav.home}</Link>
           <a href={`/${locale}#iso`}>{nav.services}</a>
