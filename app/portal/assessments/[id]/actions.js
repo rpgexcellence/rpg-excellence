@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
+import { requireAssessmentWriteAccess } from "../../../../lib/assessment-access";
 
 const VALID_CLAUSES = [
   "4",
@@ -583,6 +584,8 @@ export async function saveAssessmentAnswers(
       "Assessment not found"
     );
   }
+
+  await requireAssessmentWriteAccess(user.id, assessmentId);
 
   const {
     data: questions,
