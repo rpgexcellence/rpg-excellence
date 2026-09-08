@@ -2,10 +2,19 @@ import Link from "next/link";
 
 export default function StandardGuide({ guide, locale }) {
   const contactHref = `/${locale}/contact?standard=${encodeURIComponent(guide.code)}&topic=${encodeURIComponent("Gap analysis and certification readiness")}`;
+  const assessmentHref = guide.assessmentStandard
+    ? `/portal?standard=${encodeURIComponent(guide.assessmentStandard)}#new-assessment`
+    : "/portal";
   return <main className={`standardGuide ${guide.accent}`}>
     <section className="guideHero">
       <div><span className="guideBadge">{guide.code} GUIDE</span><h1>{guide.code} — {guide.title}</h1><p>{guide.summary}</p></div>
-      <aside><strong>Educational guidance</strong><p>This guide paraphrases key themes for practical understanding. It does not reproduce the standard or replace the official licensed publication, legal advice or accredited certification decisions.</p></aside>
+      <div className="guideHeroActions">
+        <aside><strong>Educational guidance</strong><p>This guide paraphrases key themes for practical understanding. It does not reproduce the standard or replace the official licensed publication, legal advice or accredited certification decisions.</p></aside>
+        <div className="assessmentLinkBox">
+          <div><span>RPG INTELLIGENCE ASSESSMENT</span><strong>{guide.assessmentStandard ? `Assess your ${guide.code} readiness` : `Explore ${guide.code} assurance support`}</strong><p>{guide.assessmentStandard ? "Open the controlled clause-based assessment, record evidence and generate a management-ready readiness result." : "Open RPG Intelligence to review currently available assessments and assurance tools."}</p></div>
+          <Link href={assessmentHref}>{guide.assessmentStandard ? "Start this assessment →" : "Open RPG Intelligence →"}</Link>
+        </div>
+      </div>
     </section>
     <section className="guideOverview">
       <div><span className="kicker">Overview</span><h2>What this management system is designed to achieve</h2><p>{guide.purpose}</p><p>The value comes from integrating requirements into normal governance and operations—not producing documents solely for an audit.</p></div>
