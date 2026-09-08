@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
+import { requireAssessmentWriteAccess } from "../../../../../lib/assessment-access";
 
 const ISO_14001_DIMENSIONS = [
   { key: "leadership", name: "Leadership", order: 1 },
@@ -144,6 +145,8 @@ export async function saveManagementReadiness(
   if (assessmentError || !assessment) {
     throw new Error("Assessment not found.");
   }
+
+  await requireAssessmentWriteAccess(user.id, assessmentId);
 
   const dimensions =
     getDimensions(assessment.standard);
