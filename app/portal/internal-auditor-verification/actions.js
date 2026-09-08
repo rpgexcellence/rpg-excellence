@@ -7,6 +7,8 @@ import { AUDITOR_ASSESSMENT_CRITERIA, calculateAuditorAssessment } from "./asses
 
 const clean = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
 const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || "");
+const QUALIFICATION_TYPES = ["lead_auditor_certificate", "internal_auditor_certificate", "standard_specific_certificate", "professional_qualification", "experience_record", "witnessed_audit", "cpd_record", "other"];
+const ALLOWED_EVIDENCE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"];
 
 async function context() {
   const supabase = await createClient();
@@ -57,6 +59,69 @@ export async function updateAuditorStatus(formData) {
   const { error } = await supabase.from("internal_auditor_register").update({ verification_status: status, active: status !== "suspended", updated_at: new Date().toISOString() }).eq("id", auditorId).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/portal/internal-auditor-verification");
+}
+
+export async function uploadAuditorQualification(formData) {
+  const { supabase, user } = await context();
+  const auditorId = clean(formData.get("auditor_id"));
+  const evidenceType = clean(formData.get("evidence_type"));
+  const title = clean(formData.get("title"));
+  const file = formData.get("qualification_file");
+  if (!auditorId || !title || !QUALIFICATION_TYPES.includes(evidenceType)) throw new Error("Select an auditor, evidence type and evidence title.");
+  if (!file || typeof file.arrayBuffer !== "function" || !file.size) throw new Error("Attach the qualification evidence file.");
+  if (file.size > 15 * 1024 * 1024) throw new Error("Qualification evidence must not exceed 15 MB.");
+  if (!ALLOWED_EVIDENCE_TYPES.includes(file.type)) throw new Error("Upload a PDF, Word document, JPG, PNG or WebP file.");
+  const { data: auditor, error: auditorError } = await supabase.from("internal_auditor_register").select("id").eq("id", auditorId).eq("owner_id", user.id).maybeSingle();
+  if (auditorError || !auditor) throw new Error(auditorError?.message || "Auditor not found.");
+  const safeName = String(file.name || "evidence").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const storagePath = `${user.id}/auditor-qualifications/${auditorId}/${crypto.randomUUID()}-${safeName}`;
+  const uploaded = await supabase.storage.from("internal-audit-evidence").upload(storagePath, file, { contentType: file.type, upsert: false });
+  if (uploaded.error) throw new Error(uploaded.error.message);
+  const { error } = await supabase.from("internal_auditor_qualifications").insert({
+    owner_id: user.id, auditor_id: auditorId, evidence_type: evidenceType, title,
+    issuer: clean(formData.get("issuer")), certificate_number: clean(formData.get("certificate_number")),
+    issue_date: clean(formData.get("issue_date")), expiry_date: clean(formData.get("expiry_date")),
+    file_name: file.name, storage_path: storagePath, evidence_status: "submitted",
+  });
+  if (error) {
+    await supabase.storage.from("internal-audit-evidence").remove([storagePath]);
+    throw new Error(error.message);
+  }
+  revalidatePath("/portal/internal-auditor-verification");
+  redirect("/portal/internal-auditor-verification?saved=qualification");
+}
+
+export async function approveInitialAuditor(formData) {
+  const { supabase, user } = await context();
+  const auditorId = clean(formData.get("auditor_id"));
+  const approver = clean(formData.get("approver_name"));
+  const rationale = clean(formData.get("approval_basis"));
+  const validityMonths = Math.min(36, Math.max(1, Number(formData.get("validity_months")) || 12));
+  if (!auditorId || !approver || !rationale || formData.get("approval_confirmation") !== "on") throw new Error("Select the auditor and complete the Lead Auditor approval, rationale and confirmation.");
+  const [{ data: auditor, error: auditorError }, { data: qualifications, error: evidenceError }] = await Promise.all([
+    supabase.from("internal_auditor_register").select("id, audit_training, audit_experience").eq("id", auditorId).eq("owner_id", user.id).maybeSingle(),
+    supabase.from("internal_auditor_qualifications").select("id, evidence_type, expiry_date, evidence_status").eq("auditor_id", auditorId).eq("owner_id", user.id),
+  ]);
+  if (auditorError || evidenceError) throw new Error(auditorError?.message || evidenceError?.message);
+  if (!auditor) throw new Error("Auditor not found.");
+  if (!auditor.audit_training || !auditor.audit_experience) throw new Error("Record both audit training and audit experience before initial approval.");
+  const today = new Date().toISOString().slice(0, 10);
+  const currentEvidence = (qualifications || []).filter((item) => !item.expiry_date || item.expiry_date >= today);
+  if (!currentEvidence.length) throw new Error("Upload at least one current certificate or other qualification-evidence record before initial approval.");
+  const validUntil = new Date(); validUntil.setUTCMonth(validUntil.getUTCMonth() + validityMonths);
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("internal_auditor_register").update({
+    verification_status: "verified", active: true, verified_at: now, verified_until: validUntil.toISOString().slice(0, 10),
+    verified_by_name: approver, approval_basis: rationale, approval_type: "initial_certification_and_experience",
+    initially_approved_at: now, initially_approved_by: approver, updated_at: now,
+  }).eq("id", auditorId).eq("owner_id", user.id);
+  if (error) throw new Error(error.message);
+  const { error: authorisationError } = await supabase.from("internal_auditor_standard_authorisations").update({ authorisation_status: "authorised", authorised_at: now, authorised_until: validUntil.toISOString().slice(0, 10) }).eq("auditor_id", auditorId).eq("owner_id", user.id);
+  if (authorisationError) throw new Error(authorisationError.message);
+  const { error: evidenceUpdateError } = await supabase.from("internal_auditor_qualifications").update({ evidence_status: "accepted", reviewed_by: approver, reviewed_at: now }).eq("auditor_id", auditorId).eq("owner_id", user.id).in("id", currentEvidence.map((item) => item.id));
+  if (evidenceUpdateError) throw new Error(evidenceUpdateError.message);
+  revalidatePath("/portal/internal-auditor-verification");
+  redirect("/portal/internal-auditor-verification?saved=initial_approval");
 }
 
 export async function createQuarterlySelection(formData) {
