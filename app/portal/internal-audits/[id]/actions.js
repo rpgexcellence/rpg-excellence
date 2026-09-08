@@ -316,6 +316,7 @@ export async function addAuditTeamMember(
   );
 
   const auditorRegisterId = clean(formData.get("auditor_register_id"));
+  const assignedStandardIds = [...new Set(formData.getAll("assigned_standard_ids").map(clean).filter(Boolean))];
 
   if (
     !auditId ||
@@ -348,8 +349,10 @@ export async function addAuditTeamMember(
     throw new Error("This person is not currently verified and confirmed for audit assignment.");
   }
   const authorised = new Set((controlledAuditor.standards_competence || []).filter((item) => item.authorisation_status === "authorised" && (!item.authorised_until || item.authorised_until >= today)).map((item) => item.standard_id));
-  const missingStandards = (selectedStandards || []).filter((item) => !authorised.has(item.standard_id));
-  if (missingStandards.length) throw new Error("The selected auditor is not authorised for every standard in this audit. Adjust the audit role/scope or complete competence verification first.");
+  const auditStandardIds = new Set((selectedStandards || []).map((item) => item.standard_id));
+  if (!assignedStandardIds.length) throw new Error("Assign at least one audit standard to this auditor.");
+  if (assignedStandardIds.some((standardId) => !auditStandardIds.has(standardId))) throw new Error("An assigned standard is not part of this audit.");
+  if (assignedStandardIds.some((standardId) => !authorised.has(standardId))) throw new Error("The auditor is not currently authorised for one or more assigned standards. Select only standards within their verified competence scope.");
   const memberName = controlledAuditor.full_name;
   const email = controlledAuditor.email;
 
@@ -392,6 +395,9 @@ export async function addAuditTeamMember(
 
       auditor_register_id:
         auditorRegisterId,
+
+      assigned_standard_ids:
+        assignedStandardIds,
 
       member_name:
         memberName,
@@ -487,7 +493,7 @@ export async function approveAuditTeam(
       "internal_audit_team_members"
     )
     .select(
-      "id, audit_role, competence_confirmed, independence_confirmed, confidentiality_confirmed"
+      "id, audit_role, assigned_standard_ids, competence_confirmed, independence_confirmed, confidentiality_confirmed"
     )
     .eq("audit_id", auditId)
     .eq("owner_id", user.id);
@@ -517,6 +523,17 @@ export async function approveAuditTeam(
     )
   ) {
     returnTeamWarning(auditId, "governance_required");
+  }
+
+  const { data: selectedStandards, error: standardsError } = await supabase
+    .from("internal_audit_selected_standards")
+    .select("standard_id")
+    .eq("audit_id", auditId)
+    .eq("owner_id", user.id);
+  if (standardsError) throw new Error(standardsError.message);
+  const coveredStandards = new Set(team.flatMap((member) => member.assigned_standard_ids || []));
+  if ((selectedStandards || []).some((item) => !coveredStandards.has(item.standard_id))) {
+    returnTeamWarning(auditId, "standards_coverage");
   }
 
   const { error } = await supabase
