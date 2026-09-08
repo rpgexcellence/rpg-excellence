@@ -1,9 +1,7 @@
 import Stripe from "stripe";
 import { createAdminClient } from "../../../../lib/supabase/admin";
 
-const stripe = new Stripe(
-  process.env.STRIPE_SECRET_KEY
-);
+function getStripe() { return new Stripe(process.env.STRIPE_SECRET_KEY); }
 
 function fromUnix(value) {
   if (!value) {
@@ -122,7 +120,25 @@ async function saveSubscription(
   );
 }
 
+async function saveAssessmentPass(supabase, session) {
+  const ownerId = session.metadata?.owner_id;
+  const standard = session.metadata?.standard;
+  if (!ownerId || !standard || session.payment_status !== "paid") throw new Error("Paid assessment checkout is missing required metadata.");
+  const purchasedAt = new Date();
+  const expiresAt = new Date(purchasedAt);
+  expiresAt.setUTCDate(expiresAt.getUTCDate() + 30);
+  const { error } = await supabase.from("assessment_passes").upsert({
+    owner_id: ownerId, organization_id: session.metadata?.organization_id || null, standard, status: "available",
+    stripe_checkout_session_id: session.id,
+    stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null,
+    amount_paid: session.amount_total, currency: session.currency,
+    purchased_at: purchasedAt.toISOString(), access_expires_at: expiresAt.toISOString(), updated_at: purchasedAt.toISOString(),
+  }, { onConflict: "stripe_checkout_session_id" });
+  if (error) throw new Error(`Unable to save assessment pass: ${error.message}`);
+}
+
 export async function POST(request) {
+  const stripe = getStripe();
   const signature =
     request.headers.get(
       "stripe-signature"
@@ -179,7 +195,9 @@ export async function POST(request) {
         const session =
           event.data.object;
 
-        if (
+        if (session.metadata?.purchase_type === "single_assessment") {
+          await saveAssessmentPass(supabase, session);
+        } else if (
           session.subscription
         ) {
           const subscriptionId =
