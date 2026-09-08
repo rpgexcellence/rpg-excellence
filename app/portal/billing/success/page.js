@@ -1,171 +1,34 @@
 import Link from "next/link";
+import Stripe from "stripe";
 
-export const metadata = {
-  title: "Subscription Successful",
-};
+export const metadata = { title: "Payment Successful" };
+export const dynamic = "force-dynamic";
 
-export default function BillingSuccessPage() {
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f4f7fb",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "Arial, sans-serif",
-        padding: "40px",
-      }}
-    >
-      <div
-        style={{
-          background: "#ffffff",
-          maxWidth: "700px",
-          width: "100%",
-          borderRadius: "18px",
-          padding: "50px",
-          textAlign: "center",
-          boxShadow:
-            "0 15px 40px rgba(0,0,0,.08)",
-        }}
-      >
-        <div
-          style={{
-            width: "90px",
-            height: "90px",
-            borderRadius: "50%",
-            background: "#18b66b",
-            color: "#ffffff",
-            fontSize: "46px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 25px",
-          }}
-        >
-          ✓
-        </div>
+async function getCheckout(sessionId) {
+  if (!sessionId || !process.env.STRIPE_SECRET_KEY) return null;
+  try {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    return await stripe.checkout.sessions.retrieve(sessionId);
+  } catch (error) {
+    console.error("Unable to retrieve successful checkout:", error);
+    return null;
+  }
+}
 
-        <h1
-          style={{
-            color: "#071A33",
-            marginBottom: "20px",
-          }}
-        >
-          Welcome to RPG Intelligence
-        </h1>
+export default async function BillingSuccessPage({ searchParams }) {
+  const query = await searchParams;
+  const sessionId = Array.isArray(query?.session_id) ? query.session_id[0] : query?.session_id;
+  const session = await getCheckout(sessionId);
+  const isAssessment = session?.metadata?.purchase_type === "single_assessment";
+  const standard = session?.metadata?.standard;
+  const title = isAssessment ? "Your assessment is ready" : "Welcome to RPG Intelligence";
+  const description = isAssessment ? `Your one-time payment for the ${standard || "selected ISO"} assessment was successful.` : "Your subscription has been created successfully and your 7-day free trial has started.";
 
-        <p
-          style={{
-            fontSize: "19px",
-            color: "#617087",
-            lineHeight: 1.7,
-            marginBottom: "35px",
-          }}
-        >
-          Your subscription has been
-          created successfully.
-
-          <br />
-          <br />
-
-          Your 7-day free trial has now
-          started.
-
-          <br />
-          <br />
-
-          You can begin creating
-          organisations, completing ISO
-          assessments and generating
-          Executive Reports immediately.
-        </p>
-
-        <div
-          style={{
-            display: "flex",
-            gap: "15px",
-            justifyContent: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <Link
-            href="/portal"
-            style={{
-              background: "#1459D9",
-              color: "#ffffff",
-              padding: "14px 24px",
-              borderRadius: "10px",
-              textDecoration: "none",
-              fontWeight: 700,
-            }}
-          >
-            Go to Dashboard
-          </Link>
-
-          <Link
-            href="/portal/history"
-            style={{
-              background: "#071A33",
-              color: "#ffffff",
-              padding: "14px 24px",
-              borderRadius: "10px",
-              textDecoration: "none",
-              fontWeight: 700,
-            }}
-          >
-            Assessment History
-          </Link>
-        </div>
-
-        <hr
-          style={{
-            margin: "40px 0",
-            border: 0,
-            borderTop:
-              "1px solid #e2e8f0",
-          }}
-        />
-
-        <h3
-          style={{
-            color: "#071A33",
-          }}
-        >
-          What happens next?
-        </h3>
-
-        <div
-          style={{
-            textAlign: "left",
-            marginTop: "20px",
-            lineHeight: 2,
-            color: "#617087",
-          }}
-        >
-          ✅ Create your organisation
-
-          <br />
-
-          ✅ Complete an assessment
-
-          <br />
-
-          ✅ Review your Business Assurance Score
-
-          <br />
-
-          ✅ Generate an Executive Summary
-
-          <br />
-
-          ✅ Download your PDF Report
-
-          <br />
-
-          ✅ Receive AI recommendations
-        </div>
-      </div>
-    </main>
-  );
+  return <main style={{minHeight:"100vh",background:"#f4f7fb",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial, sans-serif",padding:40}}><div style={{background:"#fff",maxWidth:700,width:"100%",borderRadius:18,padding:50,textAlign:"center",boxShadow:"0 15px 40px rgba(0,0,0,.08)"}}>
+    <div style={{width:90,height:90,borderRadius:"50%",background:"#18b66b",color:"#fff",fontSize:46,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 25px"}}>✓</div>
+    <h1 style={{color:"#071A33",marginBottom:20}}>{title}</h1><p style={{fontSize:19,color:"#617087",lineHeight:1.7,marginBottom:35}}>{description}</p>
+    {isAssessment && <div style={{background:"#eef6ff",border:"1px solid #cbdff8",borderRadius:12,padding:20,marginBottom:30,color:"#173c67",lineHeight:1.7}}><strong>{standard}</strong><br/>You have 30 days to complete this assessment. After that, your result and report remain available as a read-only record.</div>}
+    <div style={{display:"flex",gap:15,justifyContent:"center",flexWrap:"wrap"}}><Link href={isAssessment&&standard?`/portal?standard=${encodeURIComponent(standard)}#new-assessment`:"/portal"} style={{background:"#1459D9",color:"#fff",padding:"14px 24px",borderRadius:10,fontWeight:700}}>{isAssessment?"Start Assessment":"Go to Dashboard"}</Link><Link href="/portal/history" style={{background:"#071A33",color:"#fff",padding:"14px 24px",borderRadius:10,fontWeight:700}}>Assessment History</Link></div>
+    <hr style={{margin:"40px 0",border:0,borderTop:"1px solid #e2e8f0"}}/><h3 style={{color:"#071A33"}}>What happens next?</h3><div style={{textAlign:"left",margin:"20px auto 0",maxWidth:440,lineHeight:2,color:"#617087"}}>{isAssessment?<><div>✅ Open your purchased standard</div><div>✅ Complete the clause-by-clause assessment</div><div>✅ Record evidence and controlled findings</div><div>✅ Review your Business Assurance Score</div><div>✅ Generate and retain your assessment report</div></>:<><div>✅ Create your organisation</div><div>✅ Complete an assessment</div><div>✅ Review your Business Assurance Score</div><div>✅ Generate an Executive Summary</div></>}</div>
+  </div></main>;
 }
