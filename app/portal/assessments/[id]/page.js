@@ -981,18 +981,14 @@ export default async function AssessmentPage({
                               : "26px",
                         }}
                       >
-                        <h3
-                          style={{
-                            color:
-                              "#071A33",
-                            marginBottom:
-                              "10px",
-                          }}
-                        >
-                          {
-                            question.question_number
-                          }
-                        </h3>
+                        <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap",marginBottom:"10px"}}>
+                          <h3 style={{color:"#071A33",margin:0}}>
+                            Clause {question.clause_reference ?? question.question_number}
+                          </h3>
+                          {question.control_id && <span style={{padding:"5px 8px",borderRadius:"999px",background:"#edf3ff",color:"#1459D9",fontSize:"12px",fontWeight:800}}>
+                            RPG control {question.control_id}
+                          </span>}
+                        </div>
 
                         <p
                           style={{
