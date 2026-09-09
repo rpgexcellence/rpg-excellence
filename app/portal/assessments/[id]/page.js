@@ -417,6 +417,17 @@ export default async function AssessmentPage({
   ) {
     "use server";
 
+    // Draft saves are intentionally partial. Remove unanswered score
+    // controls so the action saves only responses the assessor completed.
+    for (const [key, value] of formData.entries()) {
+      if (
+        key.startsWith("score_") &&
+        String(value).trim() === ""
+      ) {
+        formData.delete(key);
+      }
+    }
+
     formData.set(
       "next_clause",
       clause
@@ -1600,6 +1611,7 @@ export default async function AssessmentPage({
                   formAction={
                     saveCurrentClause
                   }
+                  formNoValidate
                   disabled={
                     !questions.length
                   }
