@@ -15,7 +15,10 @@ import {
 import {
   createAdminClient,
 } from "../../../../../lib/supabase/admin";
-import { requireAssessmentRemediationAccess } from "../../../../../lib/assessment-access";
+import {
+  getAssessmentAccessState,
+  requireAssessmentRemediationAccess,
+} from "../../../../../lib/assessment-access";
 
 const FINDING_STATUSES = [
   "open",
@@ -66,7 +69,7 @@ async function getOwnedAssessment({
     error,
   } = await supabase
     .from("assessments")
-    .select("id, standard")
+    .select("id, standard, organization_id")
     .eq(
       "id",
       assessmentId
@@ -89,6 +92,164 @@ async function getOwnedAssessment({
   await requireAssessmentRemediationAccess(userId, assessmentId);
 
   return assessment;
+}
+
+function recommendedTreatment(finding) {
+  if (
+    finding.finding_type === "major_nc" ||
+    ["critical", "high"].includes(
+      String(finding.risk_level || "").toLowerCase()
+    )
+  ) {
+    return "8d";
+  }
+
+  if (finding.finding_type === "minor_nc") {
+    return "capa";
+  }
+
+  return "management_action";
+}
+
+export async function createAssessmentTreatmentCase(formData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/portal/login");
+
+  const assessmentId = cleanText(formData.get("assessment_id"));
+  const findingId = cleanText(formData.get("finding_id"));
+  const treatmentRoute = cleanText(formData.get("treatment_route"));
+  const treatmentRationale = cleanText(formData.get("treatment_rationale"));
+
+  if (!assessmentId || !findingId) {
+    throw new Error("Assessment and finding are required.");
+  }
+
+  if (!["management_action", "capa", "8d"].includes(treatmentRoute)) {
+    throw new Error("Select a valid treatment route.");
+  }
+
+  const assessment = await getOwnedAssessment({
+    assessmentId,
+    userId: user.id,
+  });
+  const access = await getAssessmentAccessState(user.id, assessmentId);
+  const admin = createAdminClient();
+
+  const { data: finding, error: findingError } = await admin
+    .from("assessment_findings")
+    .select("id, finding_type, risk_level, question_number, finding_statement, objective_evidence, requirement_summary, linked_rca_case_id")
+    .eq("id", findingId)
+    .eq("assessment_id", assessmentId)
+    .eq("owner_id", user.id)
+    .single();
+
+  if (findingError || !finding) {
+    throw new Error("Finding not found.");
+  }
+
+  const recommendation = recommendedTreatment(finding);
+  if (treatmentRoute !== recommendation && !treatmentRationale) {
+    throw new Error(
+      `The recommended route is ${recommendation === "8d" ? "8D" : recommendation === "capa" ? "CAPA" : "Management Action"}. Record a rationale to use a different route.`
+    );
+  }
+
+  if (finding.linked_rca_case_id && treatmentRoute !== "management_action") {
+    redirect(`/portal/rca/${finding.linked_rca_case_id}`);
+  }
+
+  if (treatmentRoute === "management_action") {
+    const { error } = await admin
+      .from("assessment_findings")
+      .update({
+        treatment_route: treatmentRoute,
+        treatment_rationale: treatmentRationale,
+        assessment_pass_id: access.assessmentPassId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", findingId)
+      .eq("owner_id", user.id);
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/portal/assessments/${assessmentId}/findings`);
+    return;
+  }
+
+  const severity = ["critical", "high", "medium", "low"].includes(
+    String(finding.risk_level || "").toLowerCase()
+  )
+    ? String(finding.risk_level).toLowerCase()
+    : finding.finding_type === "major_nc"
+      ? "high"
+      : "medium";
+
+  const { data: rcaCase, error: caseError } = await admin
+    .from("rca_cases")
+    .insert({
+      owner_id: user.id,
+      organization_id: assessment.organization_id,
+      assessment_id: assessmentId,
+      assessment_finding_id: findingId,
+      assessment_pass_id: access.assessmentPassId,
+      access_scope:
+        access.source === "single_assessment"
+          ? "single_assessment"
+          : "subscription",
+      method: "8d",
+      source_type: "assessment_finding",
+      title: `${treatmentRoute === "8d" ? "8D" : "CAPA"} · ${finding.question_number}`,
+      problem_statement:
+        finding.finding_statement ||
+        finding.requirement_summary ||
+        "Assessment finding requires controlled corrective action.",
+      severity,
+      status: "draft",
+      current_discipline: 0,
+      detected_at: new Date().toISOString(),
+    })
+    .select("id, case_reference")
+    .single();
+
+  if (caseError || !rcaCase) {
+    throw new Error(caseError?.message || "Unable to create the linked CAPA-8D case.");
+  }
+
+  const { error: linkError } = await admin
+    .from("assessment_findings")
+    .update({
+      treatment_route: treatmentRoute,
+      treatment_rationale: treatmentRationale,
+      linked_rca_case_id: rcaCase.id,
+      assessment_pass_id: access.assessmentPassId,
+      status: "action_in_progress",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", findingId)
+    .eq("owner_id", user.id);
+
+  if (linkError) throw new Error(linkError.message);
+
+  await admin.from("rca_case_events").insert({
+    case_id: rcaCase.id,
+    owner_id: user.id,
+    event_type: "assessment_finding_linked",
+    discipline: 0,
+    summary: `${rcaCase.case_reference} linked to assessment finding ${finding.question_number}`,
+    event_data: {
+      assessment_id: assessmentId,
+      finding_id: findingId,
+      treatment_route: treatmentRoute,
+      recommended_route: recommendation,
+    },
+  });
+
+  revalidatePath(`/portal/assessments/${assessmentId}/findings`);
+  revalidatePath("/portal/rca");
+  redirect(`/portal/rca/${rcaCase.id}`);
 }
 
 export async function updateFindingStatus(
