@@ -16,6 +16,8 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
+  "ISO/IEC 27001:2022",
+  "ISO/IEC 27001:2022/Amd 1:2024",
   "ISO/IEC 17024:2026",
 ];
 
@@ -412,6 +414,11 @@ export default async function AssessmentPage({
       assessment.standard
     );
 
+  const isIso27001Assessment = [
+    "ISO/IEC 27001:2022",
+    "ISO/IEC 27001:2022/Amd 1:2024",
+  ].includes(assessment.standard);
+
   async function saveCurrentClause(
     formData
   ) {
@@ -520,9 +527,27 @@ export default async function AssessmentPage({
             style={{
               display: "flex",
               justifyContent: "flex-end",
+              gap: "10px",
+              flexWrap: "wrap",
               marginBottom: "18px",
             }}
           >
+            {isIso27001Assessment && (
+              <Link
+                href={`/portal/assessments/${assessment.id}/soa`}
+                style={{
+                  padding: "11px 16px",
+                  borderRadius: "8px",
+                  background: "#087A72",
+                  color: "#ffffff",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                }}
+              >
+                Statement of Applicability
+              </Link>
+            )}
+
             <Link
               href={`/portal/assessments/${assessment.id}/evidence`}
               style={{
