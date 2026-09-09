@@ -132,7 +132,7 @@ export async function POST(request) {
       ? await stripe.checkout.sessions.create({
         ...shared,
         mode: "payment",
-        line_items: [{ price_data: { currency: "gbp", unit_amount: 12900, product_data: { name: `RPG Intelligence ${standard} Assessment`, description: "One assessment with 30-day completion access and retained read-only results." } }, quantity: 1 }],
+        line_items: [{ price_data: { currency: "gbp", unit_amount: 12900, product_data: { name: `RPG Intelligence ${standard} Assessment`, description: "One assessment with 30-day completion access, 90-day linked corrective-action management and retained read-only records." } }, quantity: 1 }],
         metadata: { purchase_type: "single_assessment", owner_id: user.id, organization_id: organization?.id ?? "", standard },
       })
       : await stripe.checkout.sessions.create({
