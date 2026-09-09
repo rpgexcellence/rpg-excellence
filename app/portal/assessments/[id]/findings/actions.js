@@ -15,7 +15,7 @@ import {
 import {
   createAdminClient,
 } from "../../../../../lib/supabase/admin";
-import { requireAssessmentWriteAccess } from "../../../../../lib/assessment-access";
+import { requireAssessmentRemediationAccess } from "../../../../../lib/assessment-access";
 
 const FINDING_STATUSES = [
   "open",
@@ -86,7 +86,7 @@ async function getOwnedAssessment({
     );
   }
 
-  await requireAssessmentWriteAccess(userId, assessmentId);
+  await requireAssessmentRemediationAccess(userId, assessmentId);
 
   return assessment;
 }
