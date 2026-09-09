@@ -142,8 +142,8 @@ export default async function Pricing({
           <section className="priceCard" style={{marginTop:32,maxWidth:820,marginInline:"auto",border:"2px solid #2d63eb"}}>
             <span>ONE-OFF ACCESS</span>
             <h2 style={{margin:"10px 0"}}>Single ISO Assessment · £129</h2>
-            <p>Complete one structured assessment without starting a subscription. Includes one organisation, one selected standard, 30 days to complete and continued read-only access to the retained result.</p>
-            <ul><li>One assessment against the standard selected at checkout</li><li>Executive assessment result and evidence trail</li><li>No recurring payment</li><li>Internal Audit, CAPA-8D and programme modules require a subscription</li></ul>
+            <p>Complete one structured assessment without starting a subscription. Includes one organisation, one selected standard, 30 days to complete, 90 days to manage assessment-linked corrective action and continued read-only access to the retained record.</p>
+            <ul><li>One assessment against the standard selected at checkout</li><li>Executive assessment result, findings and evidence trail</li><li>Assessment-linked Management Action, CAPA or 8D treatment</li><li>90-day corrective-action and effectiveness-verification workspace</li><li>No recurring payment</li><li>Standalone CAPA-8D, Internal Audit and programme modules require a subscription</li></ul>
             <SingleAssessmentButton />
           </section>
 
