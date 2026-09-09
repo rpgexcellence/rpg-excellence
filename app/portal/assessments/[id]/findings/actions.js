@@ -98,7 +98,7 @@ function recommendedTreatment(finding) {
   if (
     finding.finding_type === "major_nc" ||
     ["critical", "high"].includes(
-      String(finding.risk_level || "").toLowerCase()
+      String(finding.risk_impact || "").toLowerCase()
     )
   ) {
     return "8d";
@@ -141,7 +141,7 @@ export async function createAssessmentTreatmentCase(formData) {
 
   const { data: finding, error: findingError } = await admin
     .from("assessment_findings")
-    .select("id, finding_type, risk_level, question_number, finding_statement, objective_evidence, requirement_summary, linked_rca_case_id")
+    .select("id, finding_type, risk_impact, question_number, finding_statement, objective_evidence, requirement_summary, linked_rca_case_id")
     .eq("id", findingId)
     .eq("assessment_id", assessmentId)
     .eq("owner_id", user.id)
@@ -180,9 +180,9 @@ export async function createAssessmentTreatmentCase(formData) {
   }
 
   const severity = ["critical", "high", "medium", "low"].includes(
-    String(finding.risk_level || "").toLowerCase()
+    String(finding.risk_impact || "").toLowerCase()
   )
-    ? String(finding.risk_level).toLowerCase()
+    ? String(finding.risk_impact).toLowerCase()
     : finding.finding_type === "major_nc"
       ? "high"
       : "medium";
