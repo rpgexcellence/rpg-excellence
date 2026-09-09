@@ -37,6 +37,23 @@ const VALID_INCLUSION_SOURCES = [
   "good_practice",
 ];
 
+const VALID_RESIDUAL_RISK_LEVELS = [
+  "not_assessed",
+  "low",
+  "moderate",
+  "high",
+  "critical",
+];
+
+const VALID_TREATMENT_DECISIONS = [
+  "pending",
+  "monitor",
+  "accept",
+  "reduce",
+  "avoid",
+  "share",
+];
+
 function cleanText(value) {
   if (typeof value !== "string" || value.trim() === "") {
     return null;
@@ -235,6 +252,59 @@ export async function saveSoaControl(formData) {
         VALID_INCLUSION_SOURCES.includes(value)
     );
 
+  const residualRiskLevel = requireChoice(
+    formData.get(`residual_risk_level_${key}`),
+    VALID_RESIDUAL_RISK_LEVELS,
+    "residual-risk level"
+  );
+  const treatmentDecision = requireChoice(
+    formData.get(`treatment_decision_${key}`),
+    VALID_TREATMENT_DECISIONS,
+    "risk-treatment decision"
+  );
+  const residualRiskRationale = cleanText(
+    formData.get(`residual_risk_rationale_${key}`)
+  );
+  const riskOwner = cleanText(formData.get(`risk_owner_${key}`));
+  const acceptanceAuthority = cleanText(
+    formData.get(`risk_acceptance_authority_${key}`)
+  );
+  const acceptedAt = cleanDate(formData.get(`risk_accepted_at_${key}`));
+  const riskReviewDueAt = cleanDate(
+    formData.get(`risk_review_due_at_${key}`)
+  );
+  const actionRequired = cleanText(formData.get(`action_required_${key}`));
+
+  if (residualRiskLevel !== "not_assessed" && !residualRiskRationale) {
+    throw new Error("Explain the evidence and reasoning supporting the residual-risk level.");
+  }
+
+  if (["moderate", "high", "critical"].includes(residualRiskLevel) && !riskOwner) {
+    throw new Error("A risk owner is required for Moderate, High or Critical residual risk.");
+  }
+
+  if (["high", "critical"].includes(residualRiskLevel)) {
+    if (!["reduce", "avoid", "share", "accept"].includes(treatmentDecision)) {
+      throw new Error("High or Critical residual risk requires a controlled treatment decision.");
+    }
+
+    if (!actionRequired) {
+      throw new Error("High or Critical residual risk requires a recorded action.");
+    }
+
+    if (!acceptanceAuthority || !acceptedAt || !riskReviewDueAt) {
+      throw new Error("High or Critical residual risk requires acceptance authority, acceptance date and review date.");
+    }
+
+    if (implementationStatus === "effective") {
+      throw new Error("A control with High or Critical residual risk cannot be concluded Effective.");
+    }
+  }
+
+  if (treatmentDecision === "accept" && (!acceptanceAuthority || !acceptedAt)) {
+    throw new Error("Accepted residual risk requires the acceptance authority and acceptance date.");
+  }
+
   const payload = {
     soa_register_id: registerId,
     assessment_id: assessmentId,
@@ -252,8 +322,15 @@ export async function saveSoaControl(formData) {
     effectiveness_evidence: cleanText(
       formData.get(`effectiveness_evidence_${key}`)
     ),
-    residual_risk: cleanText(formData.get(`residual_risk_${key}`)),
-    action_required: cleanText(formData.get(`action_required_${key}`)),
+    residual_risk: residualRiskRationale,
+    residual_risk_level: residualRiskLevel,
+    residual_risk_rationale: residualRiskRationale,
+    risk_owner: riskOwner,
+    treatment_decision: treatmentDecision,
+    risk_acceptance_authority: acceptanceAuthority,
+    risk_accepted_at: acceptedAt,
+    risk_review_due_at: riskReviewDueAt,
+    action_required: actionRequired,
     target_date: cleanDate(formData.get(`target_date_${key}`)),
     assessor_conclusion: cleanText(
       formData.get(`assessor_conclusion_${key}`)
