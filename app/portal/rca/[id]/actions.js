@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import { RCA_PROFILE_BY_CODE } from "../../../../lib/rca-profile-catalog";
+import { requireAssessmentRemediationAccess } from "../../../../lib/assessment-access";
 
 const clean = (value) =>
   typeof value === "string" && value.trim()
@@ -89,13 +90,20 @@ function safeFileName(name) {
 async function getOwnedCase(supabase, userId, caseId) {
   const { data, error } = await supabase
     .from("rca_cases")
-    .select("id, current_discipline, status")
+    .select("id, current_discipline, status, access_scope, assessment_id")
     .eq("id", caseId)
     .eq("owner_id", userId)
     .maybeSingle();
 
   if (error || !data) {
     throw new Error("8D case not found.");
+  }
+
+  if (data.access_scope === "single_assessment") {
+    if (!data.assessment_id) {
+      throw new Error("This case is missing its purchased-assessment access link.");
+    }
+    await requireAssessmentRemediationAccess(userId, data.assessment_id);
   }
 
   return data;
