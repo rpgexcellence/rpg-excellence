@@ -11,6 +11,7 @@ const assessmentStandards = [
   ["ISO 9001:2015/Amd 1:2024", "ISO 9001 — Quality Management"],
   ["ISO 14001:2026", "ISO 14001 — Environmental Management"],
   ["ISO 45001:2018", "ISO 45001:2018/Amd 1:2024 — Occupational Health & Safety"],
+  ["ISO/IEC 27001:2022", "ISO/IEC 27001:2022/Amd 1:2024 — Information Security"],
   ["ISO/IEC 17024:2026", "ISO/IEC 17024 — Certification of Persons"],
 ];
 const label = (value) => String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
@@ -76,4 +77,3 @@ export default async function PortalPage({ searchParams }) {
     </div>
   </div></main>;
 }
-
