@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { getAssessmentAccessState } from "../../../../../lib/assessment-access";
 import {
+  createAssessmentTreatmentCase,
   updateFindingStatus,
   updateCorrectiveAction,
 } from "./actions";
@@ -87,6 +89,25 @@ function statusLabel(status) {
   }
 }
 
+function recommendedTreatment(finding) {
+  if (
+    finding.finding_type === "major_nc" ||
+    ["critical", "high"].includes(
+      String(finding.risk_impact || "").toLowerCase()
+    )
+  ) {
+    return "8d";
+  }
+  if (finding.finding_type === "minor_nc") return "capa";
+  return "management_action";
+}
+
+function treatmentLabel(route) {
+  if (route === "8d") return "8D";
+  if (route === "capa") return "CAPA";
+  return "Management Action";
+}
+
 export default async function FindingsPage({
   params,
 }) {
@@ -124,6 +145,11 @@ export default async function FindingsPage({
 
   const admin =
     createAdminClient();
+
+  const accessState = await getAssessmentAccessState(
+    user.id,
+    assessment.id
+  );
 
   const {
     data: findingsData,
@@ -782,12 +808,81 @@ export default async function FindingsPage({
                         </div>
                       )}
 
+                      <div
+                        style={{
+                          borderTop: "1px solid #e6ebf1",
+                          paddingTop: "18px",
+                        }}
+                      >
+                        <h3 style={{ color: "#071A33", margin: "0 0 8px" }}>
+                          Finding treatment
+                        </h3>
+                        {(() => {
+                          const recommendation = recommendedTreatment(finding);
+                          const selectedRoute = finding.treatment_route || recommendation;
+
+                          if (finding.linked_rca_case_id) {
+                            return (
+                              <div style={{ padding: "16px", borderRadius: "10px", background: "#eef4ff", border: "1px solid #b9cff5" }}>
+                                <strong style={{ color: "#0b4fc5" }}>
+                                  Linked {treatmentLabel(finding.treatment_route)} case
+                                </strong>
+                                <p style={{ color: "#526982", margin: "7px 0 12px", lineHeight: 1.5 }}>
+                                  Root-cause investigation, corrective actions and effectiveness evidence are controlled in the linked case. This finding will remain synchronized with its progress.
+                                </p>
+                                <Link
+                                  href={`/portal/rca/${finding.linked_rca_case_id}`}
+                                  style={{ display: "inline-flex", padding: "10px 14px", borderRadius: "8px", background: "#1459D9", color: "#fff", textDecoration: "none", fontWeight: 700 }}
+                                >
+                                  Open linked case →
+                                </Link>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <form action={createAssessmentTreatmentCase} style={{ display: "grid", gap: "12px" }}>
+                              <input type="hidden" name="assessment_id" value={assessment.id} />
+                              <input type="hidden" name="finding_id" value={finding.id} />
+                              <div style={{ padding: "13px 15px", borderRadius: "9px", background: recommendation === "8d" ? "#fff1f0" : recommendation === "capa" ? "#fff8e8" : "#eef4ff", color: "#34475d" }}>
+                                <strong>Recommended route: {treatmentLabel(recommendation)}</strong>
+                                <div style={{ marginTop: "5px", fontSize: "13px" }}>
+                                  {recommendation === "8d"
+                                    ? "Major or high-risk finding—structured containment, root-cause analysis and effectiveness verification are recommended."
+                                    : recommendation === "capa"
+                                      ? "Minor nonconformity—controlled correction, cause analysis and verified corrective action are recommended."
+                                      : "Advisory finding—manage through the assessment action plan unless management chooses formal escalation."}
+                                </div>
+                              </div>
+                              <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, .45fr) minmax(280px, 1fr)", gap: "12px" }}>
+                                <select name="treatment_route" defaultValue={selectedRoute} required style={{ padding: "12px", borderRadius: "8px", border: "1px solid #d8e0ea", background: "#fff" }}>
+                                  <option value="management_action">Management Action</option>
+                                  <option value="capa">CAPA</option>
+                                  <option value="8d">8D</option>
+                                </select>
+                                <input name="treatment_rationale" placeholder="Rationale required only when overriding the recommendation" style={{ padding: "12px", borderRadius: "8px", border: "1px solid #d8e0ea" }} />
+                              </div>
+                              <button type="submit" disabled={!accessState.canManageRemediation} style={{ justifySelf: "start", padding: "11px 17px", border: 0, borderRadius: "8px", background: accessState.canManageRemediation ? "#1459D9" : "#aab5c2", color: "#fff", fontWeight: 700, cursor: accessState.canManageRemediation ? "pointer" : "not-allowed" }}>
+                                {selectedRoute === "management_action" ? "Confirm Treatment Route" : "Create Linked Case"}
+                              </button>
+                              {!accessState.canManageRemediation && (
+                                <div style={{ color: "#8a6116", fontSize: "13px", fontWeight: 700 }}>
+                                  Corrective-action access has ended. This record remains available read-only.
+                                </div>
+                              )}
+                            </form>
+                          );
+                        })()}
+                      </div>
+
                       {[
                         "minor_nc",
                         "major_nc",
                       ].includes(
                         finding.finding_type
-                      ) && (
+                      ) &&
+                        (finding.treatment_route === "management_action" ||
+                          (!finding.treatment_route && Boolean(action))) && (
                         <div
                           style={{
                             borderTop:
