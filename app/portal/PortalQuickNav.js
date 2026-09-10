@@ -21,6 +21,7 @@ export default function PortalQuickNav() {
       <Link href={`/portal/assessments/${assessment[1]}/soa/summary`}>Executive Summary</Link>
       <Link href={`/portal/assessments/${assessment[1]}/soa/report`} target="_blank">PDF</Link>
       <Link href="/portal/soa">SoA Register</Link>
+      <Link href="/portal/soa/management-board">Management Board</Link>
     </>}
     {audit && <>
       <Link href={`/portal/internal-audits/${audit[1]}`}>Audit</Link>
