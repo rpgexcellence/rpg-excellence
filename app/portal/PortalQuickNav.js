@@ -6,14 +6,21 @@ import { usePathname } from "next/navigation";
 export default function PortalQuickNav() {
   const pathname = usePathname();
   const assessment = pathname.match(/^\/portal\/assessments\/([^/]+)/);
+  const soa = assessment && pathname.includes("/soa");
   const audit = pathname.match(/^\/portal\/internal-audits\/([^/]+)/);
   if (pathname === "/portal") return null;
 
   return <nav className="rpgQuickNav" aria-label="Portal quick navigation">
-    {assessment && <>
+    {assessment && !soa && <>
       <Link href={`/portal/assessments/${assessment[1]}`}>Assessment</Link>
       <Link href={`/portal/assessments/${assessment[1]}/executive-report`}>Executive Report</Link>
       <Link href={`/portal/assessments/${assessment[1]}/executive-report/pdf`} target="_blank">PDF</Link>
+    </>}
+    {soa && <>
+      <Link href={`/portal/assessments/${assessment[1]}/soa`}>Statement of Applicability</Link>
+      <Link href={`/portal/assessments/${assessment[1]}/soa/summary`}>Executive Summary</Link>
+      <Link href={`/portal/assessments/${assessment[1]}/soa/report`} target="_blank">PDF</Link>
+      <Link href="/portal/soa">SoA Register</Link>
     </>}
     {audit && <>
       <Link href={`/portal/internal-audits/${audit[1]}`}>Audit</Link>
@@ -23,4 +30,3 @@ export default function PortalQuickNav() {
     <Link href="/portal" className="home"><strong>RPG Excellence</strong><small>Product Dashboard</small></Link>
   </nav>;
 }
-
