@@ -269,7 +269,7 @@ export default async function SoaPage({ params, searchParams }) {
 
   const { data: assessment, error: assessmentError } = await supabase
     .from("assessments")
-    .select("id, owner_id, organization_id, standard, status")
+    .select("id, owner_id, organization_id, standard, status, workspace_type")
     .eq("id", id)
     .eq("owner_id", user.id)
     .single();
@@ -356,7 +356,7 @@ export default async function SoaPage({ params, searchParams }) {
             <p style={{ color: "#617087", margin: 0 }}>{assessment.standard} · 93 Annex A controls · ISO/IEC 27002:2022 guidance</p>
           </div>
           <div style={{ display: "flex", gap: "9px", flexWrap: "wrap" }}>
-            <Link href={`/portal/assessments/${id}`} style={{ border: "1px solid #cbd8e8", borderRadius: "8px", padding: "10px 14px", color: "#071a33", background: "#fff", textDecoration: "none", fontWeight: 700 }}>← Assessment</Link>
+            <Link href={assessment.workspace_type === "soa_only" ? "/portal/soa" : `/portal/assessments/${id}`} style={{ border: "1px solid #cbd8e8", borderRadius: "8px", padding: "10px 14px", color: "#071a33", background: "#fff", textDecoration: "none", fontWeight: 700 }}>{assessment.workspace_type === "soa_only" ? "← SoA Register" : "← Assessment"}</Link>
             <Link href={`/portal/assessments/${id}/soa/summary`} style={{ borderRadius: "8px", padding: "10px 14px", color: "#fff", background: "#1459d9", textDecoration: "none", fontWeight: 700 }}>Executive Summary</Link>
             <Link href={`/portal/assessments/${id}/findings`} style={{ borderRadius: "8px", padding: "10px 14px", color: "#fff", background: "#071a33", textDecoration: "none", fontWeight: 700 }}>Findings & actions</Link>
           </div>
