@@ -39,7 +39,7 @@ export default async function GapAnalysisRegister({ searchParams }) {
     ? await supabase.from("assessments").select("*").in("organization_id", organisationIds).order("created_at", { ascending: false })
     : { data: [], error: null };
   if (assessmentsError) throw new Error(assessmentsError.message);
-  const assessments = assessmentData ?? [];
+  const assessments = (assessmentData ?? []).filter((assessment) => assessment.workspace_type !== "soa_only");
   const assessmentIds = assessments.map((item) => item.id);
   const { data: answerData, error: answersError } = assessmentIds.length
     ? await supabase.from("assessment_answers").select("assessment_id,score").in("assessment_id", assessmentIds)
