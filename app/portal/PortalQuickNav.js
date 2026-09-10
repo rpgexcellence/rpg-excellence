@@ -27,6 +27,7 @@ export default function PortalQuickNav() {
     {soaPortfolio && <>
       <Link href="/portal/soa">SoA Register</Link>
       <Link href="/portal/soa/management-board">Management Board</Link>
+      <Link href="/portal/soa/management-board/executive-report">Executive Report</Link>
     </>}
     {audit && <>
       <Link href={`/portal/internal-audits/${audit[1]}`}>Audit</Link>
