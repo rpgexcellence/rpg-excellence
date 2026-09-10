@@ -7,6 +7,7 @@ export default function PortalQuickNav() {
   const pathname = usePathname();
   const assessment = pathname.match(/^\/portal\/assessments\/([^/]+)/);
   const soa = assessment && pathname.includes("/soa");
+  const soaPortfolio = pathname === "/portal/soa" || pathname.startsWith("/portal/soa/");
   const audit = pathname.match(/^\/portal\/internal-audits\/([^/]+)/);
   if (pathname === "/portal") return null;
 
@@ -20,6 +21,10 @@ export default function PortalQuickNav() {
       <Link href={`/portal/assessments/${assessment[1]}/soa`}>Statement of Applicability</Link>
       <Link href={`/portal/assessments/${assessment[1]}/soa/summary`}>Executive Summary</Link>
       <Link href={`/portal/assessments/${assessment[1]}/soa/report`} target="_blank">PDF</Link>
+      <Link href="/portal/soa">SoA Register</Link>
+      <Link href="/portal/soa/management-board">Management Board</Link>
+    </>}
+    {soaPortfolio && <>
       <Link href="/portal/soa">SoA Register</Link>
       <Link href="/portal/soa/management-board">Management Board</Link>
     </>}
