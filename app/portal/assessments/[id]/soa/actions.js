@@ -358,13 +358,26 @@ export async function saveSoaControl(formData) {
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await admin
+  const { data: savedControl, error } = await admin
     .from("assessment_soa_entries")
-    .upsert(payload, { onConflict: "assessment_id,control_id" });
+    .upsert(payload, { onConflict: "assessment_id,control_id" })
+    .select("control_id,residual_likelihood,residual_impact,residual_risk_score,residual_risk_level")
+    .single();
 
   if (error) {
     throw new Error(error.message);
   }
 
+  if (
+    savedControl.residual_likelihood !== residualLikelihood ||
+    savedControl.residual_impact !== residualImpact ||
+    savedControl.residual_risk_score !== residualRiskScore ||
+    savedControl.residual_risk_level !== residualRiskLevel
+  ) {
+    throw new Error("The residual-risk matrix values were not saved correctly. Review the assessment_soa_entries column definitions.");
+  }
+
   revalidatePath(`/portal/assessments/${assessmentId}/soa`);
+  revalidatePath("/portal/soa/management-board");
+  redirect(`/portal/assessments/${assessmentId}/soa?q=${encodeURIComponent(controlId)}&saved_control=${encodeURIComponent(controlId)}`);
 }
