@@ -131,6 +131,7 @@ async function saveAssessmentPass(supabase, session) {
   remediationExpiresAt.setUTCDate(remediationExpiresAt.getUTCDate() + 90);
   const { error } = await supabase.from("assessment_passes").upsert({
     owner_id: ownerId, organization_id: session.metadata?.organization_id || null, standard, status: "available",
+    product_type: session.metadata?.purchase_type === "standalone_soa" ? "standalone_soa" : "single_assessment",
     stripe_checkout_session_id: session.id,
     stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null,
     amount_paid: session.amount_total, currency: session.currency,
@@ -197,7 +198,7 @@ export async function POST(request) {
         const session =
           event.data.object;
 
-        if (session.metadata?.purchase_type === "single_assessment") {
+        if (["single_assessment", "standalone_soa"].includes(session.metadata?.purchase_type)) {
           await saveAssessmentPass(supabase, session);
         } else if (
           session.subscription
