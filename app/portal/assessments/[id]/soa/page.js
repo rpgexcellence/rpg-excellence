@@ -5,6 +5,7 @@ import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { getAssessmentAccessState } from "../../../../../lib/assessment-access";
 import { provisionSoa, saveSoaControl, saveSoaRegister } from "./actions";
 import GuardedImplementationStatus from "./GuardedImplementationStatus";
+import ResidualRiskDecisionFields from "./ResidualRiskDecisionFields";
 
 const THEMES = {
   organisational: { label: "Organisational", range: "5.1–5.37", colour: "#1459d9" },
@@ -180,46 +181,7 @@ function ControlCard({ row, canEdit, findings }) {
             <div style={{ gridColumn: "1 / -1", borderLeft: "4px solid #1459d9", padding: "5px 11px", color: "#52677f", fontSize: "13px", lineHeight: 1.5 }}>
               <strong style={{ color: "#071a33" }}>Residual-risk decision guide:</strong> Low — monitor; Moderate — treat or formally accept; High — controlled treatment required; Critical — immediate escalation. High or Critical risk cannot be marked Effective.
             </div>
-            <label style={labelStyle}>Residual risk level
-              <select name={`residual_risk_level_${key}`} defaultValue={row.residual_risk_level ?? "not_assessed"} style={field} disabled={!canEdit}>
-                <option value="not_assessed">Not assessed</option>
-                <option value="low">Low — acceptable and monitor</option>
-                <option value="moderate">Moderate — treat or formally accept</option>
-                <option value="high">High — further treatment required</option>
-                <option value="critical">Critical — immediate escalation</option>
-              </select>
-            </label>
-            <label style={labelStyle}>Treatment decision
-              <select name={`treatment_decision_${key}`} defaultValue={row.treatment_decision ?? "pending"} style={field} disabled={!canEdit}>
-                <option value="pending">Pending decision</option>
-                <option value="monitor">Monitor</option>
-                <option value="accept">Accept</option>
-                <option value="reduce">Reduce</option>
-                <option value="avoid">Avoid</option>
-                <option value="share">Share / transfer</option>
-              </select>
-            </label>
-            <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>Residual risk rationale
-              <textarea name={`residual_risk_rationale_${key}`} defaultValue={row.residual_risk_rationale ?? row.residual_risk ?? ""} rows={3} style={field} disabled={!canEdit} placeholder="Explain the remaining threat, likelihood, impact and why this rating is justified after existing controls." />
-            </label>
-            <label style={labelStyle}>Risk owner
-              <input name={`risk_owner_${key}`} defaultValue={row.risk_owner ?? ""} style={field} disabled={!canEdit} placeholder="Person accountable for the residual risk" />
-            </label>
-            <label style={labelStyle}>Action required
-              <textarea name={`action_required_${key}`} defaultValue={row.action_required ?? ""} rows={2} style={field} disabled={!canEdit} />
-            </label>
-            <label style={labelStyle}>Risk acceptance authority
-              <input name={`risk_acceptance_authority_${key}`} defaultValue={row.risk_acceptance_authority ?? ""} style={field} disabled={!canEdit} placeholder="Required when Accept is selected" />
-            </label>
-            <label style={labelStyle}>Risk acceptance date
-              <input type="date" name={`risk_accepted_at_${key}`} defaultValue={dateInputValue(row.risk_accepted_at)} style={field} disabled={!canEdit} />
-            </label>
-            <label style={labelStyle}>Risk review date
-              <input type="date" name={`risk_review_due_at_${key}`} defaultValue={dateInputValue(row.risk_review_due_at)} style={field} disabled={!canEdit} />
-            </label>
-            <label style={labelStyle}>Action target date
-              <input type="date" name={`target_date_${key}`} defaultValue={dateInputValue(row.target_date)} style={field} disabled={!canEdit} />
-            </label>
+            <ResidualRiskDecisionFields row={row} fieldKey={key} canEdit={canEdit} fieldStyle={field} labelStyle={labelStyle}/>
             <label style={labelStyle}>Finding reference
               <select name={`finding_reference_${key}`} defaultValue={row.finding_reference ?? ""} style={field} disabled={!canEdit}>
                 <option value="">No linked finding</option>
