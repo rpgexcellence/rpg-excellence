@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import PageShell from "../../../components/PageShell";
 import SubscribeButton from "../../../components/SubscribeButton";
 import SingleAssessmentButton from "../../../components/SingleAssessmentButton";
+import StandaloneSoaButton from "../../../components/StandaloneSoaButton";
 import { locales } from "../../../lib/i18n";
 
 export const metadata = {
@@ -145,6 +146,14 @@ export default async function Pricing({
             <p>Complete one structured assessment without starting a subscription. Includes one organisation, one selected standard, 30 days to complete, 90 days to manage assessment-linked corrective action and continued read-only access to the retained record.</p>
             <ul><li>One assessment against the standard selected at checkout</li><li>Executive assessment result, findings and evidence trail</li><li>Assessment-linked Management Action, CAPA or 8D treatment</li><li>90-day corrective-action and effectiveness-verification workspace</li><li>No recurring payment</li><li>Standalone CAPA-8D, Internal Audit and programme modules require a subscription</li></ul>
             <SingleAssessmentButton />
+          </section>
+
+          <section className="priceCard" style={{marginTop:18,maxWidth:820,marginInline:"auto",border:"2px solid #0f9f8f"}}>
+            <span>STANDALONE ISO/IEC 27001 TOOL</span>
+            <h2 style={{margin:"10px 0"}}>Statement of Applicability · £129</h2>
+            <p>Build, review and approve a controlled Statement of Applicability without purchasing the full ISO/IEC 27001 gap assessment.</p>
+            <ul><li>All 93 ISO/IEC 27001:2022 Annex A controls</li><li>Applicability, implementation and effectiveness decisions</li><li>ISO/IEC 27002-aligned guidance and evidence prompts</li><li>Residual-risk ownership, acceptance and treatment</li><li>Dynamic executive narrative and controlled PDF</li><li>30-day completion access and retained read-only record</li></ul>
+            <StandaloneSoaButton />
           </section>
 
           <p
