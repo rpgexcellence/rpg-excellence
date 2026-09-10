@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../lib/supabase/admin";
 import RiskHeatMap from "./RiskHeatMap";
 
 export const metadata = { title: "SoA Management Board | RPG Intelligence" };
@@ -19,6 +20,7 @@ function Metric({ title, value, detail, colour = "blue" }) {
 export default async function SoaManagementBoard({ searchParams }) {
   const filters = await searchParams;
   const supabase = await createClient();
+  const admin = createAdminClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/soa/management-board");
 
@@ -28,7 +30,7 @@ export default async function SoaManagementBoard({ searchParams }) {
     supabase.from("assessment_soa_registers").select("id,assessment_id,status,version,review_due_at,updated_at").eq("owner_id", user.id),
     supabase.from("assessment_soa_entries").select("assessment_id,control_id,applicability,implementation_status,residual_risk_level,residual_likelihood,residual_impact,residual_risk_score,treatment_decision,risk_owner,risk_review_due_at,action_required,target_date,finding_reference").eq("owner_id", user.id),
     supabase.from("iso27001_control_catalog").select("control_id,control_title,theme").eq("active", true),
-    supabase.from("assessment_findings").select("id,assessment_id,status,finding_type").eq("owner_id", user.id).neq("finding_type", "conformity"),
+    admin.from("assessment_findings").select("id,assessment_id,status,finding_type").eq("owner_id", user.id).neq("finding_type", "conformity"),
   ]);
   const error = orgError || assessmentError || registerError || entryError || catalogError || findingError;
   if (error) throw new Error(error.message);
