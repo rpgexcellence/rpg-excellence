@@ -1,4 +1,5 @@
 import Link from "next/link";
+import StandaloneSoaButton from "./StandaloneSoaButton";
 
 export default function StandardGuide({ guide, locale }) {
   const contactHref = `/${locale}/contact?standard=${encodeURIComponent(guide.code)}&topic=${encodeURIComponent("Gap analysis and certification readiness")}`;
@@ -14,6 +15,17 @@ export default function StandardGuide({ guide, locale }) {
           <div><span>RPG INTELLIGENCE ASSESSMENT</span><strong>{guide.assessmentStandard ? `Assess your ${guide.code} readiness` : `Explore ${guide.code} assurance support`}</strong><p>{guide.assessmentStandard ? "Open the controlled clause-based assessment, record evidence and generate a management-ready readiness result." : "Open RPG Intelligence to review currently available assessments and assurance tools."}</p></div>
           <Link href={assessmentHref}>{guide.assessmentStandard ? "Start this assessment →" : "Open RPG Intelligence →"}</Link>
         </div>
+        {guide.code === "ISO/IEC 27001" && (
+          <div className="assessmentLinkBox soaProductBox">
+            <div>
+              <span>STANDALONE STATEMENT OF APPLICABILITY</span>
+              <strong>Build or review your 93-control SoA</strong>
+              <p>Document applicability, implementation, evidence, residual risk and approval decisions with ISO/IEC 27002-aligned guidance. Includes a controlled executive report and PDF.</p>
+              <small>£129 one-off · 30-day completion access · retained read-only record</small>
+            </div>
+            <StandaloneSoaButton className="soaPurchaseButton">Buy standalone SoA →</StandaloneSoaButton>
+          </div>
+        )}
       </div>
     </section>
     <section className="guideOverview">
