@@ -485,10 +485,10 @@ export default async function AssessmentPage({
       }}
     >
       {isIso27001Assessment && (
-        <div aria-hidden="true" style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none", userSelect: "none", opacity: .025, transform: "rotate(-10deg)" }}>
+        <div aria-hidden="true" style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none", userSelect: "none", opacity: .07, transform: "rotate(-10deg)", zIndex: 0 }}>
           <div style={{ width: "720px", textAlign: "center" }}>
             <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
-            <div style={{ color: "#1459D9", fontSize: "42px", fontWeight: 900, letterSpacing: ".14em", marginTop: "-18px" }}>ISO/IEC 27001</div>
+            <div style={{ color: "#1459D9", fontSize: "42px", fontWeight: 900, letterSpacing: ".14em", marginTop: "-18px" }}>ISO/IEC 27001 ASSESSMENT</div>
           </div>
         </div>
       )}
@@ -1025,8 +1025,16 @@ export default async function AssessmentPage({
                             index === 0
                               ? "0"
                               : "26px",
+                          position: "relative",
+                          overflow: "hidden",
                         }}
                       >
+                        {isIso27001Assessment && (
+                          <div aria-hidden="true" style={{ position: "absolute", right: "18px", top: "44px", width: "330px", opacity: .055, pointerEvents: "none", userSelect: "none", textAlign: "center", transform: "rotate(-7deg)" }}>
+                            <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
+                            <div style={{ color: "#1459D9", fontSize: "21px", fontWeight: 900, letterSpacing: ".1em", marginTop: "-9px" }}>ISO/IEC 27001</div>
+                          </div>
+                        )}
                         <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap",marginBottom:"10px"}}>
                           <h3 style={{color:"#071A33",margin:0}}>
                             Clause {question.clause_reference ?? question.question_number}
