@@ -479,7 +479,7 @@ export default async function AssessmentPage({
       style={{
         minHeight: "100vh",
         background: "#f3f6f9",
-        padding: "40px",
+        padding: "36px 20px 70px",
         fontFamily:
           "Arial, sans-serif",
       }}
@@ -494,7 +494,7 @@ export default async function AssessmentPage({
       )}
       <div
         style={{
-          maxWidth: "1100px",
+          maxWidth: "1280px",
           margin: "0 auto",
           position: "relative",
           zIndex: 1,
