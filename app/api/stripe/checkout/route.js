@@ -50,7 +50,9 @@ export async function POST(request) {
     const body =
       await request.json();
 
-    const purchaseType = body?.purchaseType === "single_assessment" ? "single_assessment" : "subscription";
+    const purchaseType = ["single_assessment", "standalone_soa"].includes(body?.purchaseType)
+      ? body.purchaseType
+      : "subscription";
 
     const plan =
       typeof body?.plan === "string"
@@ -134,6 +136,28 @@ export async function POST(request) {
         mode: "payment",
         line_items: [{ price_data: { currency: "gbp", unit_amount: 12900, product_data: { name: `RPG Intelligence ${standard} Assessment`, description: "One assessment with 30-day completion access, 90-day linked corrective-action management and retained read-only records." } }, quantity: 1 }],
         metadata: { purchase_type: "single_assessment", owner_id: user.id, organization_id: organization?.id ?? "", standard },
+      })
+      : purchaseType === "standalone_soa"
+      ? await stripe.checkout.sessions.create({
+        ...shared,
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: "gbp",
+            unit_amount: 12900,
+            product_data: {
+              name: "RPG Intelligence ISO/IEC 27001 Statement of Applicability",
+              description: "Standalone 93-control SoA workspace with ISO/IEC 27002-aligned guidance, controlled executive report and PDF.",
+            },
+          },
+          quantity: 1,
+        }],
+        metadata: {
+          purchase_type: "standalone_soa",
+          owner_id: user.id,
+          organization_id: organization?.id ?? "",
+          standard: "ISO/IEC 27001:2022",
+        },
       })
       : await stripe.checkout.sessions.create({
         ...shared,
