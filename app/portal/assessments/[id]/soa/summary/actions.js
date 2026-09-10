@@ -19,8 +19,6 @@ async function context(formData) {
   if (!user) redirect("/portal/login");
   if (!assessmentId) throw new Error("Missing assessment ID.");
   await requireAssessmentWriteAccess(user.id, assessmentId);
-  const { data: assessment, error } = await supabase.from("assessments").select("id, owner_id, standard").eq("id", assessmentId).eq("owner_id", user.id).single();
-  if (error || !assessment || !["ISO/IEC 27001:2022", "ISO/IEC 27001:2022/Amd 1:2024"].includes(assessment.standard)) throw new Error("ISO 27001 assessment not found.");
   const admin = createAdminClient();
   return { assessmentId, user, admin };
 }
