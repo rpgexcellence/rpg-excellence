@@ -1098,3 +1098,646 @@ export default async function AssessmentPage({
                                 <strong
                                   style={{
                                     color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Requirement summary:
+                                </strong>{" "}
+                                {question.requirement_summary}
+                              </div>
+                            )}
+
+                            {question.assessor_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f5f8fc",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Assessor guidance:
+                                </strong>{" "}
+                                {question.assessor_guidance}
+                              </div>
+                            )}
+
+                            {question.interview_questions && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f8fafc",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Interview questions
+                                </strong>
+                                <ul
+                                  style={{
+                                    margin:
+                                      "8px 0 0 18px",
+                                    padding: 0,
+                                  }}
+                                >
+                                  {String(
+                                    question.interview_questions
+                                  )
+                                    .split("|")
+                                    .map((item) => item.trim())
+                                    .filter(Boolean)
+                                    .map((item, itemIndex) => (
+                                      <li
+                                        key={itemIndex}
+                                        style={{
+                                          marginBottom:
+                                            "5px",
+                                        }}
+                                      >
+                                        {item}
+                                      </li>
+                                    ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {question.objective_evidence && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f3fbf8",
+                                  borderLeft:
+                                    "4px solid #167C80",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "6px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Objective evidence to seek:
+                                </strong>{" "}
+                                {question.objective_evidence}
+                              </div>
+                            )}
+
+                            {question.sampling_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#fff8e8",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#735c17",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong>
+                                  Sampling guidance:
+                                </strong>{" "}
+                                {question.sampling_guidance}
+                              </div>
+                            )}
+
+                            {question.conformity_criteria && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f6f8fb",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Conformity criteria:
+                                </strong>{" "}
+                                {question.conformity_criteria}
+                              </div>
+                            )}
+
+                            {(question.minor_nc_guidance ||
+                              question.major_nc_guidance) && (
+                              <div
+                                style={{
+                                  display:
+                                    "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit, minmax(260px, 1fr))",
+                                  gap: "10px",
+                                }}
+                              >
+                                {question.minor_nc_guidance && (
+                                  <div
+                                    style={{
+                                      background:
+                                        "#fffaf0",
+                                      padding:
+                                        "12px 14px",
+                                      borderRadius:
+                                        "8px",
+                                      color:
+                                        "#735c17",
+                                      lineHeight:
+                                        1.55,
+                                      fontSize:
+                                        "14px",
+                                    }}
+                                  >
+                                    <strong>
+                                      Minor NC guidance:
+                                    </strong>{" "}
+                                    {question.minor_nc_guidance}
+                                  </div>
+                                )}
+
+                                {question.major_nc_guidance && (
+                                  <div
+                                    style={{
+                                      background:
+                                        "#fff4f2",
+                                      padding:
+                                        "12px 14px",
+                                      borderRadius:
+                                        "8px",
+                                      color:
+                                        "#8a2c20",
+                                      lineHeight:
+                                        1.55,
+                                      fontSize:
+                                        "14px",
+                                    }}
+                                  >
+                                    <strong>
+                                      Major NC guidance:
+                                    </strong>{" "}
+                                    {question.major_nc_guidance}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {question.management_focus && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f7f5ff",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "8px",
+                                  color:
+                                    "#5d4a86",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong>
+                                  Management focus:
+                                </strong>{" "}
+                                {question.management_focus}
+                              </div>
+                            )}
+
+                            {question.transition_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#eef8ff",
+                                  borderLeft:
+                                    "4px solid #0284c7",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "6px",
+                                  color:
+                                    "#475569",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Transition / amendment guidance:
+                                </strong>{" "}
+                                {question.transition_guidance}
+                              </div>
+                            )}
+
+                            {question.maturity_guidance && (
+                              <div
+                                style={{
+                                  background:
+                                    "#f0fdf4",
+                                  borderLeft:
+                                    "4px solid #16a34a",
+                                  padding:
+                                    "12px 14px",
+                                  borderRadius:
+                                    "6px",
+                                  color:
+                                    "#475569",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color:
+                                      "#071A33",
+                                  }}
+                                >
+                                  Maturity guidance:
+                                </strong>{" "}
+                                {question.maturity_guidance}
+                              </div>
+                            )}
+                            </div>
+                          </details>
+                        ) : (
+                          question.guidance && (
+                            <div
+                              style={{
+                                background:
+                                  "#f5f8fc",
+                                borderLeft:
+                                  "4px solid #1459D9",
+                                padding:
+                                  "12px 14px",
+                                borderRadius:
+                                  "6px",
+                                color:
+                                  "#617087",
+                                lineHeight: 1.55,
+                                marginBottom:
+                                  "16px",
+                                fontSize: "14px",
+                              }}
+                            >
+                              <strong
+                                style={{
+                                  color:
+                                    "#071A33",
+                                }}
+                              >
+                                Guidance:
+                              </strong>{" "}
+                              {question.guidance}
+                            </div>
+                          )
+                        )}
+
+                        <label
+                          style={{
+                            display:
+                              "block",
+                            fontWeight: 700,
+                            color:
+                              "#071A33",
+                            marginBottom:
+                              "7px",
+                          }}
+                        >
+                          Assessment score
+                        </label>
+
+                        <select
+                          name={`score_${fieldKey}`}
+                          required
+                          defaultValue={
+                            savedAnswer
+                              ?.score !==
+                              null &&
+                            savedAnswer
+                              ?.score !==
+                              undefined
+                              ? String(
+                                  savedAnswer.score
+                                )
+                              : ""
+                          }
+                          style={{
+                            width: "100%",
+                            maxWidth:
+                              "360px",
+                            padding: "12px",
+                            borderRadius:
+                              "8px",
+                            border:
+                              "1px solid #d8e0ea",
+                            background:
+                              "#fff",
+                          }}
+                        >
+                          <option
+                            value=""
+                            disabled
+                          >
+                            Select score
+                          </option>
+
+                          <option value="0">
+                            0 — Not addressed
+                          </option>
+
+                          <option value="1">
+                            1 — Initial
+                          </option>
+
+                          <option value="2">
+                            2 — Partially implemented
+                          </option>
+
+                          <option value="3">
+                            3 — Implemented
+                          </option>
+
+                          <option value="4">
+                            4 — Effective
+                          </option>
+
+                          <option value="5">
+                            5 — Best practice
+                          </option>
+                        </select>
+
+                        <label
+                          style={{
+                            display:
+                              "block",
+                            fontWeight: 700,
+                            color:
+                              "#071A33",
+                            marginTop:
+                              "18px",
+                            marginBottom:
+                              "7px",
+                          }}
+                        >
+                          {isAdvancedAssessment
+                            ? "Objective evidence / assessor notes"
+                            : "Evidence / notes"}
+                        </label>
+
+                        <textarea
+                          name={`evidence_${fieldKey}`}
+                          placeholder={
+                            isAdvancedAssessment
+                              ? "Record sampled documents, records, interviews, observations, data, references and any identified gaps..."
+                              : "Describe supporting evidence, documents, records, observations or gaps..."
+                          }
+                          rows="4"
+                          defaultValue={
+                            savedAnswer
+                              ?.evidence ??
+                            ""
+                          }
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            borderRadius:
+                              "8px",
+                            border:
+                              "1px solid #d8e0ea",
+                            resize:
+                              "vertical",
+                            boxSizing:
+                              "border-box",
+                          }}
+                        />
+
+                        {isAdvancedAssessment && (
+                          <FindingConclusionFields
+                            fieldKey={fieldKey}
+                            savedFinding={savedFinding}
+                            savedAction={savedAction}
+                            savedEvidence={
+                              savedAnswer
+                                ?.evidence ??
+                              ""
+                            }
+                          />
+                        )}
+
+                        <button
+                          type="submit"
+                          formAction={saveCurrentClause}
+                          formNoValidate
+                          style={{
+                            marginTop: "14px",
+                            padding: "10px 15px",
+                            borderRadius: "8px",
+                            border: "1px solid #1459D9",
+                            background: "#ffffff",
+                            color: "#1459D9",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Save this question
+                        </button>
+                      </div>
+                    );
+                  }
+                )
+              ) : (
+                <div
+                  style={{
+                    padding: "20px",
+                    background:
+                      "#fff8e8",
+                    borderRadius: "8px",
+                    color: "#735c17",
+                  }}
+                >
+                  No questions are
+                  currently configured
+                  for Clause {clause}.
+                </div>
+              )}
+            </div>
+
+            {/* Navigation */}
+            <div
+              style={{
+                marginTop: "32px",
+                paddingTop: "22px",
+                borderTop:
+                  "1px solid #e6ebf1",
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                gap: "12px",
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <a
+                  href="/portal"
+                  style={{
+                    padding:
+                      "12px 18px",
+                    borderRadius:
+                      "8px",
+                    border:
+                      "1px solid #d8e0ea",
+                    color:
+                      "#071A33",
+                    textDecoration:
+                      "none",
+                    fontWeight: 700,
+                  }}
+                >
+                  Dashboard
+                </a>
+
+                {previousClause && (
+                  <a
+                    href={`/portal/assessments/${assessment.id}?clause=${previousClause}`}
+                    style={{
+                      padding:
+                        "12px 18px",
+                      borderRadius:
+                        "8px",
+                      border:
+                        "1px solid #d8e0ea",
+                      color:
+                        "#071A33",
+                      textDecoration:
+                        "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ← Clause{" "}
+                    {previousClause}
+                  </a>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="submit"
+                  formAction={
+                    saveCurrentClause
+                  }
+                  formNoValidate
+                  disabled={
+                    !questions.length
+                  }
+                  style={{
+                    padding:
+                      "12px 20px",
+                    borderRadius: "8px",
+                    border:
+                      "1px solid #1459D9",
+                    background:
+                      "#ffffff",
+                    color:
+                      "#1459D9",
+                    fontWeight: 700,
+                    cursor:
+                      questions.length
+                        ? "pointer"
+                        : "not-allowed",
+                  }}
+                >
+                  Save Answers
+                </button>
+
+              <button
+                type="submit"
+                disabled={
+                  !questions.length
+                }
+                style={{
+                  padding:
+                    "12px 20px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background:
+                    questions.length
+                      ? "#1459D9"
+                      : "#c8d2df",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  cursor:
+                    questions.length
+                      ? "pointer"
+                      : "not-allowed",
+                }}
+              >
+                {nextClause
+                  ? `Save & Continue → Clause ${nextClause}`
+                  : "Complete Assessment →"}
+              </button>
+              </div>
+            </div>
+          </section>
+        </form>
+      </div>
+    </main>
+  );
+}
