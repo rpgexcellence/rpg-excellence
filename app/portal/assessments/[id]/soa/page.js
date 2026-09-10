@@ -1,1730 +1,439 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "../../../../lib/supabase/server";
-import { createAdminClient } from "../../../../lib/supabase/admin";
-import { saveAssessmentAnswers } from "./actions";
-import FindingConclusionFields from "./FindingConclusionFields";
+import { createClient } from "../../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { getAssessmentAccessState } from "../../../../../lib/assessment-access";
+import { provisionSoa, saveSoaControl, saveSoaRegister } from "./actions";
 
-import {
-  calculateClauseScore,
-  calculateSimpleOverallScore,
-  calculateWeightedOverallScore,
-  calculateProgress,
-} from "./scoring";
-
-const ADVANCED_ASSESSMENT_STANDARDS = [
-  "ISO 9001:2015/Amd 1:2024",
-  "ISO 14001:2026",
-  "ISO 45001:2018",
-  "ISO/IEC 27001:2022",
-  "ISO/IEC 27001:2022/Amd 1:2024",
-  "ISO/IEC 17024:2026",
-];
-
-const CLAUSE_NUMBERS = [
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-];
-
-const DEFAULT_CLAUSE_TITLES = {
-  "4": "Context of the Organization",
-  "5": "Leadership",
-  "6": "Planning",
-  "7": "Support",
-  "8": "Operation",
-  "9": "Performance Evaluation",
-  "10": "Improvement",
+const THEMES = {
+  organisational: { label: "Organisational", range: "5.1–5.37", colour: "#1459d9" },
+  people: { label: "People", range: "6.1–6.8", colour: "#7c3aed" },
+  physical: { label: "Physical", range: "7.1–7.14", colour: "#d97706" },
+  technological: { label: "Technological", range: "8.1–8.34", colour: "#0891b2" },
 };
 
-const CLAUSE_TITLES_BY_STANDARD = {
-  "ISO/IEC 17024:2026": {
-    "4": "General Requirements",
-    "5": "Structural Requirements",
-    "6": "Resource Requirements",
-    "7": "Records and Information Requirements",
-    "8": "Certification Schemes",
-    "9": "Certification Process Requirements",
-    "10": "Management System Requirements",
-  },
+const INCLUSION_SOURCES = [
+  ["risk_treatment", "Risk treatment"],
+  ["legal_regulatory", "Legal / regulatory"],
+  ["contractual", "Contractual"],
+  ["business_requirement", "Business requirement"],
+  ["interested_party", "Interested party"],
+  ["good_practice", "Good practice"],
+];
+
+const field = {
+  width: "100%",
+  border: "1px solid #cbd8e8",
+  borderRadius: "8px",
+  padding: "10px 11px",
+  background: "#fff",
+  color: "#071a33",
+  font: "inherit",
+  boxSizing: "border-box",
 };
 
-function getClauseTitle(standard, clauseNumber) {
+const labelStyle = {
+  display: "grid",
+  gap: "6px",
+  color: "#203b5d",
+  fontSize: "14px",
+  fontWeight: 700,
+};
+
+function value(searchParams, key, fallback = "") {
+  const item = searchParams?.[key];
+  return Array.isArray(item) ? item[0] ?? fallback : item ?? fallback;
+}
+
+function controlKey(controlId) {
+  return controlId.replaceAll(".", "_");
+}
+
+function formatDate(date) {
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(date));
+}
+
+function dateInputValue(date) {
+  return date ? String(date).slice(0, 10) : "";
+}
+
+function statusLabel(status) {
+  return String(status ?? "").replaceAll("_", " ");
+}
+
+function findingTypeLabel(type) {
+  return ({
+    major_nc: "Major NC",
+    minor_nc: "Minor NC",
+    observation: "Observation",
+    ofi: "Opportunity for improvement",
+    conformity: "Conformity",
+  })[type] ?? statusLabel(type);
+}
+
+function Metric({ label, value: metricValue, tone = "#071a33" }) {
   return (
-    CLAUSE_TITLES_BY_STANDARD[standard]?.[clauseNumber] ??
-    DEFAULT_CLAUSE_TITLES[clauseNumber] ??
-    `Clause ${clauseNumber}`
+    <div style={{ background: "#fff", border: "1px solid #d8e2ee", borderRadius: "12px", padding: "16px" }}>
+      <div style={{ color: "#657990", fontSize: "12px", fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase" }}>{label}</div>
+      <div style={{ color: tone, fontSize: "27px", fontWeight: 800, marginTop: "5px" }}>{metricValue}</div>
+    </div>
   );
 }
 
-export default async function AssessmentPage({
-  params,
-  searchParams,
-}) {
+function ControlCard({ row, canEdit, findings }) {
+  const key = controlKey(row.control_id);
+  const theme = THEMES[row.theme];
+  const sources = row.inclusion_source ?? [];
+  const complete = row.applicability !== "pending";
+
+  return (
+    <details
+      style={{
+        position: "relative",
+        background: "#fff",
+        border: `1px solid ${complete ? "#c9dfd5" : "#d8e2ee"}`,
+        borderLeft: `5px solid ${theme.colour}`,
+        borderRadius: "12px",
+        overflow: "hidden",
+      }}
+    >
+      <summary style={{ cursor: "pointer", padding: "16px 18px", listStyle: "none" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "88px minmax(220px,1fr) auto auto", alignItems: "center", gap: "13px" }}>
+          <strong style={{ color: theme.colour }}>A.{row.control_id}</strong>
+          <div>
+            <strong style={{ color: "#071a33", fontSize: "16px" }}>{row.control_title}</strong>
+            <div style={{ color: "#657990", fontSize: "13px", marginTop: "4px" }}>{row.control_intent}</div>
+          </div>
+          <span style={{ color: row.applicability === "applicable" ? "#087a52" : row.applicability === "not_applicable" ? "#8a4b08" : "#657990", fontSize: "13px", fontWeight: 800, textTransform: "capitalize" }}>
+            {statusLabel(row.applicability)}
+          </span>
+          <span style={{ background: "#eef3fa", borderRadius: "999px", color: "#294766", fontSize: "12px", fontWeight: 700, padding: "6px 9px", textTransform: "capitalize" }}>
+            {statusLabel(row.implementation_status)}
+          </span>
+        </div>
+      </summary>
+
+      <div style={{ borderTop: "1px solid #e2e9f1", padding: "20px" }}>
+        <div aria-hidden="true" style={{ position: "absolute", right: "36px", top: "92px", width: "390px", opacity: .035, pointerEvents: "none", userSelect: "none", textAlign: "center", transform: "rotate(-8deg)" }}>
+          <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
+          <div style={{ color: "#1459d9", fontSize: "25px", fontWeight: 900, letterSpacing: ".12em", marginTop: "-12px" }}>ISO/IEC 27001</div>
+        </div>
+
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <details style={{ background: "#f7f9fc", border: "1px solid #d8e2ee", borderRadius: "9px", marginBottom: "18px", overflow: "hidden" }}>
+            <summary style={{ cursor: "pointer", padding: "12px 14px", color: "#071a33", fontWeight: 800 }}>Assessment support — question, ISO/IEC 27002 guidance and evidence</summary>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", padding: "0 14px 14px" }}>
+              <div style={{ background: "#eef5ff", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>Assessment question</strong><br />{row.assessment_question}</div>
+              <div style={{ background: "#effaf8", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>ISO/IEC 27002-aligned guidance</strong><br />{row.implementation_guidance || "Apply controls proportionately to the assessed risk and operating context."}</div>
+              <div style={{ background: "#fff", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>Objective evidence to seek</strong><br />{row.objective_evidence || "Current records, system evidence, interviews, observation and adverse examples."}</div>
+              <div style={{ background: "#fff8e8", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>Effectiveness test</strong><br />{row.effectiveness_criteria || "Confirm that the control achieves its intended outcome and responds to change."}</div>
+            </div>
+          </details>
+
+          <form action={saveSoaControl}>
+          <input type="hidden" name="assessment_id" value={row.assessment_id} />
+          <input type="hidden" name="control_id" value={row.control_id} />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+            <label style={labelStyle}>Applicability decision
+              <select name={`applicability_${key}`} defaultValue={row.applicability} style={field} disabled={!canEdit}>
+                <option value="pending">Pending decision</option>
+                <option value="applicable">Applicable</option>
+                <option value="not_applicable">Not applicable</option>
+              </select>
+            </label>
+            <label style={labelStyle}>Implementation status
+              <select name={`implementation_status_${key}`} defaultValue={row.implementation_status} style={field} disabled={!canEdit}>
+                <option value="not_assessed">Not assessed</option>
+                <option value="not_implemented">Not implemented</option>
+                <option value="planned">Planned</option>
+                <option value="partially_implemented">Partially implemented</option>
+                <option value="implemented">Implemented</option>
+                <option value="effective">Effective</option>
+              </select>
+            </label>
+            <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>Applicability justification
+              <textarea name={`applicability_justification_${key}`} defaultValue={row.applicability_justification ?? ""} rows={3} style={field} disabled={!canEdit} placeholder="Explain why the control is necessary, or why exclusion does not create unmanaged risk." />
+            </label>
+          </div>
+
+          <fieldset style={{ border: 0, margin: "17px 0", padding: 0 }} disabled={!canEdit}>
+            <legend style={{ color: "#203b5d", fontSize: "14px", fontWeight: 800, marginBottom: "9px" }}>Reason for inclusion</legend>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "9px" }}>
+              {INCLUSION_SOURCES.map(([source, sourceLabel]) => (
+                <label key={source} style={{ display: "flex", gap: "7px", alignItems: "center", border: "1px solid #d8e2ee", borderRadius: "8px", padding: "8px 10px", color: "#294766", fontSize: "13px" }}>
+                  <input type="checkbox" name={`inclusion_source_${key}`} value={source} defaultChecked={sources.includes(source)} />
+                  {sourceLabel}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+            <label style={labelStyle}>Implemented control description
+              <textarea name={`control_description_${key}`} defaultValue={row.control_description ?? ""} rows={3} style={field} disabled={!canEdit} />
+            </label>
+            <label style={labelStyle}>Control owner
+              <input name={`control_owner_${key}`} defaultValue={row.control_owner ?? ""} style={field} disabled={!canEdit} />
+            </label>
+            <label style={labelStyle}>Implementation evidence
+              <textarea name={`implementation_evidence_${key}`} defaultValue={row.implementation_evidence ?? ""} rows={3} style={field} disabled={!canEdit} />
+            </label>
+            <label style={labelStyle}>Effectiveness evidence
+              <textarea name={`effectiveness_evidence_${key}`} defaultValue={row.effectiveness_evidence ?? ""} rows={3} style={field} disabled={!canEdit} />
+            </label>
+            <div style={{ gridColumn: "1 / -1", borderLeft: "4px solid #1459d9", padding: "5px 11px", color: "#52677f", fontSize: "13px", lineHeight: 1.5 }}>
+              <strong style={{ color: "#071a33" }}>Residual-risk decision guide:</strong> Low — monitor; Moderate — treat or formally accept; High — controlled treatment required; Critical — immediate escalation. High or Critical risk cannot be marked Effective.
+            </div>
+            <label style={labelStyle}>Residual risk level
+              <select name={`residual_risk_level_${key}`} defaultValue={row.residual_risk_level ?? "not_assessed"} style={field} disabled={!canEdit}>
+                <option value="not_assessed">Not assessed</option>
+                <option value="low">Low — acceptable and monitor</option>
+                <option value="moderate">Moderate — treat or formally accept</option>
+                <option value="high">High — further treatment required</option>
+                <option value="critical">Critical — immediate escalation</option>
+              </select>
+            </label>
+            <label style={labelStyle}>Treatment decision
+              <select name={`treatment_decision_${key}`} defaultValue={row.treatment_decision ?? "pending"} style={field} disabled={!canEdit}>
+                <option value="pending">Pending decision</option>
+                <option value="monitor">Monitor</option>
+                <option value="accept">Accept</option>
+                <option value="reduce">Reduce</option>
+                <option value="avoid">Avoid</option>
+                <option value="share">Share / transfer</option>
+              </select>
+            </label>
+            <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>Residual risk rationale
+              <textarea name={`residual_risk_rationale_${key}`} defaultValue={row.residual_risk_rationale ?? row.residual_risk ?? ""} rows={3} style={field} disabled={!canEdit} placeholder="Explain the remaining threat, likelihood, impact and why this rating is justified after existing controls." />
+            </label>
+            <label style={labelStyle}>Risk owner
+              <input name={`risk_owner_${key}`} defaultValue={row.risk_owner ?? ""} style={field} disabled={!canEdit} placeholder="Person accountable for the residual risk" />
+            </label>
+            <label style={labelStyle}>Action required
+              <textarea name={`action_required_${key}`} defaultValue={row.action_required ?? ""} rows={2} style={field} disabled={!canEdit} />
+            </label>
+            <label style={labelStyle}>Risk acceptance authority
+              <input name={`risk_acceptance_authority_${key}`} defaultValue={row.risk_acceptance_authority ?? ""} style={field} disabled={!canEdit} placeholder="Required when Accept is selected" />
+            </label>
+            <label style={labelStyle}>Risk acceptance date
+              <input type="date" name={`risk_accepted_at_${key}`} defaultValue={dateInputValue(row.risk_accepted_at)} style={field} disabled={!canEdit} />
+            </label>
+            <label style={labelStyle}>Risk review date
+              <input type="date" name={`risk_review_due_at_${key}`} defaultValue={dateInputValue(row.risk_review_due_at)} style={field} disabled={!canEdit} />
+            </label>
+            <label style={labelStyle}>Action target date
+              <input type="date" name={`target_date_${key}`} defaultValue={dateInputValue(row.target_date)} style={field} disabled={!canEdit} />
+            </label>
+            <label style={labelStyle}>Finding reference
+              <select name={`finding_reference_${key}`} defaultValue={row.finding_reference ?? ""} style={field} disabled={!canEdit}>
+                <option value="">No linked finding</option>
+                {row.finding_reference && !findings.some((finding) => finding.question_number === row.finding_reference) && <option value={row.finding_reference}>{row.finding_reference}</option>}
+                {findings.map((finding) => <option key={finding.id} value={finding.question_number}>{finding.question_number} · {findingTypeLabel(finding.finding_type)} · {statusLabel(finding.status)}</option>)}
+              </select>
+            </label>
+            <label style={labelStyle}>Assessor conclusion
+              <select name={`assessor_conclusion_${key}`} defaultValue={row.assessor_conclusion ?? "not_assessed"} style={field} disabled={!canEdit}>
+                <option value="not_assessed">Not assessed</option>
+                {row.assessor_conclusion && !["not_assessed", "conformity", "observation", "ofi", "minor_nc", "major_nc"].includes(row.assessor_conclusion) && <option value={row.assessor_conclusion}>{row.assessor_conclusion}</option>}
+                <option value="conformity">Conformity</option>
+                <option value="observation">Observation</option>
+                <option value="ofi">Opportunity for improvement</option>
+                <option value="minor_nc">Minor nonconformity</option>
+                <option value="major_nc">Major nonconformity</option>
+              </select>
+            </label>
+          </div>
+
+          {canEdit && (
+            <button style={{ marginTop: "16px", border: 0, borderRadius: "8px", padding: "11px 16px", background: "#1459d9", color: "#fff", fontWeight: 800, cursor: "pointer" }}>
+              Save A.{row.control_id}
+            </button>
+          )}
+          </form>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+export default async function SoaPage({ params, searchParams }) {
   const { id } = await params;
-  const resolvedSearchParams = await searchParams;
+  const filters = await searchParams;
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const requestedClause = Array.isArray(
-    resolvedSearchParams?.clause
-  )
-    ? resolvedSearchParams.clause[0]
-    : resolvedSearchParams?.clause;
+  if (!user) redirect("/portal/login");
 
-  const clause = CLAUSE_NUMBERS.includes(
-    requestedClause
-  )
-    ? requestedClause
-    : "4";
-
-  const currentClauseIndex =
-    CLAUSE_NUMBERS.indexOf(clause);
-
-  const previousClause =
-    currentClauseIndex > 0
-      ? CLAUSE_NUMBERS[
-          currentClauseIndex - 1
-        ]
-      : null;
-
-  const nextClause =
-    currentClauseIndex <
-    CLAUSE_NUMBERS.length - 1
-      ? CLAUSE_NUMBERS[
-          currentClauseIndex + 1
-        ]
-      : null;
-
-  const supabase =
-    await createClient();
-
-  const admin =
-    createAdminClient();
-
-  const {
-    data: { user },
-  } =
-    await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/portal/login");
-  }
-
-  // Load assessment
-  const {
-    data: assessment,
-    error: assessmentError,
-  } = await supabase
+  const { data: assessment, error: assessmentError } = await supabase
     .from("assessments")
-    .select("*")
+    .select("id, owner_id, organization_id, standard, status")
     .eq("id", id)
     .eq("owner_id", user.id)
     .single();
 
-  if (
-    assessmentError ||
-    !assessment
-  ) {
-    redirect("/portal");
+  if (assessmentError || !assessment) redirect("/portal");
+
+  if (!["ISO/IEC 27001:2022", "ISO/IEC 27001:2022/Amd 1:2024"].includes(assessment.standard)) {
+    redirect(`/portal/assessments/${id}`);
   }
 
-  // Load all questions
-  const {
-    data: allQuestions,
-    error: allQuestionsError,
-  } = await supabase
-    .from("assessment_questions")
+  const access = await getAssessmentAccessState(user.id, id);
+  const { data: register, error: registerError } = await admin
+    .from("assessment_soa_registers")
     .select("*")
-    .eq(
-      "standard",
-      assessment.standard
-    )
-    .eq("active", true)
-    .order("display_order", {
-      ascending: true,
-    });
-
-  if (allQuestionsError) {
-    throw new Error(
-      allQuestionsError.message
-    );
-  }
-
-  const questions = (
-    allQuestions ?? []
-  ).filter(
-    (question) =>
-      question.clause === clause
-  );
-
-  // Load formal findings and corrective actions for advanced assessments.
-  let assessmentFindings = [];
-  let correctiveActions = [];
-
-  if (
-    ADVANCED_ASSESSMENT_STANDARDS.includes(
-      assessment.standard
-    )
-  ) {
-    const {
-      data: findingsData,
-      error: findingsError,
-    } = await admin
-      .from("assessment_findings")
-      .select("*")
-      .eq(
-        "assessment_id",
-        assessment.id
-      )
-      .eq(
-        "owner_id",
-        user.id
-      )
-      .order("created_at", {
-        ascending: true,
-      });
-
-    if (findingsError) {
-      throw new Error(
-        findingsError.message
-      );
-    }
-
-    assessmentFindings =
-      findingsData ?? [];
-
-    const findingIds =
-      assessmentFindings.map(
-        (finding) => finding.id
-      );
-
-    if (findingIds.length > 0) {
-      const {
-        data: actionsData,
-        error: actionsError,
-      } = await admin
-        .from("corrective_actions")
-        .select("*")
-        .eq(
-          "assessment_id",
-          assessment.id
-        )
-        .eq(
-          "owner_id",
-          user.id
-        )
-        .in(
-          "finding_id",
-          findingIds
-        )
-        .order("created_at", {
-          ascending: true,
-        });
-
-      if (actionsError) {
-        throw new Error(
-          actionsError.message
-        );
-      }
-
-      correctiveActions =
-        actionsData ?? [];
-    }
-  }
-
-  const findingsByQuestion =
-    Object.fromEntries(
-      assessmentFindings.map(
-        (finding) => [
-          finding.question_number,
-          finding,
-        ]
-      )
-    );
-
-  const actionsByFindingId =
-    Object.fromEntries(
-      correctiveActions.map(
-        (action) => [
-          action.finding_id,
-          action,
-        ]
-      )
-    );
-
-  const allQuestionNumbers = (
-    allQuestions ?? []
-  ).map(
-    (question) =>
-      question.question_number
-  );
-
-  // Load all saved answers
-  let allSavedAnswers = [];
-
-  if (
-    allQuestionNumbers.length > 0
-  ) {
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("assessment_answers")
-      .select("*")
-      .eq(
-        "assessment_id",
-        assessment.id
-      )
-      .eq("owner_id", user.id)
-      .in(
-        "clause",
-        allQuestionNumbers
-      );
-
-    if (error) {
-      throw new Error(
-        error.message
-      );
-    }
-
-    allSavedAnswers =
-      data ?? [];
-  }
-
-  // Load active scoring profile
-  const {
-    data: scoringProfile,
-    error: scoringProfileError,
-  } = await supabase
-    .from("scoring_profiles")
-    .select(
-      "id, profile_name, version_label"
-    )
-    .eq(
-      "standard",
-      assessment.standard
-    )
-    .eq("active", true)
-    .order("created_at", {
-      ascending: false,
-    })
-    .limit(1)
+    .eq("assessment_id", id)
+    .eq("owner_id", user.id)
     .maybeSingle();
 
-  if (scoringProfileError) {
-    throw new Error(
-      scoringProfileError.message
+  if (registerError) throw new Error(registerError.message);
+
+  if (!register) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#f3f6f9", padding: "42px 20px", fontFamily: "Arial, sans-serif" }}>
+        <section style={{ maxWidth: "760px", margin: "80px auto", background: "#fff", border: "1px solid #d8e2ee", borderRadius: "16px", padding: "34px" }}>
+          <div style={{ color: "#1459d9", fontWeight: 800, letterSpacing: ".08em", fontSize: "12px" }}>ISO/IEC 27001:2022</div>
+          <h1 style={{ color: "#071a33", marginBottom: "10px" }}>Statement of Applicability</h1>
+          <p style={{ color: "#617087", lineHeight: 1.6 }}>Create the controlled SoA register for this assessment. It will include all 93 Annex A controls, ISO/IEC 27002-aligned implementation guidance and traceability to risk treatment.</p>
+          {access.canEditAssessment ? (
+            <form action={provisionSoa}>
+              <input type="hidden" name="assessment_id" value={id} />
+              <button style={{ border: 0, borderRadius: "8px", padding: "12px 17px", background: "#1459d9", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Create 93-control SoA</button>
+            </form>
+          ) : (
+            <p style={{ color: "#9a3412", fontWeight: 700 }}>Assessment editing access has ended, so a new SoA cannot be created.</p>
+          )}
+          <Link href={`/portal/assessments/${id}`} style={{ display: "inline-block", marginTop: "18px", color: "#1459d9", fontWeight: 700 }}>← Return to assessment</Link>
+        </section>
+      </main>
     );
   }
 
-  let weights = {};
+  const [{ data: catalog, error: catalogError }, { data: entries, error: entriesError }, { data: findings, error: findingsError }] = await Promise.all([
+    supabase.from("iso27001_control_catalog").select("*").eq("active", true).order("control_order", { ascending: true }),
+    admin.from("assessment_soa_entries").select("*").eq("assessment_id", id).eq("owner_id", user.id),
+    admin.from("assessment_findings").select("id, question_number, finding_type, status").eq("assessment_id", id).eq("owner_id", user.id).neq("finding_type", "conformity").order("created_at", { ascending: true }),
+  ]);
 
-  if (scoringProfile) {
-    const {
-      data: clauseWeights,
-      error: clauseWeightsError,
-    } = await supabase
-      .from(
-        "scoring_profile_clauses"
-      )
-      .select(
-        "clause, weight"
-      )
-      .eq(
-        "scoring_profile_id",
-        scoringProfile.id
-      );
+  if (catalogError) throw new Error(catalogError.message);
+  if (entriesError) throw new Error(entriesError.message);
+  if (findingsError) throw new Error(findingsError.message);
 
-    if (clauseWeightsError) {
-      throw new Error(
-        clauseWeightsError.message
-      );
-    }
+  const entryMap = new Map((entries ?? []).map((entry) => [entry.control_id, entry]));
+  const rows = (catalog ?? []).map((control) => ({ ...control, ...entryMap.get(control.control_id), assessment_id: id }));
+  const selectedTheme = value(filters, "theme", "all");
+  const selectedApplicability = value(filters, "applicability", "all");
+  const selectedStatus = value(filters, "status", "all");
+  const query = value(filters, "q", "").trim().toLowerCase();
+  const visibleRows = rows.filter((row) =>
+    (selectedTheme === "all" || row.theme === selectedTheme) &&
+    (selectedApplicability === "all" || row.applicability === selectedApplicability) &&
+    (selectedStatus === "all" || row.implementation_status === selectedStatus) &&
+    (!query || `${row.control_id} ${row.control_title} ${row.control_intent}`.toLowerCase().includes(query))
+  );
 
-    weights =
-      Object.fromEntries(
-        (
-          clauseWeights ?? []
-        ).map((row) => [
-          row.clause,
-          Number(row.weight),
-        ])
-      );
-  }
-
-  // Saved answer lookup
-  const answersByClause = {};
-
-  for (
-    const answer of allSavedAnswers
-  ) {
-    answersByClause[
-      answer.clause
-    ] = answer;
-  }
-
-  // Progress
-  const progress =
-    calculateProgress(
-      allQuestions,
-      allSavedAnswers
-    );
-
-  // Overall weighted score
-  const hasWeightedProfile =
-    Object.keys(weights).length >
-    0;
-
-  const overallScore =
-    hasWeightedProfile
-      ? calculateWeightedOverallScore(
-          {
-            clauseNumbers:
-              CLAUSE_NUMBERS,
-            questions:
-              allQuestions,
-            answers:
-              allSavedAnswers,
-            weights,
-          }
-        )
-      : calculateSimpleOverallScore(
-          allSavedAnswers
-        );
-
-  // Current clause score
-  const currentClauseScore =
-    calculateClauseScore(
-      clause,
-      allQuestions,
-      allSavedAnswers
-    );
-
-  const clauseTitle =
-    getClauseTitle(
-      assessment.standard,
-      clause
-    );
-
-  const isAdvancedAssessment =
-    ADVANCED_ASSESSMENT_STANDARDS.includes(
-      assessment.standard
-    );
-
-  const isIso27001Assessment = [
-    "ISO/IEC 27001:2022",
-    "ISO/IEC 27001:2022/Amd 1:2024",
-  ].includes(assessment.standard);
-
-  async function saveCurrentClause(
-    formData
-  ) {
-    "use server";
-
-    // Draft saves are intentionally partial. Remove unanswered score
-    // controls so the action saves only responses the assessor completed.
-    for (const [key, value] of formData.entries()) {
-      if (
-        key.startsWith("score_") &&
-        String(value).trim() === ""
-      ) {
-        formData.delete(key);
-      }
-    }
-
-    formData.set(
-      "next_clause",
-      clause
-    );
-
-    await saveAssessmentAnswers(
-      formData
-    );
-  }
-
-  // Maturity
-  let maturityLevel =
-    "Not assessed";
-
-  if (overallScore !== null) {
-    if (overallScore <= 20) {
-      maturityLevel =
-        "Initial";
-    } else if (
-      overallScore <= 40
-    ) {
-      maturityLevel =
-        "Developing";
-    } else if (
-      overallScore <= 60
-    ) {
-      maturityLevel =
-        "Managed";
-    } else if (
-      overallScore <= 80
-    ) {
-      maturityLevel =
-        "Controlled";
-    } else {
-      maturityLevel =
-        "Optimized";
-    }
-  }
+  const applicable = rows.filter((row) => row.applicability === "applicable").length;
+  const excluded = rows.filter((row) => row.applicability === "not_applicable").length;
+  const pending = rows.filter((row) => row.applicability === "pending").length;
+  const effective = rows.filter((row) => row.implementation_status === "effective").length;
+  const completion = rows.length ? Math.round(((rows.length - pending) / rows.length) * 100) : 0;
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f3f6f9",
-        padding: "40px",
-        fontFamily:
-          "Arial, sans-serif",
-      }}
-    >
-      {isIso27001Assessment && (
-        <div aria-hidden="true" style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none", userSelect: "none", opacity: .025, transform: "rotate(-10deg)" }}>
-          <div style={{ width: "720px", textAlign: "center" }}>
-            <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
-            <div style={{ color: "#1459D9", fontSize: "42px", fontWeight: 900, letterSpacing: ".14em", marginTop: "-18px" }}>ISO/IEC 27001</div>
+    <main style={{ minHeight: "100vh", background: "#f3f6f9", padding: "36px 20px 70px", fontFamily: "Arial, sans-serif" }}>
+      <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", flexWrap: "wrap", marginBottom: "20px" }}>
+          <div>
+            <div style={{ color: "#1459d9", fontWeight: 800, letterSpacing: ".08em", fontSize: "12px" }}>RPG INTELLIGENCE · CONTROLLED SoA</div>
+            <h1 style={{ color: "#071a33", margin: "8px 0" }}>Statement of Applicability</h1>
+            <p style={{ color: "#617087", margin: 0 }}>{assessment.standard} · 93 Annex A controls · ISO/IEC 27002:2022 guidance</p>
           </div>
-        </div>
-      )}
-      <div
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <p
-          style={{
-            color: "#1459D9",
-            fontWeight: 700,
-            marginBottom: "8px",
-          }}
-        >
-          RPG Intelligence
-        </p>
-
-        <h1
-          style={{
-            color: "#071A33",
-            marginBottom: "8px",
-          }}
-        >
-          {assessment.standard}{" "}
-          Assessment
-        </h1>
-
-        <p
-          style={{
-            color: "#617087",
-            marginBottom: "24px",
-          }}
-        >
-          Status:{" "}
-          <strong>
-            {assessment.status}
-          </strong>
-        </p>
-
-        {isAdvancedAssessment && (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: "10px",
-              flexWrap: "wrap",
-              marginBottom: "18px",
-            }}
-          >
-            {isIso27001Assessment && (
-              <Link
-                href={`/portal/assessments/${assessment.id}/soa`}
-                style={{
-                  padding: "11px 16px",
-                  borderRadius: "8px",
-                  background: "#087A72",
-                  color: "#ffffff",
-                  textDecoration: "none",
-                  fontWeight: 700,
-                }}
-              >
-                Statement of Applicability
-              </Link>
-            )}
-
-            <Link
-              href={`/portal/assessments/${assessment.id}/evidence`}
-              style={{
-                padding: "11px 16px",
-                borderRadius: "8px",
-                background: "#1459D9",
-                color: "#ffffff",
-                textDecoration: "none",
-                fontWeight: 700,
-              }}
-            >
-              Evidence Sampling
-            </Link>
-
-            <Link
-              href={`/portal/assessments/${assessment.id}/findings`}
-              style={{
-                padding: "11px 16px",
-                borderRadius: "8px",
-                background: "#071A33",
-                color: "#ffffff",
-                textDecoration: "none",
-                fontWeight: 700,
-              }}
-            >
-              Findings & Corrective Actions ({assessmentFindings.filter((finding) => finding.finding_type !== "conformity").length})
-            </Link>
+          <div style={{ display: "flex", gap: "9px", flexWrap: "wrap" }}>
+            <Link href={`/portal/assessments/${id}`} style={{ border: "1px solid #cbd8e8", borderRadius: "8px", padding: "10px 14px", color: "#071a33", background: "#fff", textDecoration: "none", fontWeight: 700 }}>← Assessment</Link>
+            <Link href={`/portal/assessments/${id}/findings`} style={{ borderRadius: "8px", padding: "10px 14px", color: "#fff", background: "#071a33", textDecoration: "none", fontWeight: 700 }}>Findings & actions</Link>
           </div>
+        </header>
+
+        {!access.canEditAssessment && (
+          <div style={{ background: "#fff4e5", border: "1px solid #f1c982", color: "#7a4600", borderRadius: "10px", padding: "13px 15px", marginBottom: "18px", fontWeight: 700 }}>Read-only record: assessment editing access has ended.</div>
         )}
 
-        {/* Weighted score */}
-        <section
-          style={{
-            background: "#071A33",
-            color: "#ffffff",
-            borderRadius: "16px",
-            padding: "28px",
-            marginBottom: "18px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent:
-                "space-between",
-              alignItems: "center",
-              gap: "20px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  opacity: 0.75,
-                  letterSpacing:
-                    "1px",
-                  marginBottom: "7px",
-                }}
-              >
-                RPG WEIGHTED
-                READINESS
-              </div>
-
-              <strong
-                style={{
-                  fontSize: "21px",
-                }}
-              >
-                {
-                  assessment.standard
-                }
-              </strong>
-
-              <p
-                style={{
-                  opacity: 0.75,
-                  marginBottom: "4px",
-                }}
-              >
-                {hasWeightedProfile
-                  ? `${
-                      scoringProfile
-                        ?.profile_name
-                    } ${
-                      scoringProfile
-                        ?.version_label ??
-                      ""
-                    }`
-                  : "Standard readiness model"}
-              </p>
-
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#D6A539",
-                }}
-              >
-                {maturityLevel}
-              </div>
-            </div>
-
-            <div
-              style={{
-                fontSize: "48px",
-                fontWeight: 800,
-              }}
-            >
-              {overallScore !== null
-                ? `${overallScore}%`
-                : "—"}
-            </div>
-          </div>
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(120px,1fr))", gap: "11px", marginBottom: "18px" }}>
+          <Metric label="Decision completion" value={`${completion}%`} tone="#1459d9" />
+          <Metric label="Applicable" value={applicable} tone="#087a52" />
+          <Metric label="Not applicable" value={excluded} tone="#a55a09" />
+          <Metric label="Pending" value={pending} tone="#b42318" />
+          <Metric label="Effective" value={effective} tone="#087a52" />
         </section>
 
-        {/* Progress */}
-        <section
-          style={{
-            background: "#ffffff",
-            border:
-              "1px solid #dfe6ee",
-            borderRadius: "14px",
-            padding: "20px 24px",
-            marginBottom: "24px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent:
-                "space-between",
-              alignItems: "center",
-              gap: "16px",
-              marginBottom: "12px",
-            }}
-          >
-            <strong
-              style={{
-                color: "#071A33",
-              }}
-            >
-              Assessment Progress
-            </strong>
-
-            <strong
-              style={{
-                color: "#1459D9",
-              }}
-            >
-              {progress.percentage}%
-            </strong>
+        <section style={{ background: "#071a33", color: "#fff", borderRadius: "15px", padding: "22px", marginBottom: "18px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "15px", flexWrap: "wrap", marginBottom: "15px" }}>
+            <div><strong style={{ fontSize: "20px" }}>SoA governance and approval</strong><div style={{ opacity: .72, marginTop: "5px" }}>Version {register.version} · {statusLabel(register.status)} · approved {formatDate(register.approved_at)}</div></div>
+            <div style={{ color: "#63e6d3", fontWeight: 800 }}>{rows.length} controls provisioned</div>
           </div>
-
-          <div
-            style={{
-              height: "10px",
-              background: "#e7edf4",
-              borderRadius: "999px",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${
-                  progress.percentage
-                }%`,
-                background: "#1459D9",
-                borderRadius: "999px",
-              }}
-            />
-          </div>
-
-          <p
-            style={{
-              color: "#617087",
-              fontSize: "13px",
-              marginTop: "10px",
-              marginBottom: 0,
-            }}
-          >
-            {progress.answered} of{" "}
-            {progress.total} questions
-            answered
-          </p>
+          <form action={saveSoaRegister}>
+            <input type="hidden" name="assessment_id" value={id} />
+            <fieldset disabled={!access.canEditAssessment} style={{ border: 0, padding: 0, margin: 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "120px 190px 1fr 1fr", gap: "12px" }}>
+                <label style={{ ...labelStyle, color: "#dce8f7" }}>Version<input name="version" defaultValue={register.version} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7" }}>Status<select name="status" defaultValue={register.status} style={field}><option value="draft">Draft</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="superseded">Superseded</option></select></label>
+                <label style={{ ...labelStyle, color: "#dce8f7", gridColumn: "span 2" }}>ISMS scope<textarea name="isms_scope" defaultValue={register.isms_scope ?? ""} rows={2} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7", gridColumn: "span 2" }}>Risk assessment reference<input name="risk_assessment_reference" defaultValue={register.risk_assessment_reference ?? ""} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7", gridColumn: "span 2" }}>Risk treatment plan reference<input name="risk_treatment_plan_reference" defaultValue={register.risk_treatment_plan_reference ?? ""} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7" }}>Prepared by<input name="prepared_by" defaultValue={register.prepared_by ?? ""} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7" }}>Reviewed by<input name="reviewed_by" defaultValue={register.reviewed_by ?? ""} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7" }}>Approved by<input name="approved_by" defaultValue={register.approved_by ?? ""} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7" }}>Review due<input type="date" name="review_due_at" defaultValue={register.review_due_at ?? ""} style={field} /></label>
+                <label style={{ ...labelStyle, color: "#dce8f7", gridColumn: "1 / -1" }}>Approval statement<textarea name="approval_statement" defaultValue={register.approval_statement ?? ""} rows={2} style={field} placeholder="Confirm that control selection, exclusions and residual risks have been reviewed and approved." /></label>
+              </div>
+              {access.canEditAssessment && <button style={{ marginTop: "14px", border: 0, borderRadius: "8px", padding: "11px 16px", background: "#2f63e9", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Save governance record</button>}
+            </fieldset>
+          </form>
         </section>
 
-        {/* Clause navigation */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(135px, 1fr))",
-            gap: "12px",
-            marginBottom: "24px",
-          }}
-        >
-          {CLAUSE_NUMBERS.map(
-            (number) => {
-              const score =
-                calculateClauseScore(
-                  number,
-                  allQuestions,
-                  allSavedAnswers
-                );
+        <section style={{ background: "#fff", border: "1px solid #d8e2ee", borderRadius: "13px", padding: "16px", marginBottom: "18px" }}>
+          <form method="get" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(3,1fr) auto", gap: "10px", alignItems: "end" }}>
+            <label style={labelStyle}>Search<input name="q" defaultValue={value(filters, "q")} placeholder="Control number or title" style={field} /></label>
+            <label style={labelStyle}>Theme<select name="theme" defaultValue={selectedTheme} style={field}><option value="all">All themes</option>{Object.entries(THEMES).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label>
+            <label style={labelStyle}>Applicability<select name="applicability" defaultValue={selectedApplicability} style={field}><option value="all">All decisions</option><option value="pending">Pending</option><option value="applicable">Applicable</option><option value="not_applicable">Not applicable</option></select></label>
+            <label style={labelStyle}>Implementation<select name="status" defaultValue={selectedStatus} style={field}><option value="all">All statuses</option><option value="not_assessed">Not assessed</option><option value="not_implemented">Not implemented</option><option value="planned">Planned</option><option value="partially_implemented">Partially implemented</option><option value="implemented">Implemented</option><option value="effective">Effective</option></select></label>
+            <button style={{ border: 0, borderRadius: "8px", padding: "11px 15px", background: "#1459d9", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Apply</button>
+          </form>
+        </section>
 
-              const weight =
-                weights[number];
-
-              return (
-                <a
-                  key={number}
-                  href={`/portal/assessments/${assessment.id}?clause=${number}`}
-                  style={{
-                    background:
-                      clause === number
-                        ? "#1459D9"
-                        : "#ffffff",
-                    color:
-                      clause === number
-                        ? "#ffffff"
-                        : "#071A33",
-                    borderRadius: "12px",
-                    padding: "16px",
-                    border:
-                      clause === number
-                        ? "1px solid #1459D9"
-                        : "1px solid #dfe6ee",
-                    textDecoration:
-                      "none",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      opacity: 0.75,
-                      marginBottom:
-                        "7px",
-                    }}
-                  >
-                    CLAUSE {number}
+        <details style={{ background: "#fff", border: "1px solid #d8e2ee", borderRadius: "13px", marginBottom: "18px", overflow: "hidden" }}>
+          <summary style={{ cursor: "pointer", padding: "15px 17px", color: "#071a33", fontWeight: 800 }}>
+            Existing assessment findings ({(findings ?? []).length})
+          </summary>
+          <div style={{ borderTop: "1px solid #e2e9f1", padding: "12px 17px" }}>
+            {(findings ?? []).length ? (
+              <div style={{ display: "grid", gap: "8px" }}>
+                {(findings ?? []).map((finding) => (
+                  <div key={finding.id} style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "9px 11px", background: "#f7f9fc", borderRadius: "8px", color: "#294766" }}>
+                    <strong>{finding.question_number} · {findingTypeLabel(finding.finding_type)}</strong>
+                    <span style={{ textTransform: "capitalize" }}>{statusLabel(finding.status)}</span>
                   </div>
+                ))}
+              </div>
+            ) : <div style={{ color: "#657990" }}>No formal findings have been raised for this assessment.</div>}
+            <Link href={`/portal/assessments/${id}/findings`} style={{ display: "inline-block", marginTop: "11px", color: "#1459d9", fontWeight: 800 }}>Open Findings &amp; Corrective Actions →</Link>
+          </div>
+        </details>
 
-                  <div
-                    style={{
-                      fontSize: "24px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {score !== null
-                      ? `${score}%`
-                      : "—"}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      marginTop: "6px",
-                      lineHeight: 1.35,
-                    }}
-                  >
-                    {getClauseTitle(
-                      assessment.standard,
-                      number
-                    )}
-                  </div>
-
-                  {weight && (
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        marginTop: "8px",
-                        opacity: 0.7,
-                      }}
-                    >
-                      Weight: {weight}%
-                    </div>
-                  )}
-                </a>
-              );
-            }
-          )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "10px", marginBottom: "18px" }}>
+          {Object.entries(THEMES).map(([themeKey, item]) => {
+            const themeRows = rows.filter((row) => row.theme === themeKey);
+            const decided = themeRows.filter((row) => row.applicability !== "pending").length;
+            return <Link key={themeKey} href={`?theme=${themeKey}`} style={{ background: "#fff", border: "1px solid #d8e2ee", borderTop: `4px solid ${item.colour}`, borderRadius: "10px", padding: "13px", color: "#071a33", textDecoration: "none" }}><strong>{item.label}</strong><div style={{ color: "#657990", fontSize: "13px", marginTop: "5px" }}>{item.range} · {decided}/{themeRows.length} decided</div></Link>;
+          })}
         </div>
 
-        {/* Current clause */}
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "14px",
-            padding: "22px 24px",
-            marginBottom: "24px",
-            border:
-              "1px solid #dfe6ee",
-            display: "flex",
-            justifyContent:
-              "space-between",
-            alignItems: "center",
-            gap: "20px",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                color: "#1459D9",
-                fontSize: "12px",
-                fontWeight: 700,
-                marginBottom: "6px",
-              }}
-            >
-              CLAUSE {clause}
-            </div>
-
-            <strong
-              style={{
-                color: "#071A33",
-                fontSize: "18px",
-              }}
-            >
-              {clauseTitle}
-            </strong>
-          </div>
-
-          <div
-            style={{
-              color: "#071A33",
-              fontSize: "32px",
-              fontWeight: 800,
-            }}
-          >
-            {currentClauseScore !==
-            null
-              ? `${currentClauseScore}%`
-              : "—"}
-          </div>
-        </div>
-
-        {/* Assessment form */}
-        <form
-          action={
-            saveAssessmentAnswers
-          }
-        >
-          <input
-            type="hidden"
-            name="assessment_id"
-            value={assessment.id}
-          />
-
-          <input
-            type="hidden"
-            name="current_clause"
-            value={clause}
-          />
-
-          {nextClause && (
-            <input
-              type="hidden"
-              name="next_clause"
-              value={nextClause}
-            />
-          )}
-
-          <section
-            style={{
-              background: "white",
-              padding: "30px",
-              borderRadius: "14px",
-              boxShadow:
-                "0 10px 30px rgba(7, 26, 51, 0.06)",
-            }}
-          >
-            <div
-              style={{
-                marginBottom: "28px",
-                paddingBottom: "18px",
-                borderBottom:
-                  "1px solid #e6ebf1",
-              }}
-            >
-              <p
-                style={{
-                  color: "#1459D9",
-                  fontWeight: 700,
-                  marginBottom: "8px",
-                }}
-              >
-                CLAUSE {clause}
-              </p>
-
-              <h2
-                style={{
-                  color: "#071A33",
-                  margin: 0,
-                }}
-              >
-                {clauseTitle}
-              </h2>
-
-              <p
-                style={{
-                  color: "#617087",
-                  marginTop: "10px",
-                  lineHeight: 1.6,
-                }}
-              >
-                Complete each question
-                and record the evidence
-                supporting your
-                assessment.
-              </p>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gap: "30px",
-              }}
-            >
-              {questions.length ? (
-                questions.map(
-                  (
-                    question,
-                    index
-                  ) => {
-                    const savedAnswer =
-                      answersByClause[
-                        question
-                          .question_number
-                      ] ?? null;
-
-                    const fieldKey =
-                      question.question_number
-                        .replaceAll(
-                          ".",
-                          "_"
-                        )
-                        .replaceAll(
-                          "-",
-                          "_"
-                        );
-
-                    const savedFinding =
-                      findingsByQuestion[
-                        question.question_number
-                      ] ?? null;
-
-                    const savedAction =
-                      savedFinding
-                        ? actionsByFindingId[
-                            savedFinding.id
-                          ] ?? null
-                        : null;
-
-                    return (
-                      <div
-                        key={question.id}
-                        style={{
-                          borderTop:
-                            index === 0
-                              ? "none"
-                              : "1px solid #e6ebf1",
-                          paddingTop:
-                            index === 0
-                              ? "0"
-                              : "26px",
-                        }}
-                      >
-                        <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap",marginBottom:"10px"}}>
-                          <h3 style={{color:"#071A33",margin:0}}>
-                            Clause {question.clause_reference ?? question.question_number}
-                          </h3>
-                          {question.control_id && <span style={{padding:"5px 8px",borderRadius:"999px",background:"#edf3ff",color:"#1459D9",fontSize:"12px",fontWeight:800}}>
-                            RPG control {question.control_id}
-                          </span>}
-                        </div>
-
-                        <p
-                          style={{
-                            color:
-                              "#071A33",
-                            lineHeight: 1.6,
-                            fontWeight: 600,
-                            marginBottom:
-                              "10px",
-                          }}
-                        >
-                          {
-                            question.question
-                          }
-                        </p>
-
-                        {isAdvancedAssessment ? (
-                          <details
-                            style={{
-                              border: "1px solid #dfe6ee",
-                              borderRadius: "9px",
-                              background: "#fbfcfe",
-                              marginBottom:
-                                "18px",
-                              overflow: "hidden",
-                            }}
-                          >
-                            <summary style={{ cursor: "pointer", padding: "12px 14px", color: "#071A33", fontWeight: 800, background: "#f5f8fc" }}>
-                              Assessment guidance, evidence and conformity criteria
-                            </summary>
-                            <div style={{ display: "grid", gap: "12px", padding: "12px" }}>
-                            {question.requirement_summary && (
-                              <div
-                                style={{
-                                  background:
-                                    "#eef4ff",
-                                  borderLeft:
-                                    "4px solid #1459D9",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#617087",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    color:
-                                      "#071A33",
-                                  }}
-                                >
-                                  Requirement summary:
-                                </strong>{" "}
-                                {question.requirement_summary}
-                              </div>
-                            )}
-
-                            {question.assessor_guidance && (
-                              <div
-                                style={{
-                                  background:
-                                    "#f5f8fc",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#617087",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    color:
-                                      "#071A33",
-                                  }}
-                                >
-                                  Assessor guidance:
-                                </strong>{" "}
-                                {question.assessor_guidance}
-                              </div>
-                            )}
-
-                            {question.interview_questions && (
-                              <div
-                                style={{
-                                  background:
-                                    "#f8fafc",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#617087",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    color:
-                                      "#071A33",
-                                  }}
-                                >
-                                  Interview questions
-                                </strong>
-                                <ul
-                                  style={{
-                                    margin:
-                                      "8px 0 0 18px",
-                                    padding: 0,
-                                  }}
-                                >
-                                  {String(
-                                    question.interview_questions
-                                  )
-                                    .split("|")
-                                    .map((item) => item.trim())
-                                    .filter(Boolean)
-                                    .map((item, itemIndex) => (
-                                      <li
-                                        key={itemIndex}
-                                        style={{
-                                          marginBottom:
-                                            "5px",
-                                        }}
-                                      >
-                                        {item}
-                                      </li>
-                                    ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {question.objective_evidence && (
-                              <div
-                                style={{
-                                  background:
-                                    "#f3fbf8",
-                                  borderLeft:
-                                    "4px solid #167C80",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#617087",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    color:
-                                      "#071A33",
-                                  }}
-                                >
-                                  Objective evidence to seek:
-                                </strong>{" "}
-                                {question.objective_evidence}
-                              </div>
-                            )}
-
-                            {question.sampling_guidance && (
-                              <div
-                                style={{
-                                  background:
-                                    "#fff8e8",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#735c17",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong>
-                                  Sampling guidance:
-                                </strong>{" "}
-                                {question.sampling_guidance}
-                              </div>
-                            )}
-
-                            {question.conformity_criteria && (
-                              <div
-                                style={{
-                                  background:
-                                    "#f6f8fb",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#617087",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    color:
-                                      "#071A33",
-                                  }}
-                                >
-                                  Conformity criteria:
-                                </strong>{" "}
-                                {question.conformity_criteria}
-                              </div>
-                            )}
-
-                            {(question.minor_nc_guidance ||
-                              question.major_nc_guidance) && (
-                              <div
-                                style={{
-                                  display:
-                                    "grid",
-                                  gridTemplateColumns:
-                                    "repeat(auto-fit, minmax(260px, 1fr))",
-                                  gap: "10px",
-                                }}
-                              >
-                                {question.minor_nc_guidance && (
-                                  <div
-                                    style={{
-                                      background:
-                                        "#fffaf0",
-                                      padding:
-                                        "12px 14px",
-                                      borderRadius:
-                                        "8px",
-                                      color:
-                                        "#735c17",
-                                      lineHeight:
-                                        1.55,
-                                      fontSize:
-                                        "14px",
-                                    }}
-                                  >
-                                    <strong>
-                                      Minor NC guidance:
-                                    </strong>{" "}
-                                    {question.minor_nc_guidance}
-                                  </div>
-                                )}
-
-                                {question.major_nc_guidance && (
-                                  <div
-                                    style={{
-                                      background:
-                                        "#fff4f2",
-                                      padding:
-                                        "12px 14px",
-                                      borderRadius:
-                                        "8px",
-                                      color:
-                                        "#8a2c20",
-                                      lineHeight:
-                                        1.55,
-                                      fontSize:
-                                        "14px",
-                                    }}
-                                  >
-                                    <strong>
-                                      Major NC guidance:
-                                    </strong>{" "}
-                                    {question.major_nc_guidance}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {question.management_focus && (
-                              <div
-                                style={{
-                                  background:
-                                    "#f7f5ff",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#5d4a86",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong>
-                                  Management focus:
-                                </strong>{" "}
-                                {question.management_focus}
-                              </div>
-                            )}
-
-                            {question.transition_guidance && (
-                              <div
-                                style={{
-                                  background:
-                                    "#eef8ff",
-                                  borderLeft:
-                                    "4px solid #0284c7",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#475569",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    color:
-                                      "#071A33",
-                                  }}
-                                >
-                                  Transition / amendment guidance:
-                                </strong>{" "}
-                                {question.transition_guidance}
-                              </div>
-                            )}
-
-                            {question.maturity_guidance && (
-                              <div
-                                style={{
-                                  background:
-                                    "#f0fdf4",
-                                  borderLeft:
-                                    "4px solid #16a34a",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#475569",
-                                  lineHeight: 1.55,
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    color:
-                                      "#071A33",
-                                  }}
-                                >
-                                  Maturity guidance:
-                                </strong>{" "}
-                                {question.maturity_guidance}
-                              </div>
-                            )}
-                            </div>
-                          </details>
-                        ) : (
-                          question.guidance && (
-                            <div
-                              style={{
-                                background:
-                                  "#f5f8fc",
-                                borderLeft:
-                                  "4px solid #1459D9",
-                                padding:
-                                  "12px 14px",
-                                borderRadius:
-                                  "6px",
-                                color:
-                                  "#617087",
-                                lineHeight: 1.55,
-                                marginBottom:
-                                  "16px",
-                                fontSize: "14px",
-                              }}
-                            >
-                              <strong
-                                style={{
-                                  color:
-                                    "#071A33",
-                                }}
-                              >
-                                Guidance:
-                              </strong>{" "}
-                              {question.guidance}
-                            </div>
-                          )
-                        )}
-
-                        <label
-                          style={{
-                            display:
-                              "block",
-                            fontWeight: 700,
-                            color:
-                              "#071A33",
-                            marginBottom:
-                              "7px",
-                          }}
-                        >
-                          Assessment score
-                        </label>
-
-                        <select
-                          name={`score_${fieldKey}`}
-                          required
-                          defaultValue={
-                            savedAnswer
-                              ?.score !==
-                              null &&
-                            savedAnswer
-                              ?.score !==
-                              undefined
-                              ? String(
-                                  savedAnswer.score
-                                )
-                              : ""
-                          }
-                          style={{
-                            width: "100%",
-                            maxWidth:
-                              "360px",
-                            padding: "12px",
-                            borderRadius:
-                              "8px",
-                            border:
-                              "1px solid #d8e0ea",
-                            background:
-                              "#fff",
-                          }}
-                        >
-                          <option
-                            value=""
-                            disabled
-                          >
-                            Select score
-                          </option>
-
-                          <option value="0">
-                            0 — Not addressed
-                          </option>
-
-                          <option value="1">
-                            1 — Initial
-                          </option>
-
-                          <option value="2">
-                            2 — Partially implemented
-                          </option>
-
-                          <option value="3">
-                            3 — Implemented
-                          </option>
-
-                          <option value="4">
-                            4 — Effective
-                          </option>
-
-                          <option value="5">
-                            5 — Best practice
-                          </option>
-                        </select>
-
-                        <label
-                          style={{
-                            display:
-                              "block",
-                            fontWeight: 700,
-                            color:
-                              "#071A33",
-                            marginTop:
-                              "18px",
-                            marginBottom:
-                              "7px",
-                          }}
-                        >
-                          {isAdvancedAssessment
-                            ? "Objective evidence / assessor notes"
-                            : "Evidence / notes"}
-                        </label>
-
-                        <textarea
-                          name={`evidence_${fieldKey}`}
-                          placeholder={
-                            isAdvancedAssessment
-                              ? "Record sampled documents, records, interviews, observations, data, references and any identified gaps..."
-                              : "Describe supporting evidence, documents, records, observations or gaps..."
-                          }
-                          rows="4"
-                          defaultValue={
-                            savedAnswer
-                              ?.evidence ??
-                            ""
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "12px",
-                            borderRadius:
-                              "8px",
-                            border:
-                              "1px solid #d8e0ea",
-                            resize:
-                              "vertical",
-                            boxSizing:
-                              "border-box",
-                          }}
-                        />
-
-                        {isAdvancedAssessment && (
-                          <FindingConclusionFields
-                            fieldKey={fieldKey}
-                            savedFinding={savedFinding}
-                            savedAction={savedAction}
-                            savedEvidence={
-                              savedAnswer
-                                ?.evidence ??
-                              ""
-                            }
-                          />
-                        )}
-
-                        <button
-                          type="submit"
-                          formAction={saveCurrentClause}
-                          formNoValidate
-                          style={{
-                            marginTop: "14px",
-                            padding: "10px 15px",
-                            borderRadius: "8px",
-                            border: "1px solid #1459D9",
-                            background: "#ffffff",
-                            color: "#1459D9",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Save this question
-                        </button>
-                      </div>
-                    );
-                  }
-                )
-              ) : (
-                <div
-                  style={{
-                    padding: "20px",
-                    background:
-                      "#fff8e8",
-                    borderRadius: "8px",
-                    color: "#735c17",
-                  }}
-                >
-                  No questions are
-                  currently configured
-                  for Clause {clause}.
-                </div>
-              )}
-            </div>
-
-            {/* Navigation */}
-            <div
-              style={{
-                marginTop: "32px",
-                paddingTop: "22px",
-                borderTop:
-                  "1px solid #e6ebf1",
-                display: "flex",
-                justifyContent:
-                  "space-between",
-                gap: "12px",
-                flexWrap: "wrap",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <a
-                  href="/portal"
-                  style={{
-                    padding:
-                      "12px 18px",
-                    borderRadius:
-                      "8px",
-                    border:
-                      "1px solid #d8e0ea",
-                    color:
-                      "#071A33",
-                    textDecoration:
-                      "none",
-                    fontWeight: 700,
-                  }}
-                >
-                  Dashboard
-                </a>
-
-                {previousClause && (
-                  <a
-                    href={`/portal/assessments/${assessment.id}?clause=${previousClause}`}
-                    style={{
-                      padding:
-                        "12px 18px",
-                      borderRadius:
-                        "8px",
-                      border:
-                        "1px solid #d8e0ea",
-                      color:
-                        "#071A33",
-                      textDecoration:
-                        "none",
-                      fontWeight: 700,
-                    }}
-                  >
-                    ← Clause{" "}
-                    {previousClause}
-                  </a>
-                )}
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <button
-                  type="submit"
-                  formAction={
-                    saveCurrentClause
-                  }
-                  formNoValidate
-                  disabled={
-                    !questions.length
-                  }
-                  style={{
-                    padding:
-                      "12px 20px",
-                    borderRadius: "8px",
-                    border:
-                      "1px solid #1459D9",
-                    background:
-                      "#ffffff",
-                    color:
-                      "#1459D9",
-                    fontWeight: 700,
-                    cursor:
-                      questions.length
-                        ? "pointer"
-                        : "not-allowed",
-                  }}
-                >
-                  Save Answers
-                </button>
-
-              <button
-                type="submit"
-                disabled={
-                  !questions.length
-                }
-                style={{
-                  padding:
-                    "12px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background:
-                    questions.length
-                      ? "#1459D9"
-                      : "#c8d2df",
-                  color: "#ffffff",
-                  fontWeight: 700,
-                  cursor:
-                    questions.length
-                      ? "pointer"
-                      : "not-allowed",
-                }}
-              >
-                {nextClause
-                  ? `Save & Continue → Clause ${nextClause}`
-                  : "Complete Assessment →"}
-              </button>
-              </div>
-            </div>
-          </section>
-        </form>
+        <div style={{ color: "#617087", marginBottom: "10px", fontWeight: 700 }}>Showing {visibleRows.length} of {rows.length} controls</div>
+        <section style={{ display: "grid", gap: "11px" }}>
+          {visibleRows.map((row) => <ControlCard key={row.control_id} row={row} canEdit={access.canEditAssessment} findings={findings ?? []} />)}
+          {!visibleRows.length && <div style={{ background: "#fff", border: "1px solid #d8e2ee", borderRadius: "12px", padding: "30px", color: "#617087", textAlign: "center" }}>No controls match the selected filters.</div>}
+        </section>
       </div>
     </main>
   );
