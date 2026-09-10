@@ -4,6 +4,7 @@ import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { getAssessmentAccessState } from "../../../../../lib/assessment-access";
 import { provisionSoa, saveSoaControl, saveSoaRegister } from "./actions";
+import GuardedImplementationStatus from "./GuardedImplementationStatus";
 
 const THEMES = {
   organisational: { label: "Organisational", range: "5.1–5.37", colour: "#1459d9" },
@@ -144,14 +145,7 @@ function ControlCard({ row, canEdit, findings }) {
               </select>
             </label>
             <label style={labelStyle}>Implementation status
-              <select name={`implementation_status_${key}`} defaultValue={row.implementation_status} style={field} disabled={!canEdit}>
-                <option value="not_assessed">Not assessed</option>
-                <option value="not_implemented">Not implemented</option>
-                <option value="planned">Planned</option>
-                <option value="partially_implemented">Partially implemented</option>
-                <option value="implemented">Implemented</option>
-                <option value="effective">Effective</option>
-              </select>
+              <GuardedImplementationStatus name={`implementation_status_${key}`} riskLevelName={`residual_risk_level_${key}`} defaultValue={row.implementation_status} style={field} disabled={!canEdit}/>
             </label>
             <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>Applicability justification
               <textarea name={`applicability_justification_${key}`} defaultValue={row.applicability_justification ?? ""} rows={3} style={field} disabled={!canEdit} placeholder="Explain why the control is necessary, or why exclusion does not create unmanaged risk." />
