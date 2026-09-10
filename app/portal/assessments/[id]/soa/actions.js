@@ -37,14 +37,6 @@ const VALID_INCLUSION_SOURCES = [
   "good_practice",
 ];
 
-const VALID_RESIDUAL_RISK_LEVELS = [
-  "not_assessed",
-  "low",
-  "moderate",
-  "high",
-  "critical",
-];
-
 const VALID_TREATMENT_DECISIONS = [
   "pending",
   "monitor",
@@ -84,6 +76,24 @@ function requireChoice(value, allowed, label) {
   }
 
   return text;
+}
+
+function optionalRiskValue(value, label) {
+  const text = cleanText(value);
+  if (!text) return null;
+  const number = Number(text);
+  if (!Number.isInteger(number) || number < 1 || number > 5) {
+    throw new Error(`${label} must be a whole number from 1 to 5.`);
+  }
+  return number;
+}
+
+function calculatedRiskLevel(score) {
+  if (!score) return "not_assessed";
+  if (score >= 17) return "critical";
+  if (score >= 10) return "high";
+  if (score >= 5) return "moderate";
+  return "low";
 }
 
 function fieldKey(controlId) {
@@ -252,11 +262,16 @@ export async function saveSoaControl(formData) {
         VALID_INCLUSION_SOURCES.includes(value)
     );
 
-  const residualRiskLevel = requireChoice(
-    formData.get(`residual_risk_level_${key}`),
-    VALID_RESIDUAL_RISK_LEVELS,
-    "residual-risk level"
-  );
+  const residualLikelihood = optionalRiskValue(formData.get(`residual_likelihood_${key}`), "Residual likelihood");
+  const residualImpact = optionalRiskValue(formData.get(`residual_impact_${key}`), "Residual impact");
+  if ((residualLikelihood && !residualImpact) || (!residualLikelihood && residualImpact)) {
+    throw new Error("Complete both residual likelihood and impact.");
+  }
+  if (applicability === "applicable" && (!residualLikelihood || !residualImpact)) {
+    throw new Error("Applicable controls require residual likelihood and impact values for the risk matrix.");
+  }
+  const residualRiskScore = residualLikelihood && residualImpact ? residualLikelihood * residualImpact : null;
+  const residualRiskLevel = calculatedRiskLevel(residualRiskScore);
   const treatmentDecision = requireChoice(
     formData.get(`treatment_decision_${key}`),
     VALID_TREATMENT_DECISIONS,
@@ -324,6 +339,9 @@ export async function saveSoaControl(formData) {
     ),
     residual_risk: residualRiskRationale,
     residual_risk_level: residualRiskLevel,
+    residual_likelihood: residualLikelihood,
+    residual_impact: residualImpact,
+    residual_risk_score: residualRiskScore,
     residual_risk_rationale: residualRiskRationale,
     risk_owner: riskOwner,
     treatment_decision: treatmentDecision,
