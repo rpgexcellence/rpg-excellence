@@ -115,9 +115,9 @@ function ControlCard({ row, canEdit, findings }) {
       </summary>
 
       <div style={{ borderTop: "1px solid #e2e9f1", padding: "20px" }}>
-        <div aria-hidden="true" style={{ position: "absolute", right: "36px", top: "92px", width: "390px", opacity: .035, pointerEvents: "none", userSelect: "none", textAlign: "center", transform: "rotate(-8deg)" }}>
+        <div aria-hidden="true" style={{ position: "absolute", right: "36px", top: "92px", width: "390px", opacity: .06, pointerEvents: "none", userSelect: "none", textAlign: "center", transform: "rotate(-8deg)" }}>
           <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
-          <div style={{ color: "#1459d9", fontSize: "25px", fontWeight: 900, letterSpacing: ".12em", marginTop: "-12px" }}>ISO/IEC 27001</div>
+          <div style={{ color: "#1459d9", fontSize: "25px", fontWeight: 900, letterSpacing: ".12em", marginTop: "-12px" }}>ISO/IEC 27001 SoA</div>
         </div>
 
         <div style={{ position: "relative", zIndex: 1 }}>
@@ -342,7 +342,13 @@ export default async function SoaPage({ params, searchParams }) {
 
   return (
     <main style={{ minHeight: "100vh", background: "#f3f6f9", padding: "36px 20px 70px", fontFamily: "Arial, sans-serif" }}>
-      <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+      <div aria-hidden="true" style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none", userSelect: "none", opacity: .07, transform: "rotate(-10deg)", zIndex: 0 }}>
+        <div style={{ width: "720px", textAlign: "center" }}>
+          <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
+          <div style={{ color: "#1459d9", fontSize: "40px", fontWeight: 900, letterSpacing: ".13em", marginTop: "-18px" }}>ISO/IEC 27001 SoA</div>
+        </div>
+      </div>
+      <div style={{ maxWidth: "1280px", margin: "0 auto", position: "relative", zIndex: 1 }}>
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", flexWrap: "wrap", marginBottom: "20px" }}>
           <div>
             <div style={{ color: "#1459d9", fontWeight: 800, letterSpacing: ".08em", fontSize: "12px" }}>RPG INTELLIGENCE · CONTROLLED SoA</div>
