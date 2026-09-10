@@ -357,6 +357,7 @@ export default async function SoaPage({ params, searchParams }) {
           </div>
           <div style={{ display: "flex", gap: "9px", flexWrap: "wrap" }}>
             <Link href={`/portal/assessments/${id}`} style={{ border: "1px solid #cbd8e8", borderRadius: "8px", padding: "10px 14px", color: "#071a33", background: "#fff", textDecoration: "none", fontWeight: 700 }}>← Assessment</Link>
+            <Link href={`/portal/assessments/${id}/soa/summary`} style={{ borderRadius: "8px", padding: "10px 14px", color: "#fff", background: "#1459d9", textDecoration: "none", fontWeight: 700 }}>Executive Summary</Link>
             <Link href={`/portal/assessments/${id}/findings`} style={{ borderRadius: "8px", padding: "10px 14px", color: "#fff", background: "#071a33", textDecoration: "none", fontWeight: 700 }}>Findings & actions</Link>
           </div>
         </header>
