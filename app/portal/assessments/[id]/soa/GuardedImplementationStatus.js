@@ -23,9 +23,19 @@ export default function GuardedImplementationStatus({ name, riskLevelName, defau
     if (!riskSelect) return undefined;
 
     const syncRisk = () => setRiskLevel(riskSelect.value || "not_assessed");
+    const fieldKey = riskLevelName.replace(/^residual_risk_level_/, "");
+    const syncCalculatedRisk = (event) => {
+      if (event.detail?.fieldKey === fieldKey) {
+        setRiskLevel(event.detail.riskLevel || "not_assessed");
+      }
+    };
     syncRisk();
     riskSelect.addEventListener("change", syncRisk);
-    return () => riskSelect.removeEventListener("change", syncRisk);
+    form.addEventListener("soa-risk-change", syncCalculatedRisk);
+    return () => {
+      riskSelect.removeEventListener("change", syncRisk);
+      form.removeEventListener("soa-risk-change", syncCalculatedRisk);
+    };
   }, [riskLevelName]);
 
   useEffect(() => {
