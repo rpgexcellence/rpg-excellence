@@ -62,6 +62,16 @@ function statusLabel(status) {
   return String(status ?? "").replaceAll("_", " ");
 }
 
+function findingTypeLabel(type) {
+  return ({
+    major_nc: "Major NC",
+    minor_nc: "Minor NC",
+    observation: "Observation",
+    ofi: "Opportunity for improvement",
+    conformity: "Conformity",
+  })[type] ?? statusLabel(type);
+}
+
 function Metric({ label, value: metricValue, tone = "#071a33" }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #d8e2ee", borderRadius: "12px", padding: "16px" }}>
@@ -71,7 +81,7 @@ function Metric({ label, value: metricValue, tone = "#071a33" }) {
   );
 }
 
-function ControlCard({ row, canEdit }) {
+function ControlCard({ row, canEdit, findings }) {
   const key = controlKey(row.control_id);
   const theme = THEMES[row.theme];
   const sources = row.inclusion_source ?? [];
@@ -80,6 +90,7 @@ function ControlCard({ row, canEdit }) {
   return (
     <details
       style={{
+        position: "relative",
         background: "#fff",
         border: `1px solid ${complete ? "#c9dfd5" : "#d8e2ee"}`,
         borderLeft: `5px solid ${theme.colour}`,
@@ -104,26 +115,23 @@ function ControlCard({ row, canEdit }) {
       </summary>
 
       <div style={{ borderTop: "1px solid #e2e9f1", padding: "20px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "18px" }}>
-          <div style={{ background: "#eef5ff", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}>
-            <strong style={{ color: "#071a33" }}>Assessment question</strong><br />
-            {row.assessment_question}
-          </div>
-          <div style={{ background: "#effaf8", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}>
-            <strong style={{ color: "#071a33" }}>ISO/IEC 27002-aligned guidance</strong><br />
-            {row.implementation_guidance || "Apply controls proportionately to the assessed risk and operating context."}
-          </div>
-          <div style={{ background: "#f7f9fc", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}>
-            <strong style={{ color: "#071a33" }}>Objective evidence to seek</strong><br />
-            {row.objective_evidence || "Current records, system evidence, interviews, observation and adverse examples."}
-          </div>
-          <div style={{ background: "#fff8e8", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}>
-            <strong style={{ color: "#071a33" }}>Effectiveness test</strong><br />
-            {row.effectiveness_criteria || "Confirm that the control achieves its intended outcome and responds to change."}
-          </div>
+        <div aria-hidden="true" style={{ position: "absolute", right: "36px", top: "92px", width: "390px", opacity: .035, pointerEvents: "none", userSelect: "none", textAlign: "center", transform: "rotate(-8deg)" }}>
+          <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
+          <div style={{ color: "#1459d9", fontSize: "25px", fontWeight: 900, letterSpacing: ".12em", marginTop: "-12px" }}>ISO/IEC 27001</div>
         </div>
 
-        <form action={saveSoaControl}>
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <details style={{ background: "#f7f9fc", border: "1px solid #d8e2ee", borderRadius: "9px", marginBottom: "18px", overflow: "hidden" }}>
+            <summary style={{ cursor: "pointer", padding: "12px 14px", color: "#071a33", fontWeight: 800 }}>Assessment support — question, ISO/IEC 27002 guidance and evidence</summary>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", padding: "0 14px 14px" }}>
+              <div style={{ background: "#eef5ff", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>Assessment question</strong><br />{row.assessment_question}</div>
+              <div style={{ background: "#effaf8", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>ISO/IEC 27002-aligned guidance</strong><br />{row.implementation_guidance || "Apply controls proportionately to the assessed risk and operating context."}</div>
+              <div style={{ background: "#fff", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>Objective evidence to seek</strong><br />{row.objective_evidence || "Current records, system evidence, interviews, observation and adverse examples."}</div>
+              <div style={{ background: "#fff8e8", borderRadius: "9px", padding: "13px", color: "#294766", lineHeight: 1.55 }}><strong style={{ color: "#071a33" }}>Effectiveness test</strong><br />{row.effectiveness_criteria || "Confirm that the control achieves its intended outcome and responds to change."}</div>
+            </div>
+          </details>
+
+          <form action={saveSoaControl}>
           <input type="hidden" name="assessment_id" value={row.assessment_id} />
           <input type="hidden" name="control_id" value={row.control_id} />
 
@@ -175,7 +183,7 @@ function ControlCard({ row, canEdit }) {
             <label style={labelStyle}>Effectiveness evidence
               <textarea name={`effectiveness_evidence_${key}`} defaultValue={row.effectiveness_evidence ?? ""} rows={3} style={field} disabled={!canEdit} />
             </label>
-            <div style={{ gridColumn: "1 / -1", background: "#f7f9fc", border: "1px solid #d8e2ee", borderRadius: "9px", padding: "12px 14px", color: "#294766", fontSize: "13px", lineHeight: 1.55 }}>
+            <div style={{ gridColumn: "1 / -1", borderLeft: "4px solid #1459d9", padding: "5px 11px", color: "#52677f", fontSize: "13px", lineHeight: 1.5 }}>
               <strong style={{ color: "#071a33" }}>Residual-risk decision guide:</strong> Low — monitor; Moderate — treat or formally accept; High — controlled treatment required; Critical — immediate escalation. High or Critical risk cannot be marked Effective.
             </div>
             <label style={labelStyle}>Residual risk level
@@ -219,10 +227,22 @@ function ControlCard({ row, canEdit }) {
               <input type="date" name={`target_date_${key}`} defaultValue={dateInputValue(row.target_date)} style={field} disabled={!canEdit} />
             </label>
             <label style={labelStyle}>Finding reference
-              <input name={`finding_reference_${key}`} defaultValue={row.finding_reference ?? ""} style={field} disabled={!canEdit} placeholder="Assessment finding or CAPA/8D reference" />
+              <select name={`finding_reference_${key}`} defaultValue={row.finding_reference ?? ""} style={field} disabled={!canEdit}>
+                <option value="">No linked finding</option>
+                {row.finding_reference && !findings.some((finding) => finding.question_number === row.finding_reference) && <option value={row.finding_reference}>{row.finding_reference}</option>}
+                {findings.map((finding) => <option key={finding.id} value={finding.question_number}>{finding.question_number} · {findingTypeLabel(finding.finding_type)} · {statusLabel(finding.status)}</option>)}
+              </select>
             </label>
-            <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>Assessor conclusion
-              <textarea name={`assessor_conclusion_${key}`} defaultValue={row.assessor_conclusion ?? ""} rows={3} style={field} disabled={!canEdit} />
+            <label style={labelStyle}>Assessor conclusion
+              <select name={`assessor_conclusion_${key}`} defaultValue={row.assessor_conclusion ?? "not_assessed"} style={field} disabled={!canEdit}>
+                <option value="not_assessed">Not assessed</option>
+                {row.assessor_conclusion && !["not_assessed", "conformity", "observation", "ofi", "minor_nc", "major_nc"].includes(row.assessor_conclusion) && <option value={row.assessor_conclusion}>{row.assessor_conclusion}</option>}
+                <option value="conformity">Conformity</option>
+                <option value="observation">Observation</option>
+                <option value="ofi">Opportunity for improvement</option>
+                <option value="minor_nc">Minor nonconformity</option>
+                <option value="major_nc">Major nonconformity</option>
+              </select>
             </label>
           </div>
 
@@ -231,7 +251,8 @@ function ControlCard({ row, canEdit }) {
               Save A.{row.control_id}
             </button>
           )}
-        </form>
+          </form>
+        </div>
       </div>
     </details>
   );
@@ -290,13 +311,15 @@ export default async function SoaPage({ params, searchParams }) {
     );
   }
 
-  const [{ data: catalog, error: catalogError }, { data: entries, error: entriesError }] = await Promise.all([
+  const [{ data: catalog, error: catalogError }, { data: entries, error: entriesError }, { data: findings, error: findingsError }] = await Promise.all([
     supabase.from("iso27001_control_catalog").select("*").eq("active", true).order("control_order", { ascending: true }),
     admin.from("assessment_soa_entries").select("*").eq("assessment_id", id).eq("owner_id", user.id),
+    admin.from("assessment_findings").select("id, question_number, finding_type, status").eq("assessment_id", id).eq("owner_id", user.id).neq("finding_type", "conformity").order("created_at", { ascending: true }),
   ]);
 
   if (catalogError) throw new Error(catalogError.message);
   if (entriesError) throw new Error(entriesError.message);
+  if (findingsError) throw new Error(findingsError.message);
 
   const entryMap = new Map((entries ?? []).map((entry) => [entry.control_id, entry]));
   const rows = (catalog ?? []).map((control) => ({ ...control, ...entryMap.get(control.control_id), assessment_id: id }));
@@ -389,7 +412,7 @@ export default async function SoaPage({ params, searchParams }) {
 
         <div style={{ color: "#617087", marginBottom: "10px", fontWeight: 700 }}>Showing {visibleRows.length} of {rows.length} controls</div>
         <section style={{ display: "grid", gap: "11px" }}>
-          {visibleRows.map((row) => <ControlCard key={row.control_id} row={row} canEdit={access.canEditAssessment} />)}
+          {visibleRows.map((row) => <ControlCard key={row.control_id} row={row} canEdit={access.canEditAssessment} findings={findings ?? []} />)}
           {!visibleRows.length && <div style={{ background: "#fff", border: "1px solid #d8e2ee", borderRadius: "12px", padding: "30px", color: "#617087", textAlign: "center" }}>No controls match the selected filters.</div>}
         </section>
       </div>
