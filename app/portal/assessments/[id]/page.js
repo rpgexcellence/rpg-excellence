@@ -484,10 +484,20 @@ export default async function AssessmentPage({
           "Arial, sans-serif",
       }}
     >
+      {isIso27001Assessment && (
+        <div aria-hidden="true" style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none", userSelect: "none", opacity: .025, transform: "rotate(-10deg)" }}>
+          <div style={{ width: "720px", textAlign: "center" }}>
+            <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
+            <div style={{ color: "#1459D9", fontSize: "42px", fontWeight: 900, letterSpacing: ".14em", marginTop: "-18px" }}>ISO/IEC 27001</div>
+          </div>
+        </div>
+      )}
       <div
         style={{
           maxWidth: "1100px",
           margin: "0 auto",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         <p
@@ -573,7 +583,7 @@ export default async function AssessmentPage({
                 fontWeight: 700,
               }}
             >
-              Findings & Corrective Actions
+              Findings & Corrective Actions ({assessmentFindings.filter((finding) => finding.finding_type !== "conformity").length})
             </Link>
           </div>
         )}
@@ -1042,14 +1052,20 @@ export default async function AssessmentPage({
                         </p>
 
                         {isAdvancedAssessment ? (
-                          <div
+                          <details
                             style={{
-                              display: "grid",
-                              gap: "12px",
+                              border: "1px solid #dfe6ee",
+                              borderRadius: "9px",
+                              background: "#fbfcfe",
                               marginBottom:
                                 "18px",
+                              overflow: "hidden",
                             }}
                           >
+                            <summary style={{ cursor: "pointer", padding: "12px 14px", color: "#071A33", fontWeight: 800, background: "#f5f8fc" }}>
+                              Assessment guidance, evidence and conformity criteria
+                            </summary>
+                            <div style={{ display: "grid", gap: "12px", padding: "12px" }}>
                             {question.requirement_summary && (
                               <div
                                 style={{
@@ -1375,7 +1391,8 @@ export default async function AssessmentPage({
                                 {question.maturity_guidance}
                               </div>
                             )}
-                          </div>
+                            </div>
+                          </details>
                         ) : (
                           question.guidance && (
                             <div
@@ -1540,6 +1557,24 @@ export default async function AssessmentPage({
                             }
                           />
                         )}
+
+                        <button
+                          type="submit"
+                          formAction={saveCurrentClause}
+                          formNoValidate
+                          style={{
+                            marginTop: "14px",
+                            padding: "10px 15px",
+                            borderRadius: "8px",
+                            border: "1px solid #1459D9",
+                            background: "#ffffff",
+                            color: "#1459D9",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Save this question
+                        </button>
                       </div>
                     );
                   }
