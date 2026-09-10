@@ -5,6 +5,7 @@ import { createClient } from "../../lib/supabase/server";
 import {
   getUserSubscription,
   getAvailableAssessmentPasses,
+  getAvailableStandaloneSoaPasses,
   hasActiveSubscription,
 } from "../../lib/subscription";
 
@@ -223,4 +224,73 @@ export async function createAssessment(formData) {
   redirect(
     `/portal/assessments/${data.id}`
   );
+}
+
+export async function createStandaloneSoa(formData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/portal/login");
+
+  const organizationId = formData.get("organization_id");
+  if (typeof organizationId !== "string" || !organizationId.trim()) {
+    throw new Error("Organisation is required.");
+  }
+
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("id", organizationId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!organization) throw new Error("Organisation not found.");
+
+  const subscribed = hasActiveSubscription(await getUserSubscription(user.id));
+  const passes = subscribed ? [] : await getAvailableStandaloneSoaPasses(user.id);
+  const pass = passes[0] ?? null;
+  if (!subscribed && !pass) redirect("/en/pricing?soa=required");
+
+  const { data: assessment, error: assessmentError } = await supabase
+    .from("assessments")
+    .insert({
+      organization_id: organizationId,
+      owner_id: user.id,
+      standard: "ISO/IEC 27001:2022",
+      status: "draft",
+      workspace_type: "soa_only",
+    })
+    .select("id")
+    .single();
+  if (assessmentError || !assessment) throw new Error(assessmentError?.message ?? "Unable to create SoA workspace.");
+
+  const { createAdminClient } = await import("../../lib/supabase/admin");
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+
+  if (pass) {
+    const { data: claimed, error: claimError } = await admin
+      .from("assessment_passes")
+      .update({ status: "redeemed", assessment_id: assessment.id, organization_id: organizationId, redeemed_at: now, updated_at: now })
+      .eq("id", pass.id)
+      .eq("owner_id", user.id)
+      .eq("product_type", "standalone_soa")
+      .eq("status", "available")
+      .gt("access_expires_at", now)
+      .select("id")
+      .maybeSingle();
+    if (claimError || !claimed) {
+      await admin.from("assessments").delete().eq("id", assessment.id).eq("owner_id", user.id);
+      throw new Error("This SoA purchase has already been used or has expired.");
+    }
+  }
+
+  const { data: registerId, error: provisionError } = await admin.rpc("provision_iso27001_soa", {
+    p_assessment_id: assessment.id,
+    p_owner_id: user.id,
+    p_organization_id: organizationId,
+  });
+  if (provisionError || !registerId) {
+    throw new Error(provisionError?.message ?? "Unable to provision the 93-control SoA.");
+  }
+
+  redirect(`/portal/assessments/${assessment.id}/soa`);
 }
