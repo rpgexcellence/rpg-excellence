@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import HsHubFeature from "../../components/HsHubFeature";
 import { copy, locales } from "../../lib/i18n";
 
 const standards = [
@@ -69,6 +70,7 @@ export default async function Home({ params }) {
       <ProductDashboard />
     </section>
     <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.slice(0, 4).map(([code, name]) => <div className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></div>)}</section>
+    <HsHubFeature locale={locale} />
     <section className="section" id="iso"><div className="sectionHead"><div><span className="kicker">Standards we support</span><h2>One assurance platform. Five essential management systems.</h2></div><p>Use a dedicated standard or combine compatible requirements into an integrated audit while retaining clause-level traceability.</p></div><div className="standardGrid">{standards.map(([code, title, slug, tone, description]) => <Link href={`/${locale}/${slug}`} className={`standardCard ${tone}`} key={code}><span className="standardBadge">{code}</span><strong>{title}</strong><span>{description} →</span></Link>)}</div></section>
     <section className="darkBand"><span className="kicker light">Controlled improvement workflow</span><h2>From assessment to verified effectiveness.</h2><p>RPG Excellence connects the audit conclusion to accountable improvement instead of allowing findings to disappear into disconnected spreadsheets and emails.</p><div className="toolGrid darkTools">{assuranceSteps.map(([number, title, text]) => <div className="toolCard darkTool" key={number}><span className="toolIcon">{number}</span><strong>{title}</strong><span>{text}</span></div>)}</div></section>
     <section className="capabilitySection" id="solutions"><div className="capabilityHeading"><div><span>TURN COMPLIANCE INTO PROGRESS</span><h2>Everything you need for a stronger, more resilient business.</h2></div><a href="#capability-grid">Explore all capabilities →</a></div><div className="capabilityGrid" id="capability-grid">{capabilities.map((item) => <Link href={item.href} className="capabilityCard" key={item.title}><span className={`capabilityIcon ${item.icon}`} aria-hidden="true" /><div><h3>{item.title}</h3><p>{item.text}</p></div><b>→</b></Link>)}</div></section>
@@ -85,3 +87,4 @@ export default async function Home({ params }) {
     <Footer locale={locale} />
   </main>;
 }
+
