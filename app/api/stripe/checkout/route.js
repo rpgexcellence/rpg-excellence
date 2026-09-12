@@ -3,7 +3,7 @@ import { createClient } from "../../../../lib/supabase/server";
 
 function getStripe() { return new Stripe(process.env.STRIPE_SECRET_KEY); }
 
-const PRICE_IDS = {
+const TEST_PRICE_IDS = {
   starter:
     "price_1U5WlUD5EtNcxgfBEIP28fEM",
 
@@ -13,6 +13,26 @@ const PRICE_IDS = {
   consultant:
     "price_1U5WmuD5EtNcxgfB5KYndk8X",
 };
+
+const LIVE_PRICE_ENV = {
+  starter: "STRIPE_PRICE_STARTER",
+  professional: "STRIPE_PRICE_PROFESSIONAL",
+  consultant: "STRIPE_PRICE_CONSULTANT",
+};
+
+function getSubscriptionPriceId(plan) {
+  const configured = process.env[LIVE_PRICE_ENV[plan]];
+
+  if (configured) {
+    return configured;
+  }
+
+  if (process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) {
+    return TEST_PRICE_IDS[plan] || null;
+  }
+
+  return null;
+}
 const ASSESSMENT_STANDARDS = ["ISO 9001:2015/Amd 1:2024", "ISO 14001:2026", "ISO 45001:2018", "ISO/IEC 17024:2026"];
 const TRAINING_PRODUCTS = {
   "risk-assessment-initial": "RA-INITIAL-001",
@@ -89,7 +109,7 @@ export async function POST(request) {
         : "";
 
     const priceId =
-      PRICE_IDS[plan];
+      getSubscriptionPriceId(plan);
 
     const standard = typeof body?.standard === "string" ? body.standard.trim() : "";
     const trainingProduct = typeof body?.course === "string" ? body.course.trim().toLowerCase() : "";
@@ -103,7 +123,7 @@ export async function POST(request) {
       return Response.json(
         {
           error:
-            "Invalid subscription plan.",
+            "This subscription plan is not configured for live checkout.",
         },
         {
           status: 400,
@@ -119,13 +139,17 @@ export async function POST(request) {
     if (purchaseType === "training_course") {
       const { data, error } = await supabase
         .from("hs_training_courses")
-        .select("id,course_code,title,description,price_pence,currency,validity_months,academy_code")
+        .select("id,course_code,title,description,price_pence,currency,validity_months,academy_code,published_at")
         .eq("course_code", trainingCourseCode)
         .eq("active", true)
+        .not("published_at", "is", null)
         .maybeSingle();
 
       if (error) throw new Error(`Unable to load training course: ${error.message}`);
       if (!data) return Response.json({ error: "Training course is not currently available." }, { status: 404 });
+      if (!Number.isInteger(data.price_pence) || data.price_pence <= 0 || data.currency !== "gbp") {
+        return Response.json({ error: "Training course pricing is not configured." }, { status: 503 });
+      }
       trainingCourse = data;
 
       const { data: existing, error: existingError } = await supabase
@@ -325,4 +349,3 @@ export async function POST(request) {
     );
   }
 }
-
