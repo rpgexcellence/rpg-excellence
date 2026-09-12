@@ -55,13 +55,13 @@ export default async function InternalAuditTrainingPage({ params }) {
               <Link className="iaButton secondary" href="/portal/internal-audit">Explore Internal Audit Hub</Link>
               <Link className="iaButton secondary" href="/verify/training">Verify certificate</Link>
             </div>
-            <small>Individual access £19.99 + VAT. Secure payment and immediate learner access.</small>
+            <small>Individual access £19.99. No VAT is charged. Secure payment and immediate learner access.</small>
           </div>
 
           <aside className="iaOffer">
             <span>INTERNAL AUDITOR REFRESHER</span>
             <h2>Practical Audit Decisions</h2>
-            <div className="iaPrice"><strong>£19.99</strong><small>+ VAT / learner</small></div>
+            <div className="iaPrice"><strong>£19.99</strong><small>per learner</small></div>
             <ul>
               <li>Seven interactive modules</li>
               <li>Applied audit scenarios and immediate guidance</li>
@@ -128,7 +128,7 @@ export default async function InternalAuditTrainingPage({ params }) {
           <h2>Strengthen evidence-based audit decisions.</h2>
           <div className="iaActions">
             <TrainingPurchaseButton className="iaButton primary lightPrimary" course="internal-auditor-refresher">
-              Buy for £19.99 + VAT
+              Buy for £19.99
             </TrainingPurchaseButton>
             <Link className="iaButton secondary light" href={"/" + locale + "/contact"}>Organisation licences</Link>
           </div>
@@ -143,4 +143,3 @@ export default async function InternalAuditTrainingPage({ params }) {
 const styles = `
   .iaPublic{background:#f4f8fb;color:#071a3d}.iaHero{max-width:1240px;margin:auto;padding:88px 28px 70px;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(330px,.7fr);gap:54px;align-items:center}.iaEyebrow{display:block;color:#0a56e8;font-size:12px;font-weight:900;letter-spacing:.13em;margin-bottom:14px}.iaHero h1{font-size:clamp(42px,5.2vw,72px);line-height:.98;letter-spacing:-.055em;margin:0 0 24px;max-width:820px}.iaHero>div>p{font-size:20px;line-height:1.55;color:#425777;max-width:760px}.iaActions{display:flex;gap:12px;flex-wrap:wrap;margin:29px 0 16px}.iaButton{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 22px;border-radius:10px;text-decoration:none;font:inherit;font-weight:850;cursor:pointer}.iaButton.primary{border:0;background:#0a56e8;color:#fff}.iaButton.secondary{border:1px solid #b9c8db;background:#fff;color:#071a3d}.iaButton:disabled{cursor:wait;opacity:.7}.iaOffer{padding:30px;border-radius:22px;background:#102e59;color:#fff;box-shadow:0 24px 60px rgba(7,26,61,.18)}.iaOffer>span{color:#71e0c1;font-size:11px;font-weight:900;letter-spacing:.12em}.iaOffer h2{font-size:30px;margin:14px 0}.iaPrice{display:flex;gap:10px;align-items:baseline;margin:20px 0}.iaPrice strong{font-size:40px}.iaPrice small{color:#c9d5e5}.iaOffer ul{padding-left:20px;color:#e4ebf5;line-height:1.9}.full{width:100%;box-sizing:border-box}.iaSection{max-width:1184px;margin:auto;padding:72px 28px}.iaSection h2,.iaNote h2,.iaCta h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.035em;margin:0 0 18px}.iaValueGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:32px}.iaValueGrid article,.iaLabGrid article{padding:22px;border:1px solid #d8e3ed;border-radius:15px;background:#fff}.iaValueGrid b,.iaSectionHead>strong{color:#0a56e8}.iaValueGrid h3{margin:18px 0 8px}.iaValueGrid p,.iaLabGrid p,.iaModules p,.iaNote p{color:#506482;line-height:1.55}.iaLabs{background:#fff}.iaLabGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:30px}.iaLabGrid article{display:flex;gap:14px}.iaLabGrid article>span{color:#0a56e8}.iaLabGrid h3{margin:0 0 7px}.iaLabGrid p{margin:0}.iaSectionHead{display:flex;justify-content:space-between;gap:24px;align-items:flex-end}.iaModules{margin-top:28px;border-top:1px solid #cad7e7}.iaModules article{display:grid;grid-template-columns:55px 1fr;gap:18px;padding:21px 4px;border-bottom:1px solid #cad7e7}.iaModules article>b{color:#0a56e8;font-size:19px}.iaModules h3{margin:0 0 6px}.iaModules p{margin:0}.iaNote{max-width:1128px;box-sizing:border-box;margin:18px auto 80px;padding:34px;border:1px solid #e8b23b;border-left:7px solid #e8b23b;border-radius:14px;background:#fff9e8;display:grid;grid-template-columns:.9fr 1.1fr;gap:34px}.iaNote h2{font-size:28px}.iaCta{padding:68px max(28px,calc((100% - 1128px)/2));background:#102e59;color:#fff}.iaCta .iaEyebrow{color:#71e0c1}.iaCta h2{max-width:760px}.lightPrimary{background:#16a27f!important}.iaButton.light{border-color:#fff;background:transparent;color:#fff}@media(max-width:900px){.iaHero,.iaNote{grid-template-columns:1fr}.iaValueGrid,.iaLabGrid{grid-template-columns:1fr 1fr}}@media(max-width:580px){.iaHero{padding-top:58px}.iaHero h1{font-size:42px}.iaValueGrid,.iaLabGrid{grid-template-columns:1fr}.iaSectionHead{align-items:flex-start;flex-direction:column}}
 `;
-
