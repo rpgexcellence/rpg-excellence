@@ -21,6 +21,7 @@ function CapaPreview() {
     <div className="phPreviewTitle"><strong>Interactive RCA-8D</strong><span>Guided</span></div>
     <div className="phEightD">{["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"].map((step, index) => <span className={index < 4 ? "active" : ""} key={step}>{step}</span>)}</div>
     <div className="phCause"><i/><div><b>Evidence</b><small>Cause and effect</small></div><i/><div><b>Action</b><small>Verified effectiveness</small></div></div>
+    <div className="phCommercial"><b>RCA Practitioner Training</b><span>£49.99 + VAT</span></div>
   </div>;
 }
 
@@ -53,7 +54,7 @@ const hubs = [
     text: "Move from containment to evidence-based causal analysis, accountable action and independent effectiveness review.",
     points: ["Guided D1–D8 workflow", "Cause analysis tools", "Effectiveness verification"],
     href: "/capa-8d",
-    training: "Interactive RCA-8D training",
+    training: "£49.99 practitioner training",
     preview: <CapaPreview/>,
   },
   {
@@ -81,3 +82,4 @@ export default function PlatformHubsFeature({ locale = "en" }) {
     <div className="phProof"><div className="phProofLead"><strong>Evidence that supports decisions</strong><span>One controlled record across every hub</span></div><div className="phMetric"><b>3</b><span>Operational hubs</span></div><div className="phMetric"><b>5</b><span>Shared services</span></div><div className="phMetric"><b>1</b><span>Assurance record</span></div><Link className="phProofLink" href="/portal">Open the platform →</Link></div>
   </section>;
 }
+
