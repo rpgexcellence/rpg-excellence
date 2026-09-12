@@ -9,7 +9,7 @@ import { copy, locales } from "../../../lib/i18n";
 export const metadata = {
   title: "RCA and Corrective Action Practitioner Training | RPG Excellence",
   description:
-    "Interactive RCA and corrective action training covering problem definition, containment, causal analysis, action selection and effectiveness verification.",
+    "A 180-minute interactive RCA and corrective action practitioner course with structured exercises, downloadable workbook and verifiable certificate.",
 };
 
 const modules = [
@@ -57,7 +57,7 @@ export default async function RcaTrainingPublicPage({ params }) {
               <Link className="iaButton secondary" href="/portal/rca">Explore RCA–8D Hub</Link>
               <Link className="iaButton secondary" href="/verify/training">Verify certificate</Link>
             </div>
-            <small>Individual access £49.99 + VAT. Secure payment and immediate learner access.</small>
+            <small>Individual access £49.99 + VAT. Includes the practitioner workbook, final assessment and certificate.</small>
           </div>
 
           <aside className="iaOffer">
@@ -66,11 +66,13 @@ export default async function RcaTrainingPublicPage({ params }) {
             <div className="iaPrice"><strong>£49.99</strong><small>+ VAT / learner</small></div>
             <ul>
               <li>Ten interactive modules</li>
-              <li>Applied RCA scenarios and immediate guidance</li>
+              <li>Structured practitioner exercises with immediate guidance</li>
+              <li>Three-direction 5 Why and evidence-building tools</li>
+              <li>Downloadable completed practitioner workbook</li>
               <li>Twelve-question protected final assessment</li>
               <li>80% pass mark with attempt history</li>
               <li>Downloadable, verifiable certificate</li>
-              <li>Approximately 90 minutes</li>
+              <li>Approximately 180 minutes</li>
             </ul>
             <TrainingPurchaseButton className="iaButton primary full" course="rca-8d-practitioner">
               Start practitioner training
@@ -85,8 +87,8 @@ export default async function RcaTrainingPublicPage({ params }) {
             {[
               ["Applied capability", "Every module requires an RCA decision, rationale or structured problem-solving response."],
               ["Immediate coaching", "The guidance engine highlights missing evidence and explains what needs attention."],
-              ["Controlled progression", "Modules unlock in sequence and completion evidence is retained."],
-              ["Verified result", "Protected answer keys, attempt history and a public certificate verification route support assurance."],
+              ["Reusable workbook", "The learner can download a completed practitioner workbook containing their structured investigation evidence."],
+              ["Verified result", "Controlled progression, protected assessment, attempt history and public certificate verification support assurance."],
             ].map(([title, body], index) => (
               <article key={title}><b>{String(index + 1).padStart(2, "0")}</b><h3>{title}</h3><p>{body}</p></article>
             ))}
@@ -108,7 +110,7 @@ export default async function RcaTrainingPublicPage({ params }) {
         <section className="iaSection">
           <div className="iaSectionHead">
             <div><span className="iaEyebrow">COURSE CONTENT</span><h2>Ten detailed modules</h2></div>
-            <strong>Approximately 90 minutes</strong>
+            <strong>Approximately 180 minutes</strong>
           </div>
           <div className="iaModules">
             {modules.map(([number, title, body]) => (
@@ -122,6 +124,24 @@ export default async function RcaTrainingPublicPage({ params }) {
           <p>
             Organisations should also evaluate relevant education, investigation experience, observed performance, authority and continuing professional development before assigning an RCA leader.
           </p>
+        </section>
+
+        <section className="iaWorkbook">
+          <div>
+            <span className="iaEyebrow">INCLUDED WITH THE £49.99 COURSE</span>
+            <h2>Leave with a completed RCA practitioner workbook—not just a score.</h2>
+            <p>
+              Each structured decision is retained as controlled learning evidence. After passing, the learner can download a consolidated workbook alongside the verifiable certificate.
+            </p>
+          </div>
+          <ul>
+            <li>Investigation triage and D1 team record</li>
+            <li>5W2H problem definition and evidence plan</li>
+            <li>Containment design and validation record</li>
+            <li>Completed three-direction 5 Why analysis</li>
+            <li>Human-factors and corrective-action decisions</li>
+            <li>Implementation, extent and effectiveness evidence</li>
+          </ul>
         </section>
 
         <section className="iaCta">
@@ -142,7 +162,5 @@ export default async function RcaTrainingPublicPage({ params }) {
 }
 
 const styles = `
-  .iaPublic{background:#f4f8fb;color:#071a3d}.iaHero{max-width:1240px;margin:auto;padding:88px 28px 70px;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(330px,.7fr);gap:54px;align-items:center}.iaEyebrow{display:block;color:#0a56e8;font-size:12px;font-weight:900;letter-spacing:.13em;margin-bottom:14px}.iaHero h1{font-size:clamp(42px,5.2vw,72px);line-height:.98;letter-spacing:-.055em;margin:0 0 24px;max-width:820px}.iaHero>div>p{font-size:20px;line-height:1.55;color:#425777;max-width:760px}.iaActions{display:flex;gap:12px;flex-wrap:wrap;margin:29px 0 16px}.iaButton{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 22px;border-radius:10px;text-decoration:none;font:inherit;font-weight:850;cursor:pointer}.iaButton.primary{border:0;background:#0a56e8;color:#fff}.iaButton.secondary{border:1px solid #b9c8db;background:#fff;color:#071a3d}.iaButton:disabled{cursor:wait;opacity:.7}.iaOffer{padding:30px;border-radius:22px;background:#102e59;color:#fff;box-shadow:0 24px 60px rgba(7,26,61,.18)}.iaOffer>span{color:#71e0c1;font-size:11px;font-weight:900;letter-spacing:.12em}.iaOffer h2{font-size:30px;margin:14px 0}.iaPrice{display:flex;gap:10px;align-items:baseline;margin:20px 0}.iaPrice strong{font-size:40px}.iaPrice small{color:#c9d5e5}.iaOffer ul{padding-left:20px;color:#e4ebf5;line-height:1.9}.full{width:100%;box-sizing:border-box}.iaSection{max-width:1184px;margin:auto;padding:72px 28px}.iaSection h2,.iaNote h2,.iaCta h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.035em;margin:0 0 18px}.iaValueGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:32px}.iaValueGrid article,.iaLabGrid article{padding:22px;border:1px solid #d8e3ed;border-radius:15px;background:#fff}.iaValueGrid b,.iaSectionHead>strong{color:#0a56e8}.iaValueGrid h3{margin:18px 0 8px}.iaValueGrid p,.iaLabGrid p,.iaModules p,.iaNote p{color:#506482;line-height:1.55}.iaLabs{background:#fff}.iaLabGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:30px}.iaLabGrid article{display:flex;gap:14px}.iaLabGrid article>span{color:#0a56e8}.iaLabGrid h3{margin:0 0 7px}.iaLabGrid p{margin:0}.iaSectionHead{display:flex;justify-content:space-between;gap:24px;align-items:flex-end}.iaModules{margin-top:28px;border-top:1px solid #cad7e7}.iaModules article{display:grid;grid-template-columns:55px 1fr;gap:18px;padding:21px 4px;border-bottom:1px solid #cad7e7}.iaModules article>b{color:#0a56e8;font-size:19px}.iaModules h3{margin:0 0 6px}.iaModules p{margin:0}.iaNote{max-width:1128px;box-sizing:border-box;margin:18px auto 80px;padding:34px;border:1px solid #e8b23b;border-left:7px solid #e8b23b;border-radius:14px;background:#fff9e8;display:grid;grid-template-columns:.9fr 1.1fr;gap:34px}.iaNote h2{font-size:28px}.iaCta{padding:68px max(28px,calc((100% - 1128px)/2));background:#102e59;color:#fff}.iaCta .iaEyebrow{color:#71e0c1}.iaCta h2{max-width:760px}.lightPrimary{background:#16a27f!important}.iaButton.light{border-color:#fff;background:transparent;color:#fff}@media(max-width:900px){.iaHero,.iaNote{grid-template-columns:1fr}.iaValueGrid,.iaLabGrid{grid-template-columns:1fr 1fr}}@media(max-width:580px){.iaHero{padding-top:58px}.iaHero h1{font-size:42px}.iaValueGrid,.iaLabGrid{grid-template-columns:1fr}.iaSectionHead{align-items:flex-start;flex-direction:column}}
+  .iaPublic{background:#f4f8fb;color:#071a3d}.iaHero{max-width:1240px;margin:auto;padding:88px 28px 70px;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(330px,.7fr);gap:54px;align-items:center}.iaEyebrow{display:block;color:#0a56e8;font-size:12px;font-weight:900;letter-spacing:.13em;margin-bottom:14px}.iaHero h1{font-size:clamp(42px,5.2vw,72px);line-height:.98;letter-spacing:-.055em;margin:0 0 24px;max-width:820px}.iaHero>div>p{font-size:20px;line-height:1.55;color:#425777;max-width:760px}.iaActions{display:flex;gap:12px;flex-wrap:wrap;margin:29px 0 16px}.iaButton{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 22px;border-radius:10px;text-decoration:none;font:inherit;font-weight:850;cursor:pointer}.iaButton.primary{border:0;background:#0a56e8;color:#fff}.iaButton.secondary{border:1px solid #b9c8db;background:#fff;color:#071a3d}.iaButton:disabled{cursor:wait;opacity:.7}.iaOffer{padding:30px;border-radius:22px;background:#102e59;color:#fff;box-shadow:0 24px 60px rgba(7,26,61,.18)}.iaOffer>span{color:#71e0c1;font-size:11px;font-weight:900;letter-spacing:.12em}.iaOffer h2{font-size:30px;margin:14px 0}.iaPrice{display:flex;gap:10px;align-items:baseline;margin:20px 0}.iaPrice strong{font-size:40px}.iaPrice small{color:#c9d5e5}.iaOffer ul{padding-left:20px;color:#e4ebf5;line-height:1.9}.full{width:100%;box-sizing:border-box}.iaSection{max-width:1184px;margin:auto;padding:72px 28px}.iaSection h2,.iaNote h2,.iaWorkbook h2,.iaCta h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.035em;margin:0 0 18px}.iaValueGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:32px}.iaValueGrid article,.iaLabGrid article{padding:22px;border:1px solid #d8e3ed;border-radius:15px;background:#fff}.iaValueGrid b,.iaSectionHead>strong{color:#0a56e8}.iaValueGrid h3{margin:18px 0 8px}.iaValueGrid p,.iaLabGrid p,.iaModules p,.iaNote p,.iaWorkbook p{color:#506482;line-height:1.55}.iaLabs{background:#fff}.iaLabGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:30px}.iaLabGrid article{display:flex;gap:14px}.iaLabGrid article>span{color:#0a56e8}.iaLabGrid h3{margin:0 0 7px}.iaLabGrid p{margin:0}.iaSectionHead{display:flex;justify-content:space-between;gap:24px;align-items:flex-end}.iaModules{margin-top:28px;border-top:1px solid #cad7e7}.iaModules article{display:grid;grid-template-columns:55px 1fr;gap:18px;padding:21px 4px;border-bottom:1px solid #cad7e7}.iaModules article>b{color:#0a56e8;font-size:19px}.iaModules h3{margin:0 0 6px}.iaModules p{margin:0}.iaNote,.iaWorkbook{max-width:1128px;box-sizing:border-box;margin:18px auto;padding:34px;border-radius:14px;display:grid;grid-template-columns:.9fr 1.1fr;gap:34px}.iaNote{border:1px solid #e8b23b;border-left:7px solid #e8b23b;background:#fff9e8}.iaNote h2{font-size:28px}.iaWorkbook{margin-bottom:80px;border:1px solid #bad9d0;border-left:7px solid #16a27f;background:#f1fbf7}.iaWorkbook ul{margin:4px 0;padding-left:20px;line-height:1.9}.iaCta{padding:68px max(28px,calc((100% - 1128px)/2));background:#102e59;color:#fff}.iaCta .iaEyebrow{color:#71e0c1}.iaCta h2{max-width:760px}.lightPrimary{background:#16a27f!important}.iaButton.light{border-color:#fff;background:transparent;color:#fff}@media(max-width:900px){.iaHero,.iaNote,.iaWorkbook{grid-template-columns:1fr}.iaValueGrid,.iaLabGrid{grid-template-columns:1fr 1fr}}@media(max-width:580px){.iaHero{padding-top:58px}.iaHero h1{font-size:42px}.iaValueGrid,.iaLabGrid{grid-template-columns:1fr}.iaSectionHead{align-items:flex-start;flex-direction:column}}
 `;
-
-
