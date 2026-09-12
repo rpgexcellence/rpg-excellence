@@ -18,6 +18,14 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "009",
+      title:
+        "From Safety Records to Controlled Action: The Health & Safety Hub",
+      description:
+        "How connected risk assessments, actions, reviews, competence and management visibility create stronger workplace assurance.",
+      href: "health-safety-hub",
+    },
+    {
       number: "008",
       title:
         "From Audit Schedule to Accountable Closure: The RPG Intelligence Internal Audit Module",
