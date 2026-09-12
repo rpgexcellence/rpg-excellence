@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import HsHubFeature from "../../components/HsHubFeature";
+import PlatformHubsFeature from "../../components/PlatformHubsFeature";
 import { copy, locales } from "../../lib/i18n";
 
 const standards = [
@@ -17,19 +17,6 @@ const assuranceSteps = [
   ["02", "Evidence", "Record objective evidence, accountable conclusions and controlled findings."],
   ["03", "Improve", "Investigate root causes and manage corrective actions through the CAPA-8D workflow."],
   ["04", "Verify", "Independently assess effectiveness and close only when results are sustained."],
-];
-const assuranceBenefits = [
-  ["Integrated audit control", "Plan scope, team, criteria, evidence, findings and reporting in one controlled audit record."],
-  ["Clause-level insight", "See which requirements are performing effectively and where assurance is weakest."],
-  ["Accountable CAPA-8D", "Connect every major or minor nonconformity to structured root-cause and action control."],
-  ["Independent verification", "Separate action-owner implementation from the auditor's effectiveness decision."],
-  ["Executive reporting", "Translate audit results into management-ready conclusions, trends and priorities."],
-];
-const capabilities = [
-  { icon: "audit", title: "Internal Audit", text: "Plan, execute and report audits with full traceability and real-time insight.", href: "/portal/internal-audits" },
-  { icon: "capa", title: "CAPA-8D", text: "Manage corrective action from validated cause to verified effectiveness.", href: "/portal/rca" },
-  { icon: "evidence", title: "Evidence Control", text: "Centralise objective evidence, decisions and controlled audit records.", href: "/portal/documents" },
-  { icon: "insight", title: "Executive Insight", text: "Turn assurance data into clear priorities, trends and management decisions.", href: "/portal" },
 ];
 const recentAudits = [
   ["12 Apr 2026", "ISO 9001", "Manufacturing", "Minor NC", "2", "warning"],
@@ -70,11 +57,9 @@ export default async function Home({ params }) {
       <ProductDashboard />
     </section>
     <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.slice(0, 4).map(([code, name]) => <div className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></div>)}</section>
-    <HsHubFeature locale={locale} />
+    <PlatformHubsFeature locale={locale} />
     <section className="section" id="iso"><div className="sectionHead"><div><span className="kicker">Standards we support</span><h2>One assurance platform. Five essential management systems.</h2></div><p>Use a dedicated standard or combine compatible requirements into an integrated audit while retaining clause-level traceability.</p></div><div className="standardGrid">{standards.map(([code, title, slug, tone, description]) => <Link href={`/${locale}/${slug}`} className={`standardCard ${tone}`} key={code}><span className="standardBadge">{code}</span><strong>{title}</strong><span>{description} →</span></Link>)}</div></section>
     <section className="darkBand"><span className="kicker light">Controlled improvement workflow</span><h2>From assessment to verified effectiveness.</h2><p>RPG Excellence connects the audit conclusion to accountable improvement instead of allowing findings to disappear into disconnected spreadsheets and emails.</p><div className="toolGrid darkTools">{assuranceSteps.map(([number, title, text]) => <div className="toolCard darkTool" key={number}><span className="toolIcon">{number}</span><strong>{title}</strong><span>{text}</span></div>)}</div></section>
-    <section className="capabilitySection" id="solutions"><div className="capabilityHeading"><div><span>TURN COMPLIANCE INTO PROGRESS</span><h2>Everything you need for a stronger, more resilient business.</h2></div><a href="#capability-grid">Explore all capabilities →</a></div><div className="capabilityGrid" id="capability-grid">{capabilities.map((item) => <Link href={item.href} className="capabilityCard" key={item.title}><span className={`capabilityIcon ${item.icon}`} aria-hidden="true" /><div><h3>{item.title}</h3><p>{item.text}</p></div><b>→</b></Link>)}</div></section>
-    <section className="section"><div className="sectionHead"><div><span className="kicker">Business assurance platform</span><h2>Designed for evidence, accountability and decisions.</h2></div><p>Built for auditors, QHSE leaders, action owners and management teams that need a dependable record of what was assessed, decided and improved.</p></div><div className="standardGrid">{assuranceBenefits.map(([title, text], index) => <div className={`standardCard ${index % 2 ? "teal" : "blue"}`} key={title}><span className="standardBadge">0{index + 1}</span><strong>{title}</strong><span>{text}</span></div>)}</div></section>
     <section className="homeControlBand"><div><span>CONTROLLED ASSURANCE</span><h2>From audit plan to verified improvement.</h2><p>Evidence-based decisions, accountable actions and independent effectiveness verification in one traceable workflow.</p></div><Link href="/portal" className="homePrimaryCta">Open the platform <span>→</span></Link></section>
     <section className="homeContactCta" id="contact">
       <div>
@@ -87,4 +72,3 @@ export default async function Home({ params }) {
     <Footer locale={locale} />
   </main>;
 }
-
