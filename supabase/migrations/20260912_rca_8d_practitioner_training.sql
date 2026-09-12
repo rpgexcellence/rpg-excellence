@@ -116,7 +116,7 @@ cross join (values
    )),
   (7, 'D5: Select corrective actions',
    'Compare solution strength and select actions that address verified causes without transferring unacceptable risk.',
-   'decision_lab', 9,
+   'scenario', 9,
    jsonb_build_object(
      'summary','Effective corrective action acts on the verified causal mechanism. Training or procedure revision alone rarely controls a design or system weakness.',
      'selection_tests',jsonb_build_array('Direct connection to a verified cause','Proportionate reduction of recurrence risk','Control lies within accountable authority','No unacceptable new failure mode','Specific owner and deliverable','Practical completion date','Measurable success criteria'),
@@ -134,7 +134,7 @@ cross join (values
    )),
   (9, 'D7: Prevent recurrence across the system',
    'Identify where the same causal weakness could exist and update applicable controls, learning and risk records.',
-   'decision_lab', 8,
+   'scenario', 8,
    jsonb_build_object(
      'summary','System prevention tests horizontal and vertical extent. A local fix may leave the same vulnerability in other products, sites, shifts, suppliers or management processes.',
      'extent_review',jsonb_build_array('Similar products and services','Equivalent equipment or software','Other sites and shifts','Shared suppliers or data sources','Related procedures and training','Risk assessments and control plans','Audit and monitoring programmes','Design and change processes'),
@@ -211,4 +211,3 @@ left join public.hs_training_questions q on q.course_id = c.id and q.active = tr
 left join public.hs_training_question_answers a on a.question_id = q.id
 where c.course_code = 'RCA-8D-001'
 group by c.course_code, c.active;
-
