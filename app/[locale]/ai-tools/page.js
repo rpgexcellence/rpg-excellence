@@ -4,8 +4,52 @@ import PageShell from "../../../components/PageShell";
 import { locales } from "../../../lib/i18n";
 
 export const metadata = {
-  title: "RPG Intelligence",
+  title: "RPG Excellence Platform | Assess, Audit, Control and Improve",
+  description:
+    "Explore RPG Excellence assessment, health and safety, internal audit, RCA–8D and practitioner training products.",
 };
+
+const solutionHubs = [
+  {
+    title: "Assessment & Gap Analysis",
+    description:
+      "Run evidence-led ISO readiness assessments, record findings and manage improvement through a controlled portfolio.",
+    status: "Four standards available",
+    href: "/portal",
+    action: "Open assessments",
+  },
+  {
+    title: "Health & Safety Hub",
+    description:
+      "Create and control workplace risk assessments, use the interactive 5×5 matrix, manage actions and build assessor competence.",
+    status: "Operational hub + training",
+    href: "/hs-hub",
+    action: "Explore H&S Hub",
+  },
+  {
+    title: "Internal Audit Hub",
+    description:
+      "Plan programmes, conduct evidence-led audits, control findings and verify corrective-action effectiveness.",
+    status: "Audit workflow + refresher",
+    href: "/internal-audit",
+    action: "Explore Internal Audit",
+  },
+  {
+    title: "RCA–8D Hub",
+    description:
+      "Lead D1–D8 investigations from problem definition and containment through verified causes, actions and closure.",
+    status: "RCA workspace + practitioner course",
+    href: "/capa-8d",
+    action: "Explore RCA–8D",
+  },
+];
+
+const academyProducts = [
+  ["Risk Assessment Training", "£19.99", "Interactive initial training with practical scenarios and certificate.", "/hs-hub/training"],
+  ["Risk Assessment Refresher", "£12.99", "Focused competence refresher with assessment and certificate.", "/hs-hub/training"],
+  ["Internal Auditor Refresher", "£19.99", "Evidence-led audit judgement, findings and follow-up practice.", "/internal-audit-training"],
+  ["RCA & Corrective Action Practitioner", "£49.99", "180-minute structured course, completed workbook and verifiable certificate.", "/rca-8d-training"],
+];
 
 const assessmentModules = [
   {
@@ -143,20 +187,12 @@ const supportingDocumentPacks = [
 
 const plannedModules = [
   {
-    title: "Risk Assessment Builder",
-    status: "MVP module",
-  },
-  {
-    title: "Internal Audit Builder",
-    status: "Planned module",
-  },
-  {
     title: "Business Continuity Planner",
-    status: "Planned module",
+    status: "Product roadmap",
   },
   {
     title: "ISO 27001 Risk Register",
-    status: "Planned module",
+    status: "Product roadmap",
   },
 ];
 
@@ -210,23 +246,40 @@ export default async function AiTools({
       <main className="simplePage aiPage">
         <div className="simpleInner">
           <span className="kicker">
-            RPG Intelligence
+            RPG EXCELLENCE ASSURANCE PLATFORM
           </span>
 
           <h1>
-            Intelligent ISO assessments,
-            supported by expert review.
+            Assess. Audit. Control.
+            Train. Improve.
           </h1>
 
           <p className="lead">
-            Complete a structured ISO gap
-            analysis, record objective evidence,
-            raise formal findings, manage actions
-            and generate an executive report from
-            one connected assessment workspace.
+            Connected specialist hubs turn management-system requirements,
+            workplace risks, audit evidence and recurring problems into
+            controlled action—with practical training built into the platform.
           </p>
 
-          <h2>Available ISO assessments</h2>
+          <h2>Choose your operational hub</h2>
+
+          <div className="toolGrid">
+            {solutionHubs.map(({ title, description, status, href, action }) => (
+              <Link
+                className="toolCard toolCardLink"
+                href={href.startsWith("/portal") ? href : `/${locale}${href}`}
+                key={title}
+                style={{ color: "inherit", textDecoration: "none" }}
+              >
+                <span className="toolIcon">◈</span>
+                <strong>{title}</strong>
+                <span>{description}</span>
+                <span>{status}</span>
+                <span aria-hidden="true">{action} →</span>
+              </Link>
+            ))}
+          </div>
+
+          <h2 style={sectionStyle}>Available ISO gap assessments</h2>
 
           <div className="toolGrid">
             {assessmentModules.map(
@@ -238,7 +291,7 @@ export default async function AiTools({
               }) => (
                 <Link
                   className="toolCard toolCardLink"
-                  href={href}
+                  href={`/${locale}${href}`}
                   key={standard}
                   style={{
                     color: "inherit",
@@ -263,6 +316,31 @@ export default async function AiTools({
               )
             )}
           </div>
+
+          <section style={sectionStyle}>
+            <span className="kicker">RPG TRAINING ACADEMY</span>
+            <h2>Practical training with retained evidence</h2>
+            <p className="lead">
+              Individual courses combine interactive exercises, guided
+              feedback, a final assessment and a verifiable certificate.
+            </p>
+            <div className="toolGrid">
+              {academyProducts.map(([title, price, description, href]) => (
+                <Link
+                  className="toolCard toolCardLink"
+                  href={href}
+                  key={title}
+                  style={{ color: "inherit", textDecoration: "none" }}
+                >
+                  <span className="toolIcon">◇</span>
+                  <strong>{title}</strong>
+                  <span>{description}</span>
+                  <span>{price} per learner</span>
+                  <span aria-hidden="true">View course →</span>
+                </Link>
+              ))}
+            </div>
+          </section>
 
           <section
             id="supporting-documents"
@@ -357,42 +435,7 @@ export default async function AiTools({
             </div>
           </section>
 
-          <h2 id="eight-d-capa">
-            Root cause and corrective action
-          </h2>
-
-          <div className="toolGrid">
-            <Link
-              className="toolCard toolCardLink"
-              href="/portal/rca"
-              style={{
-                color: "inherit",
-                textDecoration: "none",
-              }}
-              aria-label="Open the 8D and CAPA workspace"
-            >
-              <span className="toolIcon">
-                ◈
-              </span>
-
-              <strong>
-                8D Root Cause & CAPA
-              </strong>
-
-              <span>
-                Standalone investigation and
-                corrective-action workspace
-              </span>
-
-              <span>Available now</span>
-
-              <span aria-hidden="true">
-                Open 8D workspace →
-              </span>
-            </Link>
-          </div>
-
-          <h2>Further intelligence modules</h2>
+          <h2>Product roadmap</h2>
 
           <div className="toolGrid">
             {plannedModules.map(
