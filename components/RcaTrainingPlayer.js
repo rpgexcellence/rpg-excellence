@@ -75,6 +75,18 @@ const methodGuides = {
       ],
     },
   ],
+  5: [{
+    title:"Three-legged 5 Why reference",
+    source:"D4 causal analysis",
+    introduction:"Develop three separate chains. Each chain answers a different control question and may reach a different actionable root cause.",
+    prompts:[
+      ["Leg 1: Occurrence","Why did the specific failure happen? Examine the work, equipment, material, conditions and human factors that produced it."],
+      ["Leg 2: Escape","Why did prevention, inspection or error-proofing fail to detect the problem before release or impact?"],
+      ["Leg 3: Systemic","Why did the management system allow the occurrence and detection weaknesses to exist or persist? Examine process definition, standardisation, review and oversight."],
+      ["Why else","Test parallel explanations. A problem can require several conditions and actions to combine."],
+      ["Evidence test","Treat every answer as a hypothesis until records, observation, testing or reliable witness evidence supports the causal link."],
+    ],
+  }],
 };
 
 function MethodReferences({ moduleNumber }) {
@@ -101,6 +113,7 @@ function LearningContent({ module }) {
 }
 
 function InteractiveExercise({ module, enrolment, completeModuleAction, onBack }) {
+  if (module.module_number === 5) return <ThreeWhyExercise module={module} enrolment={enrolment} completeModuleAction={completeModuleAction} onBack={onBack}/>;
   const exercise = exercises[module.module_number];
   const [selected,setSelected] = useState(null);
   const [rationale,setRationale] = useState("");
@@ -110,6 +123,82 @@ function InteractiveExercise({ module, enrolment, completeModuleAction, onBack }
   const ready = checked && correct && rationale.trim().length >= 25 && reviewed;
   const evidence = JSON.stringify({ question:exercise.question, selected_response:exercise.options[selected] || null, correct, rationale:rationale.trim(), guidance_reviewed:reviewed });
   return <section className="iapExercise"><button className="iapBack" type="button" onClick={onBack}>← Return to learning</button><small>INTERACTIVE DECISION ENGINE</small><h2>Apply the module</h2><p className="iapPrompt">{exercise.question}</p><div className="iapOptions">{exercise.options.map((option,index) => <button type="button" className={selected === index ? "selected" : ""} onClick={() => {setSelected(index);setChecked(false);setReviewed(false);}} key={option}><i>{String.fromCharCode(65 + index)}</i><span>{option}</span></button>)}</div><label className="iapRationale"><strong>Record your evidence-based rationale</strong><span>Explain why your decision is appropriate and what evidence or principle supports it.</span><textarea value={rationale} onChange={(event) => {setRationale(event.target.value);setChecked(false);setReviewed(false);}} placeholder="Write at least 25 characters. Your response becomes part of the module evidence."/></label><button className="iapCheck" type="button" disabled={selected === null || rationale.trim().length < 25} onClick={() => setChecked(true)}>Check my decision and show guidance</button>{checked && <div className={correct ? "iapFeedback good" : "iapFeedback review"}><strong>{correct ? "Sound RCA judgement" : "Review this decision"}</strong><p>{exercise.why}</p>{!correct && <p>Select the response that is supported by the causal logic and evidence available.</p>}<label><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}/> I have reviewed the guidance and can explain my decision.</label></div>}<form action={completeModuleAction}><input type="hidden" name="enrolment_id" value={enrolment.id}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="learner_reflection" value={evidence}/><button className="iapSubmit" type="submit" disabled={!ready}>Submit evidence and complete module →</button></form>{!ready && <p className="iapRule">Choose the sound response, provide a rationale, check the guidance and confirm your review before continuing.</p>}</section>;
+}
+
+const whyLegs = [
+  { key:"occurrence", title:"Leg 1 · Occurrence", question:"Why did the defective batch occur?", tone:"blue" },
+  { key:"escape", title:"Leg 2 · Escape", question:"Why was the defect not identified before shipment?", tone:"amber" },
+  { key:"systemic", title:"Leg 3 · Systemic", question:"Why did the system allow the occurrence and escape weaknesses?", tone:"green" },
+];
+
+const workedWhyExample = {
+  occurrence:[
+    "The machine calibration was outside the required setting.",
+    "The operator did not apply the approved calibration procedure.",
+    "The operator had not received practical training on that procedure.",
+    "The manager had not verified the operator’s calibration competence.",
+    "The competence process did not assign or trigger verification after the procedure changed.",
+  ],
+  escape:[
+    "End-of-line inspection did not test for this defect.",
+    "The quality-control checklist omitted the changed calibration characteristic.",
+    "The checklist had not been reviewed after the process change.",
+    "Quality and production had no defined handover for inspection-control updates.",
+    "The change process did not require control-plan and checklist approval before release.",
+  ],
+  systemic:[
+    "No routine review tested whether quality controls remained current.",
+    "Management oversight did not include control-plan effectiveness.",
+    "Ownership and review frequency for inspection controls were undefined.",
+    "Management review received no measure of overdue or ineffective control reviews.",
+    "The management system lacked a governed periodic review and escalation process.",
+  ],
+  evidence:{
+    occurrence:"Calibration records, procedure revision, training records, competence authorisation and operator interview.",
+    escape:"Inspection plan, checklist revision history, change record, release results and interviews with Quality and production.",
+    systemic:"Process ownership, review schedule, management-review inputs, overdue records and change-control requirements.",
+  },
+};
+
+function emptyWhyModel() {
+  return { occurrence:Array(5).fill(""), escape:Array(5).fill(""), systemic:Array(5).fill("") };
+}
+
+function ThreeWhyExercise({ module, enrolment, completeModuleAction, onBack }) {
+  const [model,setModel] = useState(emptyWhyModel);
+  const [evidence,setEvidence] = useState({ occurrence:"", escape:"", systemic:"" });
+  const [worked,setWorked] = useState(false);
+  const [checked,setChecked] = useState(false);
+  const [reviewed,setReviewed] = useState(false);
+  const answers = whyLegs.flatMap((leg) => model[leg.key]);
+  const missingAnswers = answers.filter((answer) => answer.trim().length < 8).length;
+  const missingEvidence = whyLegs.filter((leg) => evidence[leg.key].trim().length < 15).length;
+  const complete = missingAnswers === 0 && missingEvidence === 0;
+  const ready = checked && complete && reviewed;
+
+  function useWorkedExample(enabled) {
+    setWorked(enabled);
+    setChecked(false);
+    setReviewed(false);
+    if (enabled) {
+      setModel({ occurrence:[...workedWhyExample.occurrence], escape:[...workedWhyExample.escape], systemic:[...workedWhyExample.systemic] });
+      setEvidence({ ...workedWhyExample.evidence });
+    } else {
+      setModel(emptyWhyModel());
+      setEvidence({ occurrence:"", escape:"", systemic:"" });
+    }
+  }
+
+  function updateWhy(leg,index,value) {
+    setModel((current) => ({ ...current, [leg]:current[leg].map((answer,answerIndex) => answerIndex === index ? value : answer) }));
+    setChecked(false);
+    setReviewed(false);
+  }
+
+  const rationale = `Occurrence: ${model.occurrence.join(" | ")} Evidence: ${evidence.occurrence} Escape: ${model.escape.join(" | ")} Evidence: ${evidence.escape} Systemic: ${model.systemic.join(" | ")} Evidence: ${evidence.systemic}`;
+  const response = JSON.stringify({ exercise_type:"three_legged_five_why", problem:"Hypothetical defective batch", paths:model, evidence, worked_example_used:worked, all_boxes_completed:complete, correct:complete, rationale, guidance_reviewed:reviewed });
+
+  return <section className="iapExercise iapWhyExercise"><button className="iapBack" type="button" onClick={onBack}>← Return to learning</button><small>INTERACTIVE 3 × 5 WHY MODEL</small><h2>Build all three causal paths</h2><p className="iapPrompt">A manufacturing company produced a defective batch. Complete five linked Why responses for occurrence, escape and systemic control. Record the evidence that would verify each path.</p><label className="iapWorked"><input type="checkbox" checked={worked} onChange={(event) => useWorkedExample(event.target.checked)}/><span><strong>Use the worked example from the training</strong><small>Populate every box. Review and modify the example before submission so the final model reflects your reasoning.</small></span></label><div className="iapWhyGrid">{whyLegs.map((leg) => <section className={`iapWhyLeg ${leg.tone}`} key={leg.key}><header><small>{leg.title}</small><h3>{leg.question}</h3></header>{model[leg.key].map((answer,index) => <label key={`${leg.key}-${index}`}><b>{index === 4 ? "Root cause" : `Why ${index + 1}`}</b><textarea value={answer} onChange={(event) => updateWhy(leg.key,index,event.target.value)} placeholder={index === 0 ? "Start with the immediate causal explanation" : "Why did the preceding condition exist?"}/></label>)}<label className="iapWhyEvidence"><b>Evidence to verify this path</b><textarea value={evidence[leg.key]} onChange={(event) => {setEvidence((current) => ({...current,[leg.key]:event.target.value}));setChecked(false);setReviewed(false);}} placeholder="Records, observation, test or interview evidence"/></label></section>)}</div><button className="iapCheck" type="button" onClick={() => setChecked(true)}>Check the model and show guidance</button>{checked && <div className={complete ? "iapFeedback good" : "iapFeedback review"}><strong>{complete ? "All three causal paths are complete" : "The causal model needs further evidence"}</strong>{missingAnswers > 0 && <p>Complete {missingAnswers} remaining Why box{missingAnswers === 1 ? "" : "es"}. Each answer must explain the condition immediately above it.</p>}{missingEvidence > 0 && <p>Add evidence for {missingEvidence} path{missingEvidence === 1 ? "" : "s"}. A completed chain remains a hypothesis until evidence supports each relationship.</p>}{complete && <p>Review every link for chronology, technical credibility and evidence. Replace any repeated statement that does not explain why the preceding condition existed.</p>}<label><input type="checkbox" disabled={!complete} checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}/> I have reviewed all three paths, their root causes and supporting evidence.</label></div>}<form action={completeModuleAction}><input type="hidden" name="enrolment_id" value={enrolment.id}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="learner_reflection" value={response}/><button className="iapSubmit" type="submit" disabled={!ready}>Submit the 3 × 5 Why model and complete D4 →</button></form>{!ready && <p className="iapRule">Complete all 15 Why boxes, add evidence for each path, check the model and confirm your review.</p>}</section>;
 }
 
 export default function RcaTrainingPlayer({ enrolment, course, modules, progress = [], completeModuleAction }) {
