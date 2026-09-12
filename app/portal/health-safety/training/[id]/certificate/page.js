@@ -74,7 +74,7 @@ export default async function TrainingCertificatePage({ params }) {
       <div className="tcWrap">
         <nav className="tcNav">
           <Link href={`/portal/health-safety/training/${id}/assessment`}>← Assessment record</Link>
-          <span className="tcHint">Use your browser’s Print command to print or save this certificate as PDF.</span>
+          <a href={`/portal/health-safety/training/${id}/certificate/pdf`}>Download PDF ↓</a>
         </nav>
 
         <article className="tcPaper">
