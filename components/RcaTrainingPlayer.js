@@ -15,6 +15,69 @@ const exercises = {
   10: { question:"The original failure occurred about once every 20 cycles. The process has run twice since action completion. What is the correct D8 decision?", options:["Close because no recurrence has been reported","Close because every action is marked complete","Continue monitoring across a justified number of recurrence opportunities","Ask the action owner whether they feel confident"], answer:2, why:"Two cycles provide insufficient opportunity to test recurrence. Effectiveness needs independent outcome evidence over a monitoring period linked to the original failure pattern." },
 };
 
+const practitionerExercises = {
+  1:{ title:"Investigation triage record", instruction:"Separate the immediate response from the decision to investigate recurrence.", fields:[
+    ["correction","Immediate correction","What will address the detected item or consequence?","Replace the nonconforming component and confirm the customer can resume operation."],
+    ["containment","Containment boundary","Which affected and potentially affected outputs must be controlled?","Hold the delivered batch, internal stock and work in progress produced since the last verified conforming check."],
+    ["evidence","Evidence to preserve","What facts must remain available for investigation?","Retain failed parts, inspection results, machine settings, traceability, change history and witness accounts."],
+    ["decision","Investigation decision and reason","Explain whether a formal 8D is proportionate.","Launch a formal 8D because the customer escape and two related internal deviations demonstrate credible recurrence risk."],
+  ]},
+  2:{ title:"D1 team and authority plan", instruction:"Select people for their evidence, expertise, impact or authority, then define the investigation boundary.", fields:[
+    ["leader","Facilitator and competence","Name the required facilitator profile and why it fits.","A trained RCA facilitator independent of the coating process, empowered to control the method and timing."],
+    ["team","Core team and contribution","Identify each required role and the evidence or decision they contribute.","Operator: work as performed. Laboratory: adhesion evidence. Purchasing: material change. Supplier: batch controls. Process owner: authority for change."],
+    ["sponsor","Sponsor and authority","What barriers, resources or approvals must the sponsor control?","Operations Director to release cross-site resources, require supplier participation and approve production-control changes."],
+    ["scope","Included and excluded scope","Define product, process, locations, time period and justified exclusions.","Include both sites, affected coating family and material batches since the approved change. Exclude unrelated coating systems after confirming separate materials and equipment."],
+  ]},
+  3:{ title:"D2 problem definition and evidence plan", instruction:"Build a cause-free problem statement and show how you will close important information gaps.", fields:[
+    ["problem","5W2H problem statement","Include what, why, where, who, when, how and how much.","Three weld batches produced on Line 2 between 8 and 10 September failed the specified radiographic acceptance criteria after a consumable change, delaying customer release by two days. Other batches using the same specification passed."],
+    ["is_is_not","IS and IS NOT comparison","Contrast affected and unaffected products, places, times or conditions.","IS: Line 2, night shift, new consumable batch, high humidity. IS NOT: Line 1, day shift, earlier consumable batch and controlled storage."],
+    ["unknowns","Unknown facts","List the information that the investigation still needs.","Actual consumable storage exposure, machine parameter history, humidity by shift and measurement-system performance are not yet verified."],
+    ["interviews","TEDS interview plan","Identify people and the Tell, Explain, Describe or Show prompts you will use.","Ask the welder to show setup and explain difficult steps. Ask the supervisor to describe the change handover. Ask the inspector to explain detection and sampling."],
+    ["evidence","Evidence acquisition plan","Connect each unknown to a record, observation, test or interview.","Review data logs and storage records, observe setup, test retained consumables, verify radiography capability and compare change-control approvals."],
+  ]},
+  4:{ title:"D3 containment control plan", instruction:"Define, verify and control temporary protection until permanent actions meet exit criteria.", fields:[
+    ["population","Affected population and traceability","Define everything that may be affected and how you established the boundary.","Control all 240 certificates created from the shared template and data source during the quarter, plus pending certificates using the same configuration."],
+    ["controls","Containment actions","State segregation, inspection, communication and release controls.","Suspend automated issue, compare source data to every certificate, notify affected customers and require Quality approval before reissue or release."],
+    ["verification","Containment verification","How will you prove the temporary control prevents another escape?","Independently sample completed checks, reconcile all 240 records and challenge-test the corrected release workflow."],
+    ["ownership","Owner, review and escalation","Name accountable owners, dates and escalation conditions.","Certification Manager owns reconciliation within 48 hours. Quality reviews progress daily and escalates missing traceability immediately."],
+    ["exit","Exit criteria","What evidence permits authorised removal of containment?","Every certificate resolved, workflow correction implemented and validated, no unexplained records, and release authorised by Quality."],
+  ]},
+  6:{ title:"Human-factor causal map", instruction:"Replace blame with the conditions that shaped behaviour and identify evidence for every proposed factor.", fields:[
+    ["action","Observed action","Describe behaviour factually without judgement.","The operator selected the previous product programme during changeover."],
+    ["conditions","Error-producing conditions","Identify task, interface, workload and environmental conditions.","Programme labels were similar, the screen truncated identifying text and changeover occurred under production pressure."],
+    ["controls","Failed or removed defences","Which system controls should have prevented or detected the error?","The independent programme check had been removed and no product-to-programme interlock existed."],
+    ["organisation","Organisational influences","Which planning, change or leadership decisions created the conditions?","Output recovery was approved without a risk review, and change control did not reassess verification controls."],
+    ["evidence","Cause-validation evidence","What would prove or disprove each relationship?","Interface photographs, programme logs, change approval, production plan, interviews and controlled recreation of the selection task."],
+  ]},
+  7:{ title:"D5 corrective-action comparison", instruction:"Compare control strength and approve actions only when they address a verified cause.", fields:[
+    ["causes","Verified causes addressed","Identify the causal mechanisms that require action.","Ambiguous programme identification, absence of product-linked selection and removal of independent verification."],
+    ["candidates","Candidate actions","Include stronger and weaker options for comparison.","Awareness email, refresher briefing, restored independent check, barcode-linked selection and software interlock."],
+    ["comparison","Strength and risk comparison","Compare cause linkage, prevention strength, practicality, stability and new risk.","The interlock directly prevents mismatch and is stable but needs validation. The independent check gives interim protection. Email and generic retraining do not control the interface weakness."],
+    ["selection","Approved action package","State selected actions, owner, date and implementation evidence.","Engineering owns the validated interlock within six weeks. Production restores the independent check immediately with controlled records until validation."],
+    ["success","Measurable success criteria","Define what implementation and effectiveness must demonstrate.","Every product scan loads the authorised programme, invalid combinations are blocked, challenge tests pass and no manual bypass occurs during the monitoring period."],
+  ]},
+  8:{ title:"D6 implementation and validation gate", instruction:"Separate proof that the action exists from proof that the changed control works.", fields:[
+    ["implementation","Implementation evidence","What proves the approved action was installed or introduced?","Approved drawing, installed-device record, software configuration, revised instruction and authorised competence records."],
+    ["validation","Validation method and result","How will the control be challenge-tested under defined conditions?","Test correct and incorrect product identities, simulated sensor failure, restart and authorised override. Record expected and actual outcomes."],
+    ["risk","Change-risk review","What new failure modes or transferred risks require control?","Assess scanner failure, unreadable codes, incorrect master data, override misuse and production recovery arrangements."],
+    ["decision","Closure or reopening decision","State whether evidence supports closure and why.","Keep the action open until a witnessed functional challenge test confirms every defined condition. Purchase order and photograph alone are insufficient."],
+  ]},
+  9:{ title:"D7 extent-of-cause review", instruction:"Identify where the same weakness could exist and justify every inclusion or exclusion.", fields:[
+    ["population","Extent population","List comparable products, equipment, software, sites, suppliers and processes.","Review all three sites using the same controller family, equivalent programme libraries, shared master data and related product-identification processes."],
+    ["applicability","Applicability and exclusions","Explain which areas require action and the evidence supporting exclusions.","Sites A and B use the same configuration and require action. Site C may be excluded only after configuration, interface and verification evidence confirms a different control design."],
+    ["transfer","System prevention actions","What standards, controls and information must change?","Standardise interlock requirements, update change control and design rules, revise risk assessments and add periodic configuration verification."],
+    ["learning","Knowledge transfer and ownership","How will learning be retained, communicated and verified?","Engineering owns the design standard, Quality updates lessons learned, site managers confirm applicability and Internal Audit samples adoption."],
+  ]},
+  10:{ title:"D8 effectiveness and closure plan", instruction:"Set a monitoring design that provides enough independent evidence of sustained control.", fields:[
+    ["baseline","Baseline and intended outcome","State the original failure pattern and the result expected after action.","The mismatch occurred about once every 20 changeovers. The expected outcome is zero incorrect programme loads or verification escapes."],
+    ["measures","Leading and lagging measures","Define indicators that show control operation and final outcome.","Leading: completed scan-interlock transactions, blocked mismatches and override use. Lagging: wrong-programme events, defects and escapes."],
+    ["period","Monitoring period and sample","Link duration and sample size to recurrence opportunity.","Monitor at least 60 representative changeovers across products, shifts and abnormal conditions, covering three times the previous recurrence interval."],
+    ["reviewer","Independent reviewer and evidence","Who will review effectiveness and what evidence will they examine?","An independent Quality Engineer reviews system logs, challenge tests, deviations, overrides and sampled operator observations."],
+    ["criteria","Acceptance and reopening criteria","State the threshold for closure and what triggers renewed analysis.","Close after 60 compliant changeovers with no bypass or escape and all leading controls operating. Reopen for any mismatch, unexplained override or failed challenge test."],
+    ["learning","Report, transfer and recognition","What must be recorded and communicated before closure?","Approve the final 8D report, retain evidence, confirm extent actions, share lessons with affected sites and acknowledge the team after effectiveness approval."],
+  ]},
+};
+
 const listLabels = {
   tools:"Investigation tools",
   containment_test:"Containment design checks",
@@ -114,6 +177,7 @@ function LearningContent({ module }) {
 
 function InteractiveExercise({ module, enrolment, completeModuleAction, onBack }) {
   if (module.module_number === 5) return <ThreeWhyExercise module={module} enrolment={enrolment} completeModuleAction={completeModuleAction} onBack={onBack}/>;
+  if (practitionerExercises[module.module_number]) return <StructuredExercise module={module} enrolment={enrolment} completeModuleAction={completeModuleAction} onBack={onBack}/>;
   const exercise = exercises[module.module_number];
   const [selected,setSelected] = useState(null);
   const [rationale,setRationale] = useState("");
@@ -123,6 +187,31 @@ function InteractiveExercise({ module, enrolment, completeModuleAction, onBack }
   const ready = checked && correct && rationale.trim().length >= 25 && reviewed;
   const evidence = JSON.stringify({ question:exercise.question, selected_response:exercise.options[selected] || null, correct, rationale:rationale.trim(), guidance_reviewed:reviewed });
   return <section className="iapExercise"><button className="iapBack" type="button" onClick={onBack}>← Return to learning</button><small>INTERACTIVE DECISION ENGINE</small><h2>Apply the module</h2><p className="iapPrompt">{exercise.question}</p><div className="iapOptions">{exercise.options.map((option,index) => <button type="button" className={selected === index ? "selected" : ""} onClick={() => {setSelected(index);setChecked(false);setReviewed(false);}} key={option}><i>{String.fromCharCode(65 + index)}</i><span>{option}</span></button>)}</div><label className="iapRationale"><strong>Record your evidence-based rationale</strong><span>Explain why your decision is appropriate and what evidence or principle supports it.</span><textarea value={rationale} onChange={(event) => {setRationale(event.target.value);setChecked(false);setReviewed(false);}} placeholder="Write at least 25 characters. Your response becomes part of the module evidence."/></label><button className="iapCheck" type="button" disabled={selected === null || rationale.trim().length < 25} onClick={() => setChecked(true)}>Check my decision and show guidance</button>{checked && <div className={correct ? "iapFeedback good" : "iapFeedback review"}><strong>{correct ? "Sound RCA judgement" : "Review this decision"}</strong><p>{exercise.why}</p>{!correct && <p>Select the response that is supported by the causal logic and evidence available.</p>}<label><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}/> I have reviewed the guidance and can explain my decision.</label></div>}<form action={completeModuleAction}><input type="hidden" name="enrolment_id" value={enrolment.id}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="learner_reflection" value={evidence}/><button className="iapSubmit" type="submit" disabled={!ready}>Submit evidence and complete module →</button></form>{!ready && <p className="iapRule">Choose the sound response, provide a rationale, check the guidance and confirm your review before continuing.</p>}</section>;
+}
+
+function StructuredExercise({ module, enrolment, completeModuleAction, onBack }) {
+  const exercise = practitionerExercises[module.module_number];
+  const empty = () => Object.fromEntries(exercise.fields.map(([key]) => [key,""]));
+  const examples = Object.fromEntries(exercise.fields.map(([key,,,example]) => [key,example]));
+  const [answers,setAnswers] = useState(empty);
+  const [worked,setWorked] = useState(false);
+  const [checked,setChecked] = useState(false);
+  const [reviewed,setReviewed] = useState(false);
+  const missing = exercise.fields.filter(([key]) => String(answers[key] || "").trim().length < 20);
+  const complete = missing.length === 0;
+  const ready = checked && complete && reviewed;
+
+  function toggleExample(enabled) {
+    setWorked(enabled);
+    setAnswers(enabled ? {...examples} : empty());
+    setChecked(false);
+    setReviewed(false);
+  }
+
+  const rationale = exercise.fields.map(([key,label]) => `${label}: ${answers[key] || ""}`).join(" | ");
+  const response = JSON.stringify({ exercise_type:"structured_practitioner_record", module_number:module.module_number, exercise_title:exercise.title, fields:answers, worked_example_used:worked, all_fields_completed:complete, correct:complete, rationale, guidance_reviewed:reviewed });
+
+  return <section className="iapExercise"><button className="iapBack" type="button" onClick={onBack}>← Return to learning</button><small>INTERACTIVE PRACTITIONER EXERCISE</small><h2>{exercise.title}</h2><p className="iapPrompt">{exercise.instruction}</p><label className="iapWorked"><input type="checkbox" checked={worked} onChange={(event) => toggleExample(event.target.checked)}/><span><strong>Use a worked example</strong><small>Populate every field with a model response. Review and modify it before submission.</small></span></label><div className="iapStructuredFields">{exercise.fields.map(([key,label,help]) => <label className="iapRationale" key={key}><strong>{label}</strong><span>{help}</span><textarea value={answers[key]} onChange={(event) => {setAnswers((current) => ({...current,[key]:event.target.value}));setChecked(false);setReviewed(false);}} placeholder="Record a specific, evidence-based response."/></label>)}</div><button className="iapCheck" type="button" onClick={() => setChecked(true)}>Check my record and show guidance</button>{checked && <div className={complete ? "iapFeedback good" : "iapFeedback review"}><strong>{complete ? "The practitioner record is complete" : "Further information is required"}</strong>{missing.length > 0 ? <p>Complete: {missing.map(([,label]) => label).join(", ")}. Each field must explain the decision or evidence, not only name a document or action.</p> : <p>Review whether every statement is specific, linked to the scenario and capable of verification. Modify any model wording that you could not defend in an investigation review.</p>}<label><input type="checkbox" disabled={!complete} checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}/> I have reviewed this practitioner record and can explain the decisions and evidence.</label></div>}<form action={completeModuleAction}><input type="hidden" name="enrolment_id" value={enrolment.id}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="learner_reflection" value={response}/><button className="iapSubmit" type="submit" disabled={!ready}>Submit practitioner evidence and complete module →</button></form>{!ready && <p className="iapRule">Complete every field, check the record and confirm your review before continuing.</p>}</section>;
 }
 
 const whyLegs = [
