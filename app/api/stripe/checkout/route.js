@@ -14,6 +14,10 @@ const PRICE_IDS = {
     "price_1U5WmuD5EtNcxgfB5KYndk8X",
 };
 const ASSESSMENT_STANDARDS = ["ISO 9001:2015/Amd 1:2024", "ISO 14001:2026", "ISO 45001:2018", "ISO/IEC 17024:2026"];
+const TRAINING_PRODUCTS = {
+  "risk-assessment-initial": "RA-INITIAL-001",
+  "risk-assessment-refresher": "RA-REFRESHER-001",
+};
 
 export async function POST(request) {
   try {
@@ -50,7 +54,7 @@ export async function POST(request) {
     const body =
       await request.json();
 
-    const purchaseType = ["single_assessment", "standalone_soa"].includes(body?.purchaseType)
+    const purchaseType = ["single_assessment", "standalone_soa", "training_course"].includes(body?.purchaseType)
       ? body.purchaseType
       : "subscription";
 
@@ -65,6 +69,8 @@ export async function POST(request) {
       PRICE_IDS[plan];
 
     const standard = typeof body?.standard === "string" ? body.standard.trim() : "";
+    const trainingProduct = typeof body?.course === "string" ? body.course.trim().toLowerCase() : "";
+    const trainingCourseCode = TRAINING_PRODUCTS[trainingProduct] || null;
 
     if (purchaseType === "single_assessment" && !ASSESSMENT_STANDARDS.includes(standard)) {
       return Response.json({ error: "Invalid assessment standard." }, { status: 400 });
@@ -80,6 +86,43 @@ export async function POST(request) {
           status: 400,
         }
       );
+    }
+
+    if (purchaseType === "training_course" && !trainingCourseCode) {
+      return Response.json({ error: "Invalid training course." }, { status: 400 });
+    }
+
+    let trainingCourse = null;
+    if (purchaseType === "training_course") {
+      const { data, error } = await supabase
+        .from("hs_training_courses")
+        .select("id,course_code,title,description,price_pence,currency,validity_months")
+        .eq("course_code", trainingCourseCode)
+        .eq("active", true)
+        .maybeSingle();
+
+      if (error) throw new Error(`Unable to load training course: ${error.message}`);
+      if (!data) return Response.json({ error: "Training course is not currently available." }, { status: 404 });
+      trainingCourse = data;
+
+      const { data: existing, error: existingError } = await supabase
+        .from("hs_training_enrolments")
+        .select("id,status,expires_at")
+        .eq("learner_id", user.id)
+        .eq("course_id", data.id)
+        .in("status", ["not_started", "in_progress", "assessment_due", "failed", "passed"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) throw new Error(`Unable to check training access: ${existingError.message}`);
+      const accessCurrent = existing && (!existing.expires_at || new Date(existing.expires_at) >= new Date());
+      if (accessCurrent) {
+        return Response.json({
+          error: "You already have current access to this course.",
+          enrolmentUrl: `/portal/health-safety/training/${existing.id}`,
+        }, { status: 409 });
+      }
     }
 
     // -----------------------------------------------
@@ -130,7 +173,33 @@ export async function POST(request) {
       billing_address_collection: "auto",
     };
 
-    const session = purchaseType === "single_assessment"
+    const session = purchaseType === "training_course"
+      ? await stripe.checkout.sessions.create({
+        ...shared,
+        mode: "payment",
+        cancel_url: `${origin}/en/hs-hub/training?checkout=cancelled`,
+        line_items: [{
+          price_data: {
+            currency: trainingCourse.currency,
+            unit_amount: trainingCourse.price_pence,
+            product_data: {
+              name: trainingCourse.title,
+              description: trainingCourse.description,
+            },
+          },
+          quantity: 1,
+        }],
+        metadata: {
+          purchase_type: "training_course",
+          owner_id: user.id,
+          learner_id: user.id,
+          organization_id: organization?.id ?? "",
+          course_id: trainingCourse.id,
+          course_code: trainingCourse.course_code,
+          course_product: trainingProduct,
+        },
+      })
+      : purchaseType === "single_assessment"
       ? await stripe.checkout.sessions.create({
         ...shared,
         mode: "payment",
