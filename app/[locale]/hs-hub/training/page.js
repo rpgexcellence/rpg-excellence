@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../../../components/Header";
 import Footer from "../../../../components/Footer";
+import TrainingPurchaseButton from "../../../../components/TrainingPurchaseButton";
 import { copy, locales } from "../../../../lib/i18n";
 
 export const metadata = {
@@ -39,12 +40,6 @@ const experiences = [
   ["Final decision test", "Demonstrate applied understanding rather than simply recalling definitions."],
 ];
 
-function purchaseLink(course) {
-  return "/portal/login?next=" +
-    encodeURIComponent("/portal/health-safety/training") +
-    "&purchase=" + course;
-}
-
 export default async function RiskAssessmentTrainingPage({ params }) {
   const { locale } = await params;
   if (!locales.includes(locale)) notFound();
@@ -63,7 +58,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
               end-to-end workplace risk assessment exercise aligned with the UK HSE five-step approach.
             </p>
             <div className="heroActions">
-              <Link className="primaryButton" href={purchaseLink("risk-assessment-initial")}>Buy initial course</Link>
+              <TrainingPurchaseButton className="primaryButton" course="risk-assessment-initial">Buy initial course</TrainingPurchaseButton>
               <Link className="secondaryButton" href={"/" + locale + "/hs-hub"}>Explore the H&amp;S Hub</Link>
               <Link className="secondaryButton" href="/verify/training">Verify certificate</Link>
             </div>
@@ -80,7 +75,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
               <li>Downloadable completion certificate</li>
               <li>12 months learner access</li>
             </ul>
-            <Link className="primaryButton full" href={purchaseLink("risk-assessment-initial")}>Start your training</Link>
+            <TrainingPurchaseButton className="primaryButton full" course="risk-assessment-initial">Start your training</TrainingPurchaseButton>
           </aside>
         </section>
 
@@ -126,7 +121,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
             <span className="courseTag">REFRESHER</span>
             <div className="price"><strong>£12.99</strong><span>+ VAT / learner</span></div>
             <p>Approximately 25–35 minutes, including assessment and certificate.</p>
-            <Link className="primaryButton full" href={purchaseLink("risk-assessment-refresher")}>Buy refresher course</Link>
+            <TrainingPurchaseButton className="primaryButton full" course="risk-assessment-refresher">Buy refresher course</TrainingPurchaseButton>
           </aside>
         </section>
 
@@ -142,7 +137,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
         <section className="finalCta">
           <span className="eyebrow">READY TO START?</span>
           <h2>Build safer decisions into everyday work.</h2>
-          <div><Link className="primaryButton" href={purchaseLink("risk-assessment-initial")}>Buy for £19.99 + VAT</Link><Link className="secondaryButton light" href={"/" + locale + "/contact"}>Organisation licences</Link></div>
+          <div><TrainingPurchaseButton className="primaryButton" course="risk-assessment-initial">Buy for £19.99 + VAT</TrainingPurchaseButton><Link className="secondaryButton light" href={"/" + locale + "/contact"}>Organisation licences</Link></div>
         </section>
       </main>
       <Footer locale={locale} />
@@ -152,5 +147,6 @@ export default async function RiskAssessmentTrainingPage({ params }) {
 }
 
 const styles = `
-  .trainingPage{background:#f4f8fb;color:#071a3d}.trainingHero{max-width:1240px;margin:auto;padding:92px 28px 72px;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);gap:54px;align-items:center}.eyebrow{display:block;color:#0a56e8;font-size:12px;font-weight:900;letter-spacing:.13em;margin-bottom:14px}.heroCopy h1{font-size:clamp(42px,5.4vw,74px);line-height:.97;letter-spacing:-.055em;margin:0 0 24px;max-width:820px}.heroCopy>p{font-size:20px;line-height:1.55;color:#425777;max-width:760px}.heroActions,.finalCta>div{display:flex;gap:12px;flex-wrap:wrap;margin:30px 0 16px}.primaryButton,.secondaryButton{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 22px;border-radius:10px;text-decoration:none;font-weight:850}.primaryButton{background:#0a56e8;color:#fff}.secondaryButton{border:1px solid #b9c8db;color:#071a3d;background:#fff}.full{width:100%;box-sizing:border-box}.courseSummary,.refresher aside{background:#071a3d;color:#fff;border-radius:22px;padding:30px;box-shadow:0 24px 60px rgba(7,26,61,.18)}.courseTag{font-size:11px;font-weight:900;letter-spacing:.12em;color:#70e3bd}.courseSummary h2{font-size:30px;margin:14px 0}.price{display:flex;align-items:baseline;gap:9px;margin:20px 0}.price strong{font-size:40px}.price span{color:#c1cce0}.courseSummary ul{padding-left:20px;line-height:2;color:#e2e9f5}.sectionBlock{max-width:1184px;margin:0 auto;padding:74px 28px}.sectionBlock h2,.competenceNote h2,.finalCta h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.035em;margin:0 0 16px}.sectionLead,.sectionBlock p{color:#506482}.outcomeGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}.outcomeGrid article{background:#fff;border:1px solid #dce5ef;border-radius:15px;padding:22px;display:flex;gap:17px}.outcomeGrid b{color:#0a56e8}.outcomeGrid p{margin:0;color:#172b4d;font-weight:700;line-height:1.45}.experience{background:#fff;max-width:none;padding-left:max(28px,calc((100% - 1184px)/2 + 28px));padding-right:max(28px,calc((100% - 1184px)/2 + 28px))}.experienceGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px}.experienceGrid article{border:1px solid #dce5ef;border-radius:15px;padding:22px;display:flex;gap:14px}.experienceGrid article>span{color:#0a56e8}.experienceGrid h3{margin:0 0 7px}.experienceGrid p{margin:0;line-height:1.5}.curriculumHead{display:flex;justify-content:space-between;gap:24px;align-items:flex-end}.curriculumHead>strong{color:#0a56e8}.moduleList{margin-top:28px;border-top:1px solid #cad7e7}.moduleList article{display:grid;grid-template-columns:54px 1fr;gap:18px;padding:22px 4px;border-bottom:1px solid #cad7e7}.moduleList article>b{color:#0a56e8;font-size:19px}.moduleList h3{margin:0 0 6px}.moduleList p{margin:0;line-height:1.5}.refresher{display:grid;grid-template-columns:1.4fr .6fr;gap:48px;align-items:center}.refresher ul{columns:2;padding-left:20px;line-height:1.9}.refresher aside p{color:#dce5ef}.competenceNote{max-width:1184px;box-sizing:border-box;margin:20px auto 80px;padding:34px;border:1px solid #f0b429;border-left:7px solid #f0b429;border-radius:14px;background:#fff9e8;display:grid;grid-template-columns:.8fr 1.2fr;gap:34px}.competenceNote h2{font-size:28px}.competenceNote p{line-height:1.65;color:#425777}.competenceNote a{color:#0a56e8;font-weight:800}.finalCta{background:#0a56e8;color:#fff;padding:70px max(28px,calc((100% - 1128px)/2));}.finalCta .eyebrow{color:#b9f4df}.finalCta h2{max-width:740px}.light{border-color:#fff;background:transparent;color:#fff}@media(max-width:850px){.trainingHero,.refresher,.competenceNote{grid-template-columns:1fr}.outcomeGrid,.experienceGrid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.trainingHero{padding-top:58px}.outcomeGrid,.experienceGrid{grid-template-columns:1fr}.refresher ul{columns:1}.heroCopy h1{font-size:42px}}
+  .trainingPage{background:#f4f8fb;color:#071a3d}.trainingHero{max-width:1240px;margin:auto;padding:92px 28px 72px;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);gap:54px;align-items:center}.eyebrow{display:block;color:#0a56e8;font-size:12px;font-weight:900;letter-spacing:.13em;margin-bottom:14px}.heroCopy h1{font-size:clamp(42px,5.4vw,74px);line-height:.97;letter-spacing:-.055em;margin:0 0 24px;max-width:820px}.heroCopy>p{font-size:20px;line-height:1.55;color:#425777;max-width:760px}.heroActions,.finalCta>div{display:flex;gap:12px;flex-wrap:wrap;margin:30px 0 16px}.primaryButton,.secondaryButton{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 22px;border-radius:10px;text-decoration:none;font:inherit;font-weight:850;cursor:pointer}.primaryButton{border:0;background:#0a56e8;color:#fff}.primaryButton:disabled{cursor:wait;opacity:.72}.secondaryButton{border:1px solid #b9c8db;color:#071a3d;background:#fff}.full{width:100%;box-sizing:border-box}.courseSummary,.refresher aside{background:#071a3d;color:#fff;border-radius:22px;padding:30px;box-shadow:0 24px 60px rgba(7,26,61,.18)}.courseTag{font-size:11px;font-weight:900;letter-spacing:.12em;color:#70e3bd}.courseSummary h2{font-size:30px;margin:14px 0}.price{display:flex;align-items:baseline;gap:9px;margin:20px 0}.price strong{font-size:40px}.price span{color:#c1cce0}.courseSummary ul{padding-left:20px;line-height:2;color:#e2e9f5}.sectionBlock{max-width:1184px;margin:0 auto;padding:74px 28px}.sectionBlock h2,.competenceNote h2,.finalCta h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.035em;margin:0 0 16px}.sectionLead,.sectionBlock p{color:#506482}.outcomeGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}.outcomeGrid article{background:#fff;border:1px solid #dce5ef;border-radius:15px;padding:22px;display:flex;gap:17px}.outcomeGrid b{color:#0a56e8}.outcomeGrid p{margin:0;color:#172b4d;font-weight:700;line-height:1.45}.experience{background:#fff;max-width:none;padding-left:max(28px,calc((100% - 1184px)/2 + 28px));padding-right:max(28px,calc((100% - 1184px)/2 + 28px))}.experienceGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px}.experienceGrid article{border:1px solid #dce5ef;border-radius:15px;padding:22px;display:flex;gap:14px}.experienceGrid article>span{color:#0a56e8}.experienceGrid h3{margin:0 0 7px}.experienceGrid p{margin:0;line-height:1.5}.curriculumHead{display:flex;justify-content:space-between;gap:24px;align-items:flex-end}.curriculumHead>strong{color:#0a56e8}.moduleList{margin-top:28px;border-top:1px solid #cad7e7}.moduleList article{display:grid;grid-template-columns:54px 1fr;gap:18px;padding:22px 4px;border-bottom:1px solid #cad7e7}.moduleList article>b{color:#0a56e8;font-size:19px}.moduleList h3{margin:0 0 6px}.moduleList p{margin:0;line-height:1.5}.refresher{display:grid;grid-template-columns:1.4fr .6fr;gap:48px;align-items:center}.refresher ul{columns:2;padding-left:20px;line-height:1.9}.refresher aside p{color:#dce5ef}.competenceNote{max-width:1184px;box-sizing:border-box;margin:20px auto 80px;padding:34px;border:1px solid #f0b429;border-left:7px solid #f0b429;border-radius:14px;background:#fff9e8;display:grid;grid-template-columns:.8fr 1.2fr;gap:34px}.competenceNote h2{font-size:28px}.competenceNote p{line-height:1.65;color:#425777}.competenceNote a{color:#0a56e8;font-weight:800}.finalCta{background:#0a56e8;color:#fff;padding:70px max(28px,calc((100% - 1128px)/2));}.finalCta .eyebrow{color:#b9f4df}.finalCta h2{max-width:740px}.light{border-color:#fff;background:transparent;color:#fff}@media(max-width:850px){.trainingHero,.refresher,.competenceNote{grid-template-columns:1fr}.outcomeGrid,.experienceGrid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.trainingHero{padding-top:58px}.outcomeGrid,.experienceGrid{grid-template-columns:1fr}.refresher ul{columns:1}.heroCopy h1{font-size:42px}}
 `;
+
