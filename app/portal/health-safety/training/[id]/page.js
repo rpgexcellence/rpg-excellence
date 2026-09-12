@@ -818,4 +818,33 @@ export default async function RiskAssessmentTrainingCoursePage({
               "#fff8e7",
             color:
               "#664b13",
+            lineHeight:
+              1.55,
+          }}
+        >
+          <strong>
+            Competence reminder
+          </strong>
+
+          <p
+            style={{
+              margin:
+                "6px 0 0",
+            }}
+          >
+            Completion of this
+            learning supports
+            knowledge and
+            understanding. Employers
+            must still consider the
+            competence, experience
+            and supervision required
+            for the complexity and
+            risk of the work.
+          </p>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
