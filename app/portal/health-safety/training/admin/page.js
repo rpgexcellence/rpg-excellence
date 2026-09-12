@@ -80,6 +80,7 @@ export default async function TrainingAdminPage() {
           </div>
           <div className="traActions">
             <Link className="traButton secondary" href="/portal/health-safety">H&amp;S Hub</Link>
+            <Link className="traButton secondary" href="/portal/health-safety/training/admin/diagnostics">Launch readiness</Link>
             <Link className="traButton" href="/portal/health-safety/training">Training Academy</Link>
           </div>
         </header>
