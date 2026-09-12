@@ -14,7 +14,7 @@ const solutionHubs = [
     title: "Assessment & Gap Analysis",
     description:
       "Run evidence-led ISO readiness assessments, record findings and manage improvement through a controlled portfolio.",
-    status: "Four standards available",
+    status: "Five standards available",
     href: "/portal",
     action: "Open assessments",
   },
@@ -51,6 +51,77 @@ const academyProducts = [
   ["RCA & Corrective Action Practitioner", "£49.99", "180-minute structured course, completed workbook and verifiable certificate.", "/rca-8d-training"],
 ];
 
+const operationalCapabilities = [
+  {
+    area: "ASSESSMENT CONTROL",
+    title: "Gap Analysis & Readiness",
+    features: [
+      "Five ISO and conformity-assessment frameworks",
+      "Clause-level scoring, evidence and findings",
+      "Management action and corrective-action workflow",
+      "Portfolio management board and executive PDF reports",
+    ],
+    href: "/portal/history?view=management-board",
+  },
+  {
+    area: "HEALTH & SAFETY",
+    title: "Operational Risk Control",
+    features: [
+      "Five-stage workplace risk-assessment workflow",
+      "Interactive 5×5 initial and residual risk matrix",
+      "Owned actions, verification and review control",
+      "Training Academy and certificate register",
+    ],
+    href: "/portal/health-safety",
+  },
+  {
+    area: "INTERNAL AUDIT",
+    title: "Audit Assurance",
+    features: [
+      "Three-year, multi-standard audit programme",
+      "Process-FMEA risk-based planning",
+      "Controlled audit execution, evidence and reporting",
+      "Auditor verification, NC register and management board",
+    ],
+    href: "/portal/internal-audits",
+  },
+  {
+    area: "RCA–8D",
+    title: "Corrective Action",
+    features: [
+      "Controlled D1–D8 investigation gates",
+      "Containment, causal paths and three-direction 5 Why",
+      "Action selection, implementation and extent review",
+      "Independent effectiveness verification and closure",
+    ],
+    href: "/portal/rca",
+  },
+];
+
+const specialistWorkspaces = [
+  {
+    title: "ISO/IEC 27001 Statement of Applicability",
+    description:
+      "A dedicated workspace for all 93 Annex A controls, applicability decisions, implementation status, residual risk and executive reporting.",
+    price: "£129 one-off",
+    href: "/portal/soa",
+  },
+  {
+    title: "Controlled Evidence Library",
+    description:
+      "Organise evidence by ISO standard, Internal Audit and RCA–CAPA family, with controlled records available across connected workflows.",
+    price: "Included with platform access",
+    href: "/portal/documents",
+  },
+  {
+    title: "Management Reporting",
+    description:
+      "Bring readiness, audit, findings, actions and verification into management-level registers, boards and downloadable reports.",
+    price: "Live portfolio intelligence",
+    href: "/portal/reports",
+  },
+];
+
 const assessmentModules = [
   {
     title: "ISO 9001 Gap Analysis",
@@ -67,6 +138,12 @@ const assessmentModules = [
   {
     title: "ISO 45001 Gap Analysis",
     standard: "ISO 45001:2018",
+    status: "Available now",
+    href: "/portal",
+  },
+  {
+    title: "ISO/IEC 27001 Gap Analysis",
+    standard: "ISO/IEC 27001:2022/Amd 1:2024",
     status: "Available now",
     href: "/portal",
   },
@@ -291,7 +368,7 @@ export default async function AiTools({
               }) => (
                 <Link
                   className="toolCard toolCardLink"
-                  href={`/${locale}${href}`}
+                  href={href}
                   key={standard}
                   style={{
                     color: "inherit",
@@ -318,6 +395,32 @@ export default async function AiTools({
           </div>
 
           <section style={sectionStyle}>
+            <span className="kicker">OPERATIONAL CAPABILITY</span>
+            <h2>What each workspace controls</h2>
+            <p className="lead">
+              The platform extends beyond assessment. Each operational area has
+              its own controlled workflow, management visibility and retained
+              evidence.
+            </p>
+            <div style={packGridStyle}>
+              {operationalCapabilities.map(({ area, title, features, href }) => (
+                <Link
+                  href={href}
+                  key={title}
+                  style={{...packStyle,color:"inherit",textDecoration:"none"}}
+                >
+                  <span className="kicker">{area}</span>
+                  <h3>{title}</h3>
+                  <ul style={{paddingLeft:20,lineHeight:1.75}}>
+                    {features.map((feature) => <li key={feature}>{feature}</li>)}
+                  </ul>
+                  <strong style={{color:"#1f5eea"}}>Open workspace →</strong>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section style={sectionStyle}>
             <span className="kicker">RPG TRAINING ACADEMY</span>
             <h2>Practical training with retained evidence</h2>
             <p className="lead">
@@ -328,7 +431,7 @@ export default async function AiTools({
               {academyProducts.map(([title, price, description, href]) => (
                 <Link
                   className="toolCard toolCardLink"
-                  href={href}
+                  href={`/${locale}${href}`}
                   key={title}
                   style={{ color: "inherit", textDecoration: "none" }}
                 >
@@ -337,6 +440,27 @@ export default async function AiTools({
                   <span>{description}</span>
                   <span>{price} per learner</span>
                   <span aria-hidden="true">View course →</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section style={sectionStyle}>
+            <span className="kicker">SPECIALIST WORKSPACES</span>
+            <h2>Controlled tools around the core assurance journey</h2>
+            <div className="toolGrid">
+              {specialistWorkspaces.map(({ title, description, price, href }) => (
+                <Link
+                  className="toolCard toolCardLink"
+                  href={href}
+                  key={title}
+                  style={{color:"inherit",textDecoration:"none"}}
+                >
+                  <span className="toolIcon">◈</span>
+                  <strong>{title}</strong>
+                  <span>{description}</span>
+                  <span>{price}</span>
+                  <span aria-hidden="true">Open →</span>
                 </Link>
               ))}
             </div>
@@ -435,7 +559,7 @@ export default async function AiTools({
             </div>
           </section>
 
-          <h2>Product roadmap</h2>
+          <h2>Next platform capabilities</h2>
 
           <div className="toolGrid">
             {plannedModules.map(
