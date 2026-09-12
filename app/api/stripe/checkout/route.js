@@ -17,7 +17,22 @@ const ASSESSMENT_STANDARDS = ["ISO 9001:2015/Amd 1:2024", "ISO 14001:2026", "ISO
 const TRAINING_PRODUCTS = {
   "risk-assessment-initial": "RA-INITIAL-001",
   "risk-assessment-refresher": "RA-REFRESHER-001",
+  "internal-auditor-refresher": "IA-REFRESHER-001",
 };
+
+function getTrainingPaths(courseCode) {
+  if (courseCode?.startsWith("IA-")) {
+    return {
+      academy: "/portal/internal-audit/training",
+      publicCatalogue: "/en/internal-audit-training",
+    };
+  }
+
+  return {
+    academy: "/portal/health-safety/training",
+    publicCatalogue: "/en/hs-hub/training",
+  };
+}
 
 export async function POST(request) {
   try {
@@ -96,7 +111,7 @@ export async function POST(request) {
     if (purchaseType === "training_course") {
       const { data, error } = await supabase
         .from("hs_training_courses")
-        .select("id,course_code,title,description,price_pence,currency,validity_months")
+        .select("id,course_code,title,description,price_pence,currency,validity_months,academy_code")
         .eq("course_code", trainingCourseCode)
         .eq("active", true)
         .maybeSingle();
@@ -118,9 +133,10 @@ export async function POST(request) {
       if (existingError) throw new Error(`Unable to check training access: ${existingError.message}`);
       const accessCurrent = existing && (!existing.expires_at || new Date(existing.expires_at) >= new Date());
       if (accessCurrent) {
+        const trainingPaths = getTrainingPaths(data.course_code);
         return Response.json({
           error: "You already have current access to this course.",
-          enrolmentUrl: `/portal/health-safety/training/${existing.id}`,
+          enrolmentUrl: `${trainingPaths.academy}/${existing.id}`,
         }, { status: 409 });
       }
     }
@@ -173,11 +189,13 @@ export async function POST(request) {
       billing_address_collection: "auto",
     };
 
+    const trainingPaths = trainingCourse ? getTrainingPaths(trainingCourse.course_code) : null;
+
     const session = purchaseType === "training_course"
       ? await stripe.checkout.sessions.create({
         ...shared,
         mode: "payment",
-        cancel_url: `${origin}/en/hs-hub/training?checkout=cancelled`,
+        cancel_url: `${origin}${trainingPaths.publicCatalogue}?checkout=cancelled`,
         line_items: [{
           price_data: {
             currency: trainingCourse.currency,
