@@ -24,8 +24,8 @@ function ContentBlock({ module }) {
 
 export default function RiskAssessmentTrainingPlayer({ enrolment, course, modules, progress = [], completeModuleAction }) {
   const progressMap = useMemo(() => new Map(progress.map((item) => [item.module_id, item])), [progress]);
-  const firstIncomplete = Math.max(0, modules.findIndex((item) => progressMap.get(item.id)?.status !== "completed"));
-  const [activeIndex, setActiveIndex] = useState(firstIncomplete === -1 ? modules.length - 1 : firstIncomplete);
+  const firstIncomplete = modules.findIndex((item) => progressMap.get(item.id)?.status !== "completed");
+  const [activeIndex, setActiveIndex] = useState(firstIncomplete === -1 ? Math.max(0, modules.length - 1) : firstIncomplete);
   const activeModule = modules[activeIndex];
   const completed = modules.filter((item) => progressMap.get(item.id)?.status === "completed").length;
   const percent = modules.length ? Math.round(completed / modules.length * 100) : 0;
