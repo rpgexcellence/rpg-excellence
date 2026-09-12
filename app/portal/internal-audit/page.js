@@ -14,7 +14,7 @@ export default async function InternalAuditHubPage() {
     supabase.from("organizations").select("id,name").eq("owner_id", user.id).order("created_at").limit(1),
     supabase.from("internal_audits").select("id,audit_reference,title,audit_type,audit_method,status,current_gate,planned_start_at,planned_end_at,updated_at").eq("owner_id", user.id).order("updated_at", { ascending: false }).limit(50),
     supabase.from("internal_audit_findings").select("id,audit_id,finding_reference,finding_type,risk_level,status,closure_verified,linked_rca_case_id,updated_at").eq("owner_id", user.id),
-    supabase.from("internal_audit_action_access").select("id,finding_id,status,submitted_at,reviewed_at,updated_at").eq("owner_id", user.id),
+    supabase.from("internal_audit_action_access").select("id,finding_id,status,submitted_at,updated_at").eq("owner_id", user.id),
   ]);
 
   for (const result of [organisationResult, auditsResult, findingsResult, actionsResult]) {
