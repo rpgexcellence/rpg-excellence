@@ -25,6 +25,16 @@ export default async function BillingSuccessPage({ searchParams }) {
   const isTraining = purchaseType === "training_course";
   const standard = session?.metadata?.standard;
   const courseCode = session?.metadata?.course_code;
+  const isInternalAuditTraining = isTraining && courseCode === "IA-REFRESHER-001";
+  const trainingAcademyHref = isInternalAuditTraining
+    ? "/portal/internal-audit/training"
+    : "/portal/health-safety/training";
+  const trainingCatalogueHref = isInternalAuditTraining
+    ? "/en/internal-audit-training"
+    : "/en/hs-hub/training";
+  const trainingName = isInternalAuditTraining
+    ? "Internal Auditor Refresher"
+    : "RPG Health & Safety Training";
 
   const title = isTraining
     ? "Your training course is ready"
@@ -43,7 +53,7 @@ export default async function BillingSuccessPage({ searchParams }) {
         : "Your subscription has been created successfully and your 7-day free trial has started.";
 
   const primaryHref = isTraining
-    ? "/portal/health-safety/training"
+    ? trainingAcademyHref
     : isStandaloneSoa
       ? "/portal#standalone-soa"
       : isAssessment && standard
@@ -59,7 +69,7 @@ export default async function BillingSuccessPage({ searchParams }) {
         : "Go to Dashboard";
 
   const secondaryHref = isTraining
-    ? "/en/hs-hub/training"
+    ? trainingCatalogueHref
     : isStandaloneSoa
       ? "/portal/soa"
       : "/portal/history";
@@ -79,9 +89,9 @@ export default async function BillingSuccessPage({ searchParams }) {
 
         {isTraining && (
           <div style={{ background: "#eef6ff", border: "1px solid #cbdff8", borderRadius: 12, padding: 20, marginBottom: 30, color: "#173c67", lineHeight: 1.7 }}>
-            <strong>{courseCode || "RPG Health & Safety Training"}</strong>
+            <strong>{trainingName}</strong>
             <br />
-            Your course includes 12 months of learner access, the final assessment and a verifiable certificate after you pass.
+            Course code {courseCode || "—"} · Your purchase includes learner access, the final assessment and a verifiable certificate after you pass.
           </div>
         )}
 
