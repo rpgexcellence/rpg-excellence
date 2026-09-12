@@ -45,17 +45,25 @@ export default async function TrainingDiagnosticsPage() {
   const modules = modulesResult.data || [];
   const questions = questionsResult.data || [];
   const answers = answersResult.data || [];
-  const requiredCodes = ["RA-INITIAL-001", "RA-REFRESHER-001"];
+  const requiredCodes = [
+    "RA-INITIAL-001",
+    "RA-REFRESHER-001",
+    "IA-REFRESHER-001",
+    "RCA-8D-001",
+  ];
   const requiredCourses = requiredCodes.map((code) => courses.find((course) => course.course_code === code));
   const activeCoursesReady = requiredCourses.every((course) =>
     course?.active && course?.published_at && course.price_pence >= 0 && course.currency === "gbp"
   );
+  const requiredCourseIds = new Set(requiredCourses.filter(Boolean).map((course) => course.id));
   const answerIds = new Set(answers.map((answer) => answer.question_id));
-  const activeQuestions = questions.filter((question) => question.active);
+  const activeModules = modules.filter((module) => module.active && requiredCourseIds.has(module.course_id));
+  const activeQuestions = questions.filter((question) => question.active && requiredCourseIds.has(question.course_id));
   const unansweredQuestions = activeQuestions.filter((question) => !answerIds.has(question.id));
   const contentReady = requiredCourses.every((course) =>
     course && modules.some((module) => module.course_id === course.id && module.active)
-  ) && activeQuestions.length > 0;
+      && questions.some((question) => question.course_id === course.id && question.active)
+  );
   const answersReady = activeQuestions.length > 0 && unansweredQuestions.length === 0;
   const stripeSecretReady = Boolean(process.env.STRIPE_SECRET_KEY);
   const stripeWebhookReady = Boolean(process.env.STRIPE_WEBHOOK_SECRET);
@@ -73,15 +81,15 @@ export default async function TrainingDiagnosticsPage() {
       title: "Published courses",
       ready: activeCoursesReady,
       detail: activeCoursesReady
-        ? "Initial and refresher courses are active, published and priced in GBP."
-        : "Both required course codes must be active, published and have valid GBP prices.",
+        ? "All four commercial courses are active, published and priced in GBP."
+        : "Every required H&S, Internal Audit and RCA–8D course must be active, published and have a valid GBP price.",
     },
     {
       title: "Learning content",
       ready: contentReady,
       detail: contentReady
-        ? `${modules.filter((item) => item.active).length} active modules and ${activeQuestions.length} active assessment questions are available.`
-        : "Each required course needs active modules and the assessment bank must contain active questions.",
+        ? `${activeModules.length} active modules and ${activeQuestions.length} active assessment questions are available across the four required courses.`
+        : "Each required course needs at least one active module and one active assessment question.",
     },
     {
       title: "Secure answer key",
@@ -124,13 +132,15 @@ export default async function TrainingDiagnosticsPage() {
       <div className="trdShell">
         <header className="trdTop">
           <div>
-            <small>H&amp;S HUB · ADMIN DIAGNOSTICS</small>
-            <h1>Training Launch Readiness</h1>
-            <p>Server-side preflight checks for course content, payment and certification dependencies.</p>
+            <small>RPG EXCELLENCE · ADMIN DIAGNOSTICS</small>
+            <h1>Multi-Academy Training Readiness</h1>
+            <p>Server-side preflight checks for H&amp;S, Internal Audit and RCA–8D course, payment and certification dependencies.</p>
           </div>
           <div className="trdActions">
             <Link className="trdButton secondary" href="/portal/health-safety/training/admin">Administration</Link>
-            <Link className="trdButton" href="/portal/health-safety/training">Training Academy</Link>
+            <Link className="trdButton" href="/portal/health-safety/training">H&amp;S Academy</Link>
+            <Link className="trdButton" href="/portal/internal-audit/training">Audit Academy</Link>
+            <Link className="trdButton" href="/portal/rca/training">RCA Academy</Link>
           </div>
         </header>
 
