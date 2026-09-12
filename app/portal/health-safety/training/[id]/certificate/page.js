@@ -103,7 +103,10 @@ export default async function TrainingCertificatePage({ params }) {
           )}
 
           <div className="tcCode">
-            Certificate <strong>{certificate.certificate_number}</strong> · Verification code <strong>{certificate.verification_code}</strong>
+            Certificate <strong>{certificate.certificate_number}</strong> · Verification code{" "}
+            <Link href={`/verify/training/${certificate.verification_code}`}>
+              <strong>{certificate.verification_code}</strong>
+            </Link>
           </div>
 
           <footer className="tcFoot">
