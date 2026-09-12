@@ -9,7 +9,9 @@ export default function sitemap() {
     "/ai-tools",
     "/hs-hub",
     "/hs-hub/training",
+    "/internal-audit",
     "/internal-audit-training",
+    "/capa-8d",
     "/rca-8d-training",
     "/iso-9001",
     "/iso-14001",
@@ -31,7 +33,7 @@ export default function sitemap() {
       priority:
         page === ""
           ? 1
-          : page === "/hs-hub" || page.startsWith("/iso-")
+          : ["/hs-hub", "/internal-audit", "/capa-8d"].includes(page) || page.startsWith("/iso-")
             ? 0.9
             : page.includes("training")
               ? 0.85
