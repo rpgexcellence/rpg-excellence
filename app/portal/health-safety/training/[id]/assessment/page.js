@@ -286,6 +286,9 @@ export default async function TrainingAssessmentPage({ params, searchParams }) {
             {certificate && (
               <div className="taCertificate">
                 <strong>Certificate {certificate.certificate_number}</strong><br/>
+                <Link href={`/portal/health-safety/training/${id}/certificate`}>
+                  Open and print certificate →
+                </Link><br/>
                 Issued {new Date(certificate.issued_at).toLocaleDateString("en-GB")}
                 {certificate.valid_until ? ` · valid until ${new Date(`${certificate.valid_until}T00:00:00Z`).toLocaleDateString("en-GB")}` : ""}
               </div>
