@@ -26,15 +26,22 @@ export default async function BillingSuccessPage({ searchParams }) {
   const standard = session?.metadata?.standard;
   const courseCode = session?.metadata?.course_code;
   const isInternalAuditTraining = isTraining && courseCode === "IA-REFRESHER-001";
+  const isRcaTraining = isTraining && courseCode === "RCA-8D-001";
   const trainingAcademyHref = isInternalAuditTraining
     ? "/portal/internal-audit/training"
-    : "/portal/health-safety/training";
+    : isRcaTraining
+      ? "/portal/rca/training"
+      : "/portal/health-safety/training";
   const trainingCatalogueHref = isInternalAuditTraining
     ? "/en/internal-audit-training"
-    : "/en/hs-hub/training";
+    : isRcaTraining
+      ? "/en/rca-8d-training"
+      : "/en/hs-hub/training";
   const trainingName = isInternalAuditTraining
     ? "Internal Auditor Refresher"
-    : "RPG Health & Safety Training";
+    : isRcaTraining
+      ? "RCA and Corrective Action Practitioner"
+      : "RPG Health & Safety Training";
 
   const title = isTraining
     ? "Your training course is ready"
