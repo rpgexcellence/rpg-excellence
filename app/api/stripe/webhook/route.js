@@ -140,6 +140,121 @@ async function saveAssessmentPass(supabase, session) {
   if (error) throw new Error(`Unable to save assessment pass: ${error.message}`);
 }
 
+async function saveTrainingPurchase(supabase, session) {
+  if (session.payment_status !== "paid") {
+    return;
+  }
+
+  const ownerId = session.metadata?.owner_id;
+  const learnerId = session.metadata?.learner_id || ownerId;
+  const organizationId = session.metadata?.organization_id || null;
+  const courseId = session.metadata?.course_id;
+  const courseCode = session.metadata?.course_code;
+
+  if (!ownerId || !learnerId || !courseId || !courseCode) {
+    throw new Error("Paid training checkout is missing required metadata.");
+  }
+
+  const { data: course, error: courseError } = await supabase
+    .from("hs_training_courses")
+    .select("id,course_code")
+    .eq("id", courseId)
+    .eq("course_code", courseCode)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (courseError) {
+    throw new Error(`Unable to verify training course: ${courseError.message}`);
+  }
+
+  if (!course) {
+    throw new Error("Paid training checkout references an unavailable course.");
+  }
+
+  const purchasedAt = new Date();
+  const accessExpiresAt = new Date(purchasedAt);
+  accessExpiresAt.setUTCFullYear(accessExpiresAt.getUTCFullYear() + 1);
+
+  const passRow = {
+    owner_id: ownerId,
+    organization_id: organizationId,
+    course_id: course.id,
+    status: "consumed",
+    stripe_checkout_session_id: session.id,
+    stripe_payment_intent_id:
+      typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id ?? null,
+    amount_paid: session.amount_total ?? null,
+    currency: session.currency || "gbp",
+    purchased_at: purchasedAt.toISOString(),
+    access_expires_at: accessExpiresAt.toISOString(),
+    assigned_to: learnerId,
+    consumed_at: purchasedAt.toISOString(),
+    updated_at: purchasedAt.toISOString(),
+  };
+
+  const { data: trainingPass, error: passError } = await supabase
+    .from("hs_training_passes")
+    .upsert(passRow, { onConflict: "stripe_checkout_session_id" })
+    .select("id")
+    .single();
+
+  if (passError) {
+    throw new Error(`Unable to save training pass: ${passError.message}`);
+  }
+
+  const { data: existingEnrolment, error: enrolmentCheckError } = await supabase
+    .from("hs_training_enrolments")
+    .select("id")
+    .eq("training_pass_id", trainingPass.id)
+    .eq("learner_id", learnerId)
+    .maybeSingle();
+
+  if (enrolmentCheckError) {
+    throw new Error(`Unable to check training enrolment: ${enrolmentCheckError.message}`);
+  }
+
+  if (!existingEnrolment) {
+    const { error: enrolmentError } = await supabase
+      .from("hs_training_enrolments")
+      .insert({
+        learner_id: learnerId,
+        organization_id: organizationId,
+        course_id: course.id,
+        training_pass_id: trainingPass.id,
+        status: "not_started",
+        progress_percent: 0,
+        expires_at: accessExpiresAt.toISOString(),
+        updated_at: purchasedAt.toISOString(),
+      });
+
+    if (enrolmentError) {
+      throw new Error(`Unable to create training enrolment: ${enrolmentError.message}`);
+    }
+  }
+
+  console.log("Training access saved:", session.id, learnerId, course.course_code);
+}
+
+async function processCheckoutSession(stripe, supabase, session) {
+  const purchaseType = session.metadata?.purchase_type;
+
+  if (purchaseType === "training_course") {
+    await saveTrainingPurchase(supabase, session);
+  } else if (["single_assessment", "standalone_soa"].includes(purchaseType)) {
+    await saveAssessmentPass(supabase, session);
+  } else if (session.subscription) {
+    const subscriptionId =
+      typeof session.subscription === "string"
+        ? session.subscription
+        : session.subscription.id;
+
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    await saveSubscription(supabase, subscription);
+  }
+}
+
 export async function POST(request) {
   const stripe = getStripe();
   const signature =
@@ -198,27 +313,15 @@ export async function POST(request) {
         const session =
           event.data.object;
 
-        if (["single_assessment", "standalone_soa"].includes(session.metadata?.purchase_type)) {
-          await saveAssessmentPass(supabase, session);
-        } else if (
-          session.subscription
-        ) {
-          const subscriptionId =
-            typeof session.subscription ===
-            "string"
-              ? session.subscription
-              : session.subscription.id;
+        await processCheckoutSession(stripe, supabase, session);
 
-          const subscription =
-            await stripe.subscriptions.retrieve(
-              subscriptionId
-            );
+        break;
+      }
 
-          await saveSubscription(
-            supabase,
-            subscription
-          );
-        }
+      case "checkout.session.async_payment_succeeded": {
+        const session = event.data.object;
+
+        await processCheckoutSession(stripe, supabase, session);
 
         break;
       }
@@ -279,3 +382,4 @@ export async function POST(request) {
     );
   }
 }
+
