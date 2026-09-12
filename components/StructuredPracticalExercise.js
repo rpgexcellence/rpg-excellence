@@ -110,6 +110,7 @@ export default function StructuredPracticalExercise({ module, enrolment, complet
   const fields = useMemo(() => schemaFor(interaction.type), [interaction.type]);
   const blank = () => Object.fromEntries(fields.map((field) => [field.name, field.type === "multi" ? [] : ""]));
   const [answers, setAnswers] = useState(blank);
+  const [answerModes, setAnswerModes] = useState({});
   const [usedExample, setUsedExample] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -117,23 +118,36 @@ export default function StructuredPracticalExercise({ module, enrolment, complet
     setUsedExample(checked);
     setConfirmed(false);
     setAnswers(checked ? Object.fromEntries(fields.map((field) => [field.name, field.example])) : blank());
+    setAnswerModes(checked ? Object.fromEntries(fields.map((field) => [field.name, "suggested"])) : {});
   }
 
   function updateMulti(name, option, checked) {
     setAnswers((current) => ({ ...current, [name]: checked ? [...current[name], option] : current[name].filter((item) => item !== option) }));
   }
 
-  const evidence = JSON.stringify({ version: 1, interaction_type: interaction.type, used_worked_example: usedExample, learner_confirmed: confirmed, answers });
+  function chooseAnswerMode(field, mode) {
+    setAnswerModes((current) => ({ ...current, [field.name]: mode }));
+    setAnswers((current) => ({ ...current, [field.name]: mode === "own" ? "" : field.example }));
+    setConfirmed(false);
+  }
+
+  const evidence = JSON.stringify({ version: 2, interaction_type: interaction.type, used_worked_example: usedExample, response_modes: answerModes, learner_confirmed: confirmed, answers });
 
   return <div className="spePage">
     <style>{`
       .spePage{color:#092748}.speBack{padding:0;border:0;background:none;color:#245cff;font-weight:850;cursor:pointer}.speHead{margin:22px 0;padding:25px;border-radius:15px;background:linear-gradient(135deg,#082a54,#087f6c);color:#fff}.speHead small{font-weight:900;letter-spacing:.11em;color:#78e3c4}.speHead h2{margin:8px 0;font-size:31px}.speHead p{margin:0;line-height:1.55}.speScenario{margin:16px 0;padding:18px;border:1px solid #c9dcfa;border-radius:12px;background:#edf4ff}.speScenario small{font-weight:900;color:#245cff;letter-spacing:.08em}.speScenario h3{margin:6px 0}.speScenario p{margin:0;color:#496681;line-height:1.5}.speExample,.speConfirm{display:flex;gap:12px;align-items:flex-start;margin:16px 0;padding:16px;border:1px solid #c7d7e5;border-radius:11px;background:#f4f8fc;cursor:pointer}.speExample input,.speConfirm input{width:19px;height:19px;margin-top:2px;accent-color:#087f6c}.speExample span{display:grid;gap:3px}.speExample small{color:#5f768c}.speGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.speField{min-width:0;margin:0;padding:16px;border:1px solid #d6e1ea;border-radius:11px}.speField.wide{grid-column:1/-1}.speField legend{padding:0 7px;font-weight:900}.speField legend i{display:inline-grid;place-items:center;width:27px;height:27px;margin-right:8px;border-radius:50%;background:#e8f0ff;color:#245cff;font-size:10px;font-style:normal}.speHelp{margin:2px 0 11px;color:#60778e;font-size:13px}.speField input:not([type=checkbox]),.speField select,.speField textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #aebfd0;border-radius:8px;background:#fff;font:inherit}.speField textarea{min-height:105px;resize:vertical}.speOptions{position:relative;display:flex;flex-wrap:wrap;gap:7px}.speOptions label{cursor:pointer}.speOptions label input{position:absolute;opacity:0}.speOptions label span{display:block;padding:9px 10px;border:1px solid #c8d8e5;border-radius:999px;color:#34536f;font-size:12px;font-weight:800}.speOptions label input:checked+span{border-color:#087f6c;background:#e4f7f1;color:#05634f}.speValidator{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;opacity:0;pointer-events:none}.speConfirm{background:#fff8e6;border-color:#e9c568}.speSubmit{width:100%;padding:13px 16px;border:0;border-radius:9px;background:#087f6c;color:#fff;font-weight:900;font-size:15px;cursor:pointer}.speNote{text-align:center;color:#687d91;font-size:12px}@media(max-width:650px){.speGrid{grid-template-columns:1fr}.speField.wide{grid-column:auto}.speHead h2{font-size:25px}}
     `}</style>
+    <style>{`.speAnswerModes{display:grid;gap:6px;margin:0 0 11px}.speAnswerModes label{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid #d8e3ec;border-radius:8px;background:#f7fafc;cursor:pointer;font-size:12px;font-weight:750}.speAnswerModes label:has(input:checked){border-color:#3573ee;background:#edf3ff;color:#174cae}.speAnswerModes input{width:auto!important;accent-color:#245cff}`}</style>
     <button type="button" className="speBack" onClick={onBack}>← Return to learning</button>
     <header className="speHead"><small>PRACTICAL EXERCISE</small><h2>Demonstrate your decision</h2><p>{interaction.instruction}</p></header>
     {content.scenario && <section className="speScenario"><small>SCENARIO REFERENCE</small><h3>{content.scenario.title}</h3><p>{content.scenario.context || content.scenario.prompt}</p></section>}
     <label className="speExample"><input type="checkbox" checked={usedExample} onChange={(event) => loadExample(event.target.checked)}/><span><strong>Use a worked example</strong><small>Populate a model response. You must review it and can modify any answer before submission.</small></span></label>
     <div className="speGrid">{fields.map((field, index) => <fieldset className={`speField ${field.type === "area" ? "wide" : ""}`} key={field.name}><legend><i>{String(index + 1).padStart(2, "0")}</i>{field.label}</legend>{field.help && <p className="speHelp">{field.help}</p>}
+      {(field.type === "text" || field.type === "area") && <div className="speAnswerModes" role="radiogroup" aria-label={`${field.label} response method`}>
+        <label><input type="radio" name={`mode-${field.name}`} checked={answerModes[field.name] === "suggested"} onChange={() => chooseAnswerMode(field, "suggested")}/>Select the suggested response</label>
+        <label><input type="radio" name={`mode-${field.name}`} checked={answerModes[field.name] === "own"} onChange={() => chooseAnswerMode(field, "own")}/>Add my own response</label>
+        <label><input type="radio" name={`mode-${field.name}`} checked={answerModes[field.name] === "modify"} onChange={() => chooseAnswerMode(field, "modify")}/>Start with the example and modify it</label>
+      </div>}
       {field.type === "select" && <select required value={answers[field.name]} onChange={(event) => setAnswers({ ...answers, [field.name]: event.target.value })}><option value="">Select an answer</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>}
       {field.type === "text" && <input required minLength={3} value={answers[field.name]} onChange={(event) => setAnswers({ ...answers, [field.name]: event.target.value })}/>} 
       {field.type === "area" && <textarea required minLength={20} value={answers[field.name]} onChange={(event) => setAnswers({ ...answers, [field.name]: event.target.value })}/>} 
