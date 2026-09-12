@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState } from "react";
@@ -64,8 +65,8 @@ const exercises = {
     a("abnormal", "Abnormal condition", "Incorrect wheel fitting, a damaged wheel or overspeed could cause failure during run-up."),
   ],
   people_map: [
-    m("people", "People who may be affected", ["Operator", "Contractor", "Maintenance staff", "Nearby employees", "Delivery driver", "Visitor or public", "New starter", "Lone worker"], ["Contractor", "Nearby employees", "Delivery driver"]),
-    a("map", "People-at-risk map", "Contractor — stored pressure and oil release — injection injury. Nearby employees — unexpected plant movement — crushing injury. Delivery driver — vehicle enters the work area — collision.", "Link every selected group to an exposure and credible harm."),
+    m("people", "People who may be affected", ["Operator", "Contractor", "Maintenance staff", "Nearby employees", "Delivery driver", "Visitor or public", "New starter", "Lone worker"], ["Operator", "Contractor", "Nearby employees", "Delivery driver"]),
+    a("map", "People-at-risk map", "Operator — unexpected plant movement or released oil — crushing injury, burns or a slip. Contractor — stored pressure and oil release — injection injury. Nearby employees — unexpected plant movement — crushing injury. Delivery driver — vehicle enters the work area — collision.", "Link every selected group to an exposure and credible harm."),
     t("consult", "People to consult", "Contractor, operators, area supervisor, maintenance lead and logistics coordinator"),
   ],
   matrix: [
