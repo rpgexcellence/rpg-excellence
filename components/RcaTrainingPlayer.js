@@ -30,7 +30,9 @@ const listLabels = {
 
 function LearningContent({ module }) {
   const content = module.content || {};
-  const lists = Object.entries(listLabels).filter(([key]) => Array.isArray(content[key]));
+  const lists = Object.keys(listLabels)
+    .filter((key) => Array.isArray(content[key]))
+    .map((key) => [key, content[key]]);
   return <div className="iapLearning">
     {content.summary && <p className="iapLead">{content.summary}</p>}
     {Array.isArray(content.sections) && <div className="iapSections">{content.sections.map((section,index) => <article key={section.heading}><b>{String(index + 1).padStart(2,"0")}</b><div><h3>{section.heading}</h3><p>{section.body}</p></div></article>)}</div>}
