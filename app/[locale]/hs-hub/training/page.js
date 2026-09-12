@@ -65,6 +65,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
             <div className="heroActions">
               <Link className="primaryButton" href={purchaseLink("risk-assessment-initial")}>Buy initial course</Link>
               <Link className="secondaryButton" href={"/" + locale + "/hs-hub"}>Explore the H&amp;S Hub</Link>
+              <Link className="secondaryButton" href="/verify/training">Verify certificate</Link>
             </div>
             <small>Individual access from £19.99 + VAT. Organisation subscription access is also available.</small>
           </div>
