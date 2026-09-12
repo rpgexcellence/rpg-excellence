@@ -18,9 +18,17 @@ const TRAINING_PRODUCTS = {
   "risk-assessment-initial": "RA-INITIAL-001",
   "risk-assessment-refresher": "RA-REFRESHER-001",
   "internal-auditor-refresher": "IA-REFRESHER-001",
+  "rca-8d-practitioner": "RCA-8D-001",
 };
 
 function getTrainingPaths(courseCode) {
+  if (courseCode?.startsWith("RCA-")) {
+    return {
+      academy: "/portal/rca/training",
+      publicCatalogue: "/en/rca-8d-training",
+    };
+  }
+
   if (courseCode?.startsWith("IA-")) {
     return {
       academy: "/portal/internal-audit/training",
@@ -317,3 +325,4 @@ export async function POST(request) {
     );
   }
 }
+
