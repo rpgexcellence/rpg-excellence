@@ -7,6 +7,10 @@ export default function sitemap() {
     "/contact",
     "/pricing",
     "/ai-tools",
+    "/hs-hub",
+    "/hs-hub/training",
+    "/internal-audit-training",
+    "/rca-8d-training",
     "/iso-9001",
     "/iso-14001",
     "/iso-45001",
@@ -14,7 +18,7 @@ export default function sitemap() {
     "/iso-27001",
     "/terms",
     "/privacy",
-    "/cookies"
+    "/cookies",
   ];
 
   const now = new Date();
@@ -24,7 +28,15 @@ export default function sitemap() {
       url: `${base}/${locale}${page}`,
       lastModified: now,
       changeFrequency: page === "" ? "weekly" : "monthly",
-      priority: page === "" ? 1 : page.startsWith("/iso-") ? 0.9 : 0.7
+      priority:
+        page === ""
+          ? 1
+          : page === "/hs-hub" || page.startsWith("/iso-")
+            ? 0.9
+            : page.includes("training")
+              ? 0.85
+              : 0.7,
     }))
   );
 }
+
