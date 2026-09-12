@@ -175,34 +175,63 @@ async function saveTrainingPurchase(supabase, session) {
   const accessExpiresAt = new Date(purchasedAt);
   accessExpiresAt.setUTCFullYear(accessExpiresAt.getUTCFullYear() + 1);
 
-  const passRow = {
-    owner_id: ownerId,
-    organization_id: organizationId,
-    course_id: course.id,
-    status: "consumed",
-    stripe_checkout_session_id: session.id,
-    stripe_payment_intent_id:
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.payment_intent?.id ?? null,
-    amount_paid: session.amount_total ?? null,
-    currency: session.currency || "gbp",
-    purchased_at: purchasedAt.toISOString(),
-    access_expires_at: accessExpiresAt.toISOString(),
-    assigned_to: learnerId,
-    consumed_at: purchasedAt.toISOString(),
-    updated_at: purchasedAt.toISOString(),
-  };
-
-  const { data: trainingPass, error: passError } = await supabase
+  const { data: savedPass, error: savedPassError } = await supabase
     .from("hs_training_passes")
-    .upsert(passRow, { onConflict: "stripe_checkout_session_id" })
-    .select("id")
-    .single();
+    .select("id,access_expires_at")
+    .eq("stripe_checkout_session_id", session.id)
+    .maybeSingle();
 
-  if (passError) {
-    throw new Error(`Unable to save training pass: ${passError.message}`);
+  if (savedPassError) {
+    throw new Error(`Unable to check training pass: ${savedPassError.message}`);
   }
+
+  let trainingPass = savedPass;
+
+  if (!trainingPass) {
+    const { data: insertedPass, error: passError } = await supabase
+      .from("hs_training_passes")
+      .insert({
+        owner_id: ownerId,
+        organization_id: organizationId,
+        course_id: course.id,
+        status: "consumed",
+        stripe_checkout_session_id: session.id,
+        stripe_payment_intent_id:
+          typeof session.payment_intent === "string"
+            ? session.payment_intent
+            : session.payment_intent?.id ?? null,
+        amount_paid: session.amount_total ?? null,
+        currency: session.currency || "gbp",
+        purchased_at: purchasedAt.toISOString(),
+        access_expires_at: accessExpiresAt.toISOString(),
+        assigned_to: learnerId,
+        consumed_at: purchasedAt.toISOString(),
+        updated_at: purchasedAt.toISOString(),
+      })
+      .select("id,access_expires_at")
+      .single();
+
+    if (passError?.code === "23505") {
+      const { data: concurrentPass, error: concurrentPassError } = await supabase
+        .from("hs_training_passes")
+        .select("id,access_expires_at")
+        .eq("stripe_checkout_session_id", session.id)
+        .single();
+
+      if (concurrentPassError) {
+        throw new Error(`Unable to recover training pass: ${concurrentPassError.message}`);
+      }
+
+      trainingPass = concurrentPass;
+    } else if (passError) {
+      throw new Error(`Unable to save training pass: ${passError.message}`);
+    } else {
+      trainingPass = insertedPass;
+    }
+  }
+
+  const enrolmentExpiresAt =
+    trainingPass.access_expires_at || accessExpiresAt.toISOString();
 
   const { data: existingEnrolment, error: enrolmentCheckError } = await supabase
     .from("hs_training_enrolments")
@@ -225,11 +254,26 @@ async function saveTrainingPurchase(supabase, session) {
         training_pass_id: trainingPass.id,
         status: "not_started",
         progress_percent: 0,
-        expires_at: accessExpiresAt.toISOString(),
+        expires_at: enrolmentExpiresAt,
         updated_at: purchasedAt.toISOString(),
       });
 
-    if (enrolmentError) {
+    if (enrolmentError?.code === "23505") {
+      const { data: concurrentEnrolment, error: concurrentEnrolmentError } =
+        await supabase
+          .from("hs_training_enrolments")
+          .select("id")
+          .eq("training_pass_id", trainingPass.id)
+          .maybeSingle();
+
+      if (concurrentEnrolmentError || !concurrentEnrolment) {
+        throw new Error(
+          `Unable to recover training enrolment: ${
+            concurrentEnrolmentError?.message || "record not found"
+          }`
+        );
+      }
+    } else if (enrolmentError) {
       throw new Error(`Unable to create training enrolment: ${enrolmentError.message}`);
     }
   }
