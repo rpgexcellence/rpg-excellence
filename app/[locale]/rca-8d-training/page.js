@@ -57,13 +57,13 @@ export default async function RcaTrainingPublicPage({ params }) {
               <Link className="iaButton secondary" href="/portal/rca">Explore RCA–8D Hub</Link>
               <Link className="iaButton secondary" href="/verify/training">Verify certificate</Link>
             </div>
-            <small>Individual access £49.99 + VAT. Includes the practitioner workbook, final assessment and certificate.</small>
+            <small>Individual access £49.99. No VAT is charged. Includes the practitioner workbook, final assessment and certificate.</small>
           </div>
 
           <aside className="iaOffer">
             <span>RCA AND CORRECTIVE ACTION PRACTITIONER</span>
             <h2>Evidence-led Problem Solving</h2>
-            <div className="iaPrice"><strong>£49.99</strong><small>+ VAT / learner</small></div>
+            <div className="iaPrice"><strong>£49.99</strong><small>per learner</small></div>
             <ul>
               <li>Ten interactive modules</li>
               <li>Structured practitioner exercises with immediate guidance</li>
@@ -149,7 +149,7 @@ export default async function RcaTrainingPublicPage({ params }) {
           <h2>Build evidence-led corrective-action capability.</h2>
           <div className="iaActions">
             <TrainingPurchaseButton className="iaButton primary lightPrimary" course="rca-8d-practitioner">
-              Buy for £49.99 + VAT
+              Buy for £49.99
             </TrainingPurchaseButton>
             <Link className="iaButton secondary light" href={"/" + locale + "/contact"}>Organisation licences</Link>
           </div>
