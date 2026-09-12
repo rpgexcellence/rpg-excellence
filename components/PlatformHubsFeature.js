@@ -12,7 +12,7 @@ function AuditPreview() {
   return <div className="phPreview phAuditPreview">
     <div className="phPreviewTitle"><strong>Audit programme</strong><span>2026</span></div>
     {auditRows.map(([name, status]) => <div className="phAuditRow" key={name}><span>{name}</span><em className={status.toLowerCase().replace(" ", "-")}>{status}</em></div>)}
-    <div className="phCommercial"><b>Internal Auditor Refresher</b><span>£19.99 + VAT</span></div>
+    <div className="phCommercial"><b>Internal Auditor Refresher</b><span>£19.99</span></div>
   </div>;
 }
 
@@ -21,7 +21,7 @@ function CapaPreview() {
     <div className="phPreviewTitle"><strong>Interactive RCA-8D</strong><span>Guided</span></div>
     <div className="phEightD">{["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"].map((step, index) => <span className={index < 4 ? "active" : ""} key={step}>{step}</span>)}</div>
     <div className="phCause"><i/><div><b>Evidence</b><small>Cause and effect</small></div><i/><div><b>Action</b><small>Verified effectiveness</small></div></div>
-    <div className="phCommercial"><b>RCA Practitioner Training</b><span>£49.99 + VAT</span></div>
+    <div className="phCommercial"><b>RCA Practitioner Training</b><span>£49.99</span></div>
   </div>;
 }
 
@@ -30,7 +30,7 @@ function SafetyPreview() {
   return <div className="phPreview phSafetyPreview">
     <div className="phPreviewTitle"><strong>Risk assessment matrix</strong><span>5 × 5</span></div>
     <div className="phSafetyBody"><div className="phMiniMatrix">{cells.map((score, index) => <span className={score >= 15 ? "red" : score >= 10 ? "orange" : score >= 5 ? "amber" : "green"} key={`${score}-${index}`}>{score}</span>)}</div><div className="phSafetySteps"><span>Identify</span><span>Assess</span><span>Control</span><span>Review</span></div></div>
-    <div className="phCommercial"><b>Interactive training</b><span>From £12.99 + VAT</span></div>
+    <div className="phCommercial"><b>Interactive training</b><span>From £12.99</span></div>
   </div>;
 }
 
@@ -82,4 +82,3 @@ export default function PlatformHubsFeature({ locale = "en" }) {
     <div className="phProof"><div className="phProofLead"><strong>Evidence that supports decisions</strong><span>One controlled record across every hub</span></div><div className="phMetric"><b>3</b><span>Operational hubs</span></div><div className="phMetric"><b>5</b><span>Shared services</span></div><div className="phMetric"><b>1</b><span>Assurance record</span></div><Link className="phProofLink" href="/portal">Open the platform →</Link></div>
   </section>;
 }
-
