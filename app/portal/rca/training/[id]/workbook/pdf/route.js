@@ -87,6 +87,10 @@ function normaliseResponse(response) {
   return response;
 }
 
+function fieldLabel(value) {
+  return clean(value).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export async function GET(request, { params }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -172,6 +176,12 @@ export async function GET(request, { params }) {
         y = addSection(page, fonts, y, label, body || "No path recorded.", key === "escape" ? "amber" : key === "systemic" ? "green" : "blue");
         y = addSection(page, fonts, y, `${label} evidence`, response.evidence?.[key] || "No evidence recorded.", "green");
       }
+    } else if (response.exercise_type === "structured_practitioner_record" && response.fields && typeof response.fields === "object") {
+      y = addSection(page, fonts, y, "Practitioner exercise", response.exercise_title || "Structured RCA record", "blue");
+      Object.entries(response.fields).forEach(([key,value],index) => {
+        y = addSection(page, fonts, y, fieldLabel(key), value || "No response recorded.", index % 3 === 1 ? "amber" : index % 3 === 2 ? "green" : "blue");
+      });
+      y = addSection(page, fonts, y, "Learner review", response.guidance_reviewed ? `The learner reviewed and confirmed this record.${response.worked_example_used ? " A worked example was used as a starting point and retained as modified learner evidence." : " The learner created the record without populating the worked example."}` : "Learner review was not recorded.", "green");
     } else {
       y = addSection(page, fonts, y, "Decision question", response.question || "Structured module exercise", "blue");
       y = addSection(page, fonts, y, "Selected response", response.selected_response || "No selected response retained.", "green");
