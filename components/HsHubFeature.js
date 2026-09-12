@@ -34,8 +34,23 @@ export default function HsHubFeature({ locale = "en" }) {
       .homeHsHub h2{max-width:820px}
       .homeHsHubLead{max-width:790px}
       .homeHsHubBridge{width:100%;max-width:none;margin-left:0;margin-right:0}
+      .homeHsHubInner{padding-top:20px;padding-bottom:20px}
+      .homeHsHub h2{margin-top:9px;margin-bottom:8px;font-size:clamp(30px,2.7vw,44px);line-height:1.01}
+      .homeHsHubLead{font-size:14px;line-height:1.45}
+      .homeHsHubActions{margin-top:14px}
+      .homeHsHubButton{min-height:40px;padding:9px 15px}
+      .homeHsHubFeatures{margin-top:14px;gap:7px}
+      .homeHsHubFeature{min-height:42px;padding:7px}
+      .homeHsHubIcon{flex-basis:26px;width:26px;height:26px}
+      .homeHsHubVisual{padding:13px}
+      .homeHsHubVisualHead{margin-bottom:8px}
+      .homeHsHubVisualHead strong{font-size:15px}
+      .homeHsHubCell{aspect-ratio:2.05}
+      .homeHsHubLegend{margin-top:8px}
+      .homeHsHubVisualFoot{margin-top:8px;padding-top:8px}
+      .homeHsHubBridge{margin-top:10px}
       @media(max-width:1050px){.homeHsHubLayout{grid-template-columns:1fr}}
-      @media(max-width:620px){.homeHsHub{padding-left:14px;padding-right:14px}.homeHsHubInner{padding-left:18px;padding-right:18px}}
+      @media(max-width:620px){.homeHsHub{padding-left:14px;padding-right:14px}.homeHsHubInner{padding:20px 18px}.homeHsHub h2{font-size:34px}.homeHsHubCell{aspect-ratio:1.5}}
     `}</style>
     <div className="homeHsHubInner">
       <div className="homeHsHubLayout">
