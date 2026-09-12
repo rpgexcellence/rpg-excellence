@@ -300,6 +300,96 @@ async function completeModuleAction(
     );
   }
 
+  const {
+    data: earlierModules,
+    error: earlierModulesError,
+  } = await supabase
+    .from("hs_training_modules")
+    .select("id")
+    .eq(
+      "course_id",
+      enrolment.course_id
+    )
+    .eq("active", true)
+    .lt(
+      "module_number",
+      module.module_number
+    );
+
+  if (earlierModulesError) {
+    throw new Error(
+      earlierModulesError.message
+    );
+  }
+
+  if (
+    earlierModules &&
+    earlierModules.length > 0
+  ) {
+    const earlierModuleIds =
+      earlierModules.map(
+        (item) => item.id
+      );
+
+    const {
+      data:
+        earlierProgress,
+      error:
+        earlierProgressError,
+    } = await supabase
+      .from(
+        "hs_training_module_progress"
+      )
+      .select("module_id")
+      .eq(
+        "enrolment_id",
+        enrolment.id
+      )
+      .eq(
+        "learner_id",
+        user.id
+      )
+      .eq(
+        "status",
+        "completed"
+      )
+      .in(
+        "module_id",
+        earlierModuleIds
+      );
+
+    if (earlierProgressError) {
+      throw new Error(
+        earlierProgressError.message
+      );
+    }
+
+    const completedEarlier =
+      new Set(
+        (
+          earlierProgress ??
+          []
+        ).map(
+          (item) =>
+            item.module_id
+        )
+      );
+
+    const sequenceComplete =
+      earlierModuleIds.every(
+        (id) =>
+          completedEarlier.has(
+            id
+          )
+      );
+
+    if (!sequenceComplete) {
+      throw new Error(
+        "Complete the preceding training modules before continuing."
+      );
+    }
+  }
+
   const content =
     module.content ?? {};
 
@@ -728,32 +818,4 @@ export default async function RiskAssessmentTrainingCoursePage({
               "#fff8e7",
             color:
               "#664b13",
-            lineHeight:
-              1.55,
-          }}
-        >
-          <strong>
-            Competence reminder
-          </strong>
 
-          <p
-            style={{
-              margin:
-                "6px 0 0",
-            }}
-          >
-            Completion of this
-            learning supports
-            knowledge and
-            understanding. Employers
-            must still consider the
-            competence, experience
-            and supervision required
-            for the complexity and
-            risk of the work.
-          </p>
-        </aside>
-      </div>
-    </main>
-  );
-}
