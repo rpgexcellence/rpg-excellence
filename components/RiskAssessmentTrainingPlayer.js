@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import StructuredPracticalExercise from "./StructuredPracticalExercise";
+import RiskMatrixHeatMap from "./RiskMatrixHeatMap";
 
 function ContentBlock({ module }) {
   const content = module.content || {};
@@ -13,7 +14,7 @@ function ContentBlock({ module }) {
     {Array.isArray(content.record) && <ul className="rtpChecklist">{content.record.map((item) => <li key={item}>{item}</li>)}</ul>}
     {Array.isArray(content.review_triggers) && <ul className="rtpChecklist">{content.review_triggers.map((item) => <li key={item}>{item}</li>)}</ul>}
     {Array.isArray(content.traps) && <div className="rtpTraps">{content.traps.map((item) => <span key={item}>⚠ {item}</span>)}</div>}
-    {Array.isArray(content.likelihood) && Array.isArray(content.severity) && <div className="rtpMatrixExercise"><div><h3>Likelihood</h3>{content.likelihood.map((item) => <span key={item}>{item}</span>)}</div><strong>×</strong><div><h3>Severity</h3>{content.severity.map((item) => <span key={item}>{item}</span>)}</div></div>}
+    {Array.isArray(content.likelihood) && Array.isArray(content.severity) && <RiskMatrixHeatMap/>}
     {content.scenario && <section className="rtpScenario"><span>APPLIED SCENARIO</span><h3>{content.scenario.title}</h3><p>{content.scenario.context || content.scenario.prompt}</p>{Array.isArray(content.scenario.tasks) && <ol>{content.scenario.tasks.map((task) => <li key={task}>{task}</li>)}</ol>}</section>}
     {(content.interaction || content.reflection) && <section className="rtpInteraction"><span>PRACTICAL EXERCISE</span><h3>{content.interaction?.instruction || content.reflection}</h3><p>Complete the separate structured exercise before this module can be recorded as complete.</p></section>}
     {content.key_message && <aside className="rtpKey"><strong>Key message</strong><p>{content.key_message}</p></aside>}
