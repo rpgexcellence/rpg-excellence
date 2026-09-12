@@ -155,6 +155,70 @@ function exampleFor(field, interactionType, answers) {
   return classifyExamples[category]?.[field.name] || field.example;
 }
 
+const fieldPurpose = {
+  hazard: "A clear source of harm is needed before suitable controls can be chosen.",
+  exposure: "The assessment must explain how contact or exposure can actually occur.",
+  harm: "A specific credible outcome is needed to support a defensible severity judgement.",
+  abnormal: "Non-routine and foreseeable failure conditions are part of a suitable assessment.",
+  people: "Every affected group may need different controls, information or supervision.",
+  map: "Each selected group must be linked to a specific exposure and credible harm.",
+  consult: "The people doing, controlling and affected by the work hold evidence needed for the decision.",
+  likelihood: "Likelihood must reflect exposure frequency and the reliability of current controls.",
+  severity: "Severity must use the worst credible outcome, without exaggeration or understatement.",
+  score: "The score must match the selected likelihood and severity values.",
+  decision: "The work decision must match the risk level and current control reliability.",
+  rationale: "The rationale provides auditable evidence for the learner's judgement.",
+  controls: "Controls should address the source and clearly define what must change.",
+  evidence: "Objective evidence is required before an action or control can be accepted as complete.",
+  owner: "An action without clear ownership is unlikely to be controlled to completion.",
+  review: "A defined trigger keeps the assessment aligned with changes and new evidence.",
+};
+
+function coachingReview(fields, answers, interactionType) {
+  const prompts = [];
+
+  fields.forEach((field) => {
+    const value = answers[field.name];
+    const missing = field.type === "multi" ? !Array.isArray(value) || value.length === 0 : !String(value || "").trim();
+    if (missing) prompts.push({ title: `Complete “${field.label}”`, explanation: fieldPurpose[field.name] || "This evidence is required to demonstrate that the scenario has been considered." });
+  });
+
+  if (interactionType === "people_map") {
+    const selected = answers.people || [];
+    const required = {
+      Operator: "Operators are working nearby and could be exposed to unexpected movement, released oil or loss of access.",
+      Contractor: "The contractor performs the intervention and may not be able to see the isolation point.",
+      "Nearby employees": "The scenario confirms that other people remain in the production area during the work.",
+      "Delivery driver": "The delivery route crosses the work area, creating a separate vehicle and access exposure.",
+    };
+    Object.entries(required).forEach(([person, explanation]) => {
+      if (!selected.includes(person)) prompts.push({ title: `Consider adding: ${person}`, explanation });
+    });
+
+    const map = String(answers.map || "").toLowerCase();
+    const keywords = { Operator: "operator", Contractor: "contractor", "Maintenance staff": "maintenance", "Nearby employees": "employee", "Delivery driver": "delivery", "Visitor or public": "visitor", "New starter": "starter", "Lone worker": "lone" };
+    selected.forEach((person) => {
+      if (map && !map.includes(keywords[person])) prompts.push({ title: `Link ${person} to exposure and harm`, explanation: "The group is selected, but the people-at-risk map does not yet show how that group could be harmed." });
+    });
+  }
+
+  if (interactionType === "matrix") {
+    const likelihood = Number.parseInt(answers.likelihood, 10);
+    const severity = Number.parseInt(answers.severity, 10);
+    const enteredScore = Number.parseInt(answers.score, 10);
+    if (likelihood && severity && enteredScore !== likelihood * severity) prompts.push({ title: `Recalculate the risk score: ${likelihood} × ${severity} = ${likelihood * severity}`, explanation: "The recorded score must mathematically match the selected likelihood and severity." });
+    if (enteredScore >= 15 && answers.decision && !answers.decision.startsWith("No")) prompts.push({ title: "Reconsider whether work can proceed", explanation: "A score of 15–25 is unacceptable in this model; work must stop until the risk is reduced." });
+    if (enteredScore >= 10 && enteredScore <= 14 && answers.decision?.startsWith("Yes — controls are adequate")) prompts.push({ title: "Further controlled action is required", explanation: "A score of 10–14 is inadequate and cannot be accepted as requiring no further action." });
+  }
+
+  if (["rapid_review", "review_decision", "template_review", "final_refresh"].includes(interactionType)) {
+    const multiField = fields.find((field) => field.type === "multi");
+    if (multiField && Array.isArray(answers[multiField.name]) && answers[multiField.name].length < 2) prompts.push({ title: `Select another relevant ${multiField.label.toLowerCase()}`, explanation: "This scenario contains more than one indicator; recognising interacting factors produces a more suitable review." });
+  }
+
+  return { passed: prompts.length === 0, prompts };
+}
+
 export default function StructuredPracticalExercise({ module, enrolment, completeModuleAction, onBack }) {
   const content = module.content || {};
   const interaction = content.interaction || { type: "reflection", instruction: content.reflection || "Apply this module to a practical example." };
@@ -164,10 +228,12 @@ export default function StructuredPracticalExercise({ module, enrolment, complet
   const [answerModes, setAnswerModes] = useState({});
   const [usedExample, setUsedExample] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [coaching, setCoaching] = useState(null);
 
   function loadExample(checked) {
     setUsedExample(checked);
     setConfirmed(false);
+    setCoaching(null);
     setAnswers((current) => {
       if (!checked) return blank();
       const category = interaction.type === "classify" ? current.category || "Mechanical" : current.category;
@@ -179,12 +245,15 @@ export default function StructuredPracticalExercise({ module, enrolment, complet
 
   function updateMulti(name, option, checked) {
     setAnswers((current) => ({ ...current, [name]: checked ? [...current[name], option] : current[name].filter((item) => item !== option) }));
+    setCoaching(null);
+    setConfirmed(false);
   }
 
   function chooseAnswerMode(field, mode) {
     setAnswerModes((current) => ({ ...current, [field.name]: mode }));
     setAnswers((current) => ({ ...current, [field.name]: mode === "own" ? "" : exampleFor(field, interaction.type, current) }));
     setConfirmed(false);
+    setCoaching(null);
   }
 
   function updateSelect(field, value) {
@@ -200,20 +269,26 @@ export default function StructuredPracticalExercise({ module, enrolment, complet
       return next;
     });
     setConfirmed(false);
+    setCoaching(null);
   }
 
-  const evidence = JSON.stringify({ version: 2, interaction_type: interaction.type, used_worked_example: usedExample, response_modes: answerModes, learner_confirmed: confirmed, answers });
+  function checkResponse() {
+    setConfirmed(false);
+    setCoaching(coachingReview(fields, answers, interaction.type));
+  }
+
+  const evidence = JSON.stringify({ version: 3, interaction_type: interaction.type, used_worked_example: usedExample, response_modes: answerModes, coaching_check_passed: Boolean(coaching?.passed), learner_confirmed: confirmed, answers });
 
   return <div className="spePage">
     <style>{`
       .spePage{color:#092748}.speBack{padding:0;border:0;background:none;color:#245cff;font-weight:850;cursor:pointer}.speHead{margin:22px 0;padding:25px;border-radius:15px;background:linear-gradient(135deg,#082a54,#087f6c);color:#fff}.speHead small{font-weight:900;letter-spacing:.11em;color:#78e3c4}.speHead h2{margin:8px 0;font-size:31px}.speHead p{margin:0;line-height:1.55}.speScenario{margin:16px 0;padding:18px;border:1px solid #c9dcfa;border-radius:12px;background:#edf4ff}.speScenario small{font-weight:900;color:#245cff;letter-spacing:.08em}.speScenario h3{margin:6px 0}.speScenario p{margin:0;color:#496681;line-height:1.5}.speExample,.speConfirm{display:flex;gap:12px;align-items:flex-start;margin:16px 0;padding:16px;border:1px solid #c7d7e5;border-radius:11px;background:#f4f8fc;cursor:pointer}.speExample input,.speConfirm input{width:19px;height:19px;margin-top:2px;accent-color:#087f6c}.speExample span{display:grid;gap:3px}.speExample small{color:#5f768c}.speGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.speField{min-width:0;margin:0;padding:16px;border:1px solid #d6e1ea;border-radius:11px}.speField.wide{grid-column:1/-1}.speField legend{padding:0 7px;font-weight:900}.speField legend i{display:inline-grid;place-items:center;width:27px;height:27px;margin-right:8px;border-radius:50%;background:#e8f0ff;color:#245cff;font-size:10px;font-style:normal}.speHelp{margin:2px 0 11px;color:#60778e;font-size:13px}.speField input:not([type=checkbox]),.speField select,.speField textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #aebfd0;border-radius:8px;background:#fff;font:inherit}.speField textarea{min-height:105px;resize:vertical}.speOptions{position:relative;display:flex;flex-wrap:wrap;gap:7px}.speOptions label{cursor:pointer}.speOptions label input{position:absolute;opacity:0}.speOptions label span{display:block;padding:9px 10px;border:1px solid #c8d8e5;border-radius:999px;color:#34536f;font-size:12px;font-weight:800}.speOptions label input:checked+span{border-color:#087f6c;background:#e4f7f1;color:#05634f}.speValidator{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;opacity:0;pointer-events:none}.speConfirm{background:#fff8e6;border-color:#e9c568}.speSubmit{width:100%;padding:13px 16px;border:0;border-radius:9px;background:#087f6c;color:#fff;font-weight:900;font-size:15px;cursor:pointer}.speNote{text-align:center;color:#687d91;font-size:12px}@media(max-width:650px){.speGrid{grid-template-columns:1fr}.speField.wide{grid-column:auto}.speHead h2{font-size:25px}}
     `}</style>
-    <style>{`.speAnswerModes{display:grid;gap:6px;margin:0 0 11px}.speAnswerModes label{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid #d8e3ec;border-radius:8px;background:#f7fafc;cursor:pointer;font-size:12px;font-weight:750}.speAnswerModes label:has(input:checked){border-color:#3573ee;background:#edf3ff;color:#174cae}.speAnswerModes input{width:auto!important;accent-color:#245cff}`}</style>
+    <style>{`.speAnswerModes{display:grid;gap:6px;margin:0 0 11px}.speAnswerModes label{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid #d8e3ec;border-radius:8px;background:#f7fafc;cursor:pointer;font-size:12px;font-weight:750}.speAnswerModes label:has(input:checked){border-color:#3573ee;background:#edf3ff;color:#174cae}.speAnswerModes input{width:auto!important;accent-color:#245cff}.speCoachButton{width:100%;margin-top:17px;padding:12px;border:2px solid #245cff;border-radius:9px;background:#fff;color:#174cae;font-weight:900;cursor:pointer}.speCoach{margin:14px 0;padding:17px;border-radius:12px}.speCoach.pass{border:1px solid #8fd7bd;background:#eaf8f2}.speCoach.prompt{border:1px solid #efc66a;background:#fff8e6}.speCoach h3{margin:0 0 8px}.speCoach p{margin:4px 0}.speCoach ul{display:grid;gap:9px;margin:10px 0 0;padding-left:20px}.speCoach li strong{display:block}.speCoach li span{display:block;margin-top:2px;color:#5c6f7d}.speConfirm.disabled{opacity:.55;cursor:not-allowed}.speSubmit:disabled{background:#91a5b5;cursor:not-allowed}`}</style>
     <button type="button" className="speBack" onClick={onBack}>← Return to learning</button>
     <header className="speHead"><small>PRACTICAL EXERCISE</small><h2>Demonstrate your decision</h2><p>{interaction.instruction}</p></header>
     {content.scenario && <section className="speScenario"><small>SCENARIO REFERENCE</small><h3>{content.scenario.title}</h3><p>{content.scenario.context || content.scenario.prompt}</p></section>}
     <label className="speExample"><input type="checkbox" checked={usedExample} onChange={(event) => loadExample(event.target.checked)}/><span><strong>Use a worked example</strong><small>Populate a model response. You must review it and can modify any answer before submission.</small></span></label>
-    <div className="speGrid">{fields.map((field, index) => <fieldset className={`speField ${field.type === "area" ? "wide" : ""}`} key={field.name}><legend><i>{String(index + 1).padStart(2, "0")}</i>{field.label}</legend>{field.help && <p className="speHelp">{field.help}</p>}
+    <div className="speGrid" onChange={() => { setCoaching(null); setConfirmed(false); }}>{fields.map((field, index) => <fieldset className={`speField ${field.type === "area" ? "wide" : ""}`} key={field.name}><legend><i>{String(index + 1).padStart(2, "0")}</i>{field.label}</legend>{field.help && <p className="speHelp">{field.help}</p>}
       {(field.type === "text" || field.type === "area") && <div className="speAnswerModes" role="radiogroup" aria-label={`${field.label} response method`}>
         <label><input type="radio" name={`mode-${field.name}`} checked={answerModes[field.name] === "suggested"} onChange={() => chooseAnswerMode(field, "suggested")}/>Select the suggested response</label>
         <label><input type="radio" name={`mode-${field.name}`} checked={answerModes[field.name] === "own"} onChange={() => chooseAnswerMode(field, "own")}/>Add my own response</label>
@@ -224,8 +299,10 @@ export default function StructuredPracticalExercise({ module, enrolment, complet
       {field.type === "area" && <textarea required minLength={20} value={answers[field.name]} onChange={(event) => setAnswers({ ...answers, [field.name]: event.target.value })}/>} 
       {field.type === "multi" && <div className="speOptions">{field.options.map((option) => <label key={option}><input type="checkbox" checked={answers[field.name].includes(option)} onChange={(event) => updateMulti(field.name, option, event.target.checked)}/><span>{option}</span></label>)}<input className="speValidator" tabIndex={-1} aria-hidden="true" required value={answers[field.name].length ? "selected" : ""} onChange={() => {}}/></div>}
     </fieldset>)}</div>
-    <label className="speConfirm"><input type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)}/><span><strong>I have reviewed this response.</strong> It reflects my decision for the scenario, and I can explain the selected controls and evidence.</span></label>
-    <form action={completeModuleAction}><input type="hidden" name="enrolment_id" value={enrolment.id}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="learner_reflection" value={evidence}/><button className="speSubmit" type="submit">Submit exercise and complete module →</button></form>
+    <button className="speCoachButton" type="button" onClick={checkResponse}>Check my response and show guidance</button>
+    {coaching && <section className={`speCoach ${coaching.passed ? "pass" : "prompt"}`} aria-live="polite">{coaching.passed ? <><h3>✓ Response check complete</h3><p>No required scenario element is missing. Review your reasoning, then confirm your response below.</p></> : <><h3>Review these points before continuing</h3><p>The engine found {coaching.prompts.length} point{coaching.prompts.length === 1 ? "" : "s"} requiring attention:</p><ul>{coaching.prompts.map((prompt, index) => <li key={`${prompt.title}-${index}`}><strong>{prompt.title}</strong><span>{prompt.explanation}</span></li>)}</ul></>}</section>}
+    <label className={`speConfirm ${coaching?.passed ? "" : "disabled"}`}><input type="checkbox" required disabled={!coaching?.passed} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)}/><span><strong>I have reviewed this response.</strong> It reflects my decision for the scenario, and I can explain the selected controls and evidence.</span></label>
+    <form action={completeModuleAction}><input type="hidden" name="enrolment_id" value={enrolment.id}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="learner_reflection" value={evidence}/><button className="speSubmit" type="submit" disabled={!coaching?.passed || !confirmed}>Submit exercise and complete module →</button></form>
     <p className="speNote">The structured response, worked-example status and learner confirmation are retained as module evidence.</p>
   </div>;
 }
