@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 
 export function middleware(request) {
+  const localeMatch = request.nextUrl.pathname.match(/^\/(fr|pl|es|it)(\/.*)?$/);
+  if (localeMatch) {
+    const englishUrl = request.nextUrl.clone();
+    englishUrl.pathname = `/en${localeMatch[2] || ""}`;
+    return NextResponse.redirect(englishUrl, 308);
+  }
+
   const match = request.nextUrl.pathname.match(/^\/audit-actions\/([^/]+)$/);
   if (!match) return NextResponse.next();
   const response = NextResponse.next();
@@ -14,4 +21,6 @@ export function middleware(request) {
   return response;
 }
 
-export const config = { matcher: ["/audit-actions/:path*"] };
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
