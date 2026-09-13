@@ -9,6 +9,7 @@ export const metadata = {
     "Building Risk-Assessment Competence Through Practical Decisions | RPG Insights",
   description:
     "Why practical scenarios, structured interaction, feedback and retained evidence add more value to risk-assessment training than passive slide completion.",
+  alternates: { canonical: "/en/insights/risk-assessment-training" },
 };
 
 const decisions = [
