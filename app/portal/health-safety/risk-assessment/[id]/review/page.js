@@ -47,7 +47,7 @@ async function submitForReview(formData) {
   const { error } = await supabase.from("hs_risk_assessments").update({ status: "in_review", submitted_at: new Date().toISOString(), submitted_by: user.id }).eq("id", id).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
   await supabase.from("hs_risk_events").insert({ assessment_id: id, owner_id: user.id, organization_id: record.assessment.organization_id, actor_id: user.id, event_type: "submitted_for_review", event_summary: "Risk assessment submitted for review" });
-  revalidatePath("/portal/health-safety/risk-assessments/" + id + "/review");
+  revalidatePath("/portal/health-safety/risk-assessment/" + id + "/review");
 }
 
 async function recordReviewDecision(formData) {
@@ -75,8 +75,8 @@ async function recordReviewDecision(formData) {
   const { error } = await supabase.from("hs_risk_assessments").update(update).eq("id", id).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
   await supabase.from("hs_risk_events").insert({ assessment_id: id, owner_id: user.id, organization_id: record.assessment.organization_id, actor_id: user.id, event_type: decision, event_summary: decision === "approved" ? "Risk assessment approved" : "Changes required following review", event_data: { approver_name: approverName, comment } });
-  revalidatePath("/portal/health-safety/risk-assessments/" + id + "/review");
-  revalidatePath("/portal/health-safety/risk-assessments/" + id);
+  revalidatePath("/portal/health-safety/risk-assessment/" + id + "/review");
+  revalidatePath("/portal/health-safety/risk-assessment/" + id);
 }
 
 async function markCommunicated(formData) {
@@ -90,14 +90,14 @@ async function markCommunicated(formData) {
   const { error } = await supabase.from("hs_risk_assessments").update({ status: "communicated", communicated_at: new Date().toISOString() }).eq("id", id).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
   await supabase.from("hs_risk_events").insert({ assessment_id: id, owner_id: user.id, organization_id: assessment.organization_id, actor_id: user.id, event_type: "communicated", event_summary: "Approved risk assessment marked as communicated" });
-  revalidatePath("/portal/health-safety/risk-assessments/" + id + "/review");
+  revalidatePath("/portal/health-safety/risk-assessment/" + id + "/review");
 }
 
 export default async function ReviewApprovalPage({ params }) {
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessments/" + id + "/review");
+  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessment/" + id + "/review");
   const record = await getControlledRecord(supabase, user.id, id);
   if (!record.assessment) notFound();
   const { assessment, hazards, actions } = record;
@@ -109,7 +109,7 @@ export default async function ReviewApprovalPage({ params }) {
   return <main className="rrPage"><style>{`
     *{box-sizing:border-box}.rrPage{min-height:100vh;padding:34px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.rrShell{max-width:1120px;margin:auto}.rrTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.rrTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.rrTop h1{font-size:34px;margin:7px 0}.rrTop p{margin:0;color:#657b93}.rrBack{padding:11px 15px;border:1px solid #ccd9e4;border-radius:9px;background:#fff;color:#173b59;text-decoration:none;font-weight:850}.rrGate{display:grid;grid-template-columns:1fr repeat(4,.45fr);gap:12px;margin:24px 0}.rrStatus,.rrMetric{padding:18px;border:1px solid #d6e2ea;border-radius:13px;background:#fff}.rrStatus span,.rrStatus strong,.rrMetric span,.rrMetric strong{display:block}.rrStatus span,.rrMetric span{font-size:11px;color:#657b91;font-weight:850}.rrStatus strong{font-size:21px;margin-top:7px}.rrMetric strong{font-size:28px;margin-top:7px}.rrPanel{padding:24px;border:1px solid #d6e2ea;border-radius:16px;background:#fff;margin-top:15px}.rrHead{margin-bottom:17px}.rrHead h2{margin:0}.rrHead p{margin:6px 0 0;color:#6b8096}.rrChecks{display:grid;gap:8px}.rrCheck{display:flex;gap:12px;align-items:flex-start;padding:13px;border-radius:10px;background:#eef8f4;color:#176148}.rrCheck.fail{background:#fff0ee;color:#a22c26}.rrCheck b{font-size:18px}.rrReady{padding:18px;border-left:5px solid #079468;border-radius:10px;background:#eaf8f2;color:#126044;font-weight:850}.rrForm{display:grid;grid-template-columns:1fr 1fr;gap:14px}.rrField{display:grid;gap:7px}.rrField.full{grid-column:1/-1}.rrField label{font-size:12px;font-weight:900;color:#294a66}.rrField input,.rrField textarea{width:100%;padding:12px;border:1px solid #cbd8e5;border-radius:9px;font:inherit}.rrField textarea{min-height:95px}.rrDecisions{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap}.rrButton{padding:13px 18px;border:0;border-radius:9px;background:#087f6c;color:#fff;font-weight:900;cursor:pointer}.rrButton.red{background:#bd3a32}.rrButton.blue{background:#1762ef}.rrButton:disabled{opacity:.45;cursor:not-allowed}.rrHistory{display:grid;gap:8px}.rrHistory div{display:flex;justify-content:space-between;gap:15px;padding:12px;border-bottom:1px solid #e4ebf0}.rrHistory span{color:#667d93}@media(max-width:780px){.rrGate{grid-template-columns:1fr 1fr}.rrStatus{grid-column:1/-1}.rrForm{grid-template-columns:1fr}.rrField.full,.rrDecisions{grid-column:auto}}
   `}</style><div className="rrShell">
-    <header className="rrTop"><div><small>{assessment.assessment_reference} · CONTROL GATE</small><h1>Review, approval and communication</h1><p>{assessment.title}</p></div><Link className="rrBack" href={"/portal/health-safety/risk-assessments/" + id}>← Assessment workspace</Link></header>
+    <header className="rrTop"><div><small>{assessment.assessment_reference} · CONTROL GATE</small><h1>Review, approval and communication</h1><p>{assessment.title}</p></div><Link className="rrBack" href={"/portal/health-safety/risk-assessment/" + id}>← Assessment workspace</Link></header>
     <section className="rrGate"><div className="rrStatus"><span>CURRENT STATUS</span><strong>{label(assessment.status)}</strong></div><div className="rrMetric"><span>HAZARDS</span><strong>{hazards.length}</strong></div><div className="rrMetric"><span>ELEVATED</span><strong>{elevated.length}</strong></div><div className="rrMetric"><span>OPEN ACTIONS</span><strong>{actions.filter((item) => openActionStatuses.includes(item.status)).length}</strong></div><div className="rrMetric"><span>OVERDUE</span><strong>{overdue.length}</strong></div></section>
     <section className="rrPanel"><div className="rrHead"><h2>Approval readiness</h2><p>The gate checks required context, risk decisions and accountable action.</p></div>{failures.length ? <div className="rrChecks">{failures.map((failure) => <div className="rrCheck fail" key={failure}><b>×</b><span>{failure}</span></div>)}</div> : <div className="rrReady">✓ Required assessment information is complete and ready for controlled review.</div>}</section>
     {canEdit && <section className="rrPanel"><div className="rrHead"><h2>Submit for competent review</h2><p>Submission locks the assessment content while the approval decision is recorded.</p></div><form action={submitForReview}><input type="hidden" name="assessment_id" value={id}/><button className="rrButton blue" disabled={failures.length > 0}>Submit for review →</button></form></section>}
