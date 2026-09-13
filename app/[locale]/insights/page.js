@@ -18,6 +18,30 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "013",
+      title:
+        "ISO/IEC 27001 Readiness: Connecting Gap Analysis and the Statement of Applicability",
+      description:
+        "How an evidence-led ISO/IEC 27001 gap analysis and controlled Statement of Applicability support distinct but connected ISMS readiness decisions.",
+      href: "iso-27001-gap-analysis-soa",
+    },
+    {
+      number: "012",
+      title:
+        "Building Risk-Assessment Competence Through Practical Decisions",
+      description:
+        "Why practical scenarios, structured interaction, feedback and retained evidence add more value to risk-assessment training than passive slide completion.",
+      href: "risk-assessment-training",
+    },
+    {
+      number: "011",
+      title:
+        "Using a 5×5 Risk Heat Map Without Losing Professional Judgement",
+      description:
+        "How likelihood, credible severity, action thresholds and evidence-based rationale turn a 5×5 risk heat map into a practical management tool.",
+      href: "interactive-risk-heat-map",
+    },
+    {
       number: "010",
       title:
         "What a Suitable and Sufficient Risk Assessment Should Show",
