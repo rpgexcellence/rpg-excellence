@@ -4,12 +4,24 @@ import { notFound } from "next/navigation";
 import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
 import TrainingPurchaseButton from "../../../components/TrainingPurchaseButton";
+import JsonLd from "../../../components/JsonLd";
 import { copy, locales } from "../../../lib/i18n";
 
 export const metadata = {
   title: "Internal Auditor Refresher Training | RPG Excellence",
   description:
     "Interactive Internal Auditor Refresher training covering audit planning, interviewing, objective evidence, findings, reporting and effective follow-up.",
+  alternates: { canonical: "/en/internal-audit-training" },
+};
+
+const courseSchema = {
+  "@context": "https://schema.org",
+  "@type": "Course",
+  name: "Internal Auditor Refresher Training",
+  description: "Practical evidence-led internal-auditor refresher.",
+  url: "https://www.rpgexcellence.com/en/internal-audit-training",
+  provider: { "@id": "https://www.rpgexcellence.com/#organization" },
+  offers: { "@type": "Offer", price: "19.99", priceCurrency: "GBP", availability: "https://schema.org/InStock" },
 };
 
 const modules = [
@@ -38,6 +50,7 @@ export default async function InternalAuditTrainingPage({ params }) {
 
   return (
     <>
+      <JsonLd data={courseSchema} />
       <Header locale={locale} nav={t.nav} />
       <main className="iaPublic">
         <section className="iaHero">
