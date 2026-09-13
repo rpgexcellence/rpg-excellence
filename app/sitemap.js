@@ -1,6 +1,6 @@
 export default function sitemap() {
   const base = "https://www.rpgexcellence.com";
-  const locales = ["en", "fr", "pl", "es", "it"];
+  const locales = ["en"];
   const pages = [
     "",
     "/about",
@@ -21,6 +21,20 @@ export default function sitemap() {
     "/terms",
     "/privacy",
     "/cookies",
+    "/insights",
+    "/insights/a-word-from-rpg",
+    "/insights/iso-9001-readiness",
+    "/insights/iso-14001-readiness",
+    "/insights/iso-45001-readiness",
+    "/insights/iso-17024-readiness",
+    "/insights/capa-8d-release",
+    "/insights/structured-rca-profiling",
+    "/insights/internal-audit-module",
+    "/insights/health-safety-hub",
+    "/insights/controlled-risk-assessment",
+    "/insights/interactive-risk-heat-map",
+    "/insights/risk-assessment-training",
+    "/insights/iso-27001-gap-analysis-soa",
   ];
 
   const now = new Date();
@@ -41,4 +55,3 @@ export default function sitemap() {
     }))
   );
 }
-
