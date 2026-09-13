@@ -1,5 +1,4 @@
 import Link from "next/link";
-import LanguageSwitcher from "./LanguageSwitcher";
 
 const MICROSOFT_BOOKING_URL =
   "https://bookings.cloud.microsoft/bookwithme/user/3e31957cbcf643eb8e7e828a5eac6aaa%40rpgexcellence.com?anonymous&ismsaljsauthenabled";
@@ -55,8 +54,6 @@ export default function Header({ locale, nav, variant = "default" }) {
       </nav>
 
       <div className="headerActions">
-        <LanguageSwitcher current={locale} />
-
         <a
           href="/portal/login"
           className={`button buttonSmall ${variant === "home" ? "headerSignIn" : ""}`}
