@@ -9,6 +9,7 @@ export const metadata = {
     "What a Suitable and Sufficient Risk Assessment Should Show | RPG Insights",
   description:
     "Practical guidance on recording hazards, exposure, credible harm, people at risk, controls, actions and review in a controlled workplace risk assessment.",
+  alternates: { canonical: "/en/insights/controlled-risk-assessment" },
 };
 
 const assessmentTests = [
