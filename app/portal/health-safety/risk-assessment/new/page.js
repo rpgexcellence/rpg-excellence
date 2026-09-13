@@ -17,7 +17,7 @@ async function createRiskAssessment(formData) {
   "use server";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessments/new");
+  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessment/new");
   const { data: organisation, error: orgError } = await supabase.from("organizations").select("id").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
   if (orgError) throw new Error(orgError.message);
   if (!organisation) throw new Error("Create an organisation before starting a risk assessment.");
@@ -65,19 +65,19 @@ async function createRiskAssessment(formData) {
     emergency_arrangements: text("emergency_arrangements") || null,
   }).select("id").single();
   if (error) throw new Error(error.message);
-  redirect("/portal/health-safety/risk-assessments/" + assessment.id);
+  redirect("/portal/health-safety/risk-assessment/" + assessment.id);
 }
 
 export default async function NewRiskAssessmentPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessments/new");
+  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessment/new");
   const today = new Date().toISOString().slice(0, 10);
 
   return <main className="nrPage"><style>{`
     *{box-sizing:border-box}.nrPage{min-height:100vh;padding:34px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.nrShell{max-width:1180px;margin:auto}.nrTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.nrTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.nrTop h1{font-size:35px;margin:7px 0}.nrTop p{margin:0;color:#657b93}.nrBack{padding:11px 15px;border:1px solid #ccd9e4;border-radius:9px;background:#fff;color:#173b59;text-decoration:none;font-weight:850}.nrGuide{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:24px 0}.nrGuide div{padding:13px;border:1px solid #d5e2ea;border-radius:11px;background:#fff}.nrGuide b,.nrGuide span{display:block}.nrGuide b{color:#087f6c}.nrGuide span{font-size:11px;margin-top:5px;color:#647990;font-weight:800}.nrGuide div:first-child{background:#087f6c}.nrGuide div:first-child b,.nrGuide div:first-child span{color:#fff}.nrForm{display:grid;gap:15px}.nrCard{padding:25px;border:1px solid #d5e2ea;border-radius:16px;background:#fff}.nrHead{margin-bottom:20px}.nrHead span{color:#1762ef;font-size:11px;font-weight:900;letter-spacing:.1em}.nrHead h2{margin:6px 0;font-size:22px}.nrHead p{margin:0;color:#6b8096}.nrGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.nrField{display:grid;gap:7px}.nrField.full{grid-column:1/-1}.nrField label,.nrLegend{font-size:12px;font-weight:900;color:#294967}.nrField input,.nrField select,.nrField textarea{width:100%;padding:12px;border:1px solid #cbd8e5;border-radius:9px;background:#fff;color:#102d49;font:inherit}.nrField textarea{min-height:94px;resize:vertical}.nrField input:focus,.nrField select:focus,.nrField textarea:focus{outline:3px solid #dceaff;border-color:#1762ef}.nrChecks{display:flex;gap:9px;flex-wrap:wrap;margin-top:9px}.nrCheck{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #d2deea;border-radius:9px;color:#37546f;font-size:12px;font-weight:750}.nrCheck input{accent-color:#087f6c}.nrPermit{display:flex!important;align-items:center;gap:9px}.nrPermit input{width:auto}.nrNotice{padding:17px;border-left:5px solid #e6a71d;border-radius:10px;background:#fff8e6;color:#68501b;line-height:1.5}.nrSubmit{position:sticky;bottom:12px;display:flex;justify-content:space-between;gap:20px;align-items:center;padding:17px 20px;border-radius:14px;background:#082a54;color:#fff;box-shadow:0 18px 45px #082a5440}.nrSubmit span{font-size:13px;color:#c8d8e8}.nrSubmit button{padding:13px 19px;border:0;border-radius:9px;background:#0aae79;color:#fff;font-weight:900;cursor:pointer}@media(max-width:760px){.nrGuide{grid-template-columns:1fr}.nrGrid{grid-template-columns:1fr}.nrField.full{grid-column:auto}.nrSubmit{position:static;display:grid}}
   `}</style><div className="nrShell">
-    <header className="nrTop"><div><small>H&amp;S HUB · GUIDED ASSESSMENT</small><h1>Create a risk assessment</h1><p>Establish the scope and people affected before identifying individual hazards.</p></div><Link className="nrBack" href="/portal/health-safety/risk-assessments">← Risk Assessment Register</Link></header>
+    <header className="nrTop"><div><small>H&amp;S HUB · GUIDED ASSESSMENT</small><h1>Create a risk assessment</h1><p>Establish the scope and people affected before identifying individual hazards.</p></div><Link className="nrBack" href="/portal/health-safety/risk-assessment">← Risk Assessment Register</Link></header>
     <section className="nrGuide">{[["1","Define context"],["2","Identify hazards"],["3","Evaluate risk"],["4","Control risk"],["5","Approve & review"]].map(([number,title]) => <div key={number}><b>{number}</b><span>{title}</span></div>)}</section>
     <form className="nrForm" action={createRiskAssessment}>
       <section className="nrCard"><div className="nrHead"><span>STEP 1A</span><h2>Assessment identity and scope</h2><p>Define clear boundaries for the work being assessed.</p></div><div className="nrGrid">
