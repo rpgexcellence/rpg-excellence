@@ -32,8 +32,12 @@ async function addHazard(formData) {
   const rationale = text("acceptance_rationale");
   const authority = text("acceptance_authority");
   const controls = formData.getAll("control_hierarchy").map(String);
+  const exposedGroups = formData.getAll("people_exposed").map(String);
+  const otherExposed = text("people_exposed_other");
   const actionRequired = text("action_required");
   if (![currentSeverity, currentLikelihood, residualSeverity, residualLikelihood].every((value) => value >= 1 && value <= 5)) throw new Error("Complete all four risk-score selections.");
+  if (!exposedGroups.length) throw new Error("Select at least one group who may be harmed.");
+  if (exposedGroups.includes("Others") && !otherExposed) throw new Error("Describe the other people who may be harmed.");
   if (residualScore > currentScore) throw new Error("Residual risk cannot exceed initial risk. Reassess the scores before saving.");
   if (!controls.length && text("additional_controls")) throw new Error("Select the hierarchy level applied to the additional controls.");
   if (decision === "accept" && (!rationale || !authority)) throw new Error("Formal risk acceptance requires a rationale and named authority.");
@@ -46,7 +50,7 @@ async function addHazard(formData) {
     assessment_id: assessmentId, owner_id: user.id, organization_id: assessment.organization_id,
     display_order: (count || 0) + 1, hazard_category: text("hazard_category"),
     hazard_type: text("hazard_type") || null, hazard_description: text("hazard_description"),
-    people_exposed: text("people_exposed"), harm_description: text("harm_description"),
+    people_exposed: [...exposedGroups.filter((item) => item !== "Others"), ...(exposedGroups.includes("Others") ? [`Other: ${otherExposed}`] : [])].join(", "), harm_description: text("harm_description"),
     existing_controls: text("existing_controls"), current_severity: currentSeverity,
     current_likelihood: currentLikelihood, additional_controls: text("additional_controls"),
     control_hierarchy: controls, residual_severity: residualSeverity,
