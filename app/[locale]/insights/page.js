@@ -18,6 +18,14 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "010",
+      title:
+        "What a Suitable and Sufficient Risk Assessment Should Show",
+      description:
+        "Practical guidance on connecting hazards, exposure, credible harm, people at risk, controls, actions and review in one traceable decision record.",
+      href: "controlled-risk-assessment",
+    },
+    {
       number: "009",
       title:
         "From Safety Records to Controlled Action: The Health & Safety Hub",
