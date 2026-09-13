@@ -3,12 +3,47 @@ import { notFound } from "next/navigation";
 import Header from "../../../../components/Header";
 import Footer from "../../../../components/Footer";
 import TrainingPurchaseButton from "../../../../components/TrainingPurchaseButton";
+import JsonLd from "../../../../components/JsonLd";
 import { copy, locales } from "../../../../lib/i18n";
 
 export const metadata = {
   title: "Risk Assessment Training | RPG Excellence",
   description:
     "Interactive risk assessment training for people who identify hazards, assess workplace risks and select effective controls.",
+  alternates: { canonical: "/en/hs-hub/training" },
+};
+
+const courseListSchema = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  itemListElement: [
+    {
+      "@type": "ListItem",
+      position: 1,
+      url: "https://www.rpgexcellence.com/en/hs-hub/training#initial-course",
+      item: {
+        "@type": "Course",
+        name: "Workplace Risk Assessment Training",
+        description: "Practical workplace risk-assessment skills.",
+        url: "https://www.rpgexcellence.com/en/hs-hub/training#initial-course",
+        provider: { "@id": "https://www.rpgexcellence.com/#organization" },
+        offers: { "@type": "Offer", price: "19.99", priceCurrency: "GBP", availability: "https://schema.org/InStock" },
+      },
+    },
+    {
+      "@type": "ListItem",
+      position: 2,
+      url: "https://www.rpgexcellence.com/en/hs-hub/training#refresher-course",
+      item: {
+        "@type": "Course",
+        name: "Workplace Risk Assessment Refresher",
+        description: "Scenario-led risk-assessment refresher.",
+        url: "https://www.rpgexcellence.com/en/hs-hub/training#refresher-course",
+        provider: { "@id": "https://www.rpgexcellence.com/#organization" },
+        offers: { "@type": "Offer", price: "12.99", priceCurrency: "GBP", availability: "https://schema.org/InStock" },
+      },
+    },
+  ],
 };
 
 const initialModules = [
@@ -47,6 +82,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
 
   return (
     <>
+      <JsonLd data={courseListSchema} />
       <Header locale={locale} nav={t.nav} />
       <main className="trainingPage">
         <section className="trainingHero">
@@ -64,7 +100,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
             </div>
             <small>Individual access from £12.99. No VAT is charged. Organisation subscription access is also available.</small>
           </div>
-          <aside className="courseSummary">
+          <aside className="courseSummary" id="initial-course">
             <span className="courseTag">INITIAL COURSE</span>
             <h2>Workplace Risk Assessment</h2>
             <div className="price"><strong>£19.99</strong><span>per learner</span></div>
@@ -110,7 +146,7 @@ export default async function RiskAssessmentTrainingPage({ params }) {
           </div>
         </section>
 
-        <section className="refresher sectionBlock">
+        <section className="refresher sectionBlock" id="refresher-course">
           <div>
             <span className="eyebrow">ANNUAL REFRESHER</span>
             <h2>Recalibrate judgement. Reinforce good habits.</h2>
