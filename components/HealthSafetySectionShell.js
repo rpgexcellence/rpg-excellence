@@ -7,6 +7,7 @@ const navigation = [
   { label: "Overview", href: "/portal/health-safety", icon: "⌂", exact: true },
   { label: "Risk Assessments", href: "/portal/health-safety/risk-assessment", icon: "▣" },
   { label: "POWRA", href: "/portal/health-safety/powra", icon: "⚑" },
+  { label: "Permit to Work", href: "/portal/health-safety/permits", icon: "◆" },
   { label: "Actions & Verification", href: "/portal/health-safety/actions", icon: "✓" },
   { label: "Training Academy", href: "/portal/health-safety/training", icon: "◇" },
   { label: "Management Board", href: "/portal/health-safety/management-board", icon: "▥" },
@@ -54,10 +55,10 @@ export default function HealthSafetySectionShell({ children }) {
         @media(max-width:700px){
           .hssLayout{display:block;padding-bottom:58px}
           .hssSide{display:none}
-          .hssMobile{position:fixed;right:0;bottom:0;left:0;z-index:100;display:grid;grid-template-columns:repeat(5,1fr);padding:7px 5px;background:#06264d;box-shadow:0 -5px 20px #061a3530}
+          .hssMobile{position:fixed;right:0;bottom:0;left:0;z-index:100;display:grid;grid-template-columns:repeat(6,1fr);padding:7px 5px;background:#06264d;box-shadow:0 -5px 20px #061a3530}
           .hssMobile a{display:grid;place-items:center;min-height:43px;padding:4px 2px;border-radius:7px;color:#c9d9e8;text-decoration:none;font-size:9px;font-weight:800;text-align:center}
           .hssMobile a.active{background:#1762a3;color:#fff}
-          .hssMobile a:last-child{display:none}
+          .hssMobile a:nth-last-child(-n+2){display:none}
         }
       `}</style>
 
