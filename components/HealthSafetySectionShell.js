@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const navigation = [
   { label: "Overview", href: "/portal/health-safety", icon: "⌂", exact: true },
   { label: "Risk Assessments", href: "/portal/health-safety/risk-assessment", icon: "▣" },
+  { label: "POWRA", href: "/portal/health-safety/powra", icon: "⚑" },
   { label: "Actions & Verification", href: "/portal/health-safety/actions", icon: "✓" },
   { label: "Training Academy", href: "/portal/health-safety/training", icon: "◇" },
   { label: "Management Board", href: "/portal/health-safety/management-board", icon: "▥" },
