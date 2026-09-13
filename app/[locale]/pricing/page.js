@@ -5,12 +5,14 @@ import SubscribeButton from "../../../components/SubscribeButton";
 import SingleAssessmentButton from "../../../components/SingleAssessmentButton";
 import StandaloneSoaButton from "../../../components/StandaloneSoaButton";
 import TrainingPurchaseButton from "../../../components/TrainingPurchaseButton";
+import JsonLd from "../../../components/JsonLd";
 import { locales } from "../../../lib/i18n";
 
 export const metadata = {
   title: "RPG Excellence Pricing | Platform, Assessments and Training",
   description:
     "Choose RPG Excellence platform access, a one-off ISO assessment, a standalone Statement of Applicability or individual practitioner training.",
+  alternates: { canonical: "/en/pricing" },
 };
 
 const trainingProducts = [
@@ -40,6 +42,30 @@ const trainingProducts = [
   },
 ];
 
+const courseListSchema = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  name: "RPG Excellence online training courses",
+  itemListElement: [
+    ["Workplace Risk Assessment Training", "Practical workplace risk-assessment skills.", "/en/hs-hub/training#initial-course", "19.99"],
+    ["Workplace Risk Assessment Refresher", "Scenario-led risk-assessment refresher.", "/en/hs-hub/training#refresher-course", "12.99"],
+    ["Internal Auditor Refresher Training", "Practical evidence-led internal-auditor refresher.", "/en/internal-audit-training", "19.99"],
+    ["RCA and Corrective Action Practitioner Training", "Evidence-led RCA and corrective-action training.", "/en/rca-8d-training", "49.99"],
+  ].map(([name, description, path, price], index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    url: `https://www.rpgexcellence.com${path}`,
+    item: {
+      "@type": "Course",
+      name,
+      description,
+      url: `https://www.rpgexcellence.com${path}`,
+      provider: { "@id": "https://www.rpgexcellence.com/#organization" },
+      offers: { "@type": "Offer", price, priceCurrency: "GBP", availability: "https://schema.org/InStock" },
+    },
+  })),
+};
+
 export default async function Pricing({
   params,
 }) {
@@ -51,6 +77,7 @@ export default async function Pricing({
 
   return (
     <PageShell locale={locale}>
+      <JsonLd data={courseListSchema} />
       <main className="simplePage">
         <div className="simpleInner">
           <span className="kicker">
