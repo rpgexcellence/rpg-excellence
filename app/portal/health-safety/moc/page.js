@@ -1,2 +1,122 @@
-import Link from"next/link";import{redirect}from"next/navigation";import{createClient}from"../../../../lib/supabase/server";export const dynamic="force-dynamic";export const metadata={title:"Management of Change Register | RPG Excellence"};const title=v=>String(v||"").replaceAll("_"," ").replace(/\b\w/g,l=>l.toUpperCase()),date=v=>v?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium"}).format(new Date(v)):"—";
-export default async function MocRegister(){const s=await createClient(),{data:{user}}=await s.auth.getUser();if(!user)redirect("/portal/login?next=/portal/health-safety/moc");const{data,error}=await s.from("hs_moc_changes").select("*").eq("owner_id",user.id).order("updated_at",{ascending:false});if(error)throw new Error(error.message);const items=data||[],active=items.filter(x=>!["closed","rejected","cancelled"].includes(x.status)).length,gates=items.filter(x=>x.status==="hse_gate").length,approval=items.filter(x=>["risk_review","approval"].includes(x.status)).length,overdue=items.filter(x=>x.target_date<new Date().toISOString().slice(0,10)&&!["closed","cancelled"].includes(x.status)).length;return <main className="mr"><style>{`*{box-sizing:border-box}.mr{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.ms{max-width:1220px;margin:auto}.mt{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.mt small{color:#087f6c;font-weight:900;letter-spacing:.1em}.mt h1{margin:6px 0;font-size:34px}.mt p{margin:0;color:#657b91}.btn{padding:12px 16px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}.metric{padding:18px;border:1px solid #d5e1e9;border-top:4px solid #1762ef;border-radius:13px;background:#fff}.metric.red{border-color:#d34b40}.metric.amber{border-top-color:#d68a00}.metric.green{border-top-color:#08865f}.metric span,.metric strong{display:block}.metric span{font-size:11px;color:#667d91;font-weight:850}.metric strong{margin-top:5px;font-size:29px}.panel{padding:21px;border:1px solid #d5e1e9;border-radius:15px;background:#fff}.panel h2{margin:0 0 4px}.panel>p{margin:0 0 16px;color:#687f94}.row{display:grid;grid-template-columns:1.35fr .8fr .65fr .75fr .65fr auto;gap:12px;align-items:center;padding:13px;border-top:1px solid #e3eaf0}.row.head{border:0;border-radius:8px;background:#eef4f8;color:#667e93;font-size:11px;font-weight:850}.row strong,.row small{display:block}.row small{margin-top:3px;color:#74899c}.status{justify-self:start;padding:6px 8px;border-radius:999px;background:#e7f2ff;color:#1759ad;font-size:11px;font-weight:850}.path{font-size:10px;font-weight:900;text-transform:uppercase;color:#a24b1c}.open{color:#087f6c;text-decoration:none;font-weight:900}.empty{padding:24px;border-radius:10px;background:#f0f5f8;color:#687e92}@media(max-width:760px){.metrics{grid-template-columns:1fr 1fr}.row{grid-template-columns:1fr auto}.row>:not(:first-child):not(:last-child){display:none}}`}</style><div className="ms"><header className="mt"><div><small>H&amp;S HUB · CHANGE ASSURANCE</small><h1>Management of Change Register</h1><p>Visibility of screening, risk review, approval, implementation and closure.</p></div><Link className="btn" href="/portal/health-safety/moc/new">New change</Link></header><section className="metrics"><div className="metric"><span>ACTIVE CHANGES</span><strong>{active}</strong></div><div className="metric amber"><span>AT HSE GATE</span><strong>{gates}</strong></div><div className="metric green"><span>AWAITING APPROVAL</span><strong>{approval}</strong></div><div className="metric red"><span>OVERDUE</span><strong>{overdue}</strong></div></section><section className="panel"><h2>Controlled changes</h2><p>Open a record to progress its current assurance gate.</p>{items.length?<div><div className="row head"><span>Change</span><span>Type</span><span>Pathway</span><span>Target</span><span>Status</span><span>Action</span></div>{items.map(x=><div className="row" key={x.id}><div><strong>{x.title}</strong><small>{x.moc_reference} · {x.department}</small></div><span>{title(x.change_type)}</span><span className="path">{x.pathway}</span><span>{date(x.target_date)}</span><span className="status">{title(x.status)}</span><Link className="open" href={`/portal/health-safety/moc/${x.id}`}>Open →</Link></div>)}</div>:<div className="empty">No controlled changes have been created.</div>}</section></div></main>}
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "../../../../lib/supabase/server";
+export const dynamic = "force-dynamic";
+export const metadata = {
+  title: "Management of Change Register | RPG Excellence",
+};
+const title = (v) =>
+    String(v || "")
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase()),
+  date = (v) =>
+    v
+      ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(
+          new Date(v),
+        )
+      : "—";
+export default async function MocRegister() {
+  const s = await createClient(),
+    {
+      data: { user },
+    } = await s.auth.getUser();
+  if (!user) redirect("/portal/login?next=/portal/health-safety/moc");
+  const { data, error } = await s
+    .from("hs_moc_changes")
+    .select("*")
+    .eq("owner_id", user.id)
+    .order("updated_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  const items = data || [],
+    active = items.filter(
+      (x) => !["closed", "rejected", "cancelled"].includes(x.status),
+    ).length,
+    gates = items.filter((x) => x.status === "hse_gate").length,
+    approval = items.filter((x) =>
+      ["risk_review", "approval"].includes(x.status),
+    ).length,
+    overdue = items.filter(
+      (x) =>
+        x.target_date < new Date().toISOString().slice(0, 10) &&
+        !["closed", "cancelled"].includes(x.status),
+    ).length;
+  return (
+    <main className="mr">
+      <style>{`*{box-sizing:border-box}.mr{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.ms{max-width:1220px;margin:auto}.mt{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.mt small{color:#087f6c;font-weight:900;letter-spacing:.1em}.mt h1{margin:6px 0;font-size:34px}.mt p{margin:0;color:#657b91}.btn{padding:12px 16px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}.metric{padding:18px;border:1px solid #d5e1e9;border-top:4px solid #1762ef;border-radius:13px;background:#fff}.metric.red{border-color:#d34b40}.metric.amber{border-top-color:#d68a00}.metric.green{border-top-color:#08865f}.metric span,.metric strong{display:block}.metric span{font-size:11px;color:#667d91;font-weight:850}.metric strong{margin-top:5px;font-size:29px}.panel{padding:21px;border:1px solid #d5e1e9;border-radius:15px;background:#fff}.panel h2{margin:0 0 4px}.panel>p{margin:0 0 16px;color:#687f94}.row{display:grid;grid-template-columns:1.35fr .8fr .65fr .75fr .65fr auto;gap:12px;align-items:center;padding:13px;border-top:1px solid #e3eaf0}.row.head{border:0;border-radius:8px;background:#eef4f8;color:#667e93;font-size:11px;font-weight:850}.row strong,.row small{display:block}.row small{margin-top:3px;color:#74899c}.status{justify-self:start;padding:6px 8px;border-radius:999px;background:#e7f2ff;color:#1759ad;font-size:11px;font-weight:850}.path{font-size:10px;font-weight:900;text-transform:uppercase;color:#a24b1c}.open{color:#087f6c;text-decoration:none;font-weight:900}.empty{padding:24px;border-radius:10px;background:#f0f5f8;color:#687e92}@media(max-width:760px){.metrics{grid-template-columns:1fr 1fr}.row{grid-template-columns:1fr auto}.row>:not(:first-child):not(:last-child){display:none}}`}</style>
+      <div className="ms">
+        <header className="mt">
+          <div>
+            <small>H&amp;S HUB · CHANGE ASSURANCE</small>
+            <h1>Management of Change Register</h1>
+            <p>
+              Visibility of screening, risk review, approval, implementation and
+              closure.
+            </p>
+          </div>
+          <Link className="btn" href="/portal/health-safety/moc/new">
+            New change
+          </Link>
+        </header>
+        <section className="metrics">
+          <div className="metric">
+            <span>TOTAL CHANGES</span>
+            <strong>{items.length}</strong>
+            <small>{active} currently active</small>
+          </div>
+          <div className="metric amber">
+            <span>AT HSE GATE</span>
+            <strong>{gates}</strong>
+          </div>
+          <div className="metric green">
+            <span>AWAITING APPROVAL</span>
+            <strong>{approval}</strong>
+          </div>
+          <div className="metric red">
+            <span>OVERDUE</span>
+            <strong>{overdue}</strong>
+          </div>
+        </section>
+        <section className="panel">
+          <h2>Controlled changes</h2>
+          <p>Open a record to progress its current assurance gate.</p>
+          {items.length ? (
+            <div>
+              <div className="row head">
+                <span>Change</span>
+                <span>Type</span>
+                <span>Pathway</span>
+                <span>Target</span>
+                <span>Status</span>
+                <span>Action</span>
+              </div>
+              {items.map((x) => (
+                <div className="row" key={x.id}>
+                  <div>
+                    <strong>{x.title}</strong>
+                    <small>
+                      {x.moc_reference} · {x.department}
+                    </small>
+                  </div>
+                  <span>{title(x.change_type)}</span>
+                  <span className="path">{x.pathway}</span>
+                  <span>{date(x.target_date)}</span>
+                  <span className="status">{title(x.status)}</span>
+                  <Link
+                    className="open"
+                    href={`/portal/health-safety/moc/${x.id}`}
+                  >
+                    Open →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty">
+              No controlled changes have been created.
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
