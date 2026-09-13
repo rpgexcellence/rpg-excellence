@@ -4,12 +4,24 @@ import { notFound } from "next/navigation";
 import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
 import TrainingPurchaseButton from "../../../components/TrainingPurchaseButton";
+import JsonLd from "../../../components/JsonLd";
 import { copy, locales } from "../../../lib/i18n";
 
 export const metadata = {
   title: "RCA and Corrective Action Practitioner Training | RPG Excellence",
   description:
     "A 180-minute interactive RCA and corrective action practitioner course with structured exercises, downloadable workbook and verifiable certificate.",
+  alternates: { canonical: "/en/rca-8d-training" },
+};
+
+const courseSchema = {
+  "@context": "https://schema.org",
+  "@type": "Course",
+  name: "RCA and Corrective Action Practitioner Training",
+  description: "Evidence-led RCA and corrective-action training.",
+  url: "https://www.rpgexcellence.com/en/rca-8d-training",
+  provider: { "@id": "https://www.rpgexcellence.com/#organization" },
+  offers: { "@type": "Offer", price: "49.99", priceCurrency: "GBP", availability: "https://schema.org/InStock" },
 };
 
 const modules = [
@@ -41,6 +53,7 @@ export default async function RcaTrainingPublicPage({ params }) {
 
   return (
     <>
+      <JsonLd data={courseSchema} />
       <Header locale={locale} nav={t.nav} />
       <main className="iaPublic">
         <section className="iaHero">
