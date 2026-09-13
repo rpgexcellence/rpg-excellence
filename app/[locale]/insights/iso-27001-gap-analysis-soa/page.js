@@ -9,6 +9,7 @@ export const metadata = {
     "ISO/IEC 27001 Readiness: Connecting Gap Analysis and the Statement of Applicability | RPG Insights",
   description:
     "How an evidence-led ISO/IEC 27001 gap analysis and controlled Statement of Applicability support distinct but connected ISMS readiness decisions.",
+  alternates: { canonical: "/en/insights/iso-27001-gap-analysis-soa" },
 };
 
 const comparison = [
