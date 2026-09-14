@@ -117,7 +117,7 @@ export default async function Pricing({
 
               <ul>
                 <li>One organisation workspace</li>
-                <li>Five ISO gap-analysis frameworks</li>
+                <li>Six ISO gap-analysis frameworks, including ISO 22301</li>
                 <li>Health &amp; Safety risk and action control</li>
                 <li>Action ownership and effectiveness verification</li>
                 <li>Controlled evidence and reports</li>
