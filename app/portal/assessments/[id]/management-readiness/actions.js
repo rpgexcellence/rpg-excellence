@@ -53,6 +53,18 @@ const ISO_17024_DIMENSIONS = [
   { key: "pcb_internal_assurance_improvement", name: "Internal Assurance, Corrective Action & Improvement", order: 9 },
 ];
 
+const ISO_22301_DIMENSIONS = [
+  { key: "bcms_leadership", name: "Leadership & Continuity Culture", order: 1 },
+  { key: "bcms_governance", name: "BCMS Governance & Accountability", order: 2 },
+  { key: "bcms_context_scope", name: "Context, Scope & Dependencies", order: 3 },
+  { key: "bcms_bia_risk", name: "Business Impact & Disruption Risk", order: 4 },
+  { key: "bcms_strategy_resources", name: "Continuity Strategies & Resources", order: 5 },
+  { key: "bcms_response_recovery", name: "Response, Recovery & Communications", order: 6 },
+  { key: "bcms_exercise_capability", name: "Exercises & Demonstrated Capability", order: 7 },
+  { key: "bcms_performance_assurance", name: "Performance & Internal Assurance", order: 8 },
+  { key: "bcms_learning_improvement", name: "Learning & Continual Improvement", order: 9 },
+];
+
 const READINESS_RATINGS = [
   "Not Ready",
   "Developing",
@@ -101,6 +113,9 @@ function getDimensions(standard) {
 
     case "ISO/IEC 17024:2026":
       return ISO_17024_DIMENSIONS;
+
+    case "ISO 22301:2019":
+      return ISO_22301_DIMENSIONS;
 
     default:
       throw new Error(
