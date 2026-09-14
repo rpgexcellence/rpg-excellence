@@ -18,6 +18,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "017",
+      title: "ISO 22301: Turning Business Continuity Plans into Demonstrated Capability",
+      description: "RPG Intelligence now provides a complete evidence-led ISO 22301:2019 gap assessment covering BIA, disruption risk, continuity strategy, response, recovery, exercises and improvement.",
+      href: "iso-22301-business-continuity-readiness",
+    },
+    {
       number: "016",
       title: "Management of Change: Approval Is Not the Finish Line",
       description: "How controlled MOC connects screening, risk review, approvals, PSSR, implementation evidence and post-change verification.",
