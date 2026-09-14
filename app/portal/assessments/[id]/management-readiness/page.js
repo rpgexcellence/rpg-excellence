@@ -272,6 +272,18 @@ const ISO_17024_DIMENSIONS = [
   },
 ];
 
+const ISO_22301_DIMENSIONS = [
+  { key: "bcms_leadership", name: "Leadership & Continuity Culture", order: 1, guidance: "Assess visible top-management accountability, strategic integration and whether continuity is treated as an operational capability rather than a document set." },
+  { key: "bcms_governance", name: "BCMS Governance & Accountability", order: 2, guidance: "Assess response authority, role clarity, escalation, decision rights, oversight and accountability before, during and after disruption." },
+  { key: "bcms_context_scope", name: "Context, Scope & Dependencies", order: 3, guidance: "Assess understanding of priority products and services, interested parties, legal obligations, internal and external dependencies and the defensibility of the BCMS scope." },
+  { key: "bcms_bia_risk", name: "Business Impact & Disruption Risk", order: 4, guidance: "Assess whether BIA and risk assessment produce credible, current and management-approved continuity requirements and priorities." },
+  { key: "bcms_strategy_resources", name: "Continuity Strategies & Resources", order: 5, guidance: "Assess whether selected solutions are feasible, proportionate and supported by people, facilities, technology, information, finance, suppliers and logistics." },
+  { key: "bcms_response_recovery", name: "Response, Recovery & Communications", order: 6, guidance: "Assess command structure, warning, communications, plan usability, recovery priorities and the ability to return activities to normal operation." },
+  { key: "bcms_exercise_capability", name: "Exercises & Demonstrated Capability", order: 7, guidance: "Assess whether exercises are realistic, objective-led, collectively validate all plans and drive verified improvements." },
+  { key: "bcms_performance_assurance", name: "Performance & Internal Assurance", order: 8, guidance: "Assess meaningful measures, evaluation, internal audit, management review and the reliability of readiness information presented to leaders." },
+  { key: "bcms_learning_improvement", name: "Learning & Continual Improvement", order: 9, guidance: "Assess learning from incidents and exercises, root cause, corrective action, effectiveness verification and sustained improvement of continuity capability." },
+];
+
 const READINESS_RATINGS = [
   "Not Ready",
   "Developing",
@@ -342,6 +354,9 @@ function getDimensions(
     case "ISO/IEC 17024:2026":
       return ISO_17024_DIMENSIONS;
 
+    case "ISO 22301:2019":
+      return ISO_22301_DIMENSIONS;
+
     default:
       throw new Error(
         `Management readiness is not configured for ${standard}.`
@@ -364,6 +379,9 @@ function getReadinessDescription(
 
     case "ISO/IEC 17024:2026":
       return "Management readiness is separate from clause conformity. It evaluates whether leadership, impartiality safeguards, scheme governance, personnel competence, examination security, certification controls and organisational capability can sustain credible certification of persons.";
+
+    case "ISO 22301:2019":
+      return "Management readiness is separate from clause conformity. It evaluates whether leadership, continuity governance, business-impact analysis, disruption-risk control, recovery strategies, response arrangements, exercises and organisational learning can sustain priority products and services during disruption.";
 
     default:
       throw new Error(
