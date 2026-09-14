@@ -78,7 +78,7 @@ export default async function Pricing({
   return (
     <PageShell locale={locale}>
       <JsonLd data={courseListSchema} />
-      <main className="simplePage">
+      <main className="simplePage" id="subscriptions">
         <div className="simpleInner">
           <span className="kicker">
             PLATFORM, ONE-OFF TOOLS & TRAINING
@@ -119,6 +119,7 @@ export default async function Pricing({
                 <li>One organisation workspace</li>
                 <li>Five ISO gap-analysis frameworks</li>
                 <li>Health &amp; Safety risk and action control</li>
+                <li>Action ownership and effectiveness verification</li>
                 <li>Controlled evidence and reports</li>
                 <li>Email support</li>
               </ul>
@@ -149,6 +150,9 @@ export default async function Pricing({
                 <li>Internal Audit programme and execution</li>
                 <li>Auditor verification and NC control</li>
                 <li>RCA–8D corrective-action workflow</li>
+                <li>POWRA and stop-work decisions</li>
+                <li>Permit to Work control</li>
+                <li>Management of Change and PSSR workflow</li>
                 <li>Statement of Applicability workspace</li>
                 <li>Priority support</li>
               </ul>
