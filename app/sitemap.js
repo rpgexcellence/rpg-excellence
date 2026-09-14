@@ -35,6 +35,9 @@ export default function sitemap() {
     "/insights/interactive-risk-heat-map",
     "/insights/risk-assessment-training",
     "/insights/iso-27001-gap-analysis-soa",
+    "/insights/management-of-change-assurance",
+    "/insights/permit-to-work-control",
+    "/insights/powra-point-of-work",
   ];
 
   const now = new Date();
