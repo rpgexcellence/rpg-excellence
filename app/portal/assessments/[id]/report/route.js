@@ -51,6 +51,7 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO 14001:2026",
   "ISO 45001:2018",
   "ISO/IEC 17024:2026",
+  "ISO 22301:2019",
 ];
 
 function getClauseTitle(standard, clauseNumber) {
@@ -84,6 +85,7 @@ function systemNameFor(standard) {
   if (standard === "ISO 45001:2018") return "OH&S management system";
   if (standard === "ISO 14001:2026") return "environmental management system";
   if (standard === "ISO/IEC 17024:2026") return "person-certification management system";
+  if (standard === "ISO 22301:2019") return "business continuity management system";
   return "management system";
 }
 
