@@ -108,6 +108,9 @@ function progressingDescription(standard) {
     case "ISO/IEC 17024:2026":
       return "The person-certification management system is established and developing, but further evidence, implementation or control of certification activities is required.";
 
+    case "ISO 22301:2019":
+      return "The business continuity management system is established and developing, but further evidence, implementation or demonstrated continuity capability is required.";
+
     default:
       return "The management system is established and developing, but further evidence or implementation is required.";
   }
