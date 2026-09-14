@@ -37,6 +37,7 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO/IEC 27001:2022",
   "ISO/IEC 27001:2022/Amd 1:2024",
   "ISO/IEC 17024:2026",
+  "ISO 22301:2019",
 ];
 
 function cleanText(value) {
