@@ -46,6 +46,7 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO 14001:2026",
   "ISO 45001:2018",
   "ISO/IEC 17024:2026",
+  "ISO 22301:2019",
 ];
 
 function getClauseTitle(standard, clauseNumber) {
