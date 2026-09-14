@@ -2,12 +2,13 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound,redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
+import { requirePlanAccess } from "../../../../../lib/plan-access";
 
 export const dynamic="force-dynamic";
 const title=value=>String(value||"").replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
 const date=value=>value?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"—";
 async function updatePermit(formData){
-  "use server";const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)redirect("/portal/login");
+  "use server";const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)redirect("/portal/login");await requirePlanAccess(user.id,"professional","Permit to Work");
   const id=String(formData.get("id")||""),intent=String(formData.get("intent")||""),notes=String(formData.get("notes")||"").trim(),now=new Date().toISOString();let values={updated_at:now};
   if(intent==="issue")values={...values,status:"issued",issued_at:now,suspended_at:null,suspension_reason:null};
   else if(intent==="suspend"){if(!notes)throw new Error("Record why the permit is being suspended.");values={...values,status:"suspended",suspended_at:now,suspension_reason:notes};}
