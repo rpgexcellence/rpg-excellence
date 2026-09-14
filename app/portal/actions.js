@@ -15,6 +15,7 @@ const AVAILABLE_ASSESSMENT_STANDARDS = [
   "ISO 45001:2018",
   "ISO/IEC 27001:2022",
   "ISO/IEC 17024:2026",
+  "ISO 22301:2019",
 ];
 
 export async function createOrganization(formData) {
