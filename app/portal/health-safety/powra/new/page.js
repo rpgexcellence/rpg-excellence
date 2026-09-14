@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import PowraForm from "../../../../../components/PowraForm";
 import { createClient } from "../../../../../lib/supabase/server";
+import { requirePlanAccess } from "../../../../../lib/plan-access";
 
 export const metadata={title:"New POWRA | RPG Excellence"};
 export const dynamic="force-dynamic";
@@ -11,6 +12,7 @@ async function createPowra(formData){
   const supabase=await createClient();
   const {data:{user}}=await supabase.auth.getUser();
   if(!user) redirect("/portal/login?next=/portal/health-safety/powra/new");
+  await requirePlanAccess(user.id,"professional","POWRA");
   const {data:organisation,error:orgError}=await supabase.from("organizations").select("id").eq("owner_id",user.id).order("created_at").limit(1).maybeSingle();
   if(orgError) throw new Error(orgError.message);
   if(!organisation) throw new Error("Create an organisation before starting a POWRA.");
