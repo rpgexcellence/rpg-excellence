@@ -18,6 +18,24 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "016",
+      title: "Management of Change: Approval Is Not the Finish Line",
+      description: "How controlled MOC connects screening, risk review, approvals, PSSR, implementation evidence and post-change verification.",
+      href: "management-of-change-assurance",
+    },
+    {
+      number: "015",
+      title: "Permit to Work: Authority Within Controlled Limits",
+      description: "Why a Permit to Work must connect scope, hazards, isolations, competence, validity, suspension and controlled close-out.",
+      href: "permit-to-work-control",
+    },
+    {
+      number: "014",
+      title: "POWRA: The Last Risk Decision Before Work Starts",
+      description: "How a point-of-work risk assessment tests real conditions, triggers stop-work decisions and captures end-of-job learning.",
+      href: "powra-point-of-work",
+    },
+    {
       number: "013",
       title:
         "ISO/IEC 27001 Readiness: Connecting Gap Analysis and the Statement of Applicability",
