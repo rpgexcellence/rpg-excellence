@@ -4,6 +4,7 @@ import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
 import { saveAssessmentAnswers } from "./actions";
 import FindingConclusionFields from "./FindingConclusionFields";
+import { ISO22301_DEFINITIONS } from "../../../../lib/iso22301-definitions";
 
 import {
   calculateClauseScore,
@@ -19,6 +20,7 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO/IEC 27001:2022",
   "ISO/IEC 27001:2022/Amd 1:2024",
   "ISO/IEC 17024:2026",
+  "ISO 22301:2019",
 ];
 
 const CLAUSE_NUMBERS = [
@@ -899,6 +901,25 @@ export default async function AssessmentPage({
               : "—"}
           </div>
         </div>
+
+        {assessment.standard === "ISO 22301:2019" && (
+          <details style={{ background: "#f7f5ff", border: "1px solid #d9cff6", borderRadius: "12px", padding: "16px 18px", marginBottom: "20px" }}>
+            <summary style={{ cursor: "pointer", color: "#442878", fontWeight: 850 }}>
+              ISO 22301 Clause 3 terms and definitions ({ISO22301_DEFINITIONS.length})
+            </summary>
+            <p style={{ color: "#617087", lineHeight: 1.6 }}>
+              Use these defined meanings consistently when completing the assessment. Requirement questions begin at Clause 4 because Clause 3 contains terminology rather than auditable requirements.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "10px" }}>
+              {ISO22301_DEFINITIONS.map(([reference, term, definition]) => (
+                <div key={reference} style={{ background: "white", border: "1px solid #e4def5", borderRadius: "8px", padding: "12px" }}>
+                  <strong style={{ color: "#071A33" }}>{reference} {term}</strong>
+                  <div style={{ color: "#617087", lineHeight: 1.5, marginTop: "5px" }}>{definition}</div>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
 
         {/* Assessment form */}
         <form
