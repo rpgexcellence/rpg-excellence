@@ -15,6 +15,7 @@ const systemName = (standard) => ({
   "ISO 45001:2018": "OH&S management system",
   "ISO/IEC 27001:2022": "information security management system",
   "ISO/IEC 17024:2026": "certification-of-persons management system",
+  "ISO 22301:2019": "business continuity management system",
 }[standard] || "management system");
 function Metric({ label, value, note, tone="#071a33" }) { return <div className="gerMetric"><span>{label}</span><strong style={{color:tone}}>{value}</strong><small>{note}</small></div>; }
 
