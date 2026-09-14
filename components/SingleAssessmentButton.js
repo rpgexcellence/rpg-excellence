@@ -5,6 +5,7 @@ const standards = [
   ["ISO 14001:2026", "ISO 14001 — Environmental Management"],
   ["ISO 45001:2018", "ISO 45001:2018/Amd 1:2024 — Occupational Health & Safety"],
   ["ISO/IEC 17024:2026", "ISO/IEC 17024 — Certification of Persons"],
+  ["ISO 22301:2019", "ISO 22301:2019 — Business Continuity Management"],
 ];
 export default function SingleAssessmentButton() {
   const [standard,setStandard]=useState(standards[0][0]);
