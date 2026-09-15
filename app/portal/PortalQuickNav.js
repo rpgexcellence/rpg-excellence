@@ -9,7 +9,7 @@ export default function PortalQuickNav() {
   const soa = assessment && pathname.includes("/soa");
   const soaPortfolio = pathname === "/portal/soa" || pathname.startsWith("/portal/soa/");
   const audit = pathname.match(/^\/portal\/internal-audits\/([^/]+)/);
-  if (pathname === "/portal") return null;
+  if (pathname === "/portal" || pathname.startsWith("/portal/business-continuity")) return null;
 
   return <nav className="rpgQuickNav" aria-label="Portal quick navigation">
     {assessment && !soa && <>
