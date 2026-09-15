@@ -6,8 +6,8 @@ const hubData = {
     title: "Prepare for disruption. Prove that recovery can work.",
     lead: "Connect ISO 22301 readiness, business-impact priorities, disruption risk, continuity arrangements, exercises and improvement in one evidence-led journey.",
     accent: "#6d45d8", dark: "#211858", pale: "#f3efff",
-    primary: "/portal?standard=ISO%2022301%3A2019#new-assessment",
-    primaryLabel: "Start ISO 22301 gap analysis →",
+    primary: "/portal/business-continuity",
+    primaryLabel: "Open BCP Hub →",
     secondary: "/iso-22301", secondaryLabel: "View ISO 22301 guide",
     capabilities: [
       ["01","ISO 22301 Gap Analysis","Assess every auditable requirement across Clauses 4–10 with evidence, findings and weighted readiness."],
