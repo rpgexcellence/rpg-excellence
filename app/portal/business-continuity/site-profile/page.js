@@ -69,7 +69,7 @@ async function saveProfile(fd) {
     status: t("intent") === "review" ? "ready_for_review" : "draft",
     region: t("region"),
     location_name: t("location_name"),
-    country: t("country"),
+    country: t("country") === "Other" ? t("country_custom") : t("country"),
     address: t("address"),
     headcount: Number(t("headcount")) || null,
     site_leader: t("site_leader"),
@@ -135,12 +135,12 @@ export default async function SiteProfile() {
     <main
       style={{
         minHeight: "100vh",
-        padding: "32px 24px 80px",
+        padding: "28px 2vw 80px",
         background: "#edf3f8",
         fontFamily: "Arial,sans-serif",
       }}
     >
-      <div style={{ maxWidth: 1500, margin: "auto" }}>
+      <div style={{ maxWidth: 1740, margin: "auto" }}>
         <header
           style={{
             display: "flex",
@@ -160,10 +160,10 @@ export default async function SiteProfile() {
             >
               BCP HUB · PART 1
             </small>
-            <h1 style={{ margin: "7px 0", color: "#071d3a", fontSize: 36 }}>
+            <h1 style={{ margin: "7px 0", color: "#071d3a", fontSize: 42 }}>
               Site Profile Assessment
             </h1>
-            <p style={{ margin: 0, color: "#62788e" }}>
+            <p style={{ margin: 0, color: "#62788e", fontSize: 16 }}>
               Establish the organisational boundary, accountable roles,
               processes, owners, dependencies and initial learning population.
             </p>
