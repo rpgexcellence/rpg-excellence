@@ -32,6 +32,7 @@ async function saveProfile(fd) {
   const value = parse("value_chain_processes"),
     support = parse("support_processes"),
     people = parse("training_participants");
+  const intent = t("intent");
   const dependencies = {
     people: t("dependency_people"),
     premises: t("dependency_premises"),
@@ -41,10 +42,11 @@ async function saveProfile(fd) {
     communications: t("dependency_communications"),
   };
   if (
-    !t("location_name") ||
-    !t("site_leader") ||
-    !t("local_facilitator") ||
-    !t("operational_description")
+    intent === "review" &&
+    (!t("location_name") ||
+      !t("site_leader") ||
+      !t("local_facilitator") ||
+      !t("operational_description"))
   )
     throw new Error(
       "Complete the mandatory site identity and operational fields.",
@@ -62,11 +64,13 @@ async function saveProfile(fd) {
     t("operating_pattern"),
     t("core_hours") && `Core hours: ${t("core_hours")}`,
     t("review_frequency") && `Review: ${t("review_frequency")}`,
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const data = {
     owner_id: user.id,
     organization_id: org.id,
-    status: t("intent") === "review" ? "ready_for_review" : "draft",
+    status: intent === "review" ? "ready_for_review" : "draft",
     region: t("region"),
     location_name: t("location_name"),
     country: t("country") === "Other" ? t("country_custom") : t("country"),
@@ -98,16 +102,19 @@ async function saveProfile(fd) {
       .eq("id", id)
       .eq("owner_id", user.id));
   else
-    ({ error } = await s
-      .from("bcp_site_profiles")
-      .insert({
-        ...data,
-        profile_reference: `BCP-SP-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-      }));
+    ({ error } = await s.from("bcp_site_profiles").insert({
+      ...data,
+      profile_reference: `BCP-SP-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
+    }));
   if (error) throw new Error(error.message);
+  if (intent === "continue")
+    redirect(
+      `/portal/business-continuity/site-profile?step=${Math.max(0, Math.min(6, Number(t("next_step")) || 0))}`,
+    );
   redirect("/portal/business-continuity");
 }
-export default async function SiteProfile() {
+export default async function SiteProfile({ searchParams }) {
+  const params = await searchParams;
   const s = await createClient(),
     {
       data: { user },
@@ -183,7 +190,12 @@ export default async function SiteProfile() {
             ← BCP Hub
           </Link>
         </header>
-        <BCPSiteProfileForm action={saveProfile} initial={initial} organisationName={org?.name || ""} />
+        <BCPSiteProfileForm
+          action={saveProfile}
+          initial={initial}
+          organisationName={org?.name || ""}
+          startStep={params?.step || 0}
+        />
       </div>
     </main>
   );
