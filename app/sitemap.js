@@ -21,6 +21,8 @@ export default function sitemap() {
     "/information-security",
     "/as9100-hub",
     "/iso-27001",
+    "/iso-27001-readiness-software",
+    "/security-and-trust",
     "/terms",
     "/privacy",
     "/cookies",
