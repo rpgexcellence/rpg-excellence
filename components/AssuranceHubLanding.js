@@ -25,7 +25,7 @@ const hubData = {
     title: "Connect security risk, controls and assurance.",
     lead: "Bring ISO/IEC 27001 readiness, risk assessment and treatment, the Statement of Applicability and objective evidence into one controlled ISMS workspace.",
     accent: "#07859a", dark: "#073f55", pale: "#eaf8fa",
-    primary: "/portal?standard=ISO%2FIEC%2027001%3A2022%2FAmd%201%3A2024#new-assessment", primaryLabel: "Open ISO 27001 assessment →",
+    primary: "/portal/information-security", primaryLabel: "Open ISMS Hub →",
     secondary: "/portal/soa", secondaryLabel: "Open SoA register",
     capabilities: [
       ["01","ISO 27001 Gap Analysis","Review management-system requirements, retain evidence and convert material gaps into owned improvement."],
