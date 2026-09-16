@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackConversion } from "./TrackedLink";
 
 export default function StandaloneSoaButton({ className = "button", children = "Purchase standalone SoA — £129" }) {
   const [loading, setLoading] = useState(false);
@@ -10,6 +11,7 @@ export default function StandaloneSoaButton({ className = "button", children = "
 
     try {
       setLoading(true);
+      trackConversion("begin_checkout", { purchase_type: "standalone_soa", value: 129, currency: "GBP" });
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
