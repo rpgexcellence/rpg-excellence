@@ -137,7 +137,7 @@ export default async function SiteProfile({ searchParams }) {
       .limit(1)
       .maybeSingle());
   return (
-    <main
+    <main className="siteProfilePage"
       style={{
         minHeight: "100vh",
         padding: "28px 2vw 80px",
@@ -145,8 +145,9 @@ export default async function SiteProfile({ searchParams }) {
         fontFamily: "Arial,sans-serif",
       }}
     >
-      <div style={{ maxWidth: 1740, margin: "auto" }}>
-        <header
+      <style>{`@media(max-width:600px){.siteProfilePage{padding:14px 10px 50px!important;overflow-x:hidden}.siteProfileInner{width:100%;max-width:100%!important}.siteProfileHeader{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}.siteProfileHeader h1{font-size:30px!important;line-height:1.08;overflow-wrap:anywhere}.siteProfileHeader>a{display:none}}`}</style>
+      <div className="siteProfileInner" style={{ maxWidth: 1740, margin: "auto" }}>
+        <header className="siteProfileHeader"
           style={{
             display: "flex",
             justifyContent: "space-between",
