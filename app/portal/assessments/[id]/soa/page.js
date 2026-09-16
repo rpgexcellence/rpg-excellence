@@ -133,6 +133,11 @@ function ControlCard({ row, canEdit, findings }) {
             </div>
           </details>
 
+          <section style={{ marginBottom: "18px", padding: "15px", border: `1px solid ${row.linked_risks?.length ? "#83cfc4" : "#d8e2ee"}`, borderRadius: "10px", background: row.linked_risks?.length ? "#effaf8" : "#f7f9fc" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}><strong>Linked information-security risks</strong><span style={{ color: "#087568", fontWeight: 900 }}>{row.linked_risks?.length ?? 0}</span></div>
+            {row.linked_risks?.length ? <div style={{ display: "grid", gap: "7px", marginTop: "10px" }}>{row.linked_risks.map((risk) => <Link key={risk.id} href={`/portal/information-security/risk-management?q=${encodeURIComponent(risk.risk_reference)}`} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "10px", padding: "10px", borderRadius: "8px", background: "#fff", color: "#163c55", textDecoration: "none" }}><span><b>{risk.risk_reference} · {risk.title}</b><small style={{ display: "block", marginTop: "3px", color: "#708497" }}>{risk.risk_owner} · {statusLabel(risk.treatment_decision)}</small></span><b>{risk.residual_score}/25 →</b></Link>)}</div> : <p style={{ margin: "8px 0 0", color: "#667c90", fontSize: "13px" }}>No controlled risk-treatment link exists for this control.</p>}
+          </section>
+
           <form action={saveSoaControl}>
           <input type="hidden" name="assessment_id" value={row.assessment_id} />
           <input type="hidden" name="control_id" value={row.control_id} />
@@ -267,18 +272,31 @@ export default async function SoaPage({ params, searchParams }) {
     );
   }
 
-  const [{ data: catalog, error: catalogError }, { data: entries, error: entriesError }, { data: findings, error: findingsError }] = await Promise.all([
+  const [{ data: catalog, error: catalogError }, { data: entries, error: entriesError }, { data: findings, error: findingsError }, { data: riskLinks, error: riskLinksError }] = await Promise.all([
     supabase.from("iso27001_control_catalog").select("*").eq("active", true).order("control_order", { ascending: true }),
     admin.from("assessment_soa_entries").select("*").eq("assessment_id", id).eq("owner_id", user.id),
     admin.from("assessment_findings").select("id, question_number, finding_type, status").eq("assessment_id", id).eq("owner_id", user.id).neq("finding_type", "conformity").order("created_at", { ascending: true }),
+    admin.from("isms_risk_controls").select("control_id,risk_id").eq("assessment_id", id).eq("owner_id", user.id),
   ]);
 
   if (catalogError) throw new Error(catalogError.message);
   if (entriesError) throw new Error(entriesError.message);
   if (findingsError) throw new Error(findingsError.message);
+  if (riskLinksError) throw new Error(riskLinksError.message);
+
+  const linkedRiskIds = [...new Set((riskLinks ?? []).map((link) => link.risk_id))];
+  let linkedRisks = [];
+  if (linkedRiskIds.length) {
+    const { data, error } = await admin.from("isms_risks").select("id,risk_reference,title,risk_owner,residual_score,treatment_decision,status").in("id", linkedRiskIds).eq("owner_id", user.id);
+    if (error) throw new Error(error.message);
+    linkedRisks = data ?? [];
+  }
+  const linkedRiskMap = new Map(linkedRisks.map((risk) => [risk.id, risk]));
+  const controlRiskMap = new Map();
+  for (const link of riskLinks ?? []) controlRiskMap.set(link.control_id, [...(controlRiskMap.get(link.control_id) ?? []), linkedRiskMap.get(link.risk_id)].filter(Boolean));
 
   const entryMap = new Map((entries ?? []).map((entry) => [entry.control_id, entry]));
-  const rows = (catalog ?? []).map((control) => ({ ...control, ...entryMap.get(control.control_id), assessment_id: id }));
+  const rows = (catalog ?? []).map((control) => ({ ...control, ...entryMap.get(control.control_id), assessment_id: id, linked_risks: controlRiskMap.get(control.control_id) ?? [] }));
   const selectedTheme = value(filters, "theme", "all");
   const selectedApplicability = value(filters, "applicability", "all");
   const selectedStatus = value(filters, "status", "all");
