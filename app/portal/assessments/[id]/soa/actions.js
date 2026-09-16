@@ -254,6 +254,19 @@ export async function saveSoaControl(formData) {
     throw new Error("Record a justification for the applicability decision.");
   }
 
+  if (applicability === "not_applicable") {
+    const { count: linkedRiskCount, error: linkedRiskError } = await admin
+      .from("isms_risk_controls")
+      .select("id", { count: "exact", head: true })
+      .eq("assessment_id", assessmentId)
+      .eq("control_id", controlId)
+      .eq("owner_id", user.id);
+    if (linkedRiskError) throw new Error(linkedRiskError.message);
+    if (linkedRiskCount > 0) {
+      throw new Error(`A.${controlId} is linked to ${linkedRiskCount} active risk treatment${linkedRiskCount === 1 ? "" : "s"}. Resolve those links before marking the control Not applicable.`);
+    }
+  }
+
   const inclusionSource = formData
     .getAll(`inclusion_source_${key}`)
     .filter(
