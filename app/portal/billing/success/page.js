@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Stripe from "stripe";
+import ConversionEvent from "../../../../components/ConversionEvent";
 
 export const metadata = { title: "Payment Successful" };
 export const dynamic = "force-dynamic";
@@ -89,6 +90,7 @@ export default async function BillingSuccessPage({ searchParams }) {
 
   return (
     <main style={{ minHeight: "100vh", background: "#f4f7fb", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Arial, sans-serif", padding: 40 }}>
+      {session && <ConversionEvent event="purchase" parameters={{transaction_id:session.id,value:(session.amount_total||0)/100,currency:(session.currency||"gbp").toUpperCase(),purchase_type:purchaseType||"subscription"}} />}
       <div style={{ background: "#fff", maxWidth: 700, width: "100%", borderRadius: 18, padding: 50, textAlign: "center", boxShadow: "0 15px 40px rgba(0,0,0,.08)" }}>
         <div style={{ width: 90, height: 90, borderRadius: "50%", background: "#18b66b", color: "#fff", fontSize: 46, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 25px" }}>✓</div>
         <h1 style={{ color: "#071A33", marginBottom: 20 }}>{title}</h1>
@@ -158,4 +160,3 @@ export default async function BillingSuccessPage({ searchParams }) {
     </main>
   );
 }
-
