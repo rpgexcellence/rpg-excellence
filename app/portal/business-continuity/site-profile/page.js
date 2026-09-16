@@ -31,15 +31,11 @@ async function saveProfile(fd) {
     };
   const value = parse("value_chain_processes"),
     support = parse("support_processes"),
+    dependencyRecords = parse("dependency_records"),
     people = parse("training_participants");
   const intent = t("intent");
   const dependencies = {
-    people: t("dependency_people"),
-    premises: t("dependency_premises"),
-    technology: t("dependency_technology"),
-    utilities: t("dependency_utilities"),
-    suppliers: t("dependency_suppliers"),
-    communications: t("dependency_communications"),
+    records: dependencyRecords,
   };
   if (
     intent === "review" &&
@@ -56,7 +52,7 @@ async function saveProfile(fd) {
     t("operational_description") && t("critical_products_services"),
     value.some((x) => x.name && x.owner),
     support.some((x) => x.name && x.owner),
-    Object.values(dependencies).some(Boolean),
+    dependencyRecords.some((x) => x.name && x.category),
     t("infosec_description") || t("remote_support"),
     people.some((x) => x.name && x.role),
   ].filter(Boolean).length;
