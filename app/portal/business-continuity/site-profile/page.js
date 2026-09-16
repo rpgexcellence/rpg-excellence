@@ -32,6 +32,7 @@ async function saveProfile(fd) {
   const value = parse("value_chain_processes"),
     support = parse("support_processes"),
     dependencyRecords = parse("dependency_records"),
+    informationContinuity = parse("information_continuity"),
     people = parse("training_participants");
   const intent = t("intent");
   const dependencies = {
@@ -53,7 +54,8 @@ async function saveProfile(fd) {
     value.some((x) => x.name && x.owner),
     support.some((x) => x.name && x.owner),
     dependencyRecords.some((x) => x.name && x.category),
-    t("infosec_description") || t("remote_support"),
+    informationContinuity.assets?.some((x) => x.name) ||
+      informationContinuity.systems?.some((x) => x.name),
     people.some((x) => x.name && x.role),
   ].filter(Boolean).length;
   const operatingHours = [
@@ -82,8 +84,8 @@ async function saveProfile(fd) {
     value_chain_processes: value,
     support_processes: support,
     site_dependencies: dependencies,
-    infosec_description: t("infosec_description"),
-    remote_support: t("remote_support"),
+    infosec_description: JSON.stringify(informationContinuity),
+    remote_support: JSON.stringify(informationContinuity.remoteSupport || []),
     training_participants: people,
     completion_percent: Math.round((completed / 7) * 100),
     review_due_date: t("review_due_date") || null,
