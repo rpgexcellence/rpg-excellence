@@ -42,6 +42,7 @@ export default function sitemap() {
     "/insights/permit-to-work-control",
     "/insights/powra-point-of-work",
     "/insights/iso-22301-business-continuity-readiness",
+    "/insights/business-continuity-implementation-module-1",
   ];
 
   const now = new Date();
