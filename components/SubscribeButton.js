@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackConversion } from "./TrackedLink";
 
 export default function SubscribeButton({
   plan,
@@ -16,6 +17,7 @@ export default function SubscribeButton({
 
     try {
       setLoading(true);
+      trackConversion("begin_checkout", { purchase_type: "subscription", plan });
 
       const response =
         await fetch(
