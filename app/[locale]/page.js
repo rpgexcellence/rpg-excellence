@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import PlatformHubsFeature from "../../components/PlatformHubsFeature";
+import HomeConversionSection from "../../components/HomeConversionSection";
+import TrackedLink from "../../components/TrackedLink";
 import { copy, locales } from "../../lib/i18n";
 
 const standards = [
@@ -53,10 +55,11 @@ export default async function Home({ params }) {
   return <main className="newHome">
     <Header locale={locale} nav={t.nav} variant="home" />
     <section className="homeHero" id="platform">
-      <div className="homeHeroCopy"><div className="homeEyebrow">AUDIT&nbsp;&nbsp; | &nbsp;&nbsp;IMPROVE&nbsp;&nbsp; | &nbsp;&nbsp;SUSTAIN</div><h1>Audit with evidence.<br /><span>Improve with confidence.</span></h1><p>One controlled platform for ISO audits, findings, CAPA-8D and effectiveness verification.</p><div className="homeCtas"><Link href="/portal" className="homePrimaryCta">Start free assessment <span>→</span></Link><a href="#solutions" className="homeSecondaryCta"><span className="playIcon">▶</span> View the platform</a></div><div className="homeTrust"><span>✓ Get started in minutes</span><span>✓ No credit card required</span><span>✓ Built for ISO and beyond</span></div></div>
+      <div className="homeHeroCopy"><div className="homeEyebrow">AUDIT&nbsp;&nbsp; | &nbsp;&nbsp;IMPROVE&nbsp;&nbsp; | &nbsp;&nbsp;SUSTAIN</div><h1>Audit with evidence.<br /><span>Improve with confidence.</span></h1><p>One controlled platform for ISO audits, findings, CAPA-8D and effectiveness verification.</p><div className="homeCtas"><TrackedLink href="/portal" event="assessment_cta_clicked" eventParams={{location:"homepage_hero"}} className="homePrimaryCta">Start free assessment <span>→</span></TrackedLink><a href="#solutions" className="homeSecondaryCta"><span className="playIcon">▶</span> View the platform</a></div><div className="homeTrust"><span>✓ Get started in minutes</span><span>✓ No credit card required</span><span>✓ Built for ISO and beyond</span></div></div>
       <ProductDashboard />
     </section>
     <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.slice(0, 4).map(([code, name]) => <div className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></div>)}</section>
+    <HomeConversionSection locale={locale} />
     <PlatformHubsFeature locale={locale} />
     <section className="section" id="iso"><div className="sectionHead"><div><span className="kicker">Standards we support</span><h2>One assurance platform. Five essential management systems.</h2></div><p>Use a dedicated standard or combine compatible requirements into an integrated audit while retaining clause-level traceability.</p></div><div className="standardGrid">{standards.map(([code, title, slug, tone, description]) => <Link href={`/${locale}/${slug}`} className={`standardCard ${tone}`} key={code}><span className="standardBadge">{code}</span><strong>{title}</strong><span>{description} →</span></Link>)}</div></section>
     <section className="darkBand"><span className="kicker light">Controlled improvement workflow</span><h2>From assessment to verified effectiveness.</h2><p>RPG Excellence connects the audit conclusion to accountable improvement instead of allowing findings to disappear into disconnected spreadsheets and emails.</p><div className="toolGrid darkTools">{assuranceSteps.map(([number, title, text]) => <div className="toolCard darkTool" key={number}><span className="toolIcon">{number}</span><strong>{title}</strong><span>{text}</span></div>)}</div></section>
