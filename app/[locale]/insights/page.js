@@ -18,6 +18,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "018",
+      title: "Building Business Continuity as a Capability: Our Full Implementation Programme Begins",
+      description: "RPG Excellence begins a full business continuity implementation programme with a connected Site Profile Assessment and role-based ISO 22301 learning.",
+      href: "business-continuity-implementation-module-1",
+    },
+    {
       number: "017",
       title: "ISO 22301: Turning Business Continuity Plans into Demonstrated Capability",
       description: "RPG Intelligence now provides a complete evidence-led ISO 22301:2019 gap assessment covering BIA, disruption risk, continuity strategy, response, recovery, exercises and improvement.",
