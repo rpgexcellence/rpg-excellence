@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {redirect} from "next/navigation";
-import BCPRolesResponsibilities from "../../../../../components/BCPRolesResponsibilities";
-import {createClient} from "../../../../../lib/supabase/server";
+import BCPRolesResponsibilities from "../../../../components/BCPRolesResponsibilities";
+import {createClient} from "../../../../lib/supabase/server";
 export const metadata={title:"BCMS Roles & Responsibilities | RPG Excellence"};export const dynamic="force-dynamic";
 const clean=value=>String(value??"").trim();const parseArray=(fd,name)=>{try{const value=JSON.parse(clean(fd.get(name))||"[]");return Array.isArray(value)?value:[]}catch{return []}};
 async function saveRoles(_previousState,fd){"use server";const s=await createClient(),{data:{user}}=await s.auth.getUser();if(!user)redirect("/portal/login?next=/portal/business-continuity/roles");const{data:org}=await s.from("organizations").select("id").eq("owner_id",user.id).order("created_at").limit(1).maybeSingle();if(!org)return{error:"Create an organisation before starting Module 4."};const t=name=>clean(fd.get(name)),id=t("assessment_id"),intent=t("intent");let existing=null;if(id){const{data}=await s.from("bcp_role_assessments").select("*").eq("id",id).eq("organization_id",org.id).eq("owner_id",user.id).maybeSingle();existing=data;if(!existing)return{error:"This Module 4 assessment could not be found."}}if(intent==="archive"){if(!existing)return{error:"Only an existing assessment can be archived."};const{error}=await s.from("bcp_role_assessments").update({status:"archived",updated_at:new Date().toISOString()}).eq("id",existing.id).eq("owner_id",user.id);if(error)return{error:error.message};redirect("/portal/business-continuity")}
