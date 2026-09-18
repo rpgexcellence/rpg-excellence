@@ -47,11 +47,24 @@ export async function signUp(formData) {
   redirect(next);
 }
 
-export async function signInWithApple(formData) {
+async function signInWithProvider(formData, provider, scopes) {
   const supabase=await createClient(),next=safeNext(formData.get("next")),requestHeaders=await headers();
   const origin=requestHeaders.get("origin")||process.env.NEXT_PUBLIC_SITE_URL||"https://www.rpgexcellence.com";
   const callback=new URL("/auth/callback",origin);callback.searchParams.set("next",next);
-  const {data,error}=await supabase.auth.signInWithOAuth({provider:"apple",options:{redirectTo:callback.toString()}});
-  if(error||!data?.url)loginError(error?.message||"Apple sign-in is not available. Please try email access.",next);
+  const options={redirectTo:callback.toString(),...(scopes?{scopes}:{})};
+  const {data,error}=await supabase.auth.signInWithOAuth({provider,options});
+  if(error||!data?.url)loginError(error?.message||"Social sign-in is not available. Please try email access.",next);
   redirect(data.url);
+}
+
+export async function signInWithApple(formData) {
+  return signInWithProvider(formData,"apple");
+}
+
+export async function signInWithGoogle(formData) {
+  return signInWithProvider(formData,"google");
+}
+
+export async function signInWithMicrosoft(formData) {
+  return signInWithProvider(formData,"azure","openid email profile");
 }
