@@ -3,7 +3,7 @@ import {useActionState,useMemo,useState} from "react";
 
 const steps=[["Module 1 link","Site and assessment boundary"],["External context","Political, economic and wider change"],["Internal context","Governance, capability and culture"],["Interested parties","Needs, obligations and communication"],["Direction & scope","Appetite, objectives and boundaries"],["Priorities","Generated Clause 4 registers"]];
 const managementSystems=[
- {code:"Q",name:"Quality",standard:"ISO 9001:2015"},{code:"E",name:"Environmental",standard:"ISO 14001:2026"},{code:"S",name:"Occupational health and safety",standard:"ISO 45001:2018/Amd 1:2024"},{code:"B",name:"Business continuity",standard:"ISO 22301:2019/Amd 1:2024"},{code:"IS",name:"Information security",standard:"ISO/IEC 27001:2022"},{code:"EN",name:"Energy",standard:"ISO 50001:2018"}
+ {code:"Q",name:"Quality",standard:"ISO 9001:2026"},{code:"E",name:"Environmental",standard:"ISO 14001:2026"},{code:"S",name:"Occupational health and safety",standard:"ISO 45001:2018/Amd 1:2024"},{code:"B",name:"Business continuity",standard:"ISO 22301:2019/Amd 1:2024"},{code:"IS",name:"Information security",standard:"ISO/IEC 27001:2022"},{code:"EN",name:"Energy",standard:"ISO 50001:2018"}
 ];
 const objectiveCriteria={
  Q:[["Maintain delivery of priority products and services","At least 95% of priority services meet their approved recovery target"],["Protect customer commitments during disruption","100% of material disruptions communicated within agreed customer timescales"],["Improve continuity of quality-critical processes","All quality-critical processes exercised and actions closed by the review date"]],
