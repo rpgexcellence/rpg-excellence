@@ -39,7 +39,26 @@ const participantRows=value=>{
 function Slider({label,value,onChange}){return <label className="ctxSlider"><span>{label}<b>{value}/5</b></span><input type="range" min="1" max="5" value={value} onChange={e=>onChange(+e.target.value)}/></label>}
 function Pills({items,onPick}){return <div className="ctxPills">{items.map(x=><button type="button" key={x} onClick={()=>onPick(x)}>+ {x}</button>)}</div>}
 function Issues({title,items,setItems,suggestions}){const change=(id,k,v)=>setItems(items.map(x=>x.id===id?{...x,[k]:v}:x)),applyPreset=(id,preset)=>setItems(items.map(x=>x.id===id?{...x,issue:preset[0],effect:preset[1]}:x));return <><Intro title={title} text="Record only issues capable of affecting continuity. Select a category and a suggested issue to generate an editable continuity summary." action={()=>setItems([...items,newIssue()])}/><Pills items={suggestions} onPick={x=>setItems([...items,newIssue(x)])}/><div className="ctxRecords">{items.map((x,i)=><article className="ctxRecord" key={x.id}><header><strong>{String(i+1).padStart(2,"0")} {x.category||"Context issue"}</strong><Tag score={issueScore(x)}/><button type="button" onClick={()=>setItems(items.filter(y=>y.id!==x.id))}>Remove</button></header>{issuePresets[x.category]?.length>0&&<div className="ctxPresetBox"><b>Quick issues — select one to build the summary</b><div>{issuePresets[x.category].map(p=><button type="button" key={p[0]} className={x.issue===p[0]?"selected":""} onClick={()=>applyPreset(x.id,p)}>+ {p[0]}</button>)}</div></div>}<div className="ctxGrid"><Field label="Category" value={x.category} onChange={v=>change(x.id,"category",v)}/><Field label="Issue / change" value={x.issue} onChange={v=>change(x.id,"issue",v)} placeholder="Select a quick issue or describe what is changing"/><Field wide area label="Quick continuity summary — review and modify" value={x.effect} onChange={v=>change(x.id,"effect",v)} placeholder="Select a quick issue to generate a summary, or write your own"/><Field label="Evidence / source" value={x.evidence} onChange={v=>change(x.id,"evidence",v)}/><Field label="Owner" value={x.owner} onChange={v=>change(x.id,"owner",v)}/></div><div className="ctxSliders"><Slider label="Relevance" value={x.relevance} onChange={v=>change(x.id,"relevance",v)}/><Slider label="Disruption exposure" value={x.exposure} onChange={v=>change(x.id,"exposure",v)}/><Slider label="Rate of change" value={x.change} onChange={v=>change(x.id,"change",v)}/></div></article>)}</div></>}
-function Intro({title,text,action}){return <div className="ctxIntro"><div><b>{title}</b><p>{text}</p></div>{action&&<button type="button" onClick={action}>+ Add record</button>}</div>}
+const visualEnhancements=`
+.ctxPresetBox{margin:14px 0 2px;padding:15px;border:1px solid #d5e1ed;border-radius:11px;background:linear-gradient(135deg,#f6f9fd,#eef4fb)}
+.ctxPresetBox>b{display:block;margin-bottom:10px;color:#173b60;font-size:12px}
+.ctxPresetBox>div{display:flex;flex-wrap:wrap;gap:8px}
+.ctxPresetBox button{padding:8px 11px;border:1px solid #b9cde1;border-radius:999px;background:#fff;color:#244b72;font-size:11px;font-weight:750;cursor:pointer;transition:.16s ease}
+.ctxPresetBox button:hover{border-color:#315fe6;background:#eef3ff;color:#1f4fc9;transform:translateY(-1px)}
+.ctxPresetBox button.selected{border-color:#315fe6;background:#315fe6;color:#fff;box-shadow:0 4px 10px #315fe62c}
+.ctxParticipants{display:grid;gap:9px;align-content:start}
+.ctxParticipants>span{font-size:12px;font-weight:850}
+.ctxParticipants>small{display:block;color:#60778e;font-size:11px;line-height:1.35}
+.ctxParticipants>em{padding:8px 10px;border-radius:7px;background:#fff7e8;color:#8a5b00;font-size:11px;font-style:normal}
+.ctxParticipant{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.ctxParticipant input{margin-top:0!important}
+.ctxParticipant button{height:40px;padding:0 11px;border:1px solid #f0c4bd;border-radius:8px;background:#fff4f2;color:#b42318;font-size:11px;font-weight:850;cursor:pointer}
+.ctxParticipant button:hover{background:#fee7e3}
+.ctxAddParticipant{justify-self:start;padding:9px 12px;border:1px solid #b8cce0;border-radius:8px;background:#f7faff;color:#17436f;font-size:11px;font-weight:850;cursor:pointer}
+.ctxAddParticipant:hover{border-color:#315fe6;background:#eef3ff;color:#2453bb}
+@media(max-width:720px){.ctxParticipant{grid-template-columns:1fr}.ctxParticipant button{justify-self:start}}
+`;
+function Intro({title,text,action}){return <><style>{visualEnhancements}</style><div className="ctxIntro"><div><b>{title}</b><p>{text}</p></div>{action&&<button type="button" onClick={action}>+ Add record</button>}</div></>}
 function Tag({score}){const b=band(score);return <span className={`ctxBand ${b.toLowerCase()}`}>{b} · {score}</span>}
 function Field({label,value,onChange,placeholder="",wide=false,area=false}){return <label className={wide?"wide":""}>{label}{area?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>:<input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>}</label>}
 
