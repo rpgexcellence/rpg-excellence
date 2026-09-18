@@ -39,15 +39,16 @@ async function saveContext(_previousState,formData){
   redirect("/portal/business-continuity");
  }
  let profile=null;
- if(siteProfileId){const{data}=await supabase.from("bcp_site_profiles").select("id").eq("id",siteProfileId).eq("organization_id",org.id).neq("status","archived").maybeSingle();profile=data}
+ if(siteProfileId){const{data}=await supabase.from("bcp_site_profiles").select("*").eq("id",siteProfileId).eq("organization_id",org.id).neq("status","archived").maybeSingle();profile=data}
  const checks=completionChecks({profile,external,internal,parties,objectives,risks,scope}),completed=checks.filter(Boolean).length,completionPercent=Math.round(completed/checks.length*100);
  if(["review","approve"].includes(intent)&&!checks.every(Boolean))return{error:"Complete all six controlled sections before submission: linked site, External context, Internal context, interested parties with communication, owned objectives and evaluated risks, and the BCMS scope."};
+ if(intent==="approve"&&profile?.status!=="approved")return{error:"Approve the linked Module 1 Site Profile before approving this Module 3 assessment."};
  const reviewer=clean(formData.get("reviewer_name")),reviewComment=clean(formData.get("review_comment"));
  if(intent==="approve"&&!reviewer)return{error:"Record the competent reviewer or approval authority before approval."};
  if(intent==="changes"&&(!reviewer||!reviewComment))return{error:"Record the reviewer and the changes required."};
  const currentVersion=Number(existing?.version)||1,editingApproved=existing?.status==="approved"&&intent!=="approve",version=editingApproved?currentVersion+1:currentVersion;
  const status=intent==="approve"?"approved":intent==="changes"?"changes_required":intent==="review"?"ready_for_review":"draft";
- const now=new Date().toISOString(),data={owner_id:user.id,organization_id:org.id,site_profile_id:profile?.id||null,assessment_title:clean(formData.get("assessment_title"))||"Organisational context and interested parties",participants:clean(formData.get("participants")),risk_appetite:within(formData.get("risk_appetite"),1,5,3),external_context:external,internal_context:internal,interested_parties:parties,objectives,risks_opportunities:risks,scope_data:scope,completion_percent:completionPercent,review_due_date:clean(formData.get("review_due_date"))||null,status,version,prepared_by:existing?.prepared_by||user.email||"Account owner",reviewed_by:["approve","changes"].includes(intent)?reviewer:null,reviewed_at:["approve","changes"].includes(intent)?now:null,review_comment:["approve","changes"].includes(intent)?reviewComment:null,approved_by:intent==="approve"?reviewer:null,approved_at:intent==="approve"?now:null,updated_at:now};
+ const now=new Date().toISOString(),data={owner_id:user.id,organization_id:org.id,site_profile_id:profile?.id||null,site_profile_version:profile?.version||1,site_profile_snapshot:profile||null,assessment_title:clean(formData.get("assessment_title"))||"Organisational context and interested parties",participants:clean(formData.get("participants")),risk_appetite:within(formData.get("risk_appetite"),1,5,3),external_context:external,internal_context:internal,interested_parties:parties,objectives,risks_opportunities:risks,scope_data:scope,completion_percent:completionPercent,review_due_date:clean(formData.get("review_due_date"))||null,status,version,prepared_by:existing?.prepared_by||user.email||"Account owner",reviewed_by:["approve","changes"].includes(intent)?reviewer:null,reviewed_at:["approve","changes"].includes(intent)?now:null,review_comment:["approve","changes"].includes(intent)?reviewComment:null,approved_by:intent==="approve"?reviewer:null,approved_at:intent==="approve"?now:null,updated_at:now};
  if(editingApproved)await supabase.from("bcp_context_assessment_versions").insert({assessment_id:existing.id,organization_id:org.id,owner_id:user.id,version:currentVersion,status:existing.status,snapshot:existing,change_reason:"Approved version superseded by a new revision"});
  let savedId=existing?.id,error;
  if(existing)({error}=await supabase.from("bcp_context_assessments").update(data).eq("id",existing.id).eq("owner_id",user.id));
@@ -64,7 +65,7 @@ export default async function ContextPage({searchParams}){
  const{data:org}=await supabase.from("organizations").select("id,name").eq("owner_id",user.id).order("created_at").limit(1).maybeSingle();
  let profiles=[],initial=null;
  if(org){
-  ({data:profiles=[]}=await supabase.from("bcp_site_profiles").select("id,profile_reference,region,country,location_name,address,site_leader,local_facilitator,operational_description,critical_products_services,value_chain_processes,support_processes,site_dependencies,interested_parties,training_participants").eq("organization_id",org.id).neq("status","archived").order("updated_at",{ascending:false}));
+  ({data:profiles=[]}=await supabase.from("bcp_site_profiles").select("id,profile_reference,status,version,completion_percent,region,country,location_name,address,site_leader,local_facilitator,operational_description,critical_products_services,value_chain_processes,support_processes,site_dependencies,information_continuity,interested_parties,training_participants").eq("organization_id",org.id).neq("status","archived").order("updated_at",{ascending:false}));
   if(params?.new!=="1"){
    let query=supabase.from("bcp_context_assessments").select("*").eq("organization_id",org.id).neq("status","archived");
    if(params?.id)query=query.eq("id",params.id);
