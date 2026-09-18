@@ -2,200 +2,45 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import BCPSiteProfileForm from "../../../../components/BCPSiteProfileForm";
 import { createClient } from "../../../../lib/supabase/server";
-export const metadata = { title: "BCP Site Profile | RPG Excellence" };
-export const dynamic = "force-dynamic";
-async function saveProfile(fd) {
-  "use server";
-  const s = await createClient(),
-    {
-      data: { user },
-    } = await s.auth.getUser();
-  if (!user)
-    redirect("/portal/login?next=/portal/business-continuity/site-profile");
-  const { data: org } = await s
-    .from("organizations")
-    .select("id")
-    .eq("owner_id", user.id)
-    .order("created_at")
-    .limit(1)
-    .maybeSingle();
-  if (!org)
-    throw new Error("Create an organisation before starting a site profile.");
-  const t = (n) => String(fd.get(n) || "").trim(),
-    parse = (n) => {
-      try {
-        return JSON.parse(t(n) || "[]");
-      } catch {
-        return [];
-      }
-    };
-  const value = parse("value_chain_processes"),
-    support = parse("support_processes"),
-    dependencyRecords = parse("dependency_records"),
-    informationContinuity = parse("information_continuity"),
-    people = parse("training_participants");
-  const intent = t("intent");
-  const dependencies = {
-    records: dependencyRecords,
-  };
-  if (
-    intent === "review" &&
-    (!t("location_name") ||
-      !t("site_leader") ||
-      !t("local_facilitator") ||
-      !t("operational_description"))
-  )
-    throw new Error(
-      "Complete the mandatory site identity and operational fields.",
-    );
-  const completed = [
-    t("location_name") && t("site_leader") && t("local_facilitator"),
-    t("operational_description") && t("critical_products_services"),
-    value.some((x) => x.name && x.owner),
-    support.some((x) => x.name && x.owner),
-    dependencyRecords.some((x) => x.name && x.category),
-    informationContinuity.assets?.some((x) => x.name) ||
-      informationContinuity.systems?.some((x) => x.name),
-    people.some((x) => x.name && x.role),
-  ].filter(Boolean).length;
-  const operatingHours = [
-    t("operating_pattern"),
-    t("core_hours") && `Core hours: ${t("core_hours")}`,
-    t("review_frequency") && `Review: ${t("review_frequency")}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const data = {
-    owner_id: user.id,
-    organization_id: org.id,
-    status: intent === "review" ? "ready_for_review" : "draft",
-    region: t("region"),
-    location_name: t("location_name"),
-    country: t("country") === "Other" ? t("country_custom") : t("country"),
-    address: t("address"),
-    headcount: Number(t("headcount")) || null,
-    site_leader: t("site_leader"),
-    site_leader_email: t("site_leader_email"),
-    regional_facilitator: t("regional_facilitator"),
-    local_facilitator: t("local_facilitator"),
-    operational_description: t("operational_description"),
-    critical_products_services: t("critical_products_services"),
-    operating_hours: operatingHours,
-    value_chain_processes: value,
-    support_processes: support,
-    site_dependencies: dependencies,
-    infosec_description: JSON.stringify(informationContinuity),
-    remote_support: JSON.stringify(informationContinuity.remoteSupport || []),
-    training_participants: people,
-    completion_percent: Math.round((completed / 7) * 100),
-    review_due_date: t("review_due_date") || null,
-    updated_at: new Date().toISOString(),
-  };
-  const id = t("profile_id");
-  let error;
-  if (id)
-    ({ error } = await s
-      .from("bcp_site_profiles")
-      .update(data)
-      .eq("id", id)
-      .eq("owner_id", user.id));
-  else
-    ({ error } = await s.from("bcp_site_profiles").insert({
-      ...data,
-      profile_reference: `BCP-SP-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-    }));
-  if (error) throw new Error(error.message);
-  if (intent === "continue")
-    redirect(
-      `/portal/business-continuity/site-profile?step=${Math.max(0, Math.min(6, Number(t("next_step")) || 0))}`,
-    );
-  redirect("/portal/business-continuity");
+
+export const metadata={title:"BCP Site Profile | RPG Excellence"};
+export const dynamic="force-dynamic";
+const clean=value=>String(value??"").trim();
+const parseArray=(fd,name)=>{try{const value=JSON.parse(clean(fd.get(name))||"[]");return Array.isArray(value)?value:[]}catch{return []}};
+const parseObject=(fd,name)=>{try{const value=JSON.parse(clean(fd.get(name))||"{}");return value&&typeof value==="object"&&!Array.isArray(value)?value:{}}catch{return {}}};
+const validEmail=value=>!value||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const withIds=items=>items.map(item=>({...item,id:clean(item?.id)||crypto.randomUUID()}));
+const hasDuplicates=items=>{const names=items.map(x=>clean(x?.name).toLowerCase()).filter(Boolean);return new Set(names).size!==names.length};
+function profileChecks({location,leader,facilitator,description,services,value,support,dependencies,information,people}){return [Boolean(location&&leader&&facilitator),Boolean(description&&services),value.some(x=>clean(x?.name)&&clean(x?.owner)&&x?.products?.length),support.some(x=>clean(x?.name)&&clean(x?.owner)&&x?.products?.length),dependencies.some(x=>clean(x?.name)&&clean(x?.category)&&(x?.siteWide||x?.processes?.length)),Boolean(information.assets?.some(x=>clean(x?.name)&&clean(x?.owner))||information.systems?.some(x=>clean(x?.name)&&clean(x?.businessOwner))),people.some(x=>clean(x?.name)&&clean(x?.role)&&validEmail(clean(x?.email)))]}
+
+async function saveProfile(_previousState,fd){
+ "use server";
+ const s=await createClient(),{data:{user}}=await s.auth.getUser();
+ if(!user)redirect("/portal/login?next=/portal/business-continuity/site-profile");
+ const{data:org}=await s.from("organizations").select("id").eq("owner_id",user.id).order("created_at").limit(1).maybeSingle();
+ if(!org)return{error:"Create an organisation before starting a site profile."};
+ const t=name=>clean(fd.get(name)),intent=t("intent"),id=t("profile_id");let existing=null;
+ if(id){const{data}=await s.from("bcp_site_profiles").select("*").eq("id",id).eq("organization_id",org.id).eq("owner_id",user.id).maybeSingle();existing=data;if(!existing)return{error:"This site profile could not be found or you do not have access to it."}}
+ if(intent==="archive"){if(!existing)return{error:"Only an existing profile can be archived."};const{error}=await s.from("bcp_site_profiles").update({status:"archived",updated_at:new Date().toISOString()}).eq("id",existing.id).eq("owner_id",user.id);if(error)return{error:error.message};redirect("/portal/business-continuity")}
+ const value=withIds(parseArray(fd,"value_chain_processes")),support=withIds(parseArray(fd,"support_processes")),dependencyRecords=withIds(parseArray(fd,"dependency_records")),information=parseObject(fd,"information_continuity"),people=withIds(parseArray(fd,"training_participants"));information.assets=withIds(Array.isArray(information.assets)?information.assets:[]);information.systems=withIds(Array.isArray(information.systems)?information.systems:[]);information.remoteSupport=withIds(Array.isArray(information.remoteSupport)?information.remoteSupport:[]);
+ const location=t("location_name"),leader=t("site_leader"),facilitator=t("local_facilitator"),description=t("operational_description"),services=t("critical_products_services");
+ const checks=profileChecks({location,leader,facilitator,description,services,value,support,dependencies:dependencyRecords,information,people}),completion=Math.round(checks.filter(Boolean).length/checks.length*100);
+ if(["review","approve"].includes(intent)&&!checks.every(Boolean))return{error:"Complete all seven controlled sections before submission: site accountability, services, owned value-chain and support processes, linked dependencies, owned information or systems, and valid participant records."};
+ if(!validEmail(t("site_leader_email")))return{error:"Enter a valid site leader email address."};
+ if(hasDuplicates([...value,...support]))return{error:"Process names must be unique across value-chain and support processes."};
+ if(hasDuplicates(dependencyRecords))return{error:"Dependency names must be unique within the site profile."};
+ const reviewer=t("reviewer_name"),comment=t("review_comment");if(intent==="approve"&&!reviewer)return{error:"Record the competent reviewer or approval authority before approval."};if(intent==="changes"&&(!reviewer||!comment))return{error:"Record the reviewer and explain the changes required."};
+ const now=new Date().toISOString(),currentVersion=Number(existing?.version)||1,editingApproved=existing?.status==="approved"&&intent!=="approve",version=editingApproved?currentVersion+1:currentVersion,status=intent==="approve"?"approved":intent==="changes"?"changes_required":intent==="review"?"ready_for_review":"draft";
+ const data={owner_id:user.id,organization_id:org.id,status,version,region:t("region"),location_name:location,country:t("country")==="Other"?t("country_custom"):t("country"),address:t("address"),headcount:Number(t("headcount"))||null,site_leader:leader,site_leader_email:t("site_leader_email"),regional_facilitator:t("regional_facilitator"),local_facilitator:facilitator,operational_description:description,critical_products_services:services,operating_pattern:t("operating_pattern"),core_hours:t("core_hours"),review_frequency:t("review_frequency"),operating_hours:[t("operating_pattern"),t("core_hours")&&`Core hours: ${t("core_hours")}`,t("review_frequency")&&`Review: ${t("review_frequency")}`].filter(Boolean).join(" · "),value_chain_processes:value,support_processes:support,site_dependencies:{records:dependencyRecords},information_continuity:information,infosec_description:JSON.stringify(information),remote_support:JSON.stringify(information.remoteSupport||[]),training_participants:people,completion_percent:completion,review_due_date:t("review_due_date")||null,prepared_by:existing?.prepared_by||user.email||"Account owner",reviewed_by:["approve","changes"].includes(intent)?reviewer:null,reviewed_at:["approve","changes"].includes(intent)?now:null,review_comment:["approve","changes"].includes(intent)?comment:null,approved_by:intent==="approve"?reviewer:null,approved_at:intent==="approve"?now:null,updated_at:now};
+ if(editingApproved){const{error}=await s.from("bcp_site_profile_versions").insert({profile_id:existing.id,organization_id:org.id,owner_id:user.id,version:currentVersion,status:existing.status,snapshot:existing,change_reason:"Approved profile superseded by a new revision"});if(error)return{error:error.message}}
+ let savedId=existing?.id,error;if(existing)({error}=await s.from("bcp_site_profiles").update(data).eq("id",existing.id).eq("owner_id",user.id));else{const result=await s.from("bcp_site_profiles").insert({...data,profile_reference:`BCP-SP-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0,6).toUpperCase()}`}).select("id").single();error=result.error;savedId=result.data?.id}if(error)return{error:error.message};
+ if(intent==="approve"){const{error:versionError}=await s.from("bcp_site_profile_versions").upsert({profile_id:savedId,organization_id:org.id,owner_id:user.id,version,status:"approved",snapshot:{...data,id:savedId},change_reason:comment||"Controlled approval"},{onConflict:"profile_id,version"});if(versionError)return{error:versionError.message}}
+ if(intent==="continue")redirect(`/portal/business-continuity/site-profile?id=${savedId}&step=${Math.max(0,Math.min(6,Number(t("next_step"))||0))}`);redirect(`/portal/business-continuity/site-profile?id=${savedId}&step=6`);
 }
-export default async function SiteProfile({ searchParams }) {
-  const params = await searchParams;
-  const s = await createClient(),
-    {
-      data: { user },
-    } = await s.auth.getUser();
-  if (!user)
-    redirect("/portal/login?next=/portal/business-continuity/site-profile");
-  const { data: org } = await s
-    .from("organizations")
-    .select("id,name")
-    .eq("owner_id", user.id)
-    .order("created_at")
-    .limit(1)
-    .maybeSingle();
-  let initial = null;
-  if (org)
-    ({ data: initial } = await s
-      .from("bcp_site_profiles")
-      .select("*")
-      .eq("organization_id", org.id)
-      .neq("status", "archived")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle());
-  return (
-    <main className="siteProfilePage"
-      style={{
-        minHeight: "100vh",
-        padding: "28px 2vw 80px",
-        background: "#edf3f8",
-        fontFamily: "Arial,sans-serif",
-      }}
-    >
-      <style>{`@media(max-width:600px){.siteProfilePage{padding:14px 10px 50px!important;overflow-x:hidden}.siteProfileInner{width:100%;max-width:100%!important}.siteProfileHeader{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}.siteProfileHeader h1{font-size:30px!important;line-height:1.08;overflow-wrap:anywhere}.siteProfileHeader>a{display:none}}`}</style>
-      <div className="siteProfileInner" style={{ maxWidth: 1740, margin: "auto" }}>
-        <header className="siteProfileHeader"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 20,
-            alignItems: "start",
-            marginBottom: 22,
-          }}
-        >
-          <div>
-            <small
-              style={{
-                color: "#6845d1",
-                fontWeight: 900,
-                letterSpacing: ".1em",
-              }}
-            >
-              BCP HUB · PART 1
-            </small>
-            <h1 style={{ margin: "7px 0", color: "#071d3a", fontSize: 42 }}>
-              Site Profile Assessment
-            </h1>
-            <p style={{ margin: 0, color: "#62788e", fontSize: 16 }}>
-              Establish the organisational boundary, accountable roles,
-              processes, owners, dependencies and initial learning population.
-            </p>
-          </div>
-          <Link
-            href="/portal/business-continuity"
-            style={{
-              padding: "11px 14px",
-              border: "1px solid #c5d3e0",
-              borderRadius: 8,
-              background: "#fff",
-              color: "#173b60",
-              textDecoration: "none",
-              fontWeight: 850,
-            }}
-          >
-            ← BCP Hub
-          </Link>
-        </header>
-        <BCPSiteProfileForm
-          action={saveProfile}
-          initial={initial}
-          organisationName={org?.name || ""}
-          startStep={params?.step || 0}
-        />
-      </div>
-    </main>
-  );
+
+export default async function SiteProfile({searchParams}){
+ const params=await searchParams,s=await createClient(),{data:{user}}=await s.auth.getUser();if(!user)redirect("/portal/login?next=/portal/business-continuity/site-profile");
+ const{data:org}=await s.from("organizations").select("id,name").eq("owner_id",user.id).order("created_at").limit(1).maybeSingle();let initial=null;
+ if(org&&params?.new!=="1"){let query=s.from("bcp_site_profiles").select("*").eq("organization_id",org.id).neq("status","archived");if(params?.id)query=query.eq("id",params.id);({data:initial}=await query.order("updated_at",{ascending:false}).limit(1).maybeSingle())}
+ return <main className="siteProfilePage" style={{minHeight:"100vh",padding:"28px 2vw 80px",background:"#edf3f8",fontFamily:"Arial,sans-serif"}}><style>{`@media(max-width:600px){.siteProfilePage{padding:14px 10px 50px!important;overflow-x:hidden}.siteProfileInner{width:100%;max-width:100%!important}.siteProfileHeader{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}.siteProfileHeader h1{font-size:30px!important}.siteProfileHeader nav{flex-wrap:wrap}}`}</style><div className="siteProfileInner" style={{maxWidth:1740,margin:"auto"}}><header className="siteProfileHeader" style={{display:"flex",justifyContent:"space-between",gap:20,alignItems:"start",marginBottom:22}}><div><small style={{color:"#6845d1",fontWeight:900,letterSpacing:".1em"}}>BCP HUB · MODULE 1 · CONTROLLED SITE PROFILE</small><h1 style={{margin:"7px 0",color:"#071d3a",fontSize:42}}>Site Profile Assessment</h1><p style={{margin:0,color:"#62788e",fontSize:16}}>Establish the controlled site boundary and trusted source data used by Module 3, risk assessment and BIA.</p></div><nav style={{display:"flex",gap:8}}><Link href="/portal/business-continuity/site-profile?new=1" style={{padding:"11px 14px",border:"1px solid #2863e7",borderRadius:8,background:"#2863e7",color:"#fff",textDecoration:"none",fontWeight:850}}>+ New profile</Link><Link href="/portal/business-continuity" style={{padding:"11px 14px",border:"1px solid #c5d3e0",borderRadius:8,background:"#fff",color:"#173b60",textDecoration:"none",fontWeight:850}}>← BCP Hub</Link></nav></header><BCPSiteProfileForm action={saveProfile} initial={initial} organisationName={org?.name||""} startStep={params?.step||0}/></div></main>;
 }
