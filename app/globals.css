@@ -252,3 +252,25 @@ a{text-decoration:none;color:inherit}
 .r4Raci>footer span{padding:5px 8px;border-radius:999px;background:#e8eef4;color:#60758a;font-size:10px;font-weight:800}.r4Raci>footer span.complete{background:#ddf5e9;color:#087443}
 .r4ControlDetails{margin-top:13px;padding-top:12px;border-top:1px solid #e0e8ef}.r4ControlDetails summary{color:#17436f;font-size:12px;font-weight:850;cursor:pointer}
 @media(max-width:760px){.r4Raci>header{display:grid}.r4RaciLegend{justify-content:flex-start}.r4Raci table{min-width:620px}}
+
+/* Module 4 - responsibility applicability and custom actors */
+.r4Standards,.r4ActorBuilder{margin-top:16px;padding:16px;border:1px solid #cbd9e6;border-radius:12px;background:#f8fbfe}
+.r4Standards>header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:12px}
+.r4Standards>header b,.r4ActorBuilder>header b{color:#0a2342;font-size:15px}
+.r4Standards>header p,.r4ActorBuilder>header p{margin:4px 0 0;color:#60778e;font-size:12px}
+.r4Standards>header strong{flex:0 0 auto;padding:6px 9px;border-radius:999px;background:#e7efff;color:#2858d5;font-size:10px}
+.r4Standards>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.r4Standards>div>button{display:flex;align-items:center;gap:10px;min-height:68px;padding:11px 12px;border:1px solid #b9ccec;border-radius:9px;background:#fff;color:#173b60;text-align:left;cursor:pointer}
+.r4Standards>div>button.selected{border:2px solid #315fe6;background:#eef3ff;box-shadow:0 4px 12px rgb(49 95 230 / 10%)}
+.r4Standards>div>button>i{display:grid;place-items:center;flex:0 0 22px;width:22px;height:22px;border:2px solid #9eb2c6;border-radius:6px;color:#fff;font-style:normal;font-weight:900}
+.r4Standards>div>button.selected>i{border-color:#315fe6;background:#315fe6}
+.r4Standards>div>button>span{display:grid;gap:3px}.r4Standards>div>button b{font-size:12px}.r4Standards>div>button small{color:#647b92;font-size:10px}
+.r4ActorBuilder{background:#fff}
+.r4ActorInput{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;margin-top:12px}
+.r4ActorInput input{min-width:0;padding:11px 12px;border:1px solid #b9ccdf;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit;font-size:12px}
+.r4ActorInput button{padding:10px 14px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-size:12px;font-weight:850;cursor:pointer}
+.r4CustomActors{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.r4CustomActors span{display:flex;align-items:center;gap:7px;padding:6px 7px 6px 10px;border:1px solid #b9ccec;border-radius:999px;background:#eef4ff;color:#17436f;font-size:11px;font-weight:750}
+.r4CustomActors button{display:grid;place-items:center;width:18px;height:18px;padding:0;border:0;border-radius:50%;background:#d6e2f8;color:#234f82;font-size:14px;line-height:1;cursor:pointer}
+@media(max-width:900px){.r4Standards>div{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.r4Standards>header{display:grid}.r4Standards>div{grid-template-columns:1fr}.r4ActorInput{grid-template-columns:1fr}}
