@@ -7,6 +7,7 @@ export const metadata = {
   title: "RPG Insights",
   description:
     "Practical ISO guidance, standards updates, RPG Intelligence releases and business assurance insights from RPG Excellence.",
+  alternates: { canonical: "/en/insights" },
 };
 
 export default async function InsightsPage({ params }) {
