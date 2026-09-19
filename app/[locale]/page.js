@@ -14,11 +14,21 @@ const standards = [
   ["ISO 22301", "Business Continuity", "iso-22301", "purple", "Build resilient operations through impact analysis, continuity plans and exercising."],
   ["ISO 27001", "Information Security", "iso-27001", "teal", "Assess information-security risk, controls, governance and the Statement of Applicability."],
 ];
-const assuranceSteps = [
-  ["01", "Assess", "Complete a structured assessment or internal audit against applicable requirements."],
-  ["02", "Evidence", "Record objective evidence, accountable conclusions and controlled findings."],
-  ["03", "Improve", "Investigate root causes and manage corrective actions through the CAPA-8D workflow."],
-  ["04", "Verify", "Independently assess effectiveness and close only when results are sustained."],
+const customerJourney = [
+  ["01", "Start", "Create your workspace and select the standards, sites and priorities relevant to your organisation."],
+  ["02", "Understand", "Assess readiness, identify risk and establish the obligations that matter."],
+  ["03", "Build", "Create controlled registers, responsibilities, objectives and implementation actions."],
+  ["04", "Implement", "Assign work, train responsible people and retain objective evidence."],
+  ["05", "Assure", "Audit performance, investigate weaknesses and verify corrective action."],
+  ["06", "Demonstrate", "Present management-ready reports and prepare confidently for certification."],
+];
+const startingPoints = [
+  ["Understand our ISO gaps", "ISO Readiness Assessment", "/portal"],
+  ["Control workplace risk", "Health & Safety Hub", "/portal/health-safety"],
+  ["Build an ISMS", "ISO 27001 Risk & SoA", "/portal/information-security"],
+  ["Implement business continuity", "Business Continuity Hub", "/portal/business-continuity"],
+  ["Strengthen internal auditing", "Internal Audit Hub", "/portal/internal-audit"],
+  ["Resolve recurring problems", "CAPA-8D Hub", "/portal/rca"],
 ];
 const recentAudits = [
   ["12 Apr 2026", "ISO 9001", "Manufacturing", "Minor NC", "2", "warning"],
@@ -55,15 +65,18 @@ export default async function Home({ params }) {
   return <main className="newHome">
     <Header locale={locale} nav={t.nav} variant="home" />
     <section className="homeHero" id="platform">
-      <div className="homeHeroCopy"><div className="homeEyebrow">AUDIT&nbsp;&nbsp; | &nbsp;&nbsp;IMPROVE&nbsp;&nbsp; | &nbsp;&nbsp;SUSTAIN</div><h1>Audit with evidence.<br /><span>Improve with confidence.</span></h1><p>One controlled platform for ISO audits, findings, CAPA-8D and effectiveness verification.</p><div className="homeCtas"><TrackedLink href="/portal" event="assessment_cta_clicked" eventParams={{location:"homepage_hero"}} className="homePrimaryCta">Start free assessment <span>→</span></TrackedLink><a href="#solutions" className="homeSecondaryCta"><span className="playIcon">▶</span> View the platform</a></div><div className="homeTrust"><span>✓ Get started in minutes</span><span>✓ No credit card required</span><span>✓ Built for ISO and beyond</span></div></div>
+      <div className="homeHeroCopy"><div className="homeEyebrow">AUDIT&nbsp;&nbsp; | &nbsp;&nbsp;IMPROVE&nbsp;&nbsp; | &nbsp;&nbsp;SUSTAIN</div><h1>Audit with evidence.<br /><span>Improve with confidence.</span></h1><p>One controlled platform for ISO audits, findings, CAPA-8D and effectiveness verification.</p><div className="homeCtas"><TrackedLink href="/portal" event="assessment_cta_clicked" eventParams={{location:"homepage_hero"}} className="homePrimaryCta">Start free assessment <span>→</span></TrackedLink><a href="#customer-journey" className="homeSecondaryCta"><span className="playIcon">▶</span> See how it works</a><TrackedLink href="/portal/login?mode=create" event="account_creation_clicked" eventParams={{location:"homepage_hero"}} className="homeAccountCta">Create free account <span>→</span></TrackedLink></div><div className="homeTrust"><span>✓ Get started in minutes</span><span>✓ No credit card required</span><span>✓ 14-day subscription trial</span></div></div>
       <ProductDashboard />
     </section>
-    <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.slice(0, 4).map(([code, name]) => <div className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></div>)}</section>
-    <HomeConversionSection locale={locale} />
+    <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.map(([code, name]) => <div className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></div>)}</section>
+    <section className="customerJourney" id="customer-journey">
+      <header><span>YOUR RPG EXCELLENCE JOURNEY</span><h2>From first assessment to verified assurance.</h2><p>Begin with the work you need today. Each stage creates controlled information that supports the next.</p></header>
+      <div className="journeyGrid">{customerJourney.map(([number,title,text],index)=><article key={number}><div><b>{number}</b>{index<customerJourney.length-1&&<i aria-hidden="true">→</i>}</div><h3>{title}</h3><p>{text}</p></article>)}</div>
+      <footer><strong>Start with one assessment.</strong><span>Build a connected assurance system as your organisation develops.</span></footer>
+    </section>
+    <section className="startingPoints" id="solutions"><header><span>CHOOSE WHERE TO START</span><h2>What does your organisation need to achieve?</h2><p>Select an outcome and open the connected RPG Excellence workspace.</p></header><div>{startingPoints.map(([need,product,href])=><Link href={href} key={need}><span>{need}</span><strong>{product}</strong><b>→</b></Link>)}</div></section>
     <PlatformHubsFeature locale={locale} />
-    <section className="section" id="iso"><div className="sectionHead"><div><span className="kicker">Standards we support</span><h2>One assurance platform. Five essential management systems.</h2></div><p>Use a dedicated standard or combine compatible requirements into an integrated audit while retaining clause-level traceability.</p></div><div className="standardGrid">{standards.map(([code, title, slug, tone, description]) => <Link href={`/${locale}/${slug}`} className={`standardCard ${tone}`} key={code}><span className="standardBadge">{code}</span><strong>{title}</strong><span>{description} →</span></Link>)}</div></section>
-    <section className="darkBand"><span className="kicker light">Controlled improvement workflow</span><h2>From assessment to verified effectiveness.</h2><p>RPG Excellence connects the audit conclusion to accountable improvement instead of allowing findings to disappear into disconnected spreadsheets and emails.</p><div className="toolGrid darkTools">{assuranceSteps.map(([number, title, text]) => <div className="toolCard darkTool" key={number}><span className="toolIcon">{number}</span><strong>{title}</strong><span>{text}</span></div>)}</div></section>
-    <section className="homeControlBand"><div><span>CONTROLLED ASSURANCE</span><h2>From audit plan to verified improvement.</h2><p>Evidence-based decisions, accountable actions and independent effectiveness verification in one traceable workflow.</p></div><Link href="/portal" className="homePrimaryCta">Open the platform <span>→</span></Link></section>
+    <HomeConversionSection locale={locale} />
     <section className="homeContactCta" id="contact">
       <div>
         <span>CONTACT RPG EXCELLENCE</span>
