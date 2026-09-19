@@ -9,6 +9,7 @@ export const metadata = {
     "ISO/IEC 17024:2026 Readiness Assessment Released | RPG Insights",
   description:
     "RPG Insights Issue 006: the release of an evidence-led ISO/IEC 17024:2026 readiness assessment for organisations operating certification of persons.",
+  alternates: { canonical: "/en/insights/iso-17024-readiness" },
 };
 
 export default async function ISO17024ReadinessInsight({
