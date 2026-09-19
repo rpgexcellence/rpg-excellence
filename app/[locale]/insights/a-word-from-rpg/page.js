@@ -8,6 +8,7 @@ export const metadata = {
   title: "A Word from RPG | RPG Insights",
   description:
     "Welcome to RPG Insights. Learn why RPG Excellence created RPG Intelligence and how we aim to support better assurance, management systems and continuous improvement.",
+  alternates: { canonical: "/en/insights/a-word-from-rpg" },
 };
 
 export default async function WordFromRPG({
