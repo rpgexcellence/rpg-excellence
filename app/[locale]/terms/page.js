@@ -6,6 +6,7 @@ export const metadata = {
   title: "Terms & Conditions | RPG Excellence",
   description:
     "Terms governing access to and use of RPG Excellence services, software, assessments and digital tools.",
+  alternates: { canonical: "/en/terms" },
 };
 
 export default async function Terms({ params }) {
