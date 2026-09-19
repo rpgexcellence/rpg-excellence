@@ -274,3 +274,35 @@ a{text-decoration:none;color:inherit}
 .r4CustomActors button{display:grid;place-items:center;width:18px;height:18px;padding:0;border:0;border-radius:50%;background:#d6e2f8;color:#234f82;font-size:14px;line-height:1;cursor:pointer}
 @media(max-width:900px){.r4Standards>div{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.r4Standards>header{display:grid}.r4Standards>div{grid-template-columns:1fr}.r4ActorInput{grid-template-columns:1fr}}
+
+/* Homepage customer journey and conversion refinements */
+.homeHeroCopy{max-width:680px}
+.homeCtas{gap:11px;flex-wrap:wrap}
+.homePrimaryCta,.homeSecondaryCta,.homeAccountCta{min-height:56px;padding:0 20px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:16px;font-weight:900}
+.homeAccountCta{border:2px solid #d59a22;background:#e5ad39;color:#0b2342;box-shadow:0 12px 24px rgba(176,121,13,.15)}
+.homeAccountCta:hover{background:#d79d28}
+.standardStrip{grid-template-columns:1.2fr repeat(5,1fr);gap:18px}
+.globeIcon{font-size:32px}
+.customerJourney{padding:72px 3.3vw 64px;background:linear-gradient(180deg,#fff,#f5f9ff);color:#09213f}
+.customerJourney header,.startingPoints header{max-width:880px}
+.customerJourney header>span,.startingPoints header>span{color:#1762ef;font-size:11px;font-weight:950;letter-spacing:.17em}
+.customerJourney h2,.startingPoints h2{margin:10px 0 12px;font-size:clamp(34px,3.6vw,54px);line-height:1.05;letter-spacing:-.045em}
+.customerJourney header p,.startingPoints header p{margin:0;color:#60758a;font-size:17px;line-height:1.55}
+.journeyGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:34px}
+.journeyGrid article{min-width:0;padding:20px 17px;border:1px solid #d7e4f0;border-radius:14px;background:#fff;box-shadow:0 10px 28px rgba(13,54,94,.06)}
+.journeyGrid article>div{display:flex;align-items:center;gap:10px}
+.journeyGrid article>div b{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#e8f0ff;color:#1762ef;font-size:12px}
+.journeyGrid article>div i{margin-left:auto;color:#83a6d2;font-style:normal;font-size:20px}
+.journeyGrid h3{margin:17px 0 8px;font-size:18px}
+.journeyGrid p{margin:0;color:#61758b;font-size:12px;line-height:1.55}
+.customerJourney footer{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:26px;color:#4f6680}
+.customerJourney footer strong{color:#0c3159}
+.startingPoints{padding:60px 3.3vw;background:#fff;color:#09213f}
+.startingPoints>div{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:28px}
+.startingPoints a{display:grid;grid-template-columns:1fr auto;gap:7px 14px;padding:20px;border:1px solid #d6e2ed;border-radius:13px;background:#fff;color:#123b66;box-shadow:0 8px 24px rgba(16,56,95,.06);transition:.2s}
+.startingPoints a:hover{transform:translateY(-3px);border-color:#8eb2e8}
+.startingPoints a span{grid-column:1/-1;color:#657b91;font-size:11px}
+.startingPoints a strong{font-size:15px}
+.startingPoints a b{color:#1762ef}
+@media(max-width:1250px){.standardStrip{grid-template-columns:repeat(3,1fr)}.journeyGrid{grid-template-columns:repeat(3,1fr)}.journeyGrid article>div i{display:none}}
+@media(max-width:760px){.homeAccountCta{width:100%}.standardStrip{grid-template-columns:1fr 1fr}.customerJourney,.startingPoints{padding:48px 20px}.journeyGrid,.startingPoints>div{grid-template-columns:1fr}.journeyGrid article{padding:19px}.customerJourney h2,.startingPoints h2{font-size:36px}}
