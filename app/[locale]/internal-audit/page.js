@@ -49,7 +49,7 @@ export default async function InternalAuditHubPage({ params }) {
           <p>Replace disconnected spreadsheets, emails and action lists with one controlled audit workspace—from annual programme and objective evidence to corrective action and independent effectiveness verification.</p>
           <div className="iahActions">
             <Link className="iahButton primary" href="/portal/login?mode=create">Start your 14-day free trial →</Link>
-            <Link className="iahButton secondary" href="#how-it-works">See how it works</Link>
+            <Link className="iahButton secondary" href={`/${locale}/internal-audit/hub-at-a-glance`}>Explore the Hub at a glance</Link>
           </div>
           <div className="iahConfidence"><span>✓ No credit card required</span><span>✓ Set up in minutes</span><span>✓ Evidence-ready audit trail</span></div>
         </div>
