@@ -7,6 +7,7 @@ export const metadata = {
   title: "RPG Excellence Platform | Assess, Audit, Control and Improve",
   description:
     "Explore RPG Excellence assessment, health and safety, internal audit, RCA–8D and practitioner training products.",
+  alternates: { canonical: "/en/ai-tools" },
 };
 
 const solutionHubs = [
