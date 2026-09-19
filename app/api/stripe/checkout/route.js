@@ -299,7 +299,7 @@ export async function POST(request) {
         },
 
         subscription_data: {
-          trial_period_days: 7,
+          trial_period_days: 14,
 
           metadata: {
             owner_id:
