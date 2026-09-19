@@ -19,6 +19,7 @@ export default function sitemap() {
     "/iso-22301",
     "/business-continuity",
     "/information-security",
+    "/information-security/hub-at-a-glance",
     "/as9100-hub",
     "/iso-27001",
     "/iso-27001-readiness-software",
