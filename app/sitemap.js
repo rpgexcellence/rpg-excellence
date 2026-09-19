@@ -30,6 +30,7 @@ export default function sitemap() {
     "/insights",
     "/insights/a-word-from-rpg",
     "/insights/iso-9001-readiness",
+    "/insights/iso-9001-2026-update",
     "/insights/iso-14001-readiness",
     "/insights/iso-45001-readiness",
     "/insights/iso-17024-readiness",
@@ -58,11 +59,12 @@ export default function sitemap() {
       priority:
         page === ""
           ? 1
-          : ["/hs-hub", "/internal-audit", "/capa-8d"].includes(page) || page.startsWith("/iso-")
+          : ["/hs-hub", "/internal-audit", "/capa-8d"].includes(page) ||
+              page.startsWith("/iso-")
             ? 0.9
             : page.includes("training")
               ? 0.85
               : 0.7,
-    }))
+    })),
   );
 }
