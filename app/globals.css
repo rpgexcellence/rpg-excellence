@@ -226,3 +226,29 @@ a{text-decoration:none;color:inherit}
     grid-template-columns: 1fr;
   }
 }
+
+/* Module 4 - dynamic colour RACI matrix */
+.r4Assignment > label{display:block;margin-top:15px;color:#0a2342;font-size:13px;font-weight:850}
+.r4Assignment > label input{width:100%;margin-top:7px;padding:12px 13px;border:1px solid #b9ccdf;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}
+.r4Raci{margin-top:17px;overflow:hidden;border:1px solid #cbd9e6;border-radius:12px;background:#fff}
+.r4Raci>header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;padding:16px 17px;background:#f3f7fb;border-bottom:1px solid #d8e3ed}
+.r4Raci>header b{font-size:16px}.r4Raci>header p{margin:5px 0 0;color:#60778e;font-size:12px}
+.r4RaciLegend{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.r4RaciLegend span{padding:6px 8px;border-radius:6px;font-size:10px;font-weight:850;white-space:nowrap}
+.r4RaciLegend .r{background:#e4efff;color:#1557b7}.r4RaciLegend .a{background:#eee7ff;color:#6539b7}.r4RaciLegend .c{background:#fff0cf;color:#965c00}.r4RaciLegend .i{background:#ddf7f4;color:#08776c}
+.r4RaciScroll{overflow-x:auto}.r4Raci table{width:100%;border-collapse:collapse;table-layout:fixed}
+.r4Raci th,.r4Raci td{border-bottom:1px solid #e3eaf1;padding:9px;text-align:center}
+.r4Raci thead th{background:#fbfdff;color:#536a82;font-size:10px}.r4Raci thead th:first-child{width:45%;padding-left:17px;text-align:left;font-size:12px}
+.r4Raci thead th b{display:block;margin-bottom:3px;font-size:17px}.r4Raci thead th small{font-size:9px;font-weight:600}
+.r4Raci thead th.r b{color:#1765c1}.r4Raci thead th.a b{color:#7140c4}.r4Raci thead th.c b{color:#ad6c00}.r4Raci thead th.i b{color:#078378}
+.r4Raci tbody th{padding-left:17px;color:#173b60;font-size:12px;text-align:left}.r4Raci tbody tr:hover{background:#f8fbff}
+.r4Raci td button{display:inline-grid;place-items:center;width:34px;height:34px;border:2px solid #c6d3df;border-radius:8px;background:#fff;color:#fff;font-size:13px;font-weight:950;cursor:pointer;transition:.15s ease}
+.r4Raci td button:hover{transform:translateY(-1px);border-color:#7892aa}
+.r4Raci td button.r.selected{border-color:#1765c1;background:#1765c1;box-shadow:0 4px 10px rgb(23 101 193 / 22%)}
+.r4Raci td button.a.selected{border-color:#7140c4;background:#7140c4;box-shadow:0 4px 10px rgb(113 64 196 / 22%)}
+.r4Raci td button.c.selected{border-color:#d58b0b;background:#d58b0b;box-shadow:0 4px 10px rgb(213 139 11 / 22%)}
+.r4Raci td button.i.selected{border-color:#07998b;background:#07998b;box-shadow:0 4px 10px rgb(7 153 139 / 22%)}
+.r4Raci>footer{display:flex;flex-wrap:wrap;gap:7px;padding:11px 16px;background:#f8fbfe}
+.r4Raci>footer span{padding:5px 8px;border-radius:999px;background:#e8eef4;color:#60758a;font-size:10px;font-weight:800}.r4Raci>footer span.complete{background:#ddf5e9;color:#087443}
+.r4ControlDetails{margin-top:13px;padding-top:12px;border-top:1px solid #e0e8ef}.r4ControlDetails summary{color:#17436f;font-size:12px;font-weight:850;cursor:pointer}
+@media(max-width:760px){.r4Raci>header{display:grid}.r4RaciLegend{justify-content:flex-start}.r4Raci table{min-width:620px}}
