@@ -9,6 +9,7 @@ export const metadata = {
     "ISO 9001 Moves Beyond the Checklist | RPG Insights",
   description:
     "RPG Insights Issue 002: how RPG Intelligence approaches ISO 9001:2015/Amd 1:2024 through evidence-led assessment, management readiness, certification-readiness decision support and climate-action considerations.",
+  alternates: { canonical: "/en/insights/iso-9001-readiness" },
 };
 
 export default async function ISO9001ReadinessInsight({
