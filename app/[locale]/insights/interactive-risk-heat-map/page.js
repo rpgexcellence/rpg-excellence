@@ -9,6 +9,7 @@ export const metadata = {
     "Using a 5×5 Risk Heat Map Without Losing Professional Judgement | RPG Insights",
   description:
     "How likelihood, credible severity, action thresholds and evidence-based rationale turn a 5×5 risk heat map into a practical management tool.",
+  alternates: { canonical: "/en/insights/interactive-risk-heat-map" },
 };
 
 const bands = [
