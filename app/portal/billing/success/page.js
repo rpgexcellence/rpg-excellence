@@ -58,7 +58,7 @@ export default async function BillingSuccessPage({ searchParams }) {
       ? "Your one-time payment for the ISO/IEC 27001 Statement of Applicability workspace was successful."
       : isAssessment
         ? `Your one-time payment for the ${standard || "selected ISO"} assessment was successful.`
-        : "Your subscription has been created successfully and your 7-day free trial has started.";
+        : "Your subscription has been created successfully and your 14-day free trial has started.";
 
   const primaryHref = isTraining
     ? trainingAcademyHref
