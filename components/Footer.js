@@ -28,6 +28,20 @@ export default function Footer({ locale }) {
           </Link>
         </div>
 
+        <a
+          className="footerLinkedIn"
+          href="https://www.linkedin.com/in/rpg-excellence-b8971942b"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Follow RPG Excellence on LinkedIn (opens in a new tab)"
+          title="Follow RPG Excellence on LinkedIn"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5.3 7.8H1.7V19h3.6V7.8ZM3.5 2.2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2ZM11.1 7.8H7.7V19h3.6v-5.5c0-1.5.3-2.9 2.1-2.9 1.8 0 1.8 1.7 1.8 3V19h3.6v-6.1c0-3-0.6-5.4-4.2-5.4-1.7 0-2.9.9-3.4 1.8h-.1V7.8Z" />
+          </svg>
+          <span>LinkedIn</span>
+        </a>
+
         <div className="footerLinks">
           <Link href={`/${locale}/insights`}>
             RPG Insights
