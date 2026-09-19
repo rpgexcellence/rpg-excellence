@@ -19,13 +19,14 @@ const emptyRisk=(name="")=>({id:uid(),name,category:Object.entries(catalogue).fi
 const normalise=r=>({...emptyRisk(r?.name),...r,impact:{...emptyRisk().impact,...(r?.impact||{})},causes:arr(r?.causes),warningIndicators:arr(r?.warningIndicators),affectedProcesses:arr(r?.affectedProcesses),affectedDependencies:arr(r?.affectedDependencies),existingControls:arr(r?.existingControls),actions:arr(r?.actions)});
 const metrics=r=>{const impact=Math.max(...Object.values(r.impact||{}).map(Number),1),likelihood=clamp(r.likelihood,1,5),inherent=impact*likelihood,residualLikelihood=Math.max(1,Math.ceil(likelihood*(1-clamp(r.controlEffectiveness,0,100)/100))),residual=impact*residualLikelihood;return{impact,likelihood,inherent,residualLikelihood,residual,inherentBand:band(inherent),residualBand:band(residual)}};
 const toggle=(list,value)=>list.includes(value)?list.filter(x=>x!==value):[...list,value];
-const profileItems=(profile,key)=>arr(profile?.[key]).map(x=>String(x?.name||x)).filter(Boolean);
+const profileItems=(profile,key)=>arr(profile?.[key]).map(x=>typeof x==="string"?x:(x?.name||x?.title||x?.role||x?.fullName||"")).map(String).filter(x=>x&&x!=="[object Object]");
+const personName=value=>typeof value==="string"?value:(value?.name||value?.fullName||value?.title||value?.role||value?.email||"");
 
 export default function BCPHazardScenarioAssessment({action,profiles=[],contexts=[],roles=[],initial,organisationName="",startStep=0}){
  const [formState,formAction,isPending]=useActionState(action,{error:""}),[step,setStep]=useState(clamp(startStep,0,5));
  const [profileId,setProfileId]=useState(initial?.site_profile_id||""),[contextId,setContextId]=useState(initial?.context_assessment_id||""),[roleId,setRoleId]=useState(initial?.role_assessment_id||"");
  const profile=profiles.find(x=>x.id===profileId),context=contexts.find(x=>x.id===contextId),role=roles.find(x=>x.id===roleId);
- const people=useMemo(()=>{const values=[profile?.site_leader,profile?.local_facilitator,...profileItems(profile,"training_participants").map(String),...arr(role?.roles).flatMap(x=>arr(x.people))];return [...new Set(values.map(x=>typeof x==="string"?x:x?.name).filter(Boolean))]},[profile,role]);
+ const people=useMemo(()=>{const values=[profile?.site_leader,profile?.local_facilitator,...arr(profile?.training_participants),...arr(role?.roles).flatMap(x=>arr(x.people))];return [...new Set(values.map(personName).map(x=>String(x).trim()).filter(x=>x&&x!=="[object Object]"))]},[profile,role]);
  const processes=[...profileItems(profile,"value_chain_processes"),...profileItems(profile,"support_processes")],dependencies=[...profileItems(profile,"dependency_records"),...profileItems(profile,"site_dependencies")];
  const [participants,setParticipants]=useState(arr(initial?.participants).length?arr(initial.participants):[]),[risks,setRisks]=useState(arr(initial?.scenario_assessments).map(normalise));
  const selected=risks.map(x=>x.name),completion=[Boolean(profile),participants.length>0&&risks.length>0,risks.length>0&&risks.every(x=>x.description&&x.affectedProcesses.length),risks.every(x=>x.existingControls.length&&x.owner),risks.every(x=>x.treatment&&x.decisionRationale&&(metrics(x).residualBand==="Low"||x.actions.length)),risks.length>0].filter(Boolean).length/6*100;
