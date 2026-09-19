@@ -9,6 +9,7 @@ export const metadata = {
     "Introducing the RPG Intelligence CAPA–8D Module | RPG Insights",
   description:
     "RPG Insights Issue 005: an evidence-led D0–D8 investigation workspace for root-cause validation, corrective action and effectiveness review.",
+  alternates: { canonical: "/en/insights/capa-8d-release" },
 };
 
 export default async function CAPA8DReleaseInsight({ params }) {
