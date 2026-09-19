@@ -27,6 +27,7 @@ const hubData = {
     accent: "#07859a", dark: "#073f55", pale: "#eaf8fa",
     primary: "/portal/information-security", primaryLabel: "Open ISMS Hub →",
     secondary: "/portal/soa", secondaryLabel: "Open SoA register",
+    overview: "/information-security/hub-at-a-glance", overviewLabel: "See the customer journey",
     capabilities: [
       ["01","ISO 27001 Gap Analysis","Review management-system requirements, retain evidence and convert material gaps into owned improvement."],
       ["02","Security Risk Register","Record assets, threats, vulnerabilities, consequences, controls, treatment and residual-risk decisions."],
@@ -61,8 +62,9 @@ const hubData = {
 export default function AssuranceHubLanding({ hub, locale }) {
   const data = hubData[hub];
   const secondaryHref=data.secondary.startsWith("/portal")?data.secondary:`/${locale}${data.secondary}`;
+  const overviewHref=data.overview?`/${locale}${data.overview}`:null;
   return <main className="ahl" style={{"--accent":data.accent,"--dark":data.dark,"--pale":data.pale}}>
-    <section className="ahlHero"><div><span className="ahlEyebrow">RPG EXCELLENCE · {data.eyebrow}</span><h1>{data.title}</h1><p>{data.lead}</p><div className="ahlActions"><Link className="ahlButton primary" href={data.primary}>{data.primaryLabel}</Link><Link className="ahlButton secondary" href={secondaryHref}>{data.secondaryLabel}</Link></div></div><aside className="ahlPreview"><header><span>CONNECTED ASSURANCE HUB</span><b>{hub === "aerospace" ? "COMING SOON" : "AVAILABLE NOW"}</b></header><div className="ahlRadar"><i/><i/><i/><i/><strong>{hub === "continuity" ? "BCP" : hub === "security" ? "ISMS" : "AS9100"}</strong></div><div className="ahlSignals"><span>Requirements</span><span>Risk</span><span>Evidence</span><span>Action</span></div></aside></section>
+    <section className="ahlHero"><div><span className="ahlEyebrow">RPG EXCELLENCE · {data.eyebrow}</span><h1>{data.title}</h1><p>{data.lead}</p><div className="ahlActions"><Link className="ahlButton primary" href={data.primary}>{data.primaryLabel}</Link><Link className="ahlButton secondary" href={secondaryHref}>{data.secondaryLabel}</Link>{overviewHref&&<Link className="ahlButton secondary" href={overviewHref}>{data.overviewLabel} →</Link>}</div></div><aside className="ahlPreview"><header><span>CONNECTED ASSURANCE HUB</span><b>{hub === "aerospace" ? "COMING SOON" : "AVAILABLE NOW"}</b></header><div className="ahlRadar"><i/><i/><i/><i/><strong>{hub === "continuity" ? "BCP" : hub === "security" ? "ISMS" : "AS9100"}</strong></div><div className="ahlSignals"><span>Requirements</span><span>Risk</span><span>Evidence</span><span>Action</span></div></aside></section>
     <section className="ahlRibbon"><strong>One controlled assurance journey</strong>{data.stages.map((stage,index)=><span key={stage}><i>{String(index+1).padStart(2,"0")}</i>{stage}</span>)}</section>
     <section className="ahlSection"><span className="ahlEyebrow">HUB CAPABILITY</span><div className="ahlHeading"><h2>From requirement to evidence-led decision.</h2><p>{data.note}</p></div><div className="ahlGrid">{data.capabilities.map(([number,title,text])=><article key={number}><b>{number}</b><h3>{title}</h3><p>{text}</p></article>)}</div></section>
     <section className="ahlCta"><div><span className="ahlEyebrow">RPG EXCELLENCE</span><h2>{data.note}</h2></div><Link className="ahlButton primary" href={data.primary}>{data.primaryLabel}</Link></section>
