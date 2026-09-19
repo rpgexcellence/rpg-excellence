@@ -9,6 +9,7 @@ export const metadata = {
     "ISO 14001:2026 — Environmental Management Moves from Compliance to Business Assurance | RPG Insights",
   description:
     "RPG Insights Issue 003: how RPG Intelligence connects ISO 14001:2026 conformity, evidence assurance, compliance obligations, management action, management readiness and certification-readiness decision support.",
+  alternates: { canonical: "/en/insights/iso-14001-readiness" },
 };
 
 export default async function ISO14001ReadinessInsight({
