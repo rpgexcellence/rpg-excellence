@@ -6,6 +6,7 @@ import { locales } from "../../../lib/i18n";
 export const metadata = {
   title: "About RPG Excellence | Practical Business Assurance",
   description: "Practitioner-led digital assurance for ISO assessment, health and safety, internal audit, RCA–8D and competence development.",
+  alternates: { canonical: "/en/about" },
 };
 
 const principles = [
