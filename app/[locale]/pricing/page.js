@@ -130,7 +130,7 @@ export default async function Pricing({
                 }}
               >
                 <SubscribeButton plan="starter">
-                  Start 7-Day Free Trial
+                  Start 14-Day Free Trial
                 </SubscribeButton>
               </div>
             </div>
@@ -163,7 +163,7 @@ export default async function Pricing({
                 }}
               >
                 <SubscribeButton plan="professional">
-                  Start 7-Day Free Trial
+                  Start 14-Day Free Trial
                 </SubscribeButton>
               </div>
             </div>
@@ -192,7 +192,7 @@ export default async function Pricing({
                 }}
               >
                 <SubscribeButton plan="consultant">
-                  Start 7-Day Free Trial
+                  Start 14-Day Free Trial
                 </SubscribeButton>
               </div>
             </div>
@@ -246,7 +246,7 @@ export default async function Pricing({
               textAlign: "center",
             }}
           >
-            Subscription plans include a 7-day free trial. One-off assessments,
+            Subscription plans include a 14-day free trial. One-off assessments,
             specialist workspaces and training courses are charged at checkout.
           </p>
         </div>
