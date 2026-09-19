@@ -6,6 +6,7 @@ export const metadata = {
   title: "Cookie Policy | RPG Excellence",
   description:
     "Information about cookies and similar technologies used by RPG Excellence.",
+  alternates: { canonical: "/en/cookies" },
 };
 
 export default async function Cookies({ params }) {
