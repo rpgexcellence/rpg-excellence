@@ -9,6 +9,7 @@ export const metadata = {
     "From Safety Records to Controlled Action | RPG Insights",
   description:
     "How the RPG Excellence Health & Safety Hub connects risk assessments, actions, reviews, training and management visibility in one controlled workspace.",
+  alternates: { canonical: "/en/insights/health-safety-hub" },
 };
 
 const controlCycle = [
@@ -342,4 +343,3 @@ export default async function HealthSafetyHubInsight({
     </PageShell>
   );
 }
-
