@@ -219,6 +219,7 @@ export async function POST(request) {
       success_url: `${origin}/portal/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/en/pricing?checkout=cancelled`,
       billing_address_collection: "auto",
+      consent_collection: { promotions: "auto" },
     };
 
     const trainingPaths = trainingCourse ? getTrainingPaths(trainingCourse.course_code) : null;
