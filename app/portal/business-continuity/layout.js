@@ -1,6 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "../../../lib/supabase/server";
+import { requirePlanAccess } from "../../../lib/plan-access";
 
-export default function BusinessContinuityLayout({ children }) {
+export default async function BusinessContinuityLayout({ children }) {
+  const s = await createClient();
+  const { data: { user } } = await s.auth.getUser();
+  if (!user) redirect("/portal/login?next=/portal/business-continuity");
+  await requirePlanAccess(user, "starter", "Business Continuity");
   return (
     <>
       {children}
