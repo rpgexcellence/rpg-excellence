@@ -5,6 +5,7 @@ import { useState } from "react";
 export default function NewsletterSignup({
   locale = "en",
   source = "homepage",
+  compact = false,
 }) {
   const [email, setEmail] =
     useState("");
@@ -67,11 +68,12 @@ export default function NewsletterSignup({
 
   return (
     <form
+      id="newsletter"
       onSubmit={handleSubmit}
       style={{
         display: "grid",
-        gap: "12px",
-        maxWidth: "640px",
+        gap: compact ? "8px" : "12px",
+        maxWidth: compact ? "100%" : "640px",
       }}
     >
       <div
@@ -94,11 +96,11 @@ export default function NewsletterSignup({
           autoComplete="email"
           style={{
             flex: "1 1 260px",
-            padding: "14px 16px",
+            padding: compact ? "11px 13px" : "14px 16px",
             borderRadius: "10px",
             border:
               "1px solid #d8e0ea",
-            fontSize: "16px",
+            fontSize: compact ? "13px" : "16px",
           }}
         />
 
@@ -108,7 +110,7 @@ export default function NewsletterSignup({
             status === "loading"
           }
           style={{
-            padding: "14px 20px",
+            padding: compact ? "11px 15px" : "14px 20px",
             borderRadius: "10px",
             border: "none",
             background: "#1459D9",
@@ -132,7 +134,7 @@ export default function NewsletterSignup({
 
       <div
         style={{
-          fontSize: "13px",
+          fontSize: compact ? "10px" : "13px",
           color: "#617087",
           lineHeight: 1.5,
         }}
