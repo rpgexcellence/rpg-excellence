@@ -19,6 +19,11 @@ export default async function TrainingAdminPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/health-safety/training/admin");
 
+  console.info("Training admin diagnostic: authenticated user", {
+    userId: user.id,
+    email: user.email || null,
+  });
+
   const admin = createAdminClient();
   const { data: access, error: accessError } = await admin
     .from("portal_admins")
@@ -28,7 +33,30 @@ export default async function TrainingAdminPage() {
     .eq("role", "admin")
     .maybeSingle();
 
-  if (accessError || !access) redirect("/portal/health-safety/training");
+  if (accessError || !access) {
+    console.error("Training admin diagnostic: access denied", {
+      userId: user.id,
+      email: user.email || null,
+      adminRecordFound: Boolean(access),
+      adminRecord: access || null,
+      error: accessError
+        ? {
+            message: accessError.message,
+            code: accessError.code,
+            details: accessError.details,
+            hint: accessError.hint,
+          }
+        : null,
+    });
+    redirect("/portal/health-safety/training");
+  }
+
+  console.info("Training admin diagnostic: access granted", {
+    userId: user.id,
+    email: user.email || null,
+    role: access.role,
+    active: access.active,
+  });
 
   const [coursesResult, enrolmentsResult, passesResult, certificatesResult, usersResult] = await Promise.all([
     admin.from("hs_training_courses").select("id,course_code,title,version,active").order("course_code"),
@@ -135,4 +163,3 @@ export default async function TrainingAdminPage() {
     </main>
   );
 }
-
