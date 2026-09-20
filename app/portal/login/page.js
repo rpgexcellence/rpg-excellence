@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { signIn, signInWithApple, signInWithGoogle, signInWithMicrosoft, signUp } from "./actions";
+import NewsletterSignup from "../../../components/NewsletterSignup";
 
 export const metadata = { title: "Sign in | RPG Intelligence", description: "Secure access to the RPG Intelligence business assurance workspace." };
 const safeNext=value=>{const next=String(value||"");return next.startsWith("/")&&!next.startsWith("//")?next:"/portal"};
@@ -20,6 +21,7 @@ export default async function LoginPage({searchParams}) {
       <div className="divider"><span>or continue with</span></div>
       <form className="socialLogin"><input type="hidden" name="next" value={next}/><button className="socialButton googleButton" formAction={signInWithGoogle} aria-label="Continue with Google"><b className="googleMark">G</b>Continue with Google</button><button className="socialButton microsoftButton" formAction={signInWithMicrosoft} aria-label="Continue with Microsoft"><span className="microsoftMark" aria-hidden="true"><i/><i/><i/><i/></span>Continue with Microsoft</button><button className="socialButton appleButton" formAction={signInWithApple} aria-label="Continue with Apple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.79 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.1v-.01ZM12.03 7.25C11.88 5.02 13.69 3.18 15.77 3c.29 2.58-2.34 4.5-3.74 4.25Z"/></svg>Continue with Apple</button></form>
       <p className="legal">By continuing, you agree to our <Link href="/en/terms">Terms</Link> and acknowledge our <Link href="/en/privacy">Privacy Policy</Link>.</p><div className="trust"><span>🔒 Encrypted access</span><span>UK GDPR aligned</span></div>
+      <div style={{marginTop:"18px",padding:"15px",border:"1px solid #d8e3ee",borderRadius:"10px",background:"#fff"}}><b style={{display:"block",marginBottom:"3px",fontSize:"12px"}}>RPG Insights</b><span style={{display:"block",marginBottom:"10px",color:"#6c8093",fontSize:"10px"}}>Optional ISO and assurance updates.</span><NewsletterSignup locale="en" source="login" compact /></div>
     </div></section>
   </main>;
 }
