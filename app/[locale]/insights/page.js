@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageShell from "../../../components/PageShell";
 import { locales } from "../../../lib/i18n";
+import NewsletterSignup from "../../../components/NewsletterSignup";
 
 export const metadata = {
   title: "RPG Insights",
@@ -19,55 +20,33 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
-      number: "020",
-      title:
-        "Quality Culture Is What Happens When the Procedure Is Not Watching",
-      description:
-        "How organisations can turn quality culture into observable leadership, speaking-up, process, competence and improvement behaviours under ISO 9001:2026.",
-      href: "quality-culture-iso-9001-2026",
-    },
-    {
-      number: "019",
-      title: "ISO 9001:2026 Is Published — What Should Organisations Do Now?",
-      description:
-        "A practical overview of the revised standard, its main areas of emphasis and five actions for a controlled, evidence-led QMS transition.",
-      href: "iso-9001-2026-release",
-    },
-    {
       number: "018",
-      title:
-        "Building Business Continuity as a Capability: Our Full Implementation Programme Begins",
-      description:
-        "RPG Excellence begins a full business continuity implementation programme with a connected Site Profile Assessment and role-based ISO 22301 learning.",
+      title: "Building Business Continuity as a Capability: Our Full Implementation Programme Begins",
+      description: "RPG Excellence begins a full business continuity implementation programme with a connected Site Profile Assessment and role-based ISO 22301 learning.",
       href: "business-continuity-implementation-module-1",
     },
     {
       number: "017",
-      title:
-        "ISO 22301: Turning Business Continuity Plans into Demonstrated Capability",
-      description:
-        "RPG Intelligence now provides a complete evidence-led ISO 22301:2019 gap assessment covering BIA, disruption risk, continuity strategy, response, recovery, exercises and improvement.",
+      title: "ISO 22301: Turning Business Continuity Plans into Demonstrated Capability",
+      description: "RPG Intelligence now provides a complete evidence-led ISO 22301:2019 gap assessment covering BIA, disruption risk, continuity strategy, response, recovery, exercises and improvement.",
       href: "iso-22301-business-continuity-readiness",
     },
     {
       number: "016",
       title: "Management of Change: Approval Is Not the Finish Line",
-      description:
-        "How controlled MOC connects screening, risk review, approvals, PSSR, implementation evidence and post-change verification.",
+      description: "How controlled MOC connects screening, risk review, approvals, PSSR, implementation evidence and post-change verification.",
       href: "management-of-change-assurance",
     },
     {
       number: "015",
       title: "Permit to Work: Authority Within Controlled Limits",
-      description:
-        "Why a Permit to Work must connect scope, hazards, isolations, competence, validity, suspension and controlled close-out.",
+      description: "Why a Permit to Work must connect scope, hazards, isolations, competence, validity, suspension and controlled close-out.",
       href: "permit-to-work-control",
     },
     {
       number: "014",
       title: "POWRA: The Last Risk Decision Before Work Starts",
-      description:
-        "How a point-of-work risk assessment tests real conditions, triggers stop-work decisions and captures end-of-job learning.",
+      description: "How a point-of-work risk assessment tests real conditions, triggers stop-work decisions and captures end-of-job learning.",
       href: "powra-point-of-work",
     },
     {
@@ -80,21 +59,24 @@ export default async function InsightsPage({ params }) {
     },
     {
       number: "012",
-      title: "Building Risk-Assessment Competence Through Practical Decisions",
+      title:
+        "Building Risk-Assessment Competence Through Practical Decisions",
       description:
         "Why practical scenarios, structured interaction, feedback and retained evidence add more value to risk-assessment training than passive slide completion.",
       href: "risk-assessment-training",
     },
     {
       number: "011",
-      title: "Using a 5×5 Risk Heat Map Without Losing Professional Judgement",
+      title:
+        "Using a 5×5 Risk Heat Map Without Losing Professional Judgement",
       description:
         "How likelihood, credible severity, action thresholds and evidence-based rationale turn a 5×5 risk heat map into a practical management tool.",
       href: "interactive-risk-heat-map",
     },
     {
       number: "010",
-      title: "What a Suitable and Sufficient Risk Assessment Should Show",
+      title:
+        "What a Suitable and Sufficient Risk Assessment Should Show",
       description:
         "Practical guidance on connecting hazards, exposure, credible harm, people at risk, controls, actions and review in one traceable decision record.",
       href: "controlled-risk-assessment",
@@ -133,7 +115,8 @@ export default async function InsightsPage({ params }) {
     },
     {
       number: "005",
-      title: "Introducing the RPG Intelligence CAPA–8D Module",
+      title:
+        "Introducing the RPG Intelligence CAPA–8D Module",
       description:
         "An evidence-led investigation workspace for root-cause validation, controlled corrective action, effectiveness review and accountable D0–D8 gate approval.",
       href: "capa-8d-release",
@@ -177,8 +160,8 @@ export default async function InsightsPage({ params }) {
           <span className="kicker">RPG Insights</span>
 
           <h1>
-            Practical guidance for better assurance, compliance and management
-            systems.
+            Practical guidance for better assurance,
+            compliance and management systems.
           </h1>
 
           <p
@@ -190,10 +173,18 @@ export default async function InsightsPage({ params }) {
               marginBottom: "36px",
             }}
           >
-            RPG Insights shares practical ISO guidance, standards developments,
-            RPG Intelligence updates and business assurance thinking from RPG
-            Excellence.
+            RPG Insights shares practical ISO guidance,
+            standards developments, RPG Intelligence
+            updates and business assurance thinking from
+            RPG Excellence.
           </p>
+
+          <section id="newsletter" className="assuranceCard" style={{padding:"24px",marginBottom:"30px",background:"#edf4ff"}}>
+            <span className="kicker">RPG INSIGHTS NEWSLETTER</span>
+            <h2 style={{margin:"9px 0 7px"}}>Keep up with standards and assurance developments.</h2>
+            <p style={{color:"#617087",margin:"0 0 16px",lineHeight:1.55}}>Short, practical updates for people responsible for management systems, risk and organisational assurance.</p>
+            <NewsletterSignup locale={locale} source="insights" />
+          </section>
 
           <section style={{ display: "grid", gap: "20px" }}>
             {issues.map((issue) => (
@@ -202,7 +193,9 @@ export default async function InsightsPage({ params }) {
                 className="assuranceCard"
                 style={{ padding: "28px" }}
               >
-                <span className="kicker">Issue {issue.number}</span>
+                <span className="kicker">
+                  Issue {issue.number}
+                </span>
 
                 <h2
                   style={{
