@@ -314,6 +314,26 @@ export default async function BCPHub() {
                 : "Start hazard assessment →"}
             </strong>
           </Link>
+          <Link
+            href={
+              bias?.[0]?.id
+                ? `/portal/business-continuity/bia?id=${bias[0].id}`
+                : "/portal/business-continuity/bia?new=1"
+            }
+          >
+            <small>MODULE 6 · CLAUSE 8.2.2</small>
+            <h2>Business Impact Analysis</h2>
+            <p>
+              Analyse disruption impacts over time, confirm MTPD, RTO, MBCO
+              and RPO, and control recovery priorities, resources and
+              dependencies.
+            </p>
+            <strong>
+              {bias?.length
+                ? "Continue latest BIA →"
+                : "Start Business Impact Analysis →"}
+            </strong>
+          </Link>
           <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
             <small>ISO 22301</small>
             <h2>Gap Analysis</h2>
