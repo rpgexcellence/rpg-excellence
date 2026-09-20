@@ -299,6 +299,22 @@ async function processCheckoutSession(stripe, supabase, session) {
   }
 }
 
+async function saveNewsletterConsent(supabase, session) {
+  if (session.consent?.promotions !== "opted_in") return;
+  const email = String(session.customer_details?.email || session.customer_email || "").trim().toLowerCase();
+  if (!email) return;
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("newsletter_subscribers").upsert({
+    email,
+    status: "subscribed",
+    source: "stripe_checkout",
+    locale: "en",
+    consented_at: now,
+    unsubscribed_at: null,
+  }, { onConflict: "email" });
+  if (error) throw new Error(`Unable to save checkout newsletter consent: ${error.message}`);
+}
+
 export async function POST(request) {
   const stripe = getStripe();
   const signature =
@@ -358,6 +374,7 @@ export async function POST(request) {
           event.data.object;
 
         await processCheckoutSession(stripe, supabase, session);
+        await saveNewsletterConsent(supabase, session);
 
         break;
       }
@@ -366,6 +383,7 @@ export async function POST(request) {
         const session = event.data.object;
 
         await processCheckoutSession(stripe, supabase, session);
+        await saveNewsletterConsent(supabase, session);
 
         break;
       }
@@ -426,4 +444,3 @@ export async function POST(request) {
     );
   }
 }
-
