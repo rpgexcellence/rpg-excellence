@@ -129,7 +129,7 @@ export default async function BCPHub() {
     ({ data: contexts = [] } = await s
       .from("bcp_context_assessments")
       .select(
-        "id,assessment_reference,assessment_title,site_profile_id,status,version,completion_percent,review_due_date,updated_at",
+        "id,assessment_reference,assessment_title,site_profile_id,status,version,completion_percent,review_due_date,updated_at,external_context,internal_context,interested_parties",
       )
       .eq("organization_id", org.id)
       .neq("status", "archived")
@@ -150,18 +150,22 @@ export default async function BCPHub() {
       .eq("organization_id", org.id)
       .neq("status", "archived")
       .order("updated_at", { ascending: false }));
-    ({ data: bias = [] } = await s
+    const biaResult = await s
       .from("bcp_bia_assessments")
-      .select(
-        "id,assessment_reference,assessment_title,site_profile_id,status,version,completion_percent,next_review_date,updated_at,prioritized_activities",
-      )
+      .select("*")
       .eq("organization_id", org.id)
       .neq("status", "archived")
-      .order("updated_at", { ascending: false }));
+      .order("updated_at", { ascending: false });
+    bias = biaResult.data || [];
   }
   const done = training?.filter((x) => x.status === "complete").length || 0;
   const liveRisks = hazards.flatMap((x) =>
-      Array.isArray(x.scenario_assessments) ? x.scenario_assessments : [],
+      Array.isArray(x.scenario_assessments)
+        ? x.scenario_assessments.map((risk) => ({
+            ...risk,
+            assessmentId: x.id,
+          }))
+        : [],
     ),
     appetite =
       hazards.find((x) => x.methodology?.appetiteScore)?.methodology
@@ -215,7 +219,12 @@ export default async function BCPHub() {
             </article>
           ))}
         </section>
-        <BCPDashboardRiskOverview risks={liveRisks} appetite={appetite} />
+        <BCPDashboardRiskOverview
+          risks={liveRisks}
+          appetite={appetite}
+          contextAssessment={contexts[0] || null}
+          biaAssessment={bias[0] || null}
+        />
         <section className="cards">
           <Link
             href={
@@ -303,24 +312,6 @@ export default async function BCPHub() {
               {hazards?.length
                 ? "Continue latest assessment →"
                 : "Start hazard assessment →"}
-            </strong>
-          </Link>
-          <Link
-            href={
-              bias?.[0]?.id
-                ? `/portal/business-continuity/bia?id=${bias[0].id}`
-                : "/portal/business-continuity/bia?new=1"
-            }
-          >
-            <small>MODULE 6 · CLAUSE 8.2.2</small>
-            <h2>Business Impact Analysis</h2>
-            <p>
-              Measure disruption impacts over time, determine MTPD, RTO, MBCO,
-              TRO and RPO, then connect priority activities to resources and
-              dependencies.
-            </p>
-            <strong>
-              {bias?.length ? "Continue latest BIA →" : "Start Business Impact Analysis →"}
             </strong>
           </Link>
           <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
@@ -506,38 +497,6 @@ export default async function BCPHub() {
             <div className="registerEmpty">
               No active Module 5 assessment. Link a Site Profile and begin
               scenario screening.
-            </div>
-          )}
-        </section>
-        <section className="register">
-          <header>
-            <div>
-              <h2>Module 6 Business Impact Analysis Register</h2>
-              <p>
-                Continue or review impact-over-time analysis, recovery objectives
-                and prioritized activity requirements.
-              </p>
-            </div>
-            <Link className="registerAdd" href="/portal/business-continuity/bia?new=1">
-              + New BIA
-            </Link>
-          </header>
-          {bias?.length ? (
-            bias.map((b) => (
-              <Link href={`/portal/business-continuity/bia?id=${b.id}`} key={b.id}>
-                <div>
-                  <strong>{b.assessment_title || "Business Impact Analysis"}</strong>
-                  <small>
-                    {b.assessment_reference} · Version {b.version || 1} · {Array.isArray(b.prioritized_activities) ? b.prioritized_activities.length : 0} priority activities
-                    {b.next_review_date ? ` · Review ${new Date(b.next_review_date).toLocaleDateString("en-GB")}` : ""}
-                  </small>
-                </div>
-                <span>{b.status.replaceAll("_", " ")} · {b.completion_percent}% →</span>
-              </Link>
-            ))
-          ) : (
-            <div className="registerEmpty">
-              No active BIA. Complete the Site Profile and Hazard Assessment, then generate linked BIA starting points.
             </div>
           )}
         </section>
