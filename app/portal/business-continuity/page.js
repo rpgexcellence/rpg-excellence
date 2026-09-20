@@ -75,6 +75,9 @@ function PortalSidebar() {
             <Link href="/portal/business-continuity/hazard-scenarios">
               Hazard Scenarios
             </Link>
+            <Link href="/portal/business-continuity/bia">
+              Business Impact Analysis
+            </Link>
             <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
               ISO 22301 Assessment
             </Link>
@@ -108,7 +111,8 @@ export default async function BCPHub() {
     training = [],
     contexts = [],
     roles = [],
-    hazards = [];
+    hazards = [],
+    bias = [];
   if (org) {
     ({ data: profiles = [] } = await s
       .from("bcp_site_profiles")
@@ -142,6 +146,14 @@ export default async function BCPHub() {
       .from("bcp_hazard_assessments")
       .select(
         "id,assessment_reference,assessment_title,site_profile_id,status,version,completion_percent,next_review_date,updated_at,scenario_assessments,methodology",
+      )
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false }));
+    ({ data: bias = [] } = await s
+      .from("bcp_bia_assessments")
+      .select(
+        "id,assessment_reference,assessment_title,site_profile_id,status,version,completion_percent,next_review_date,updated_at,prioritized_activities",
       )
       .eq("organization_id", org.id)
       .neq("status", "archived")
@@ -291,6 +303,24 @@ export default async function BCPHub() {
               {hazards?.length
                 ? "Continue latest assessment →"
                 : "Start hazard assessment →"}
+            </strong>
+          </Link>
+          <Link
+            href={
+              bias?.[0]?.id
+                ? `/portal/business-continuity/bia?id=${bias[0].id}`
+                : "/portal/business-continuity/bia?new=1"
+            }
+          >
+            <small>MODULE 6 · CLAUSE 8.2.2</small>
+            <h2>Business Impact Analysis</h2>
+            <p>
+              Measure disruption impacts over time, determine MTPD, RTO, MBCO,
+              TRO and RPO, then connect priority activities to resources and
+              dependencies.
+            </p>
+            <strong>
+              {bias?.length ? "Continue latest BIA →" : "Start Business Impact Analysis →"}
             </strong>
           </Link>
           <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
@@ -476,6 +506,38 @@ export default async function BCPHub() {
             <div className="registerEmpty">
               No active Module 5 assessment. Link a Site Profile and begin
               scenario screening.
+            </div>
+          )}
+        </section>
+        <section className="register">
+          <header>
+            <div>
+              <h2>Module 6 Business Impact Analysis Register</h2>
+              <p>
+                Continue or review impact-over-time analysis, recovery objectives
+                and prioritized activity requirements.
+              </p>
+            </div>
+            <Link className="registerAdd" href="/portal/business-continuity/bia?new=1">
+              + New BIA
+            </Link>
+          </header>
+          {bias?.length ? (
+            bias.map((b) => (
+              <Link href={`/portal/business-continuity/bia?id=${b.id}`} key={b.id}>
+                <div>
+                  <strong>{b.assessment_title || "Business Impact Analysis"}</strong>
+                  <small>
+                    {b.assessment_reference} · Version {b.version || 1} · {Array.isArray(b.prioritized_activities) ? b.prioritized_activities.length : 0} priority activities
+                    {b.next_review_date ? ` · Review ${new Date(b.next_review_date).toLocaleDateString("en-GB")}` : ""}
+                  </small>
+                </div>
+                <span>{b.status.replaceAll("_", " ")} · {b.completion_percent}% →</span>
+              </Link>
+            ))
+          ) : (
+            <div className="registerEmpty">
+              No active BIA. Complete the Site Profile and Hazard Assessment, then generate linked BIA starting points.
             </div>
           )}
         </section>
