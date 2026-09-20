@@ -78,6 +78,9 @@ function PortalSidebar() {
             <Link href="/portal/business-continuity/bia">
               Business Impact Analysis
             </Link>
+            <Link href="/portal/business-continuity/outsourced-processes">
+              Outsourced Processes
+            </Link>
             <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
               ISO 22301 Assessment
             </Link>
@@ -112,7 +115,8 @@ export default async function BCPHub() {
     contexts = [],
     roles = [],
     hazards = [],
-    bias = [];
+    bias = [],
+    outsourced = [];
   if (org) {
     ({ data: profiles = [] } = await s
       .from("bcp_site_profiles")
@@ -157,6 +161,13 @@ export default async function BCPHub() {
       .neq("status", "archived")
       .order("updated_at", { ascending: false });
     bias = biaResult.data || [];
+    const outsourcedResult = await s
+      .from("bcp_outsourced_process_assessments")
+      .select("id,assessment_reference,assessment_title,status,version,completion_percent,next_review_date,updated_at,assurance_summary")
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false });
+    outsourced = outsourcedResult.data || [];
   }
   const done = training?.filter((x) => x.status === "complete").length || 0;
   const liveRisks = hazards.flatMap((x) =>
@@ -332,6 +343,26 @@ export default async function BCPHub() {
               {bias?.length
                 ? "Continue latest BIA →"
                 : "Start Business Impact Analysis →"}
+            </strong>
+          </Link>
+          <Link
+            href={
+              outsourced?.[0]?.id
+                ? `/portal/business-continuity/outsourced-processes?id=${outsourced[0].id}`
+                : "/portal/business-continuity/outsourced-processes?new=1"
+            }
+          >
+            <small>MODULE 7 · CLAUSE 8.1</small>
+            <h2>Outsourced Process &amp; Supply Chain Control</h2>
+            <p>
+              Convert BIA dependencies and recovery objectives into supplier
+              controls, continuity-capability checks, performance assurance
+              and accountable actions.
+            </p>
+            <strong>
+              {outsourced?.length
+                ? "Continue latest supplier assessment →"
+                : "Start outsourced-process control →"}
             </strong>
           </Link>
           <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
