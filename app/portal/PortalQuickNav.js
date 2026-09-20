@@ -11,7 +11,9 @@ export default function PortalQuickNav() {
   const audit = pathname.match(/^\/portal\/internal-audits\/([^/]+)/);
   if (pathname === "/portal" || pathname.startsWith("/portal/business-continuity")) return null;
 
-  return <nav className="rpgQuickNav" aria-label="Portal quick navigation">
+  const hasContextLinks = Boolean(assessment || soaPortfolio || audit);
+
+  return <nav className={`rpgQuickNav ${hasContextLinks ? "contextual" : "homeOnly"}`} aria-label="Portal quick navigation">
     {assessment && !soa && <>
       <Link href={`/portal/assessments/${assessment[1]}`}>Assessment</Link>
       <Link href={`/portal/assessments/${assessment[1]}/executive-report`}>Executive Report</Link>
