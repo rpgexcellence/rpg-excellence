@@ -17,8 +17,11 @@ export default function PortalLayout({ children }) {
         .rpgQuickNav a:hover{background:#174e86;color:#fff}.rpgQuickNav a:focus-visible{outline:3px solid #5dd8e5;outline-offset:2px}
         .rpgQuickNav .home{display:grid;gap:1px;margin-left:3px;padding:8px 12px;background:#1762ef;color:#fff}
         .rpgQuickNav .home strong{font-size:12px;line-height:1.2}.rpgQuickNav .home small{font-size:10px;line-height:1.2;color:#dbe8ff}
-        @media(max-width:680px){
-          .rpgQuickNav{left:8px;right:8px;bottom:8px;overflow-x:auto;justify-content:flex-start}
+        @media(max-width:1100px){
+          .rpgQuickNav.homeOnly{display:none}
+        }
+        @media(max-width:900px){
+          .rpgQuickNav.contextual{position:static;max-width:calc(100% - 24px);margin:14px 12px calc(14px + env(safe-area-inset-bottom));overflow-x:auto;justify-content:flex-start}
           .rpgQuickNav a{padding:9px 10px}.rpgQuickNav .home{margin-left:auto}
         }
         @media print{.rpgQuickNav{display:none!important}}
