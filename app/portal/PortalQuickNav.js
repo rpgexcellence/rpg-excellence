@@ -9,9 +9,10 @@ export default function PortalQuickNav() {
   const soa = assessment && pathname.includes("/soa");
   const soaPortfolio = pathname === "/portal/soa" || pathname.startsWith("/portal/soa/");
   const audit = pathname.match(/^\/portal\/internal-audits\/([^/]+)/);
+  const supplier = pathname.match(/^\/portal\/suppliers\/([^/]+)/);
   if (pathname === "/portal" || pathname.startsWith("/portal/business-continuity")) return null;
 
-  const hasContextLinks = Boolean(assessment || soaPortfolio || audit);
+  const hasContextLinks = Boolean(assessment || soaPortfolio || audit || supplier);
 
   return <nav className={`rpgQuickNav ${hasContextLinks ? "contextual" : "homeOnly"}`} aria-label="Portal quick navigation">
     {assessment && !soa && <>
@@ -35,6 +36,10 @@ export default function PortalQuickNav() {
       <Link href={`/portal/internal-audits/${audit[1]}`}>Audit</Link>
       <Link href={`/portal/internal-audits/${audit[1]}?gate=report`}>Executive Report</Link>
       <Link href={`/portal/internal-audits/${audit[1]}/report`} target="_blank">PDF</Link>
+    </>}
+    {supplier && <>
+      <Link href={`/portal/suppliers?id=${supplier[1]}`}>Supplier Record</Link>
+      <Link href={`/portal/suppliers/${supplier[1]}/code-of-conduct`}>Code of Conduct</Link>
     </>}
     <Link href="/portal" className="home"><strong>RPG Excellence</strong><small>Product Dashboard</small></Link>
   </nav>;
