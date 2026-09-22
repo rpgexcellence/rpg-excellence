@@ -1,4 +1,3 @@
-
 "use server";
 
  
@@ -106,5 +105,3 @@ export async function saveOutsourcedProcesses(_state, fd) {
   if(intent==="continue")redirect(`/portal/business-continuity/outsourced-processes?id=${savedId}&step=${Math.max(0,Math.min(5,Number(t("next_step"))||0))}`);redirect(`/portal/business-continuity/outsourced-processes?id=${savedId}&step=5`);
 
 }
-
-app/portal/business-continuity/outsourced-processes/actions.js
