@@ -518,15 +518,19 @@ function SupplierCard({
 
           </label>
 
-          <Field
+          {!item.supplierId && (
 
-            label="Supplier / subcontractor *"
+            <Field
 
-            value={item.supplierName}
+              label="Supplier / subcontractor *"
 
-            onChange={(v) => setRecords(records.map((record) => record.id === item.id ? { ...record, supplierName: v, supplierId: "", source: "Manual" } : record))}
+              value={item.supplierName}
 
-          />
+              onChange={(v) => setRecords(records.map((record) => record.id === item.id ? { ...record, supplierName: v, supplierId: "", source: "Manual" } : record))}
+
+            />
+
+          )}
 
           <Field
 
