@@ -100,8 +100,10 @@ export default function SupplierAssuranceWorkspace({
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const [step, setStep] = useState(0);
-  const [data, setData] = useState(() => initialData(initial));
-  const [types, setTypes] = useState(() => initial?.supplier_types || []);
+  const [data, setData] = useState(() => initialData(initial || {}));
+  const [types, setTypes] = useState(
+    () => initial?.supplier_types || [],
+  );
   const [standards, setStandards] = useState(
     () => initial?.applicable_standards || ["iso9001"],
   );
@@ -125,6 +127,7 @@ export default function SupplierAssuranceWorkspace({
     () => applicableQuestions(standards, types),
     [standards, types],
   );
+
   const result = useMemo(
     () =>
       calculateSupplierAssurance({
@@ -136,6 +139,7 @@ export default function SupplierAssuranceWorkspace({
       }),
     [standards, types, answers, risk, data.criticality],
   );
+
   const codeSections = useMemo(
     () =>
       buildCodeOfConductSections({
@@ -145,23 +149,35 @@ export default function SupplierAssuranceWorkspace({
       }),
     [standards, types, data.legal_name],
   );
+
   const averagePerformance = Math.round(
-    Object.values(performance).reduce((sum, value) => sum + n(value, 0), 0) / 4,
+    Object.values(performance).reduce(
+      (sum, value) => sum + n(value, 0),
+      0,
+    ) / 4,
   );
+
   const update = (key, value) =>
     setData((current) => ({ ...current, [key]: value }));
+
   const toggle = (list, setter, value) =>
     setter(
       list.includes(value)
         ? list.filter((item) => item !== value)
         : [...list, value],
     );
+
   const answer = (id, key, value) =>
     setAnswers((current) => ({
       ...current,
-      [id]: { ...(current[id] || {}), [key]: value },
+      [id]: {
+        ...(current[id] || {}),
+        [key]: value,
+      },
     }));
+
   const active = initial || null;
+
   const riskTone =
     result.riskBand === "Critical"
       ? "red"
@@ -170,20 +186,23 @@ export default function SupplierAssuranceWorkspace({
         : result.riskBand === "Medium"
           ? "blue"
           : "green";
-  const statusLabel = String(active?.approval_status || "draft").replaceAll(
-    "_",
-    " ",
-  );
+
+  const statusLabel = String(
+    active?.approval_status || "draft",
+  ).replaceAll("_", " ");
 
   return (
     <main className="saPage">
       <style>{styles}</style>
+
       <div className="saShell">
         <aside className="saSide">
           <Link href="/portal" className="saBrand">
             <b>RPG</b> Excellence
           </Link>
+
           <small>SUPPLIER ASSURANCE HUB</small>
+
           <nav>
             <Link
               href="/portal/suppliers"
@@ -191,31 +210,42 @@ export default function SupplierAssuranceWorkspace({
             >
               Management board
             </Link>
+
             <Link
               href="/portal/suppliers?new=1"
               className={!active ? "accent" : ""}
             >
               + New supplier
             </Link>
+
             <span>SUPPLIER REGISTER</span>
+
             {suppliers.map((supplier) => (
               <Link
                 key={supplier.id}
                 href={`/portal/suppliers?id=${supplier.id}`}
                 className={
-                  active?.id === supplier.id ? "active supplier" : "supplier"
+                  active?.id === supplier.id
+                    ? "active supplier"
+                    : "supplier"
                 }
               >
                 <b>{supplier.legal_name}</b>
                 <small>
                   {supplier.supplier_reference} ·{" "}
-                  {String(supplier.approval_status).replaceAll("_", " ")}
+                  {String(supplier.approval_status).replaceAll(
+                    "_",
+                    " ",
+                  )}
                 </small>
               </Link>
             ))}
           </nav>
+
           <div className="saSideFoot">
-            <strong>{organization?.name || "Organisation required"}</strong>
+            <strong>
+              {organization?.name || "Organisation required"}
+            </strong>
             <span>
               {suppliers.length} supplier
               {suppliers.length === 1 ? "" : "s"} under assurance
@@ -238,9 +268,13 @@ export default function SupplierAssuranceWorkspace({
                   : "Classify once, then let the engine apply the right controls."}
               </p>
             </div>
+
             <div>
               <Link href="/portal">Product dashboard</Link>
-              <Link className="primary" href="/portal/suppliers?new=1">
+              <Link
+                className="primary"
+                href="/portal/suppliers?new=1"
+              >
                 + New supplier
               </Link>
             </div>
@@ -250,14 +284,16 @@ export default function SupplierAssuranceWorkspace({
             <div>
               <span>ONE SUPPLIER · ONE ASSURANCE POSITION</span>
               <h2>
-                Risk-based approval across every applicable standard.
+                Risk-based approval across every applicable
+                standard.
               </h2>
               <p>
-                The engine adapts due diligence, evidence, approval and
-                monitoring to the supplier’s scope, criticality and
-                management-system requirements.
+                The engine adapts due diligence, evidence, approval
+                and monitoring to the supplier’s scope, criticality
+                and management-system requirements.
               </p>
             </div>
+
             <aside>
               <article>
                 <strong>{result.riskBand}</strong>
@@ -288,7 +324,9 @@ export default function SupplierAssuranceWorkspace({
               label="High / critical"
               value={
                 suppliers.filter((item) =>
-                  ["High", "Critical"].includes(item.risk_result?.riskBand),
+                  ["High", "Critical"].includes(
+                    item.risk_result?.riskBand,
+                  ),
                 ).length
               }
               detail="Enhanced assurance required"
@@ -298,7 +336,8 @@ export default function SupplierAssuranceWorkspace({
               label="Pending approval"
               value={
                 suppliers.filter(
-                  (item) => item.approval_status === "pending_approval",
+                  (item) =>
+                    item.approval_status === "pending_approval",
                 ).length
               }
               detail="Decision required"
@@ -307,7 +346,9 @@ export default function SupplierAssuranceWorkspace({
             <Metric
               label="Codes issued"
               value={documents.length}
-              detail={active ? "For selected supplier" : "Select a supplier"}
+              detail={
+                active ? "For selected supplier" : "Select a supplier"
+              }
               tone="green"
             />
           </section>
@@ -315,7 +356,9 @@ export default function SupplierAssuranceWorkspace({
           {(saved || state?.error) && (
             <div
               className={
-                state?.error ? "saMessage error" : "saMessage success"
+                state?.error
+                  ? "saMessage error"
+                  : "saMessage success"
               }
             >
               {state?.error ||
@@ -439,8 +482,9 @@ export default function SupplierAssuranceWorkspace({
                     <small>STEP 1</small>
                     <h2>Supplier identity and relationship</h2>
                     <p>
-                      Capture the legal entity, contact and exact scope
-                      before the engine determines applicable controls.
+                      Capture the legal entity, contact and exact
+                      scope before the engine determines applicable
+                      controls.
                     </p>
                   </div>
                   <Pill>
@@ -448,19 +492,24 @@ export default function SupplierAssuranceWorkspace({
                       "Reference created on save"}
                   </Pill>
                 </div>
+
                 <div className="saGrid">
                   <Field
                     label="Legal supplier name *"
                     name="legal_name"
                     value={data.legal_name}
-                    onChange={(value) => update("legal_name", value)}
+                    onChange={(value) =>
+                      update("legal_name", value)
+                    }
                     required
                   />
                   <Field
                     label="Trading name"
                     name="trading_name"
                     value={data.trading_name}
-                    onChange={(value) => update("trading_name", value)}
+                    onChange={(value) =>
+                      update("trading_name", value)
+                    }
                   />
                   <Field
                     label="Registered address *"
@@ -478,19 +527,25 @@ export default function SupplierAssuranceWorkspace({
                     label="Country"
                     name="country"
                     value={data.country}
-                    onChange={(value) => update("country", value)}
+                    onChange={(value) =>
+                      update("country", value)
+                    }
                   />
                   <Field
                     label="Company / registration number"
                     name="company_number"
                     value={data.company_number}
-                    onChange={(value) => update("company_number", value)}
+                    onChange={(value) =>
+                      update("company_number", value)
+                    }
                   />
                   <Field
                     label="Website"
                     name="website"
                     value={data.website}
-                    onChange={(value) => update("website", value)}
+                    onChange={(value) =>
+                      update("website", value)
+                    }
                     type="url"
                   />
                   <Field
@@ -558,16 +613,20 @@ export default function SupplierAssuranceWorkspace({
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 2</small>
-                    <h2>Classification and applicable standards</h2>
+                    <h2>
+                      Classification and applicable standards
+                    </h2>
                     <p>
-                      Select every relevant relationship. The question
-                      set and Code of Conduct change immediately.
+                      Select every relevant relationship. The
+                      question set and Code of Conduct change
+                      immediately.
                     </p>
                   </div>
                   <Pill tone="purple">
                     {standards.length} standards
                   </Pill>
                 </div>
+
                 <h3>Supplier classification</h3>
                 <div className="saChoices">
                   {SUPPLIER_TYPES.map(([id, label]) => (
@@ -576,14 +635,19 @@ export default function SupplierAssuranceWorkspace({
                       className={
                         types.includes(id) ? "selected" : ""
                       }
-                      onClick={() => toggle(types, setTypes, id)}
+                      onClick={() =>
+                        toggle(types, setTypes, id)
+                      }
                       key={id}
                     >
-                      <i>{types.includes(id) ? "✓" : "+"}</i>
+                      <i>
+                        {types.includes(id) ? "✓" : "+"}
+                      </i>
                       {label}
                     </button>
                   ))}
                 </div>
+
                 <h3>Applicable assurance frameworks</h3>
                 <div className="saStandardGrid">
                   {SUPPLIER_STANDARDS.map((standard) => (
@@ -595,7 +659,11 @@ export default function SupplierAssuranceWorkspace({
                           : ""
                       }
                       onClick={() =>
-                        toggle(standards, setStandards, standard.id)
+                        toggle(
+                          standards,
+                          setStandards,
+                          standard.id,
+                        )
                       }
                       key={standard.id}
                     >
@@ -604,6 +672,7 @@ export default function SupplierAssuranceWorkspace({
                     </button>
                   ))}
                 </div>
+
                 <label className="saCheck">
                   <input
                     type="checkbox"
@@ -634,21 +703,23 @@ export default function SupplierAssuranceWorkspace({
                     <small>STEP 3</small>
                     <h2>Dynamic supplier risk engine</h2>
                     <p>
-                      Score the relationship before controls. Assurance
-                      gaps then adjust the risk position automatically.
+                      Score the relationship before controls.
+                      Assurance gaps then adjust the risk position
+                      automatically.
                     </p>
                   </div>
                   <Pill tone={riskTone}>
                     {result.riskScore}/40 · {result.riskBand}
                   </Pill>
                 </div>
+
                 <div className="saRiskSummary">
                   <div>
                     <span>ENGINE DECISION</span>
                     <strong>{result.recommendation}</strong>
                     <small>
-                      Recommended review: every {result.reviewMonths}{" "}
-                      months
+                      Recommended review: every{" "}
+                      {result.reviewMonths} months
                     </small>
                   </div>
                   <div className={`saRiskDial ${riskTone}`}>
@@ -656,6 +727,7 @@ export default function SupplierAssuranceWorkspace({
                     <span>RISK</span>
                   </div>
                 </div>
+
                 <div className="saGrid risk">
                   <Field
                     label="Supplier criticality"
@@ -666,20 +738,29 @@ export default function SupplierAssuranceWorkspace({
                       name="criticality"
                       value={data.criticality}
                       onChange={(event) =>
-                        update("criticality", event.target.value)
+                        update(
+                          "criticality",
+                          event.target.value,
+                        )
                       }
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
                       <option value="high">High</option>
-                      <option value="critical">Critical</option>
+                      <option value="critical">
+                        Critical
+                      </option>
                     </select>
                   </Field>
+
                   {[
                     ["likelihood", "Likelihood of failure"],
                     ["consequence", "Consequence of failure"],
                     ["dependency", "Business dependency"],
-                    ["detectability", "Difficulty detecting failure"],
+                    [
+                      "detectability",
+                      "Difficulty detecting failure",
+                    ],
                   ].map(([key, label]) => (
                     <label key={key}>
                       <span>{label}</span>
@@ -688,7 +769,9 @@ export default function SupplierAssuranceWorkspace({
                           <button
                             type="button"
                             className={
-                              risk[key] === value ? "selected" : ""
+                              risk[key] === value
+                                ? "selected"
+                                : ""
                             }
                             onClick={() =>
                               setRisk((current) => ({
@@ -702,14 +785,19 @@ export default function SupplierAssuranceWorkspace({
                           </button>
                         ))}
                       </div>
-                      <small>1 = lowest · 5 = highest</small>
+                      <small>
+                        1 = lowest · 5 = highest
+                      </small>
                     </label>
                   ))}
                 </div>
+
                 <div className="saRule">
                   <b>Automated controls</b>
                   <span>
-                    {["High", "Critical"].includes(result.riskBand)
+                    {["High", "Critical"].includes(
+                      result.riskBand,
+                    )
                       ? "Technical approval + enhanced monitoring + supplier audit"
                       : result.riskBand === "Medium"
                         ? "Documented approval + periodic monitoring"
@@ -732,13 +820,16 @@ export default function SupplierAssuranceWorkspace({
                     </p>
                   </div>
                   <Pill
-                    tone={result.blockers.length ? "red" : "green"}
+                    tone={
+                      result.blockers.length ? "red" : "green"
+                    }
                   >
                     {result.blockers.length
                       ? `${result.blockers.length} blockers`
                       : "No blockers"}
                   </Pill>
                 </div>
+
                 <div className="saProgress">
                   <i
                     style={{
@@ -749,17 +840,21 @@ export default function SupplierAssuranceWorkspace({
                     {result.assuranceScore}% assurance complete
                   </span>
                 </div>
+
                 <div className="saQuestions">
                   {questions.map((item, index) => {
                     const current = answers[item.id] || {};
+
                     return (
                       <article
                         key={item.id}
                         className={
                           item.blocker &&
-                          ["no", "unanswered", undefined].includes(
-                            current.response,
-                          )
+                          [
+                            "no",
+                            "unanswered",
+                            undefined,
+                          ].includes(current.response)
                             ? "blocker"
                             : ""
                         }
@@ -770,8 +865,11 @@ export default function SupplierAssuranceWorkspace({
                             <span>{item.category}</span>
                             <strong>{item.question}</strong>
                           </div>
-                          {item.blocker && <em>MANDATORY</em>}
+                          {item.blocker && (
+                            <em>MANDATORY</em>
+                          )}
                         </header>
+
                         <div className="saResponses">
                           {[
                             ["yes", "Yes"],
@@ -787,7 +885,11 @@ export default function SupplierAssuranceWorkspace({
                                   : ""
                               }
                               onClick={() =>
-                                answer(item.id, "response", value)
+                                answer(
+                                  item.id,
+                                  "response",
+                                  value,
+                                )
                               }
                               key={value}
                             >
@@ -795,12 +897,15 @@ export default function SupplierAssuranceWorkspace({
                             </button>
                           ))}
                         </div>
+
                         <label>
                           <span>
                             Evidence expected: {item.evidence}
                           </span>
                           <textarea
-                            value={current.evidence || ""}
+                            value={
+                              current.evidence || ""
+                            }
                             onChange={(event) =>
                               answer(
                                 item.id,
@@ -812,9 +917,11 @@ export default function SupplierAssuranceWorkspace({
                             placeholder="Record document references, observations, certificate details or required action"
                           />
                         </label>
+
                         <small>
-                          Control {index + 1} of {questions.length} ·
-                          Weight {item.weight}
+                          Control {index + 1} of{" "}
+                          {questions.length} · Weight{" "}
+                          {item.weight}
                         </small>
                       </article>
                     );
@@ -828,45 +935,65 @@ export default function SupplierAssuranceWorkspace({
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 5</small>
-                    <h2>Approval and monitoring decision</h2>
+                    <h2>
+                      Approval and monitoring decision
+                    </h2>
                     <p>
-                      Translate the evaluated risk and evidence into a
-                      controlled decision and proportionate monitoring
-                      plan.
+                      Translate the evaluated risk and evidence
+                      into a controlled decision and proportionate
+                      monitoring plan.
                     </p>
                   </div>
                   <Pill
-                    tone={result.blockers.length ? "red" : "green"}
+                    tone={
+                      result.blockers.length ? "red" : "green"
+                    }
                   >
                     {result.blockers.length
                       ? "Approval blocked"
                       : "Eligible for approval"}
                   </Pill>
                 </div>
+
                 <div className="saDecision">
                   <article>
                     <span>Risk</span>
                     <strong className={riskTone}>
                       {result.riskBand}
                     </strong>
-                    <small>{result.riskScore}/40</small>
+                    <small>
+                      {result.riskScore}/40
+                    </small>
                   </article>
                   <article>
                     <span>Assurance</span>
-                    <strong>{result.assuranceScore}%</strong>
-                    <small>{result.gaps.length} gaps</small>
+                    <strong>
+                      {result.assuranceScore}%
+                    </strong>
+                    <small>
+                      {result.gaps.length} gaps
+                    </small>
                   </article>
                   <article>
                     <span>Performance</span>
-                    <strong>{averagePerformance}%</strong>
-                    <small>Current weighted snapshot</small>
+                    <strong>
+                      {averagePerformance}%
+                    </strong>
+                    <small>
+                      Current weighted snapshot
+                    </small>
                   </article>
                   <article>
                     <span>Review</span>
-                    <strong>{result.reviewMonths}m</strong>
-                    <small>Engine recommendation</small>
+                    <strong>
+                      {result.reviewMonths}m
+                    </strong>
+                    <small>
+                      Engine recommendation
+                    </small>
                   </article>
                 </div>
+
                 <div className="saGrid">
                   <Field
                     label="Approved scope"
@@ -894,14 +1021,21 @@ export default function SupplierAssuranceWorkspace({
                     label="Competent approver"
                     name="approved_by"
                     value={data.approved_by}
-                    onChange={(value) => update("approved_by", value)}
+                    onChange={(value) =>
+                      update("approved_by", value)
+                    }
                   />
                   <Field
                     label="Review frequency (months)"
                     name="review_frequency_months"
-                    value={String(data.review_frequency_months)}
+                    value={String(
+                      data.review_frequency_months,
+                    )}
                     onChange={(value) =>
-                      update("review_frequency_months", value)
+                      update(
+                        "review_frequency_months",
+                        value,
+                      )
                     }
                     type="number"
                     min="1"
@@ -926,13 +1060,20 @@ export default function SupplierAssuranceWorkspace({
                     type="date"
                   />
                 </div>
+
                 <h3>Performance snapshot</h3>
                 <div className="saPerformance">
                   {[
                     ["conformity", "Conformity"],
                     ["delivery", "On-time delivery"],
-                    ["responsiveness", "Responsiveness"],
-                    ["correctiveAction", "Corrective action"],
+                    [
+                      "responsiveness",
+                      "Responsiveness",
+                    ],
+                    [
+                      "correctiveAction",
+                      "Corrective action",
+                    ],
                   ].map(([key, label]) => (
                     <label key={key}>
                       <span>{label}</span>
@@ -942,10 +1083,15 @@ export default function SupplierAssuranceWorkspace({
                         max="100"
                         value={performance[key]}
                         onChange={(event) =>
-                          setPerformance((current) => ({
-                            ...current,
-                            [key]: n(event.target.value, 0),
-                          }))
+                          setPerformance(
+                            (current) => ({
+                              ...current,
+                              [key]: n(
+                                event.target.value,
+                                0,
+                              ),
+                            }),
+                          )
                         }
                       />
                       <b>%</b>
@@ -960,30 +1106,35 @@ export default function SupplierAssuranceWorkspace({
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 6</small>
-                    <h2>Dynamic Supplier Code of Conduct</h2>
+                    <h2>
+                      Dynamic Supplier Code of Conduct
+                    </h2>
                     <p>
                       The document is assembled from common
                       responsible-business requirements plus
-                      supplier-specific ISO, laboratory, certification
-                      and aerospace controls.
+                      supplier-specific ISO, laboratory,
+                      certification and aerospace controls.
                     </p>
                   </div>
                   <Pill tone="purple">
                     {codeSections.length} sections
                   </Pill>
                 </div>
+
                 <div className="saCocPreview">
                   <header>
                     <span>
-                      RPG EXCELLENCE · CONTROLLED SUPPLIER DOCUMENT
+                      RPG EXCELLENCE · CONTROLLED
+                      SUPPLIER DOCUMENT
                     </span>
                     <h3>
-                      Supplier Code of Conduct &amp; Assurance
-                      Requirements
+                      Supplier Code of Conduct &amp;
+                      Assurance Requirements
                     </h3>
                     <p>
                       <b>Supplier:</b>{" "}
-                      {data.legal_name || "Complete supplier name"}
+                      {data.legal_name ||
+                        "Complete supplier name"}
                       <br />
                       <b>Address:</b>{" "}
                       {data.registered_address ||
@@ -994,6 +1145,7 @@ export default function SupplierAssuranceWorkspace({
                         "Complete supply description"}
                     </p>
                   </header>
+
                   <div className="saCocStandards">
                     {standards.map((id) => (
                       <Pill key={id}>
@@ -1003,26 +1155,34 @@ export default function SupplierAssuranceWorkspace({
                       </Pill>
                     ))}
                   </div>
+
                   {codeSections.map((item, index) => (
                     <article key={item.id}>
                       <b>
                         {index + 1}. {item.title}
                       </b>
-                      <span>{item.applicability}</span>
-                      <p>{item.paragraphs[0]}</p>
+                      <span>
+                        {item.applicability}
+                      </span>
+                      <p>
+                        {item.paragraphs[0]}
+                      </p>
                       <small>
-                        {item.requirements.length} controlled
-                        requirements included
+                        {item.requirements.length}{" "}
+                        controlled requirements included
                       </small>
                     </article>
                   ))}
                 </div>
+
                 {!active && (
                   <div className="saNotice">
-                    Save the supplier record first. The blue button
-                    will then generate a controlled, versioned PDF
-                    populated with the supplier name, address, scope
-                    and applicable requirements.
+                    Save the supplier record first.
+                    The blue button will then generate
+                    a controlled, versioned PDF
+                    populated with the supplier name,
+                    address, scope and applicable
+                    requirements.
                   </div>
                 )}
               </>
@@ -1033,7 +1193,9 @@ export default function SupplierAssuranceWorkspace({
                 <button
                   type="button"
                   onClick={() =>
-                    setStep(Math.max(0, step - 1))
+                    setStep(
+                      Math.max(0, step - 1),
+                    )
                   }
                   disabled={step === 0}
                 >
@@ -1042,13 +1204,21 @@ export default function SupplierAssuranceWorkspace({
                 <button
                   type="button"
                   onClick={() =>
-                    setStep(Math.min(tabs.length - 1, step + 1))
+                    setStep(
+                      Math.min(
+                        tabs.length - 1,
+                        step + 1,
+                      ),
+                    )
                   }
-                  disabled={step === tabs.length - 1}
+                  disabled={
+                    step === tabs.length - 1
+                  }
                 >
                   Next →
                 </button>
               </div>
+
               <div>
                 <button
                   name="intent"
@@ -1069,9 +1239,14 @@ export default function SupplierAssuranceWorkspace({
                   name="intent"
                   value="approve"
                   className="primary"
-                  disabled={pending || result.blockers.length > 0}
+                  disabled={
+                    pending ||
+                    result.blockers.length > 0
+                  }
                 >
-                  {pending ? "Saving…" : "Approve supplier"}
+                  {pending
+                    ? "Saving…"
+                    : "Approve supplier"}
                 </button>
               </div>
             </footer>
@@ -1080,13 +1255,19 @@ export default function SupplierAssuranceWorkspace({
           {active && (
             <section className="saGenerate">
               <div>
-                <small>CONTROLLED DOCUMENT GENERATOR</small>
-                <h2>Supplier-specific Code of Conduct</h2>
+                <small>
+                  CONTROLLED DOCUMENT GENERATOR
+                </small>
+                <h2>
+                  Supplier-specific Code of Conduct
+                </h2>
                 <p>
-                  Create a new controlled version using the supplier’s
-                  saved name, address, scope, classification and
-                  applicable standards.
+                  Create a new controlled version using
+                  the supplier’s saved name, address,
+                  scope, classification and applicable
+                  standards.
                 </p>
+
                 {documents.length > 0 && (
                   <div className="saDocList">
                     {documents.map((document) => (
@@ -1094,7 +1275,11 @@ export default function SupplierAssuranceWorkspace({
                         key={document.id}
                         href={`/portal/suppliers/${active.id}/code-of-conduct?document=${document.id}`}
                       >
-                        <b>{document.document_reference}</b>
+                        <b>
+                          {
+                            document.document_reference
+                          }
+                        </b>
                         <span>
                           Version {document.version} ·{" "}
                           {document.status}
@@ -1104,6 +1289,7 @@ export default function SupplierAssuranceWorkspace({
                   </div>
                 )}
               </div>
+
               <form action={generateAction}>
                 <input
                   type="hidden"
@@ -1114,8 +1300,8 @@ export default function SupplierAssuranceWorkspace({
                   Generate Supplier Code of Conduct →
                 </button>
                 <small>
-                  Creates a controlled HTML preview and downloadable
-                  PDF
+                  Creates a controlled HTML preview
+                  and downloadable PDF
                 </small>
               </form>
             </section>
