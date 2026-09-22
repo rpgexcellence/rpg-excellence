@@ -194,7 +194,28 @@ export default function SupplierAssuranceWorkspace({
   return (
     <main className="saPage">
       <style>{styles}</style>
-
+<style>{`
+  .saPage{font-size:16px;line-height:1.5}
+  .saSide>small,.saSide nav>span,.saTop>div:first-child>small,.saSectionHead small,.saGenerate>div>small{font-size:12px}
+  .saSide nav>a,.saSide nav>a.supplier b,.saTop a,.saTabs button,.saGrid label>span,.saQuestions label>span,.saPerformance label>span,.saActions button,.saGenerate button{font-size:14px}
+  .saSide nav>a.supplier small,.saSideFoot span,.saMetric>span,.saMetric small,.saPill,.saDecision span,.saDecision small{font-size:12px}
+  .saCocPreview>header{padding:32px}
+  .saCocPreview>header>span{font-size:12px}
+  .saCocPreview h3{font-size:26px;line-height:1.25}
+  .saCocPreview>header p{font-size:15px;line-height:1.7}
+  .saCocStandards{padding:18px 24px}
+  .saCocPreview>article{gap:9px 18px;padding:20px 24px}
+  .saCocPreview>article>b{font-size:16px;line-height:1.4}
+  .saCocPreview>article>span{font-size:12px;line-height:1.4}
+  .saCocPreview>article>p{font-size:14px;line-height:1.6}
+  .saCocPreview>article>small{font-size:12px}
+  .saGenerate p,.saSectionHead p{font-size:15px}
+  .saGenerate form small{font-size:12px}
+  @media(max-width:600px){
+    .saCocPreview>header{padding:22px}
+    .saCocPreview>article{grid-template-columns:1fr;padding:18px}
+  }
+`}</style>
       <div className="saShell">
         <aside className="saSide">
           <Link href="/portal" className="saBrand">
