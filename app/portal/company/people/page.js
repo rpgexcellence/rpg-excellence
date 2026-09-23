@@ -10,6 +10,7 @@ import { createClient } from "../../../../lib/supabase/server";
 import { functionLabel } from "../../../../lib/people-access";
 import PeopleAccessForm from "./PeopleAccessForm";
 import { suspendPerson } from "./actions";
+import "./people-access-readable.css";
 
 export const metadata = { title: "People, Roles & Access | RPG Excellence" };
 export const dynamic = "force-dynamic";
