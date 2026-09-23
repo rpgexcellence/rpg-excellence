@@ -1,0 +1,242 @@
+/* RPG People, Roles & Access — readable typography */
+
+.paPage {
+  font-size: 16px !important;
+}
+
+.paTop > div > span,
+.paRegister header span,
+.paQr > div > span {
+  font-size: 13px !important;
+}
+
+.paTop h1 {
+  font-size: 46px !important;
+}
+
+.paTop p {
+  font-size: 16px !important;
+  line-height: 1.65 !important;
+}
+
+.paTop > a {
+  font-size: 14px !important;
+}
+
+.paMetrics span {
+  font-size: 14px !important;
+}
+
+.paMetrics b {
+  font-size: 32px !important;
+}
+
+.paNotice span,
+.paError span {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.paCreate > summary b {
+  font-size: 17px !important;
+}
+
+.paCreate > summary small {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.paSection h2 {
+  font-size: 21px !important;
+}
+
+.paSection header p {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.paGrid label > span,
+.paFunctionControl label,
+.paPermissions label > span {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+
+.paGrid input,
+.paGrid select,
+.paGrid textarea,
+.paFunctionControl input,
+.paFunctionControl select,
+.paPermissions select {
+  min-height: 48px !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
+}
+
+.paGrid textarea {
+  min-height: 100px !important;
+}
+
+.paPage .paChoice.paChoiceThree {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.paChoice label {
+  min-height: 110px !important;
+  padding: 20px !important;
+}
+
+.paChoice b {
+  font-size: 17px !important;
+  line-height: 1.35 !important;
+}
+
+.paChoice small {
+  margin-top: 8px !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+}
+
+.paChoice .superAdminChoice {
+  border-color: #9ab8ff !important;
+  background: linear-gradient(145deg, #ffffff, #f0f5ff) !important;
+}
+
+.paChoice .superAdminChoice.selected {
+  border-color: #315fe6 !important;
+  box-shadow: 0 0 0 4px rgba(49, 95, 230, 0.13) !important;
+}
+
+.paFunctions button {
+  min-height: 220px !important;
+  padding: 18px !important;
+}
+
+.paFunctions button b {
+  font-size: 16px !important;
+  line-height: 1.35 !important;
+}
+
+.paFunctions button small {
+  min-height: 52px !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.paFunctions button span {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+}
+
+.paFunctionControl label {
+  font-size: 13px !important;
+}
+
+.paPermissions label {
+  min-height: 98px !important;
+  padding: 15px !important;
+}
+
+.paPermissions label > span {
+  min-height: 38px;
+}
+
+.paSubmit b {
+  font-size: 16px !important;
+}
+
+.paSubmit span {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.paSubmit button {
+  min-height: 50px !important;
+  font-size: 15px !important;
+}
+
+.paRegister h2 {
+  font-size: 25px !important;
+}
+
+.paRegister > header > b {
+  font-size: 13px !important;
+}
+
+.paIdentity h3 {
+  font-size: 19px !important;
+}
+
+.paIdentity p,
+.paIdentity small {
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+.status {
+  font-size: 12px !important;
+}
+
+.paRelations span {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+}
+
+.paRelations b {
+  font-size: 11px !important;
+}
+
+.paFunctionStrip span,
+.paFunctionStrip small {
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.paFunctionStrip p {
+  font-size: 13px !important;
+}
+
+.paPeople footer {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.paPeople footer button {
+  min-height: 38px !important;
+  font-size: 13px !important;
+}
+
+.paQr p {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.paQr dt {
+  font-size: 11px !important;
+}
+
+.paQr dd {
+  font-size: 14px !important;
+}
+
+.paQr .paSecurity {
+  font-size: 13px !important;
+}
+
+.paQrImage a {
+  font-size: 14px !important;
+}
+
+.paEmpty {
+  font-size: 15px !important;
+}
+
+@media (max-width: 900px) {
+  .paPage .paChoice.paChoiceThree {
+    grid-template-columns: 1fr;
+  }
+
+  .paTop h1 {
+    font-size: 38px !important;
+  }
+}
