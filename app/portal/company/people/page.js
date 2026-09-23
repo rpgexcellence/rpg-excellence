@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+// RPG PEOPLE PAGE FIX V3 — NULL-SAFE DATA HANDLING — 2026-09-23
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -34,16 +35,39 @@ async function getAdminContext() {
 export default async function PeopleAccessPage({ searchParams }) {
   const params = await searchParams;
   const { admin, organization } = await getAdminContext();
-  const [{ data: people = [] }, { data: authorizations = [] }, { data: permissions = [] }, { data: invitations = [] }] = await Promise.all([
+  const [peopleResult, authorizationsResult, permissionsResult, invitationsResult] = await Promise.all([
     admin.from("organization_people").select("*").eq("organization_id", organization.id).order("last_name"),
     admin.from("organization_person_authorizations").select("*").eq("organization_id", organization.id),
     admin.from("organization_person_permissions").select("*").eq("organization_id", organization.id),
     admin.from("organization_invitations").select("id,person_id,status,expires_at,invitation_reference").eq("organization_id", organization.id).order("created_at", { ascending: false }),
   ]);
-  const byPerson = (rows, personId) => rows.filter((item) => item.person_id === personId);
-  const active = people.filter((person) => person.account_status === "active").length;
-  const invited = people.filter((person) => person.account_status === "invited").length;
-  const directory = people.filter((person) => person.account_type === "directory").length;
+  const people = peopleResult.data || [];
+  const authorizations = authorizationsResult.data || [];
+  const permissions = permissionsResult.data || [];
+  const invitations = invitationsResult.data || [];
+  const setupError = [peopleResult, authorizationsResult, permissionsResult, invitationsResult].find((result) => result.error)?.error || null;
+  const byPerson = (rows, personId) => {
+    const matches = [];
+    for (const item of Array.isArray(rows) ? rows : []) {
+      if (item?.person_id === personId) matches.push(item);
+    }
+    return matches;
+  };
+  const accessByPerson = (rows, personId) => {
+    const matches = [];
+    for (const item of Array.isArray(rows) ? rows : []) {
+      if (item?.person_id === personId && item?.access_level !== "none") matches.push(item);
+    }
+    return matches;
+  };
+  let active = 0;
+  let invited = 0;
+  let directory = 0;
+  for (const person of people) {
+    if (person?.account_status === "active") active += 1;
+    if (person?.account_status === "invited") invited += 1;
+    if (person?.account_type === "directory") directory += 1;
+  }
   let invitePreview = null;
   if (params?.invite) {
     const { data: invitation } = await admin.from("organization_invitations").select("*,organization_people(first_name,last_name,email,position)").eq("organization_id", organization.id).eq("token_hash", hash(params.invite)).eq("status", "active").maybeSingle();
@@ -57,10 +81,11 @@ export default async function PeopleAccessPage({ searchParams }) {
     <section className="paMetrics"><article><span>People</span><b>{people.length}</b></article><article><span>Active users</span><b>{active}</b></article><article><span>Awaiting activation</span><b>{invited}</b></article><article><span>Directory only</span><b>{directory}</b></article></section>
     {params?.created === "directory" && <div className="paNotice success"><b>Directory person created.</b><span>The person can now be selected as an owner, manager, deputy or escalation contact.</span></div>}
     {params?.suspended && <div className="paNotice"><b>Access suspended.</b><span>Active QR invitations were revoked and the event was added to the audit trail.</span></div>}
+    {setupError && <div className="paError" role="alert"><b>People &amp; Access database setup is incomplete</b><span>{setupError.message}. Run the complete File 1 migration in the Supabase SQL Editor, then refresh this page.</span></div>}
     {invitePreview && <section className="paQr"><div><span>SECURE QR INVITATION</span><h2>{invitePreview.organization_people.first_name} {invitePreview.organization_people.last_name}</h2><p>{invitePreview.organization_people.email} · {invitePreview.organization_people.position || "Position not recorded"}</p><dl><div><dt>Reference</dt><dd>{invitePreview.invitation_reference}</dd></div><div><dt>Expires</dt><dd>{date(invitePreview.expires_at)}</dd></div><div><dt>Email</dt><dd>{params.email === "sent" ? "Invitation sent" : "Email not sent — download and issue the QR securely"}</dd></div></dl><p className="paSecurity">The QR is restricted to the approved email, can be used once and contains no personal information.</p></div><div className="paQrImage"><Image src={invitePreview.qr} width={260} height={260} alt={`Personal RPG invitation QR for ${invitePreview.organization_people.first_name} ${invitePreview.organization_people.last_name}`} unoptimized/><a href={invitePreview.qr} download={`${invitePreview.invitation_reference}.png`}>Download QR as PNG</a></div></section>}
     <details className="paCreate" open={people.length === 0 || Boolean(params?.new)}><summary><span>＋</span><div><b>Create person or system user</b><small>Build the profile, organisational connections, functions, permissions and QR invitation.</small></div></summary><PeopleAccessForm people={people}/></details>
     <section className="paRegister"><header><div><span>CONTROLLED REGISTER</span><h2>Company people and access</h2></div><b>{people.length} records</b></header>
-      {people.length ? <div className="paPeople">{people.map((person) => { const functions = byPerson(authorizations, person.id); const access = byPerson(permissions, person.id).filter((item) => item.access_level !== "none"); const manager = people.find((item) => item.id === person.manager_person_id); const invitation = invitations.find((item) => item.person_id === person.id && item.status === "active"); return <article key={person.id}><div className="paIdentity"><div className="paInitials">{person.first_name[0]}{person.last_name[0]}</div><div><h3>{person.first_name} {person.last_name}</h3><p>{person.position || "Position not recorded"}{person.department ? ` · ${person.department}` : ""}</p><small>{person.email}</small></div><span className={`status ${person.account_status}`}>{person.account_status}</span></div><div className="paRelations"><span><b>Reports to</b>{manager ? `${manager.first_name} ${manager.last_name}` : "Not assigned"}</span><span><b>Site</b>{person.site || "All / not assigned"}</span><span><b>Module access</b>{access.length} modules</span></div><div className="paFunctionStrip">{functions.length ? functions.map((item) => <div key={item.id} title={`${functionLabel(item.function_key)} — ${item.status}`}><ProfessionalFunctionIcon type={item.function_key} label={functionLabel(item.function_key)} size={45}/><span>{functionLabel(item.function_key)}</span><small>{item.status}</small></div>) : <p>No professional function assigned.</p>}</div><footer><span>{invitation ? `QR ${invitation.invitation_reference} expires ${date(invitation.expires_at)}` : person.account_type === "directory" ? "Directory record — no login" : "No active QR invitation"}</span>{!['suspended','closed'].includes(person.account_status) && <form action={suspendPerson}><input type="hidden" name="person_id" value={person.id}/><button>Revoke / suspend</button></form>}</footer></article>; })}</div> : <div className="paEmpty">No people have been added. Open “Create person or system user” to begin.</div>}
+      {people.length ? <div className="paPeople">{people.map((person) => { const functions = byPerson(authorizations, person.id); const access = accessByPerson(permissions, person.id); const manager = people.find((item) => item.id === person.manager_person_id); const invitation = invitations.find((item) => item.person_id === person.id && item.status === "active"); return <article key={person.id}><div className="paIdentity"><div className="paInitials">{person.first_name[0]}{person.last_name[0]}</div><div><h3>{person.first_name} {person.last_name}</h3><p>{person.position || "Position not recorded"}{person.department ? ` · ${person.department}` : ""}</p><small>{person.email}</small></div><span className={`status ${person.account_status}`}>{person.account_status}</span></div><div className="paRelations"><span><b>Reports to</b>{manager ? `${manager.first_name} ${manager.last_name}` : "Not assigned"}</span><span><b>Site</b>{person.site || "All / not assigned"}</span><span><b>Module access</b>{access.length} modules</span></div><div className="paFunctionStrip">{functions.length ? functions.map((item) => <div key={item.id} title={`${functionLabel(item.function_key)} — ${item.status}`}><ProfessionalFunctionIcon type={item.function_key} label={functionLabel(item.function_key)} size={45}/><span>{functionLabel(item.function_key)}</span><small>{item.status}</small></div>) : <p>No professional function assigned.</p>}</div><footer><span>{invitation ? `QR ${invitation.invitation_reference} expires ${date(invitation.expires_at)}` : person.account_type === "directory" ? "Directory record — no login" : "No active QR invitation"}</span>{!['suspended','closed'].includes(person.account_status) && <form action={suspendPerson}><input type="hidden" name="person_id" value={person.id}/><button>Revoke / suspend</button></form>}</footer></article>; })}</div> : <div className="paEmpty">No people have been added. Open “Create person or system user” to begin.</div>}
     </section>
   </div></main>;
 }
