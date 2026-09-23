@@ -1,7 +1,3 @@
-"use client";
-
- 
-
 import { useActionState, useMemo, useRef, useState } from "react";
 
  
@@ -362,9 +358,9 @@ export default function BCPSiteProfileForm({ action, initial, organisationName="
 
     const form=formRef.current;
 
-    const get=n=>form?.elements?.namedItem(n)?.value?.trim?.()||"";
+    const get=(name,fallback="")=>{const field=form?.elements?.namedItem(name);return field?String(field.value??"").trim():String(fallback??"").trim()};
 
-    const complete=[get("location_name")&&get("site_leader")&&get("local_facilitator"),get("operational_description")&&services.length,value.some(x=>x.name&&x.owner&&x.products?.length),support.some(x=>x.name&&x.owner&&x.products?.length),dependencies.some(x=>x.name&&x.category&&(x.siteWide||x.processes?.length)),information.assets.some(x=>x.name&&x.owner)||information.systems.some(x=>x.name&&x.businessOwner),people.some(x=>x.name&&x.role&&(!x.email||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email)))].map(Boolean);
+    const complete=[get("location_name",effectiveLocation)&&get("site_leader",initial?.site_leader)&&get("local_facilitator",initial?.local_facilitator),get("operational_description",initial?.operational_description)&&services.length,value.some(x=>x.name&&x.owner&&x.products?.length),support.some(x=>x.name&&x.owner&&x.products?.length),dependencies.some(x=>x.name&&x.category&&(x.siteWide||x.processes?.length)),information.assets.some(x=>x.name&&x.owner)||information.systems.some(x=>x.name&&x.businessOwner),people.some(x=>x.name&&x.role&&(!x.email||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email)))].map(Boolean);
 
     return {complete,percent:Math.round(complete.filter(Boolean).length/steps.length*100)};
 
