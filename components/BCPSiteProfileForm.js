@@ -1,6 +1,6 @@
-import { useActionState, useMemo, useRef, useState } from "react";
+"use client";
 
- 
+import { useActionState, useMemo, useRef, useState } from "react";
 
 const blankProcess = { name:"", description:"", owner:"", products:[], upstream:"", outputs:"", downstream:"", dependencyCategories:[], dependencyDetails:"", obligation:false, obligationDetails:"", stopsCritical:false, breachRisk:false, materialHarm:false, workableAlternative:true, biaOverride:"auto", saved:false };
 
