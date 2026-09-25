@@ -33,7 +33,7 @@ export default async function SoaBoardExecutiveReport({ searchParams }) {
   const requestedOrganisation = typeof query?.organization === "string" ? query.organization : "";
   const selectedOrganisation = organisations.find((item) => item.id === requestedOrganisation) ?? organisations[0];
   const admin = createAdminClient();
-  const data = await loadSoaBoardReportData(admin, user.id, selectedOrganisation.id);
+  const data = await loadSoaBoardReportData(supabase, user.id, selectedOrganisation.id, admin);
   const { metrics, report, generated, topRisks, ready } = data;
   const reference = report?.report_reference || `SOA-MB-${new Date().toISOString().slice(0, 7).replace("-", "")}-${selectedOrganisation.id.replaceAll("-", "").slice(0, 6).toUpperCase()}`;
   const value = (saved, fallback) => saved || fallback;
