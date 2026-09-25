@@ -275,18 +275,6 @@ export default async function PortalPage({ searchParams }) {
               </div>
             </div>
             <div className="pdEvidenceGroup">
-              <SideLink href="/portal/soa">Statement of Applicability</SideLink>
-              <div
-                className="pdEvidenceMenu"
-                aria-label="Statement of Applicability views"
-              >
-                <Link href="/portal/soa">SoA Register</Link>
-                <Link href="/portal/soa/management-board">
-                  SoA Management Board
-                </Link>
-              </div>
-            </div>
-            <div className="pdEvidenceGroup">
               <SideLink href="/portal/information-security">Information Security</SideLink>
               <div className="pdEvidenceMenu" aria-label="Information security hub">
                 <Link href="/portal/information-security">ISMS Dashboard</Link>
