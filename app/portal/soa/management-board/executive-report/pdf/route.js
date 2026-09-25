@@ -49,14 +49,14 @@ export async function GET(request) {
   let organizationId = url.searchParams.get("organization");
 
   if (!organizationId) {
-    const { data: organisation } = await admin.from("organizations").select("id").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
+    const { data: organisation } = await supabase.from("organizations").select("id").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
     organizationId = organisation?.id;
   }
   if (!organizationId) return new Response("Organisation not found.", { status: 404 });
 
   let data;
   try {
-    data = await loadSoaBoardReportData(admin, user.id, organizationId);
+    data = await loadSoaBoardReportData(supabase, user.id, organizationId, admin);
   } catch (error) {
     return new Response(error.message || "Unable to create report.", { status: 500 });
   }
