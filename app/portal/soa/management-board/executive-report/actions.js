@@ -22,7 +22,7 @@ async function getContext(formData) {
   if (!user) redirect(`/portal/login?next=${encodeURIComponent(REPORT_PATH)}`);
 
   const admin = createAdminClient();
-  const data = await loadSoaBoardReportData(admin, user.id, organizationId);
+  const data = await loadSoaBoardReportData(supabase, user.id, organizationId, admin);
   return { admin, user, organizationId, data };
 }
 
