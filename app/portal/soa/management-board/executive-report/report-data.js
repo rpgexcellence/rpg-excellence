@@ -12,8 +12,8 @@ const formatDate = (value) => value
   ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value))
   : "—";
 
-export async function loadSoaBoardReportData(admin, userId, organizationId) {
-  const { data: organisation, error: organisationError } = await admin
+export async function loadSoaBoardReportData(dataClient, userId, organizationId, reportClient = dataClient) {
+  const { data: organisation, error: organisationError } = await dataClient
     .from("organizations")
     .select("id,name")
     .eq("id", organizationId)
@@ -23,12 +23,12 @@ export async function loadSoaBoardReportData(admin, userId, organizationId) {
   if (organisationError || !organisation) throw new Error("Organisation not found or access denied.");
 
   const [assessmentResult, registerResult, entryResult, catalogueResult, findingResult, reportResult] = await Promise.all([
-    admin.from("assessments").select("id,organization_id,standard,workspace_type,status").eq("owner_id", userId).eq("organization_id", organizationId),
-    admin.from("assessment_soa_registers").select("id,assessment_id,status,version,review_due_at,updated_at").eq("owner_id", userId),
-    admin.from("assessment_soa_entries").select("assessment_id,control_id,applicability,implementation_status,residual_risk_level,residual_likelihood,residual_impact,residual_risk_score,treatment_decision,risk_owner,risk_review_due_at,action_required,target_date,finding_reference").eq("owner_id", userId),
-    admin.from("iso27001_control_catalog").select("control_id,control_title,theme").eq("active", true),
-    admin.from("assessment_findings").select("id,assessment_id,status,finding_type").eq("owner_id", userId).neq("finding_type", "conformity"),
-    admin.from("soa_management_reports").select("*").eq("owner_id", userId).eq("organization_id", organizationId).maybeSingle(),
+    dataClient.from("assessments").select("id,organization_id,standard,workspace_type,status").eq("owner_id", userId).eq("organization_id", organizationId),
+    dataClient.from("assessment_soa_registers").select("id,assessment_id,status,version,review_due_at,updated_at").eq("owner_id", userId),
+    dataClient.from("assessment_soa_entries").select("assessment_id,control_id,applicability,implementation_status,residual_risk_level,residual_likelihood,residual_impact,residual_risk_score,treatment_decision,risk_owner,risk_review_due_at,action_required,target_date,finding_reference").eq("owner_id", userId),
+    dataClient.from("iso27001_control_catalog").select("control_id,control_title,theme").eq("active", true),
+    dataClient.from("assessment_findings").select("id,assessment_id,status,finding_type").eq("owner_id", userId).neq("finding_type", "conformity"),
+    reportClient.from("soa_management_reports").select("*").eq("owner_id", userId).eq("organization_id", organizationId).maybeSingle(),
   ]);
 
   const error = assessmentResult.error || registerResult.error || entryResult.error || catalogueResult.error || findingResult.error || reportResult.error;
