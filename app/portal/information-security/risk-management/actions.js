@@ -16,6 +16,7 @@ export async function saveISMSRisk(fd){
  const intent=clean(fd.get("intent"))||"complete",title=clean(fd.get("title")),cause=clean(fd.get("cause")),event=clean(fd.get("event")),consequence=clean(fd.get("consequence")),riskOwner=clean(fd.get("risk_owner")),rationale=clean(fd.get("assessment_rationale"));
  if(!title||!riskOwner)throw new Error("Enter the risk title and select a risk owner.");
  if(intent==="complete"&&(!cause||!event||!consequence||!rationale))throw new Error("Complete the risk statement and assessment rationale.");
+ if(intent==="complete"&&!clean(fd.get("review_due_date")))throw new Error("Select the risk review due date before completing the assessment.");
  const id=clean(fd.get("risk_id")),soaAssessmentId=clean(fd.get("soa_assessment_id"))||null,controls=list(fd.get("controls")),assets=list(fd.get("asset_ids"));
  if(soaAssessmentId){const{data:owned}=await s.from("assessments").select("id").eq("id",soaAssessmentId).eq("owner_id",user.id).maybeSingle();if(!owned)throw new Error("The selected SoA workspace is not available to this account.")}
  const{data:methodology}=await s.from("isms_risk_methodologies").select("id,appetite_score").eq("organization_id",org.id).eq("status","approved").order("approved_at",{ascending:false}).limit(1).maybeSingle();
