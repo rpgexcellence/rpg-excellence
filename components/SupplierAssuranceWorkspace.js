@@ -99,6 +99,7 @@ export default function SupplierAssuranceWorkspace({
   evidenceFiles = [],
   subTierSuppliers = [],
   supplierSites = [],
+  supplierNcStats = {},
   action,
   generateAction,
   saved,
@@ -216,6 +217,7 @@ export default function SupplierAssuranceWorkspace({
   const statusLabel = String(
     active?.approval_status || "draft",
   ).replaceAll("_", " ");
+  const activeNc = active ? (supplierNcStats[active.id] || { open: 0, pending: 0, closed: 0, total: 0 }) : { open: 0, pending: 0, closed: 0, total: 0 };
 
   return (
     <main className="saPage">
@@ -285,6 +287,7 @@ export default function SupplierAssuranceWorkspace({
                     " ",
                   )}
                 </small>
+                <span className="saSupplierNc">NC: {supplierNcStats[supplier.id]?.open || 0} open · {supplierNcStats[supplier.id]?.pending || 0} pending · {supplierNcStats[supplier.id]?.closed || 0} closed</span>
               </Link>
             ))}
           </nav>
@@ -317,6 +320,7 @@ export default function SupplierAssuranceWorkspace({
             </div>
 
             <div>
+              {active ? <Link className="issue" href={`/portal/internal-audit-actions?raise=1&supplier=${active.id}#raise-manual-nc`}>+ Raise Supplier Issue</Link> : null}
               <Link href="/portal">Product dashboard</Link>
               <Link
                 className="primary"
@@ -367,6 +371,9 @@ export default function SupplierAssuranceWorkspace({
               value={suppliers.length}
               detail="Controlled supplier records"
             />
+            <Metric label="NCs open" value={activeNc.open} detail={active ? "Action required" : "Select a supplier"} tone="red" />
+            <Metric label="NCs pending" value={activeNc.pending} detail={active ? "CAPA or verification" : "Select a supplier"} tone="amber" />
+            <Metric label="NCs closed" value={activeNc.closed} detail={active ? "Effectiveness verified" : "Select a supplier"} tone="green" />
             <Metric
               label="High / critical"
               value={
@@ -1427,6 +1434,7 @@ const styles = `
 .saSide nav>a.supplier{display:grid;gap:4px;border:1px solid #ffffff0d}
 .saSide nav>a.supplier b{font-size:11px}
 .saSide nav>a.supplier small{color:#9db4ca;font-size:8px;text-transform:capitalize}
+.saSide nav>a.supplier .saSupplierNc{color:#66dfd5;font-size:8px;font-weight:800;line-height:1.35}
 .saSideFoot{display:grid;gap:5px;margin-top:auto;padding:15px;border-top:1px solid #ffffff1c}
 .saSideFoot span{color:#9db4ca;font-size:10px}
 .saWork{min-width:0;padding:28px clamp(20px,3vw,48px) 100px}
@@ -1437,6 +1445,7 @@ const styles = `
 .saTop>div:last-child{display:flex;gap:8px}
 .saTop a{padding:11px 14px;border:1px solid #c7d5e3;border-radius:9px;background:#fff;color:#173b60;text-decoration:none;font-size:12px;font-weight:850}
 .saTop a.primary{border-color:#315fe6;background:#315fe6;color:#fff}
+.saTop a.issue{border-color:#c87900;background:#fff4df;color:#8a5100}
 .saHero{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:25px;align-items:center;margin-top:22px;padding:28px 30px;border-radius:18px;background:linear-gradient(120deg,#06264d,#0a3a68);color:#fff;box-shadow:0 16px 36px #082a5426}
 .saHero>div>span{color:#61dfdc;font-size:10px;font-weight:950;letter-spacing:.12em}
 .saHero h2{margin:10px 0 8px;font-size:31px}
