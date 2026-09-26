@@ -46,6 +46,7 @@ export default async function SuppliersPage({ searchParams }) {
   let evidenceFiles = [];
   let subTierSuppliers = [];
   let supplierSites = [];
+  let supplierNcStats = {};
 
   if (organization) {
     const { data, error } = await supabase
@@ -60,6 +61,24 @@ export default async function SuppliersPage({ searchParams }) {
     }
 
     suppliers = data || [];
+
+    if (suppliers.length) {
+      const { data: supplierFindings = [], error: supplierFindingsError } = await supabase
+        .from("internal_audit_findings")
+        .select("id,supplier_id,status,linked_rca_case_id,closure_verified")
+        .eq("owner_id", user.id)
+        .in("supplier_id", suppliers.map((supplier) => supplier.id));
+      if (supplierFindingsError) throw new Error(supplierFindingsError.message);
+      supplierNcStats = Object.fromEntries(suppliers.map((supplier) => [supplier.id, { open: 0, pending: 0, closed: 0, total: 0 }]));
+      for (const finding of supplierFindings || []) {
+        const stats = supplierNcStats[finding.supplier_id];
+        if (!stats) continue;
+        stats.total += 1;
+        if (finding.status === "closed" && finding.closure_verified) stats.closed += 1;
+        else if (finding.linked_rca_case_id || ["verification", "technical_review"].includes(finding.status)) stats.pending += 1;
+        else stats.open += 1;
+      }
+    }
 
     const { data: authorisedApprovers = [] } = await supabase
       .from("organization_person_authorizations")
@@ -134,6 +153,7 @@ export default async function SuppliersPage({ searchParams }) {
       evidenceFiles={evidenceFiles}
       subTierSuppliers={subTierSuppliers}
       supplierSites={supplierSites}
+      supplierNcStats={supplierNcStats}
       action={saveSupplier}
       generateAction={generateSupplierCodeOfConduct}
       saved={params?.saved === "1"}
