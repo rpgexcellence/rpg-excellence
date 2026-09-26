@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SuppliersPage({ searchParams }) {
   const params = await searchParams;
+  const managementBoard = params?.view === "board";
   const supabase = await createClient();
 
   const {
@@ -99,7 +100,9 @@ export default async function SuppliersPage({ searchParams }) {
       approvers = people || [];
     }
 
-    if (params?.id) {
+    if (managementBoard) {
+      selected = null;
+    } else if (params?.id) {
       selected =
         suppliers.find((item) => item.id === params.id) ||
         null;
@@ -158,6 +161,7 @@ export default async function SuppliersPage({ searchParams }) {
       supplierSites={supplierSites}
       supplierNcStats={supplierNcStats}
       supplierContacts={supplierContacts}
+      managementBoard={managementBoard}
       action={saveSupplier}
       generateAction={generateSupplierCodeOfConduct}
       saved={params?.saved === "1"}
