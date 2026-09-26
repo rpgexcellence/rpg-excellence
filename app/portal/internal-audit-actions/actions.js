@@ -25,16 +25,23 @@ export async function createManualNonconformity(formData) {
   const objectiveEvidence = clean(formData.get("objective_evidence"));
   const failureStatement = clean(formData.get("failure_statement"));
   const riskLevel = clean(formData.get("risk_level")) || "medium";
+  const supplierId = clean(formData.get("supplier_id"));
   if (!MANUAL_NC_TYPES.has(findingType) || !MANUAL_NC_SOURCES.has(sourceCategory) || !title || !criteria || !objectiveEvidence || !failureStatement || !MANUAL_NC_RISKS.has(riskLevel)) {
     redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
   }
 
   const admin = createAdminClient();
+  if (sourceCategory === "supplier") {
+    if (!supplierId) redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
+    const { data: supplier, error: supplierError } = await admin.from("suppliers").select("id").eq("id", supplierId).eq("owner_id", user.id).maybeSingle();
+    if (supplierError || !supplier) throw new Error(supplierError?.message || "The selected supplier is not available to this account.");
+  }
   const now = new Date();
   const reference = `MNC-${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}-${randomUUID().slice(0, 6).toUpperCase()}`;
   const { data: finding, error: findingError } = await admin.from("internal_audit_findings").insert({
     owner_id: user.id,
     audit_id: null,
+    supplier_id: sourceCategory === "supplier" ? supplierId : null,
     finding_reference: reference,
     finding_type: findingType,
     title,
@@ -74,6 +81,7 @@ export async function createManualNonconformity(formData) {
   }
 
   revalidatePath("/portal/internal-audit-actions");
+  revalidatePath("/portal/suppliers");
   redirect(`/portal/internal-audit-actions?manual_created=${encodeURIComponent(reference)}#all-ncs`);
 }
 
