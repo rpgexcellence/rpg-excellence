@@ -104,6 +104,7 @@ export async function saveSupplier(_state, fd) {
   const performance = json(fd, "performance", {});
   const sites = json(fd, "supplier_sites", []);
   const subtiers = json(fd, "subtier_suppliers", []);
+  const contacts = json(fd, "supplier_contacts", []);
   const criticality = clean(fd.get("criticality")) || "medium";
 
   if (!legalName || !address || !supplyDescription) {
@@ -183,14 +184,10 @@ export async function saveSupplier(_state, fd) {
     country: clean(fd.get("country")) || null,
     company_number: clean(fd.get("company_number")) || null,
     website: clean(fd.get("website")) || null,
-    primary_contact_name:
-      clean(fd.get("primary_contact_name")) || null,
-    primary_contact_title:
-      clean(fd.get("primary_contact_title")) || null,
-    primary_contact_email:
-      clean(fd.get("primary_contact_email")) || null,
-    primary_contact_phone:
-      clean(fd.get("primary_contact_phone")) || null,
+    primary_contact_name: (() => { const contact = contacts.find((item) => item.is_primary) || contacts[0]; return contact ? `${clean(contact.first_name)} ${clean(contact.last_name)}`.trim() || null : null; })(),
+    primary_contact_title: contacts.find((contact) => contact.is_primary)?.business_title || contacts[0]?.business_title || null,
+    primary_contact_email: contacts.find((contact) => contact.is_primary)?.email || contacts[0]?.email || null,
+    primary_contact_phone: contacts.find((contact) => contact.is_primary)?.telephone || contacts[0]?.telephone || null,
     supply_description: supplyDescription,
     supplier_types: types,
     applicable_standards: standards,
@@ -304,6 +301,25 @@ export async function saveSupplier(_state, fd) {
   if (siteRows.length) {
     const { error } = await supabase.from("supplier_sites").upsert(siteRows);
     if (error) return { error: `Supplier saved, but sites could not be saved: ${error.message}` };
+  }
+
+  const contactRows = contacts.filter((contact) => clean(contact.first_name) || clean(contact.last_name) || clean(contact.email)).map((contact) => ({
+    ...(uuid(contact.id) ? { id: contact.id } : {}), supplier_id: savedId, organization_id: organization.id, owner_id: user.id,
+    first_name: clean(contact.first_name), last_name: clean(contact.last_name) || null,
+    business_title: clean(contact.business_title) || null, department: clean(contact.department) || null,
+    telephone: clean(contact.telephone) || null, mobile: clean(contact.mobile) || null,
+    email: clean(contact.email).toLowerCase(), is_primary: Boolean(contact.is_primary), is_active: contact.is_active !== false,
+    updated_at: now,
+  }));
+  if (contactRows.some((contact) => !contact.first_name || !contact.email)) return { error: "Each supplier contact requires a first name and email address." };
+  if (contactRows.filter((contact) => contact.is_primary).length > 1) return { error: "Only one supplier contact can be marked as primary." };
+  const retainedContactIds = contactRows.filter((contact) => contact.id).map((contact) => contact.id);
+  let deleteContacts = supabase.from("supplier_contacts").delete().eq("supplier_id", savedId);
+  if (retainedContactIds.length) deleteContacts = deleteContacts.not("id", "in", `(${retainedContactIds.join(",")})`);
+  await deleteContacts;
+  if (contactRows.length) {
+    const { error } = await supabase.from("supplier_contacts").upsert(contactRows);
+    if (error) return { error: `Supplier saved, but contacts could not be saved: ${error.message}` };
   }
 
   const retainedSubtierIds = subtiers.filter((supplier) => uuid(supplier.id)).map((supplier) => supplier.id);
