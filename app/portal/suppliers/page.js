@@ -47,6 +47,7 @@ export default async function SuppliersPage({ searchParams }) {
   let subTierSuppliers = [];
   let supplierSites = [];
   let supplierNcStats = {};
+  let supplierContacts = [];
 
   if (organization) {
     const { data, error } = await supabase
@@ -125,10 +126,11 @@ export default async function SuppliersPage({ searchParams }) {
 
       documents = docs || [];
 
-      const [{ data: evidence = [] }, { data: subtiers = [] }, { data: sites = [] }] = await Promise.all([
+      const [{ data: evidence = [] }, { data: subtiers = [] }, { data: sites = [] }, { data: contacts = [] }] = await Promise.all([
         supabase.from("supplier_evidence_files").select("id,control_id,file_name,storage_path,uploaded_at").eq("supplier_id", selected.id).order("uploaded_at", { ascending: false }),
         supabase.from("supplier_subtier_suppliers").select("*").eq("supplier_id", selected.id).order("created_at"),
         supabase.from("supplier_sites").select("*").eq("supplier_id", selected.id).order("created_at"),
+        supabase.from("supplier_contacts").select("*").eq("supplier_id", selected.id).order("is_primary", { ascending: false }).order("last_name"),
       ]);
       evidenceFiles = await Promise.all((evidence || []).map(async (file) => {
         const { data: signed } = await supabase.storage.from("supplier-assurance-evidence").createSignedUrl(file.storage_path, 3600);
@@ -140,6 +142,7 @@ export default async function SuppliersPage({ searchParams }) {
         return { ...supplier, client_key: supplier.id, certificate_url: signed?.signedUrl || "#" };
       }));
       supplierSites = (sites || []).map((site) => ({ ...site, client_key: site.id }));
+      supplierContacts = (contacts || []).map((contact) => ({ ...contact, client_key: contact.id }));
     }
   }
 
@@ -154,6 +157,7 @@ export default async function SuppliersPage({ searchParams }) {
       subTierSuppliers={subTierSuppliers}
       supplierSites={supplierSites}
       supplierNcStats={supplierNcStats}
+      supplierContacts={supplierContacts}
       action={saveSupplier}
       generateAction={generateSupplierCodeOfConduct}
       saved={params?.saved === "1"}
