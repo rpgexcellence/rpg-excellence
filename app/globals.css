@@ -101,6 +101,47 @@ a {
   align-items: center;
   gap: 10px;
 }
+.headerYouTube {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid #d8e0ea;
+  border-radius: 10px;
+  background: #fff;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+.headerYouTube svg {
+  width: 24px;
+  height: 24px;
+}
+.headerYouTube .youtubeBody,
+.footerYouTube .youtubeBody {
+  fill: #ff0033;
+}
+.headerYouTube .youtubePlay,
+.footerYouTube .youtubePlay {
+  fill: #fff;
+}
+.headerYouTube:hover {
+  border-color: #ff0033;
+  background: #fff5f7;
+  transform: translateY(-1px);
+}
+.headerYouTube:focus-visible {
+  outline: 3px solid #ff8aa2;
+  outline-offset: 3px;
+}
+.headerYouTubeHome {
+  border-color: #8ba3c0;
+  background: rgba(255, 255, 255, 0.08);
+}
+.headerYouTubeHome:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: #fff;
+}
 .language {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -459,7 +500,15 @@ a {
   gap: 24px;
   border-top: 1px solid var(--line);
 }
-.footerLinkedIn {
+.footerSocials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin-left: -36px;
+}
+.footerLinkedIn,
+.footerYouTube {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -482,12 +531,27 @@ a {
   fill: currentColor;
   flex: 0 0 auto;
 }
+.footerYouTube {
+  color: #3a4657;
+}
+.footerYouTube svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
 .footerLinkedIn:hover {
   background: #eef6ff;
   border-color: #0a66c2;
   transform: translateY(-1px);
 }
-.footerLinkedIn:focus-visible {
+.footerYouTube:hover {
+  background: #fff5f7;
+  border-color: #ff0033;
+  color: #171717;
+  transform: translateY(-1px);
+}
+.footerLinkedIn:focus-visible,
+.footerYouTube:focus-visible {
   outline: 3px solid #87bff2;
   outline-offset: 3px;
 }
@@ -662,6 +726,10 @@ a {
   }
   .footer {
     grid-template-columns: 1fr;
+  }
+  .footerSocials {
+    margin-left: 0;
+    flex-wrap: wrap;
   }
   .footerLinks {
     flex-wrap: wrap;
