@@ -2,7 +2,14 @@
 
 import { useActionState, useMemo, useState } from "react";
 
-const steps = ["Linked scope", "Activities", "Impacts over time", "Recovery objectives", "Resources & dependencies", "BIA register"];
+const steps = [
+  "Linked scope",
+  "Activities",
+  "Impacts over time",
+  "Recovery objectives",
+  "Resources & dependencies",
+  "BIA register",
+];
 const horizons = [
   { key: "h0", label: "0-4 hours", hours: 4 },
   { key: "h1", label: "4-24 hours", hours: 24 },
@@ -11,57 +18,336 @@ const horizons = [
   { key: "h4", label: "1-2 weeks", hours: 336 },
   { key: "h5", label: "Over 2 weeks", hours: 720 },
 ];
-const impactTypes = ["Financial", "Customer / service", "Legal / regulatory", "Reputation", "People / welfare", "Operations", "Environment", "Information / data"];
-const resourceTypes = ["People & competence", "Premises & workspace", "Technology & applications", "Data & vital records", "Equipment & consumables", "Utilities", "Suppliers & partners", "Transport & logistics", "Communications", "Finance & insurance"];
-const evidenceTypes = ["Document / procedure", "Contract / SLA", "System or asset record", "Training / competence record", "Supplier evidence", "Exercise / test result", "Inventory / resource record", "Other evidence"];
+const impactTypes = [
+  "Financial",
+  "Customer / service",
+  "Legal / regulatory",
+  "Reputation",
+  "People / welfare",
+  "Operations",
+  "Environment",
+  "Information / data",
+];
+const resourceTypes = [
+  "People & competence",
+  "Premises & workspace",
+  "Technology & applications",
+  "Data & vital records",
+  "Equipment & consumables",
+  "Utilities",
+  "Suppliers & partners",
+  "Transport & logistics",
+  "Communications",
+  "Finance & insurance",
+];
+const evidenceTypes = [
+  "Document / procedure",
+  "Contract / SLA",
+  "System or asset record",
+  "Training / competence record",
+  "Supplier evidence",
+  "Exercise / test result",
+  "Inventory / resource record",
+  "Other evidence",
+];
 const arr = (v) => (Array.isArray(v) ? v : []);
 const uid = () => crypto.randomUUID();
 const clamp = (n, a, b) => Math.max(a, Math.min(b, Number(n) || a));
-const priorHours = (hours) => horizons[Math.max(0, horizons.findIndex((x) => x.hours === hours) - 1)]?.hours || 4;
-const emptyScores = () => Object.fromEntries(impactTypes.map((t) => [t, Object.fromEntries(horizons.map((h) => [h.key, 0]))]));
+const priorHours = (hours) =>
+  horizons[Math.max(0, horizons.findIndex((x) => x.hours === hours) - 1)]
+    ?.hours || 4;
+const emptyScores = () =>
+  Object.fromEntries(
+    impactTypes.map((t) => [
+      t,
+      Object.fromEntries(horizons.map((h) => [h.key, 0])),
+    ]),
+  );
 const emptyActivity = (source = {}) => ({
-  id: uid(), name: source.name || "", description: source.description || "", owner: source.owner || "", products: arr(source.products),
-  processType: source.processType || "Value-chain", included: true, impactScores: emptyScores(), impactRationales: {}, unacceptableThreshold: 4,
-  mtpdHours: 0, rtoHours: 0, mbcoPercent: 30, troHours: 0, rpoHours: 24, manualWorkaround: "", workaroundDurationHours: 0,
-  remoteCapable: false, workloadShift: "", minimumPeople: 1, requiredSkills: [], resources: [], dependencies: [], hazards: [],
-  recoveryPriority: "", assumptions: "", evidence: [], strategyRequirements: [],
+  id: uid(),
+  name: source.name || "",
+  description: source.description || "",
+  ownerPersonId: source.ownerPersonId || "",
+  owner: source.owner || "",
+  products: arr(source.products),
+  processType: source.processType || "Value-chain",
+  included: true,
+  impactScores: emptyScores(),
+  impactRationales: {},
+  unacceptableThreshold: 4,
+  mtpdHours: 0,
+  rtoHours: 0,
+  mbcoPercent: 30,
+  troHours: 0,
+  rpoHours: 24,
+  manualWorkaround: "",
+  workaroundDurationHours: 0,
+  remoteCapable: false,
+  workloadShift: "",
+  minimumPeople: 1,
+  requiredSkills: [],
+  resources: [],
+  dependencies: [],
+  hazards: [],
+  recoveryPriority: "",
+  assumptions: "",
+  evidence: [],
+  strategyRequirements: [],
 });
-const normaliseEvidence = (x, index) => typeof x === "string" ? { id: `legacy-${index}-${x}`, type: "Document / procedure", reference: x, description: "" } : { id: x?.id || `evidence-${index}`, type: x?.type || "Document / procedure", reference: x?.reference || x?.title || "", description: x?.description || "" };
-const normalise = (x) => ({ ...emptyActivity(x), ...x, products: arr(x?.products), impactScores: { ...emptyScores(), ...(x?.impactScores || {}) }, impactRationales: x?.impactRationales || {}, requiredSkills: arr(x?.requiredSkills), resources: arr(x?.resources), dependencies: arr(x?.dependencies), hazards: arr(x?.hazards), evidence: arr(x?.evidence).map(normaliseEvidence), strategyRequirements: arr(x?.strategyRequirements) });
-const maxAt = (item, key) => Math.max(...impactTypes.map((t) => Number(item.impactScores?.[t]?.[key] || 0)));
+const normaliseEvidence = (x, index) =>
+  typeof x === "string"
+    ? {
+        id: `legacy-${index}-${x}`,
+        type: "Document / procedure",
+        reference: x,
+        description: "",
+      }
+    : {
+        id: x?.id || `evidence-${index}`,
+        type: x?.type || "Document / procedure",
+        reference: x?.reference || x?.title || "",
+        description: x?.description || "",
+      };
+const normalise = (x) => ({
+  ...emptyActivity(x),
+  ...x,
+  products: arr(x?.products),
+  impactScores: { ...emptyScores(), ...(x?.impactScores || {}) },
+  impactRationales: x?.impactRationales || {},
+  requiredSkills: arr(x?.requiredSkills),
+  resources: arr(x?.resources),
+  dependencies: arr(x?.dependencies),
+  hazards: arr(x?.hazards),
+  evidence: arr(x?.evidence).map(normaliseEvidence),
+  strategyRequirements: arr(x?.strategyRequirements),
+});
+const maxAt = (item, key) =>
+  Math.max(
+    ...impactTypes.map((t) => Number(item.impactScores?.[t]?.[key] || 0)),
+  );
 const derive = (item) => {
   const threshold = clamp(item.unacceptableThreshold, 3, 5);
   const hit = horizons.find((h) => maxAt(item, h.key) >= threshold);
   const mtpd = Number(item.mtpdHours) || hit?.hours || 0;
   const rto = Number(item.rtoHours) || (mtpd ? priorHours(mtpd) : 0);
   const peak = Math.max(...horizons.map((h) => maxAt(item, h.key)));
-  const priority = !rto ? "Unconfirmed" : rto <= 4 ? "P1 Immediate" : rto <= 24 ? "P2 Same day" : rto <= 72 ? "P3 Within 3 days" : rto <= 168 ? "P4 Within 1 week" : "P5 Planned recovery";
-  const valid = Boolean(mtpd && rto && rto < mtpd && Number(item.mbcoPercent) > 0 && Number(item.troHours) >= rto && Number(item.rpoHours) >= 0);
+  const priority = !rto
+    ? "Unconfirmed"
+    : rto <= 4
+      ? "P1 Immediate"
+      : rto <= 24
+        ? "P2 Same day"
+        : rto <= 72
+          ? "P3 Within 3 days"
+          : rto <= 168
+            ? "P4 Within 1 week"
+            : "P5 Planned recovery";
+  const valid = Boolean(
+    mtpd &&
+    rto &&
+    rto < mtpd &&
+    Number(item.mbcoPercent) > 0 &&
+    Number(item.troHours) >= rto &&
+    Number(item.rpoHours) >= 0,
+  );
   return { mtpd, rto, peak, priority, valid };
 };
-const split = (v) => String(v || "").split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
+const split = (v) =>
+  String(v || "")
+    .split(/[,\n]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 
-function Field({ label, value, onChange, area = false, type = "text", children, ...rest }) {
-  return <label>{label}{children || (area ? <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} {...rest} /> : <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} {...rest} />)}</label>;
+function Field({
+  label,
+  value,
+  onChange,
+  area = false,
+  type = "text",
+  children,
+  ...rest
+}) {
+  return (
+    <label>
+      {label}
+      {children ||
+        (area ? (
+          <textarea
+            value={value || ""}
+            onChange={(e) => onChange(e.target.value)}
+            {...rest}
+          />
+        ) : (
+          <input
+            type={type}
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            {...rest}
+          />
+        ))}
+    </label>
+  );
+}
+const personName = (person) =>
+  person ? `${person.first_name} ${person.last_name}`.trim() : "";
+function PersonSelect({ item, change, people }) {
+  return (
+    <label>
+      Accountable owner *
+      <select
+        value={item.ownerPersonId || ""}
+        onChange={(e) => {
+          const person = people.find((x) => x.id === e.target.value);
+          change({
+            ownerPersonId: e.target.value,
+            owner: personName(person),
+          });
+        }}
+      >
+        <option value="">Select approved Company Person</option>
+        {people.map((person) => (
+          <option value={person.id} key={person.id}>
+            {personName(person)}
+            {person.position ? ` · ${person.position}` : ""}
+          </option>
+        ))}
+      </select>
+      <small className="biaOwnerGuide">
+        Linked to an active Company People profile with Business Continuity
+        access.
+      </small>
+    </label>
+  );
 }
 function Chips({ values, options, onChange }) {
-  return <div className="biaChips">{options.map((x) => <button type="button" key={x} className={values.includes(x) ? "selected" : ""} onClick={() => onChange(values.includes(x) ? values.filter((v) => v !== x) : [...values, x])}>{values.includes(x) ? "✓ " : "+ "}{x}</button>)}</div>;
+  return (
+    <div className="biaChips">
+      {options.map((x) => (
+        <button
+          type="button"
+          key={x}
+          className={values.includes(x) ? "selected" : ""}
+          onClick={() =>
+            onChange(
+              values.includes(x)
+                ? values.filter((v) => v !== x)
+                : [...values, x],
+            )
+          }
+        >
+          {values.includes(x) ? "✓ " : "+ "}
+          {x}
+        </button>
+      ))}
+    </div>
+  );
 }
 function suggestedSkills(item) {
-  const text = `${item.name} ${item.description} ${arr(item.products).join(" ")} ${item.processType}`.toLowerCase();
-  const common = ["Business continuity awareness", "Incident communication", "Prioritisation under disruption", "Documented procedure knowledge"];
-  const rules = [
-    [["customer", "enquiry", "support"], ["Customer communication", "CRM / case management", "Service-level triage", "Complaint handling", "Product and service knowledge"]],
-    [["contract", "commercial", "quotation"], ["Contract review", "Commercial risk assessment", "Customer requirements analysis", "Legal and regulatory awareness", "Technical feasibility review"]],
-    [["plan", "planning", "schedule"], ["Operational planning", "Capacity and resource planning", "Work scheduling", "Contingency planning", "Supply-chain coordination"]],
-    [["delivery", "service", "product"], ["Operational delivery", "Quality control", "Technical competence", "Customer coordination", "Problem solving and escalation"]],
-    [["software", "system", "digital", "data", "technology"], ["Application administration", "Cybersecurity awareness", "Backup and data restoration", "IT incident response", "Vendor technical support"]],
-    [["supplier", "procurement", "purchase"], ["Supplier management", "Alternative sourcing", "Purchase authorisation", "Supply risk assessment", "Expediting"]],
-    [["finance", "payment", "invoice"], ["Financial systems access", "Payment authorisation", "Cash-flow prioritisation", "Financial control", "Fraud prevention"]],
-    [["laboratory", "test", "inspection", "engineering"], ["Authorised technical competence", "Equipment operation", "Method and specification knowledge", "Measurement assurance", "Technical result review"]],
+  const text =
+    `${item.name} ${item.description} ${arr(item.products).join(" ")} ${item.processType}`.toLowerCase();
+  const common = [
+    "Business continuity awareness",
+    "Incident communication",
+    "Prioritisation under disruption",
+    "Documented procedure knowledge",
   ];
-  const matched = rules.flatMap(([terms, skills]) => terms.some((term) => text.includes(term)) ? skills : []);
-  const fallback = item.processType === "Support" ? ["Support-service coordination", "Internal customer communication", "Service restoration"] : ["Process operation", "Output verification", "Operational decision-making"];
+  const rules = [
+    [
+      ["customer", "enquiry", "support"],
+      [
+        "Customer communication",
+        "CRM / case management",
+        "Service-level triage",
+        "Complaint handling",
+        "Product and service knowledge",
+      ],
+    ],
+    [
+      ["contract", "commercial", "quotation"],
+      [
+        "Contract review",
+        "Commercial risk assessment",
+        "Customer requirements analysis",
+        "Legal and regulatory awareness",
+        "Technical feasibility review",
+      ],
+    ],
+    [
+      ["plan", "planning", "schedule"],
+      [
+        "Operational planning",
+        "Capacity and resource planning",
+        "Work scheduling",
+        "Contingency planning",
+        "Supply-chain coordination",
+      ],
+    ],
+    [
+      ["delivery", "service", "product"],
+      [
+        "Operational delivery",
+        "Quality control",
+        "Technical competence",
+        "Customer coordination",
+        "Problem solving and escalation",
+      ],
+    ],
+    [
+      ["software", "system", "digital", "data", "technology"],
+      [
+        "Application administration",
+        "Cybersecurity awareness",
+        "Backup and data restoration",
+        "IT incident response",
+        "Vendor technical support",
+      ],
+    ],
+    [
+      ["supplier", "procurement", "purchase"],
+      [
+        "Supplier management",
+        "Alternative sourcing",
+        "Purchase authorisation",
+        "Supply risk assessment",
+        "Expediting",
+      ],
+    ],
+    [
+      ["finance", "payment", "invoice"],
+      [
+        "Financial systems access",
+        "Payment authorisation",
+        "Cash-flow prioritisation",
+        "Financial control",
+        "Fraud prevention",
+      ],
+    ],
+    [
+      ["laboratory", "test", "inspection", "engineering"],
+      [
+        "Authorised technical competence",
+        "Equipment operation",
+        "Method and specification knowledge",
+        "Measurement assurance",
+        "Technical result review",
+      ],
+    ],
+  ];
+  const matched = rules.flatMap(([terms, skills]) =>
+    terms.some((term) => text.includes(term)) ? skills : [],
+  );
+  const fallback =
+    item.processType === "Support"
+      ? [
+          "Support-service coordination",
+          "Internal customer communication",
+          "Service restoration",
+        ]
+      : [
+          "Process operation",
+          "Output verification",
+          "Operational decision-making",
+        ];
   return [...new Set([...matched, ...fallback, ...common])].slice(0, 12);
 }
 function SkillSelector({ item, change }) {
@@ -72,7 +358,40 @@ function SkillSelector({ item, change }) {
     change("requiredSkills", [...new Set([...item.requiredSkills, value])]);
     setCustomSkill("");
   };
-  return <div className="biaStructuredEditor"><div className="biaEditorHead"><b>Required skills / competence</b><span>{item.requiredSkills.length} selected</span></div><small>Select the minimum competence needed to recover this activity at MBCO.</small><Chips values={item.requiredSkills} options={[...new Set([...suggestedSkills(item), ...item.requiredSkills])]} onChange={(v) => change("requiredSkills", v)}/><div className="biaInlineAdd"><input value={customSkill} onChange={(e) => setCustomSkill(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }} placeholder="Add organisation-specific skill or competence"/><button type="button" onClick={addCustom}>+ Add skill</button></div></div>;
+  return (
+    <div className="biaStructuredEditor">
+      <div className="biaEditorHead">
+        <b>Required skills / competence</b>
+        <span>{item.requiredSkills.length} selected</span>
+      </div>
+      <small>
+        Select the minimum competence needed to recover this activity at MBCO.
+      </small>
+      <Chips
+        values={item.requiredSkills}
+        options={[
+          ...new Set([...suggestedSkills(item), ...item.requiredSkills]),
+        ]}
+        onChange={(v) => change("requiredSkills", v)}
+      />
+      <div className="biaInlineAdd">
+        <input
+          value={customSkill}
+          onChange={(e) => setCustomSkill(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addCustom();
+            }
+          }}
+          placeholder="Add organisation-specific skill or competence"
+        />
+        <button type="button" onClick={addCustom}>
+          + Add skill
+        </button>
+      </div>
+    </div>
+  );
 }
 function EvidenceEditor({ item, change }) {
   const [type, setType] = useState(evidenceTypes[0]);
@@ -80,74 +399,1138 @@ function EvidenceEditor({ item, change }) {
   const [description, setDescription] = useState("");
   const save = () => {
     if (!reference.trim() || !description.trim()) return;
-    change("evidence", [...item.evidence, { id: uid(), type, reference: reference.trim(), description: description.trim() }]);
-    setType(evidenceTypes[0]); setReference(""); setDescription("");
+    change("evidence", [
+      ...item.evidence,
+      {
+        id: uid(),
+        type,
+        reference: reference.trim(),
+        description: description.trim(),
+      },
+    ]);
+    setType(evidenceTypes[0]);
+    setReference("");
+    setDescription("");
   };
-  const removeEvidence = (id) => change("evidence", item.evidence.filter((x) => x.id !== id));
-  return <div className="biaStructuredEditor biaEvidenceEditor"><div className="biaEditorHead"><b>Evidence references</b><span>{item.evidence.length} saved</span></div><small>Add a traceable reference and explain what it demonstrates for this recovery requirement.</small>{item.evidence.length > 0 && <div className="biaEvidenceList">{item.evidence.map((entry) => <article key={entry.id}><div><small>{entry.type}</small><b>{entry.reference}</b><p>{entry.description || "Legacy reference — add a description by replacing this entry."}</p></div><button type="button" onClick={() => removeEvidence(entry.id)}>Remove</button></article>)}</div>}<div className="biaEvidenceForm"><label>Evidence type<select value={type} onChange={(e) => setType(e.target.value)}>{evidenceTypes.map((x) => <option key={x}>{x}</option>)}</select></label><label>Reference / title *<input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. BC exercise report EX-2026-04"/></label><label className="wide">What does this evidence demonstrate? *<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe availability, capacity, recovery capability, test result or assurance provided."/></label><button type="button" disabled={!reference.trim() || !description.trim()} onClick={save}>Save evidence reference</button></div></div>;
+  const removeEvidence = (id) =>
+    change(
+      "evidence",
+      item.evidence.filter((x) => x.id !== id),
+    );
+  return (
+    <div className="biaStructuredEditor biaEvidenceEditor">
+      <div className="biaEditorHead">
+        <b>Evidence references</b>
+        <span>{item.evidence.length} saved</span>
+      </div>
+      <small>
+        Add a traceable reference and explain what it demonstrates for this
+        recovery requirement.
+      </small>
+      {item.evidence.length > 0 && (
+        <div className="biaEvidenceList">
+          {item.evidence.map((entry) => (
+            <article key={entry.id}>
+              <div>
+                <small>{entry.type}</small>
+                <b>{entry.reference}</b>
+                <p>
+                  {entry.description ||
+                    "Legacy reference — add a description by replacing this entry."}
+                </p>
+              </div>
+              <button type="button" onClick={() => removeEvidence(entry.id)}>
+                Remove
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
+      <div className="biaEvidenceForm">
+        <label>
+          Evidence type
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            {evidenceTypes.map((x) => (
+              <option key={x}>{x}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Reference / title *
+          <input
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="e.g. BC exercise report EX-2026-04"
+          />
+        </label>
+        <label className="wide">
+          What does this evidence demonstrate? *
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe availability, capacity, recovery capability, test result or assurance provided."
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!reference.trim() || !description.trim()}
+          onClick={save}
+        >
+          Save evidence reference
+        </button>
+      </div>
+    </div>
+  );
 }
 function ImpactEditor({ item, change }) {
-  const setScore = (type, key, value) => change("impactScores", { ...item.impactScores, [type]: { ...(item.impactScores[type] || {}), [key]: Number(value) } });
-  return <div className="biaImpactWrap"><table className="biaImpact"><thead><tr><th>Impact type</th>{horizons.map((h) => <th key={h.key}>{h.label}</th>)}<th>Rationale</th></tr></thead><tbody>{impactTypes.map((type) => <tr key={type}><th>{type}</th>{horizons.map((h) => <td key={h.key}><select aria-label={`${type} at ${h.label}`} value={item.impactScores?.[type]?.[h.key] || 0} onChange={(e) => setScore(type, h.key, e.target.value)}><option value="0">N/A</option><option value="1">1 Minimal</option><option value="2">2 Minor</option><option value="3">3 Material</option><option value="4">4 Major</option><option value="5">5 Severe</option></select></td>)}<td><input value={item.impactRationales?.[type] || ""} onChange={(e) => change("impactRationales", { ...item.impactRationales, [type]: e.target.value })} placeholder="Evidence / consequence" /></td></tr>)}</tbody></table></div>;
+  const setScore = (type, key, value) =>
+    change("impactScores", {
+      ...item.impactScores,
+      [type]: { ...(item.impactScores[type] || {}), [key]: Number(value) },
+    });
+  return (
+    <div className="biaImpactWrap">
+      <table className="biaImpact">
+        <thead>
+          <tr>
+            <th>Impact type</th>
+            {horizons.map((h) => (
+              <th key={h.key}>{h.label}</th>
+            ))}
+            <th>Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          {impactTypes.map((type) => (
+            <tr key={type}>
+              <th>{type}</th>
+              {horizons.map((h) => (
+                <td key={h.key}>
+                  <select
+                    aria-label={`${type} at ${h.label}`}
+                    value={item.impactScores?.[type]?.[h.key] || 0}
+                    onChange={(e) => setScore(type, h.key, e.target.value)}
+                  >
+                    <option value="0">N/A</option>
+                    <option value="1">1 Minimal</option>
+                    <option value="2">2 Minor</option>
+                    <option value="3">3 Material</option>
+                    <option value="4">4 Major</option>
+                    <option value="5">5 Severe</option>
+                  </select>
+                </td>
+              ))}
+              <td>
+                <input
+                  value={item.impactRationales?.[type] || ""}
+                  onChange={(e) =>
+                    change("impactRationales", {
+                      ...item.impactRationales,
+                      [type]: e.target.value,
+                    })
+                  }
+                  placeholder="Evidence / consequence"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
-function ActivityCard({ item, activities, setActivities, hazards = [], sourceDependencies = [], mode }) {
-  const change = (key, value) => setActivities(activities.map((x) => x.id === item.id ? { ...x, [key]: value } : x));
-  const remove = () => setActivities(activities.filter((x) => x.id !== item.id));
+function ActivityCard({
+  item,
+  activities,
+  setActivities,
+  hazards = [],
+  sourceDependencies = [],
+  people = [],
+  mode,
+}) {
+  const change = (key, value) =>
+    setActivities(
+      activities.map((x) =>
+        x.id === item.id
+          ? { ...x, ...(typeof key === "object" ? key : { [key]: value }) }
+          : x,
+      ),
+    );
+  const remove = () =>
+    setActivities(activities.filter((x) => x.id !== item.id));
   const d = derive(item);
-  const applicableHazards = arr(hazards).filter((h) => arr(h.affectedProcesses).includes(item.name) || !arr(h.affectedProcesses).length);
-  if (mode === "select" && item.processType === "Site-specific") return <article className={`biaActivityEdit ${item.included ? "included" : ""}`}><header><div><b>Define site-specific activity</b><span>Record an activity that is not inherited from Module 1.</span></div><button type="button" className="remove" onClick={remove}>Remove</button></header><div className="biaGrid"><Field label="Activity name *" value={item.name} onChange={(v) => change("name", v)} placeholder="e.g. Emergency customer support"/><Field label="Accountable owner *" value={item.owner} onChange={(v) => change("owner", v)} placeholder="Role or named owner"/><Field area label="Activity description" value={item.description} onChange={(v) => change("description", v)} placeholder="Purpose, outputs and continuity relevance"/><Field label="Products / services supported" value={item.products.join(", ")} onChange={(v) => change("products", split(v))} placeholder="Separate entries with commas"/></div><label className="biaCheck compact"><input type="checkbox" checked={item.included} onChange={(e) => change("included", e.target.checked)}/> Include this activity in the BIA</label></article>;
-  if (mode === "select") return <article className={`biaActivityPick ${item.included ? "included" : ""}`}><div><b>{item.name || "Unnamed activity"}</b><span>{item.processType} · {item.owner || "Owner not assigned"}</span><small>{item.products.join(", ") || "No product/service linked"}</small></div><button type="button" onClick={() => change("included", !item.included)}>{item.included ? "✓ Included" : "+ Include"}</button></article>;
+  const applicableHazards = arr(hazards).filter(
+    (h) =>
+      arr(h.affectedProcesses).includes(item.name) ||
+      !arr(h.affectedProcesses).length,
+  );
+  if (mode === "select" && item.processType === "Site-specific")
+    return (
+      <article className={`biaActivityEdit ${item.included ? "included" : ""}`}>
+        <header>
+          <div>
+            <b>Define site-specific activity</b>
+            <span>Record an activity that is not inherited from Module 1.</span>
+          </div>
+          <button type="button" className="remove" onClick={remove}>
+            Remove
+          </button>
+        </header>
+        <div className="biaGrid">
+          <Field
+            label="Activity name *"
+            value={item.name}
+            onChange={(v) => change("name", v)}
+            placeholder="e.g. Emergency customer support"
+          />
+          <PersonSelect item={item} change={change} people={people} />
+          <Field
+            area
+            label="Activity description"
+            value={item.description}
+            onChange={(v) => change("description", v)}
+            placeholder="Purpose, outputs and continuity relevance"
+          />
+          <Field
+            label="Products / services supported"
+            value={item.products.join(", ")}
+            onChange={(v) => change("products", split(v))}
+            placeholder="Separate entries with commas"
+          />
+        </div>
+        <label className="biaCheck compact">
+          <input
+            type="checkbox"
+            checked={item.included}
+            onChange={(e) => change("included", e.target.checked)}
+          />{" "}
+          Include this activity in the BIA
+        </label>
+      </article>
+    );
+  if (mode === "select")
+    return (
+      <article className={`biaActivityPick ${item.included ? "included" : ""}`}>
+        <div>
+          <b>{item.name || "Unnamed activity"}</b>
+          <span>
+            {item.processType} · {item.owner || "Owner not assigned"}
+          </span>
+          <small>
+            {item.products.join(", ") || "No product/service linked"}
+          </small>
+          {item.included && (
+            <PersonSelect item={item} change={change} people={people} />
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => change("included", !item.included)}
+        >
+          {item.included ? "✓ Included" : "+ Include"}
+        </button>
+      </article>
+    );
   if (!item.included) return null;
-  if (mode === "impact") return <article className="biaRecord"><header><div><b>{item.name}</b><span>{item.products.join(", ") || "Supporting activity"}</span></div><strong className={`score s${d.peak}`}>Peak {d.peak}/5</strong></header><ImpactEditor item={item} change={change}/><div className="biaGrid three"><Field label="Unacceptable impact threshold" value={item.unacceptableThreshold} onChange={(v) => change("unacceptableThreshold", Number(v))}>{<select value={item.unacceptableThreshold} onChange={(e) => change("unacceptableThreshold", Number(e.target.value))}><option value="3">3 Material</option><option value="4">4 Major</option><option value="5">5 Severe</option></select>}</Field><div className="biaEngine"><small>INDICATIVE MTPD</small><b>{d.mtpd ? `${d.mtpd} hours` : "Not reached"}</b><span>First period where impact becomes unacceptable · management confirmation required</span></div><Field area label="Overall assumptions and evidence" value={item.assumptions} onChange={(v) => change("assumptions", v)} /></div></article>;
-  if (mode === "objectives") return <article className="biaRecord"><header><div><b>{item.name}</b><span>{d.priority}</span></div><strong className={d.valid ? "valid" : "invalid"}>{d.valid ? "Objectives valid" : "Review timing"}</strong></header><div className="biaTimeline"><span>Disruption</span><i style={{ width: `${Math.min(100, (d.rto / Math.max(d.mtpd, 1)) * 100)}%` }} /><b>RTO {d.rto || "-"}h</b><i /><b>MTPD {d.mtpd || "-"}h</b></div><div className="biaGrid three"><Field type="number" label="MTPD hours *" value={item.mtpdHours || d.mtpd} onChange={(v) => change("mtpdHours", Number(v))} min="1"/><Field type="number" label="RTO hours *" value={item.rtoHours || d.rto} onChange={(v) => change("rtoHours", Number(v))} min="1"/><Field type="number" label="MBCO minimum capacity % *" value={item.mbcoPercent} onChange={(v) => change("mbcoPercent", Number(v))} min="1" max="100"/><Field type="number" label="TRO full recovery hours *" value={item.troHours} onChange={(v) => change("troHours", Number(v))} min="1"/><Field type="number" label="RPO maximum data loss hours *" value={item.rpoHours} onChange={(v) => change("rpoHours", Number(v))} min="0"/><Field label="Recovery priority" value={item.recoveryPriority || d.priority} onChange={(v) => change("recoveryPriority", v)} /></div><div className="biaGrid"><Field area label="Minimum continuity operating arrangement" value={item.manualWorkaround} onChange={(v) => change("manualWorkaround", v)} placeholder="Describe what must operate at the MBCO level"/><Field type="number" label="Maximum workaround duration hours" value={item.workaroundDurationHours} onChange={(v) => change("workaroundDurationHours", Number(v))}/><Field label="Workload shifting / alternate location" value={item.workloadShift} onChange={(v) => change("workloadShift", v)}/><label className="biaCheck"><input type="checkbox" checked={item.remoteCapable} onChange={(e) => change("remoteCapable", e.target.checked)}/> Activity can operate remotely</label></div></article>;
-  if (mode === "resources") return <article className="biaRecord"><header><div><b>{item.name}</b><span>{d.priority} · MBCO {item.mbcoPercent}%</span></div><strong>{item.resources.length} resources</strong></header><div className="biaPeopleSkills"><Field type="number" label="Minimum people at MBCO" value={item.minimumPeople} onChange={(v) => change("minimumPeople", Number(v))}/><SkillSelector item={item} change={change}/></div><b className="biaLabel">Required resources</b><Chips values={item.resources} options={resourceTypes} onChange={(v) => change("resources", v)}/><b className="biaLabel">Linked Module 1 dependencies</b><Chips values={item.dependencies} options={[...new Set([...sourceDependencies.filter((x) => x.siteWide || arr(x.processes).includes(item.name)).map((x) => x.name).filter(Boolean), ...arr(item.dependencies)])]} onChange={(v) => change("dependencies", v)}/><b className="biaLabel">Linked Module 5 disruption scenarios</b><Chips values={item.hazards} options={[...new Set([...applicableHazards.map((x) => x.name).filter(Boolean), ...item.hazards])]} onChange={(v) => change("hazards", v)}/><div className="biaGrid"><Field label="Recovery strategy requirements" value={item.strategyRequirements.join(", ")} onChange={(v) => change("strategyRequirements", split(v))} placeholder="Alternate site, cross-trained team, redundant system..."/></div><EvidenceEditor item={item} change={change}/></article>;
+  if (mode === "impact")
+    return (
+      <article className="biaRecord">
+        <header>
+          <div>
+            <b>{item.name}</b>
+            <span>{item.products.join(", ") || "Supporting activity"}</span>
+          </div>
+          <strong className={`score s${d.peak}`}>Peak {d.peak}/5</strong>
+        </header>
+        <ImpactEditor item={item} change={change} />
+        <div className="biaGrid three">
+          <Field
+            label="Unacceptable impact threshold"
+            value={item.unacceptableThreshold}
+            onChange={(v) => change("unacceptableThreshold", Number(v))}
+          >
+            {
+              <select
+                value={item.unacceptableThreshold}
+                onChange={(e) =>
+                  change("unacceptableThreshold", Number(e.target.value))
+                }
+              >
+                <option value="3">3 Material</option>
+                <option value="4">4 Major</option>
+                <option value="5">5 Severe</option>
+              </select>
+            }
+          </Field>
+          <div className="biaEngine">
+            <small>INDICATIVE MTPD</small>
+            <b>{d.mtpd ? `${d.mtpd} hours` : "Not reached"}</b>
+            <span>
+              First period where impact becomes unacceptable · management
+              confirmation required
+            </span>
+          </div>
+          <Field
+            area
+            label="Overall assumptions and evidence"
+            value={item.assumptions}
+            onChange={(v) => change("assumptions", v)}
+          />
+        </div>
+      </article>
+    );
+  if (mode === "objectives")
+    return (
+      <article className="biaRecord">
+        <header>
+          <div>
+            <b>{item.name}</b>
+            <span>{d.priority}</span>
+          </div>
+          <strong className={d.valid ? "valid" : "invalid"}>
+            {d.valid ? "Objectives valid" : "Review timing"}
+          </strong>
+        </header>
+        <div className="biaTimeline">
+          <span>Disruption</span>
+          <i
+            style={{
+              width: `${Math.min(100, (d.rto / Math.max(d.mtpd, 1)) * 100)}%`,
+            }}
+          />
+          <b>RTO {d.rto || "-"}h</b>
+          <i />
+          <b>MTPD {d.mtpd || "-"}h</b>
+        </div>
+        <div className="biaGrid three">
+          <Field
+            type="number"
+            label="MTPD hours *"
+            value={item.mtpdHours || d.mtpd}
+            onChange={(v) => change("mtpdHours", Number(v))}
+            min="1"
+          />
+          <Field
+            type="number"
+            label="RTO hours *"
+            value={item.rtoHours || d.rto}
+            onChange={(v) => change("rtoHours", Number(v))}
+            min="1"
+          />
+          <Field
+            type="number"
+            label="MBCO minimum capacity % *"
+            value={item.mbcoPercent}
+            onChange={(v) => change("mbcoPercent", Number(v))}
+            min="1"
+            max="100"
+          />
+          <Field
+            type="number"
+            label="TRO full recovery hours *"
+            value={item.troHours}
+            onChange={(v) => change("troHours", Number(v))}
+            min="1"
+          />
+          <Field
+            type="number"
+            label="RPO maximum data loss hours *"
+            value={item.rpoHours}
+            onChange={(v) => change("rpoHours", Number(v))}
+            min="0"
+          />
+          <Field
+            label="Recovery priority"
+            value={item.recoveryPriority || d.priority}
+            onChange={(v) => change("recoveryPriority", v)}
+          />
+        </div>
+        <div className="biaGrid">
+          <Field
+            area
+            label="Minimum continuity operating arrangement"
+            value={item.manualWorkaround}
+            onChange={(v) => change("manualWorkaround", v)}
+            placeholder="Describe what must operate at the MBCO level"
+          />
+          <Field
+            type="number"
+            label="Maximum workaround duration hours"
+            value={item.workaroundDurationHours}
+            onChange={(v) => change("workaroundDurationHours", Number(v))}
+          />
+          <Field
+            label="Workload shifting / alternate location"
+            value={item.workloadShift}
+            onChange={(v) => change("workloadShift", v)}
+          />
+          <label className="biaCheck">
+            <input
+              type="checkbox"
+              checked={item.remoteCapable}
+              onChange={(e) => change("remoteCapable", e.target.checked)}
+            />{" "}
+            Activity can operate remotely
+          </label>
+        </div>
+      </article>
+    );
+  if (mode === "resources")
+    return (
+      <article className="biaRecord">
+        <header>
+          <div>
+            <b>{item.name}</b>
+            <span>
+              {d.priority} · MBCO {item.mbcoPercent}%
+            </span>
+          </div>
+          <strong>{item.resources.length} resources</strong>
+        </header>
+        <div className="biaPeopleSkills">
+          <Field
+            type="number"
+            label="Minimum people at MBCO"
+            value={item.minimumPeople}
+            onChange={(v) => change("minimumPeople", Number(v))}
+          />
+          <SkillSelector item={item} change={change} />
+        </div>
+        <b className="biaLabel">Required resources</b>
+        <Chips
+          values={item.resources}
+          options={resourceTypes}
+          onChange={(v) => change("resources", v)}
+        />
+        <b className="biaLabel">Linked Module 1 dependencies</b>
+        <Chips
+          values={item.dependencies}
+          options={[
+            ...new Set([
+              ...sourceDependencies
+                .filter(
+                  (x) => x.siteWide || arr(x.processes).includes(item.name),
+                )
+                .map((x) => x.name)
+                .filter(Boolean),
+              ...arr(item.dependencies),
+            ]),
+          ]}
+          onChange={(v) => change("dependencies", v)}
+        />
+        <b className="biaLabel">Linked Module 5 disruption scenarios</b>
+        <Chips
+          values={item.hazards}
+          options={[
+            ...new Set([
+              ...applicableHazards.map((x) => x.name).filter(Boolean),
+              ...item.hazards,
+            ]),
+          ]}
+          onChange={(v) => change("hazards", v)}
+        />
+        <div className="biaGrid">
+          <Field
+            label="Recovery strategy requirements"
+            value={item.strategyRequirements.join(", ")}
+            onChange={(v) => change("strategyRequirements", split(v))}
+            placeholder="Alternate site, cross-trained team, redundant system..."
+          />
+        </div>
+        <EvidenceEditor item={item} change={change} />
+      </article>
+    );
   return null;
 }
 
-export default function BCPBusinessImpactAnalysis({ action, profiles = [], contexts = [], roles = [], hazards = [], initial, organisationName = "", startStep = 0 }) {
-  const [formState, formAction, isPending] = useActionState(action, { error: "" });
+export default function BCPBusinessImpactAnalysis({
+  action,
+  profiles = [],
+  contexts = [],
+  roles = [],
+  hazards = [],
+  people = [],
+  initial,
+  organisationName = "",
+  startStep = 0,
+}) {
+  const [formState, formAction, isPending] = useActionState(action, {
+    error: "",
+  });
   const [step, setStep] = useState(clamp(startStep, 0, 5));
   const [profileId, setProfileId] = useState(initial?.site_profile_id || "");
-  const [contextId, setContextId] = useState(initial?.context_assessment_id || "");
+  const [contextId, setContextId] = useState(
+    initial?.context_assessment_id || "",
+  );
   const [roleId, setRoleId] = useState(initial?.role_assessment_id || "");
   const [hazardId, setHazardId] = useState(initial?.hazard_assessment_id || "");
-  const profile = profiles.find((x) => x.id === profileId), hazard = hazards.find((x) => x.id === hazardId);
-  const processSource = [...arr(profile?.value_chain_processes).map((x) => ({ ...x, processType: "Value-chain" })), ...arr(profile?.support_processes).map((x) => ({ ...x, processType: "Support" }))].filter((x) => x.name);
-  const [activities, setActivities] = useState(arr(initial?.activity_assessments).map(normalise));
+  const profile = profiles.find((x) => x.id === profileId),
+    hazard = hazards.find((x) => x.id === hazardId);
+  const processSource = [
+    ...arr(profile?.value_chain_processes).map((x) => ({
+      ...x,
+      processType: "Value-chain",
+    })),
+    ...arr(profile?.support_processes).map((x) => ({
+      ...x,
+      processType: "Support",
+    })),
+  ].filter((x) => x.name);
+  const [activities, setActivities] = useState(
+    arr(initial?.activity_assessments).map(normalise),
+  );
   const sourceDependencies = arr(profile?.site_dependencies?.records);
   const hazardRecords = arr(hazard?.scenario_assessments);
-  const generate = () => setActivities(processSource.map((p) => {
-    const existing = activities.find((x) => x.name === p.name);
-    if (existing) return existing;
-    const item = emptyActivity(p);
-    item.dependencies = sourceDependencies.filter((d) => d.siteWide || arr(d.processes).includes(p.name)).map((d) => d.name).filter(Boolean);
-    item.resources = [...new Set(sourceDependencies.filter((d) => d.siteWide || arr(d.processes).includes(p.name)).map((d) => d.category).filter(Boolean))];
-    item.hazards = hazardRecords.filter((h) => arr(h.affectedProcesses).includes(p.name)).map((h) => h.name);
-    return item;
-  }));
-  const included = activities.filter((x) => x.included), derived = included.map((x) => ({ item: x, ...derive(x) })).sort((a, b) => a.rto - b.rto);
-  const checks = [Boolean(profileId && activities.length), included.length > 0 && included.every((x) => x.name && x.owner), included.length > 0 && included.every((x) => derive(x).peak > 0), included.every((x) => derive(x).valid), included.every((x) => x.resources.length && x.dependencies.length), included.length > 0 && included.every((x) => x.evidence.length && x.assumptions)];
-  const completion = Math.round(checks.filter(Boolean).length / checks.length * 100);
+  const generate = () =>
+    setActivities(
+      processSource.map((p) => {
+        const existing = activities.find((x) => x.name === p.name);
+        if (existing) return existing;
+        const item = emptyActivity(p);
+        item.dependencies = sourceDependencies
+          .filter((d) => d.siteWide || arr(d.processes).includes(p.name))
+          .map((d) => d.name)
+          .filter(Boolean);
+        item.resources = [
+          ...new Set(
+            sourceDependencies
+              .filter((d) => d.siteWide || arr(d.processes).includes(p.name))
+              .map((d) => d.category)
+              .filter(Boolean),
+          ),
+        ];
+        item.hazards = hazardRecords
+          .filter((h) => arr(h.affectedProcesses).includes(p.name))
+          .map((h) => h.name);
+        return item;
+      }),
+    );
+  const included = activities.filter((x) => x.included),
+    derived = included
+      .map((x) => ({ item: x, ...derive(x) }))
+      .sort((a, b) => a.rto - b.rto);
+  const checks = [
+    Boolean(profileId && activities.length),
+    included.length > 0 &&
+      included.every((x) => x.name && x.owner && x.ownerPersonId),
+    included.length > 0 && included.every((x) => derive(x).peak > 0),
+    included.every((x) => derive(x).valid),
+    included.every((x) => x.resources.length && x.dependencies.length),
+    included.length > 0 &&
+      included.every((x) => x.evidence.length && x.assumptions),
+  ];
+  const completion = Math.round(
+    (checks.filter(Boolean).length / checks.length) * 100,
+  );
   const go = (n) => {
     const target = clamp(n, 0, 5);
     setStep(target > 0 && !profile ? 0 : target);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  return <form action={formAction} className="biaShell"><style>{styles}</style><style>{activityEditStyles}</style>{[["assessment_id", initial?.id || ""], ["site_profile_id", profileId], ["context_assessment_id", contextId], ["role_assessment_id", roleId], ["hazard_assessment_id", hazardId], ["activity_assessments", JSON.stringify(activities)], ["next_step", Math.min(5, step + 1)]].map(([name, value]) => <input key={name} type="hidden" name={name} value={value}/>)}
-    {formState?.error && <div className="biaError"><b>Cannot save Business Impact Analysis</b><span>{formState.error}</span></div>}
-    <aside><div className="biaBrand">RPG <span>Excellence</span></div><small>BCP MODULE 6</small><section><strong>{completion}%</strong><span>complete</span><i><b style={{ width: `${completion}%` }}/></i></section><nav>{steps.map((name, i) => <button type="button" key={name} className={step === i ? "active" : ""} onClick={() => go(i)}><b>{checks[i] ? "✓" : i + 1}</b><span>{name}</span></button>)}</nav><div className="biaLive"><b>LIVE ENGINE</b><span>{included.length} activities in scope</span><span>{derived.filter((x) => x.valid).length} recovery objectives valid</span><span>{derived.filter((x) => x.rto <= 24).length} same-day priorities</span></div></aside>
-    <main><header className="biaTop"><div><small>STEP {step + 1} OF 6 · ISO 22301 CLAUSE 8.2.2</small><h1>{steps[step]}</h1><p>Determine impacts over time, continuity priorities and evidence-led recovery requirements.</p></div><b>{initial?.status?.replaceAll("_", " ") || "draft"}</b></header><div className="biaProgress"><i style={{ width: `${completion}%` }}/></div>
-      {step === 0 && <section className="biaPanel"><Intro title="Connect the controlled source records." text="The BIA inherits products, services, activities, dependencies, accountable people and disruption risks. Source versions are frozen when the BIA is approved."/><div className="biaGrid"><label>Module 1 Site Profile *<select value={profileId} onChange={(e) => setProfileId(e.target.value)}><option value="">Select profile</option>{profiles.map((x) => <option key={x.id} value={x.id}>{x.location_name} · v{x.version || 1} · {x.status}</option>)}</select></label><label>Module 3 Context Assessment<select value={contextId} onChange={(e) => setContextId(e.target.value)}><option value="">Optional</option>{contexts.filter((x) => !profileId || x.site_profile_id === profileId).map((x) => <option key={x.id} value={x.id}>{x.assessment_reference} · {x.status}</option>)}</select></label><label>Module 4 Roles Assessment<select value={roleId} onChange={(e) => setRoleId(e.target.value)}><option value="">Optional</option>{roles.filter((x) => !profileId || x.site_profile_id === profileId).map((x) => <option key={x.id} value={x.id}>{x.assessment_reference} · {x.status}</option>)}</select></label><label>Module 5 Hazard Assessment<select value={hazardId} onChange={(e) => setHazardId(e.target.value)}><option value="">Optional</option>{hazards.filter((x) => !profileId || x.site_profile_id === profileId).map((x) => <option key={x.id} value={x.id}>{x.assessment_reference} · {x.status}</option>)}</select></label><label>BIA title<input name="assessment_title" defaultValue={initial?.assessment_title || `${organisationName || "Organisation"} business impact analysis`}/></label><label>Next review date<input type="date" name="next_review_date" defaultValue={initial?.next_review_date || ""}/></label></div>{profile && <div className="biaSource"><article><b>{processSource.length}</b><span>activities</span></article><article><b>{String(profile.critical_products_services || "").split(/[,\n]+/).filter(Boolean).length}</b><span>products/services</span></article><article><b>{sourceDependencies.length}</b><span>dependencies</span></article><article><b>{hazardRecords.length}</b><span>hazard scenarios</span></article></div>}</section>}
-      {step === 1 && <section className="biaPanel"><Intro title="Confirm the activities that support products and services." text="Generate the scope from Module 1, then include every value-chain and supporting activity whose disruption could affect delivery."/><button className="biaGenerate" type="button" onClick={generate} disabled={!profile}>✦ Generate linked BIA starting points</button><div className="biaPicks">{activities.map((x) => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} mode="select"/>)}{!activities.length && <div className="biaEmpty"><span>{profile ? "Generate the linked activities from the selected profile." : "A Module 1 Site Profile must be selected before activities can be generated."}</span>{!profile && <button type="button" onClick={() => go(0)}>← Select Module 1 profile</button>}</div>}</div><button type="button" className="biaAdd" disabled={!profile} onClick={() => setActivities([...activities, emptyActivity({ processType: "Site-specific" })])}>+ Add site-specific activity</button></section>}
-      {step === 2 && <section className="biaPanel"><Intro title="Assess how consequences grow as disruption continues." text="Score each credible impact at every time horizon. The engine detects the first point at which any consequence reaches the organisation's unacceptable threshold."/><div className="biaMtpdGuide"><div><small>MTPD GUIDANCE</small><b>Maximum Tolerable Period of Disruption</b><p>The longest period an activity can be disrupted before the resulting impact becomes unacceptable to the organisation.</p></div><div><b>How the engine identifies it</b><p>The first time horizon where any impact score reaches the selected unacceptable-impact threshold becomes the indicative MTPD.</p></div><div><b>Management confirmation required</b><p>Confirm the result using contractual, financial, regulatory, customer and operational evidence. Record assumptions or override reasoning below.</p></div></div><div className="biaScale"><b>Impact scale</b><span>0 N/A</span><span>1 Minimal</span><span>2 Minor</span><span>3 Material</span><span>4 Major</span><span>5 Severe</span></div><div className="biaRecords">{included.map((x) => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} mode="impact" hazards={hazardRecords} sourceDependencies={sourceDependencies}/>)}</div></section>}
-      {step === 3 && <section className="biaPanel"><Intro title="Set recovery objectives inside the tolerable disruption period." text="RTO must be shorter than MTPD. Define the minimum acceptable operating capacity, full recovery time and maximum tolerable data loss."/><div className="biaMtpdGuide biaRecoveryGuide"><div><small>RECOVERY OBJECTIVE GUIDANCE</small><b>MTPD — the outer tolerance</b><p>The maximum time the activity may remain disrupted before its impacts become unacceptable. Treat the indicative result from Step 3 as a management decision that must be supported by evidence.</p></div><div><b>RTO and MBCO — minimum recovery</b><p>RTO is the target time to resume the activity and must be shorter than MTPD. MBCO is the minimum acceptable service or output capacity that must be available at that point.</p></div><div><b>TRO and RPO — full recovery and data</b><p>TRO is the target time to restore normal operations and must not be earlier than RTO. RPO is the maximum tolerable data loss, measured backwards from the disruption.</p></div></div><div className="biaGuidanceNote"><b>Apply and evidence the sequence:</b><span>Disruption → RTO: resume at MBCO → TRO: restore normal operation. Confirm each target against contracts, customer commitments, legal duties, dependencies, resource capability and tested recovery arrangements.</span></div><div className="biaRules"><span><b>MTPD</b> impact becomes unacceptable</span><span>›</span><span><b>RTO</b> activity resumes at MBCO</span><span>›</span><span><b>TRO</b> full recovery achieved</span></div><div className="biaRecords">{included.map((x) => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} mode="objectives" hazards={hazardRecords} sourceDependencies={sourceDependencies}/>)}</div></section>}
-      {step === 4 && <section className="biaPanel"><Intro title="Define the resources and dependencies required at the recovery target." text="Connect people, premises, technology, data, equipment, utilities, suppliers and interdependencies to each prioritized activity."/><div className="biaMtpdGuide biaResourceGuide"><div><small>RESOURCE &amp; DEPENDENCY GUIDANCE</small><b>Resources required at MBCO</b><p>Record the minimum people, competence, premises, technology, data, equipment, utilities and supplies needed to resume the activity at its minimum acceptable capacity by the RTO.</p></div><div><b>Dependencies and disruption scenarios</b><p>Link the internal and external services the activity relies on, including suppliers, systems and upstream processes. Connect credible Module 5 scenarios that could prevent those dependencies from being available.</p></div><div><b>Recovery strategy and evidence</b><p>Define how each requirement will be provided—for example an alternate site, cross-trained people, redundant systems or supplier arrangements—and cite contracts, inventories, test records or approved plans.</p></div></div><div className="biaGuidanceNote"><b>Use the minimum credible requirement:</b><span>Do not select every possible resource. State what must be available at MBCO, who controls it, when it is needed, its lead time, any single point of failure and the tested workaround if it is unavailable.</span></div><div className="biaRecords">{included.map((x) => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} mode="resources" hazards={hazardRecords} sourceDependencies={sourceDependencies}/>)}</div></section>}
-      {step === 5 && <section className="biaPanel"><Intro title="Review the prioritized activity and recovery requirements register." text="Approve only when impact evidence, timing logic, minimum capacity, resources and dependencies are complete and defensible."/><div className="biaSummary"><article><b>{included.length}</b><span>activities</span></article><article><b>{derived.filter((x) => x.rto <= 24).length}</b><span>RTO ≤ 24 hours</span></article><article><b>{derived.filter((x) => !x.valid).length}</b><span>timing conflicts</span></article><article><b>{[...new Set(included.flatMap((x) => x.dependencies))].length}</b><span>dependencies</span></article></div><div className="biaRegister"><header><b>Priority</b><b>Activity / owner</b><b>Products & services</b><b>RTO</b><b>MTPD</b><b>MBCO</b><b>RPO</b><b>Assurance</b></header>{derived.map((x, i) => <article key={x.item.id}><b>{i + 1}</b><span><strong>{x.item.name}</strong><small>{x.item.owner || "Owner not assigned"}</small></span><span>{x.item.products.join(", ") || "Support activity"}</span><b>{x.rto || "-"}h</b><b>{x.mtpd || "-"}h</b><b>{x.item.mbcoPercent}%</b><b>{x.item.rpoHours}h</b><em className={x.valid ? "ok" : "warn"}>{x.valid ? "Validated" : "Review"}</em></article>)}</div><div className="biaGrid"><label>Review frequency<select name="review_frequency" defaultValue={initial?.review_frequency || "Every 6 months"}><option>Quarterly</option><option>Every 6 months</option><option>Annually</option><option>After material change</option></select></label><label>Competent reviewer / approver<input name="reviewer_name" defaultValue={initial?.reviewed_by || initial?.approved_by || profile?.site_leader || ""}/></label><label className="wide">Review decision and limitations<textarea name="review_comment" defaultValue={initial?.review_comment || ""}/></label></div></section>}
-      <footer><button type="button" disabled={!step || isPending} onClick={() => go(step - 1)}>← Previous</button>{initial?.id && <button className="danger" name="intent" value="archive" disabled={isPending} onClick={(e) => { if (!window.confirm("Archive this BIA?")) e.preventDefault(); }}>Archive</button>}<span>{isPending ? "Saving…" : "Controlled progress saves to your account"}</span>{step < 5 ? <button className="primary" name="intent" value="continue" disabled={isPending || !profile}>Save &amp; continue →</button> : <><button name="intent" value="draft" disabled={isPending || !profile}>Save draft</button><button name="intent" value="review" disabled={isPending || !profile}>Submit for review</button><button className="primary" name="intent" value="approve" disabled={isPending || !profile}>Approve controlled BIA →</button></>}</footer>
-    </main>
-  </form>;
+  return (
+    <form action={formAction} className="biaShell">
+      <style>{styles}</style>
+      <style>{activityEditStyles}</style>
+      <style>{ownerStyles}</style>
+      {[
+        ["assessment_id", initial?.id || ""],
+        ["site_profile_id", profileId],
+        ["context_assessment_id", contextId],
+        ["role_assessment_id", roleId],
+        ["hazard_assessment_id", hazardId],
+        ["activity_assessments", JSON.stringify(activities)],
+        ["next_step", Math.min(5, step + 1)],
+      ].map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      {formState?.error && (
+        <div className="biaError">
+          <b>Cannot save Business Impact Analysis</b>
+          <span>{formState.error}</span>
+        </div>
+      )}
+      <aside>
+        <div className="biaBrand">
+          RPG <span>Excellence</span>
+        </div>
+        <small>BCP MODULE 6</small>
+        <section>
+          <strong>{completion}%</strong>
+          <span>complete</span>
+          <i>
+            <b style={{ width: `${completion}%` }} />
+          </i>
+        </section>
+        <nav>
+          {steps.map((name, i) => (
+            <button
+              type="button"
+              key={name}
+              className={step === i ? "active" : ""}
+              onClick={() => go(i)}
+            >
+              <b>{checks[i] ? "✓" : i + 1}</b>
+              <span>{name}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="biaLive">
+          <b>LIVE ENGINE</b>
+          <span>{included.length} activities in scope</span>
+          <span>
+            {derived.filter((x) => x.valid).length} recovery objectives valid
+          </span>
+          <span>
+            {derived.filter((x) => x.rto <= 24).length} same-day priorities
+          </span>
+        </div>
+      </aside>
+      <main>
+        <header className="biaTop">
+          <div>
+            <small>STEP {step + 1} OF 6 · ISO 22301 CLAUSE 8.2.2</small>
+            <h1>{steps[step]}</h1>
+            <p>
+              Determine impacts over time, continuity priorities and
+              evidence-led recovery requirements.
+            </p>
+          </div>
+          <b>{initial?.status?.replaceAll("_", " ") || "draft"}</b>
+        </header>
+        <div className="biaProgress">
+          <i style={{ width: `${completion}%` }} />
+        </div>
+        {step === 0 && (
+          <section className="biaPanel">
+            <Intro
+              title="Connect the controlled source records."
+              text="The BIA inherits products, services, activities, dependencies, accountable people and disruption risks. Source versions are frozen when the BIA is approved."
+            />
+            <div className="biaGrid">
+              <label>
+                Module 1 Site Profile *
+                <select
+                  value={profileId}
+                  onChange={(e) => setProfileId(e.target.value)}
+                >
+                  <option value="">Select profile</option>
+                  {profiles.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.location_name} · v{x.version || 1} · {x.status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Module 3 Context Assessment
+                <select
+                  value={contextId}
+                  onChange={(e) => setContextId(e.target.value)}
+                >
+                  <option value="">Optional</option>
+                  {contexts
+                    .filter(
+                      (x) => !profileId || x.site_profile_id === profileId,
+                    )
+                    .map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.assessment_reference} · {x.status}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Module 4 Roles Assessment
+                <select
+                  value={roleId}
+                  onChange={(e) => setRoleId(e.target.value)}
+                >
+                  <option value="">Optional</option>
+                  {roles
+                    .filter(
+                      (x) => !profileId || x.site_profile_id === profileId,
+                    )
+                    .map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.assessment_reference} · {x.status}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Module 5 Hazard Assessment
+                <select
+                  value={hazardId}
+                  onChange={(e) => setHazardId(e.target.value)}
+                >
+                  <option value="">Optional</option>
+                  {hazards
+                    .filter(
+                      (x) => !profileId || x.site_profile_id === profileId,
+                    )
+                    .map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.assessment_reference} · {x.status}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                BIA title
+                <input
+                  name="assessment_title"
+                  defaultValue={
+                    initial?.assessment_title ||
+                    `${organisationName || "Organisation"} business impact analysis`
+                  }
+                />
+              </label>
+              <label>
+                Next review date
+                <input
+                  type="date"
+                  name="next_review_date"
+                  defaultValue={initial?.next_review_date || ""}
+                />
+              </label>
+            </div>
+            {profile && (
+              <div className="biaSource">
+                <article>
+                  <b>{processSource.length}</b>
+                  <span>activities</span>
+                </article>
+                <article>
+                  <b>
+                    {
+                      String(profile.critical_products_services || "")
+                        .split(/[,\n]+/)
+                        .filter(Boolean).length
+                    }
+                  </b>
+                  <span>products/services</span>
+                </article>
+                <article>
+                  <b>{sourceDependencies.length}</b>
+                  <span>dependencies</span>
+                </article>
+                <article>
+                  <b>{hazardRecords.length}</b>
+                  <span>hazard scenarios</span>
+                </article>
+              </div>
+            )}
+          </section>
+        )}
+        {step === 1 && (
+          <section className="biaPanel">
+            <Intro
+              title="Confirm the activities that support products and services."
+              text="Generate the scope from Module 1, then include every value-chain and supporting activity whose disruption could affect delivery."
+            />
+            <button
+              className="biaGenerate"
+              type="button"
+              onClick={generate}
+              disabled={!profile}
+            >
+              ✦ Generate linked BIA starting points
+            </button>
+            <div className="biaPicks">
+              {activities.map((x) => (
+                <ActivityCard
+                  key={x.id}
+                  item={x}
+                  activities={activities}
+                  setActivities={setActivities}
+                  people={people}
+                  mode="select"
+                />
+              ))}
+              {!activities.length && (
+                <div className="biaEmpty">
+                  <span>
+                    {profile
+                      ? "Generate the linked activities from the selected profile."
+                      : "A Module 1 Site Profile must be selected before activities can be generated."}
+                  </span>
+                  {!profile && (
+                    <button type="button" onClick={() => go(0)}>
+                      ← Select Module 1 profile
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="biaAdd"
+              disabled={!profile}
+              onClick={() =>
+                setActivities([
+                  ...activities,
+                  emptyActivity({ processType: "Site-specific" }),
+                ])
+              }
+            >
+              + Add site-specific activity
+            </button>
+          </section>
+        )}
+        {step === 2 && (
+          <section className="biaPanel">
+            <Intro
+              title="Assess how consequences grow as disruption continues."
+              text="Score each credible impact at every time horizon. The engine detects the first point at which any consequence reaches the organisation's unacceptable threshold."
+            />
+            <div className="biaMtpdGuide">
+              <div>
+                <small>MTPD GUIDANCE</small>
+                <b>Maximum Tolerable Period of Disruption</b>
+                <p>
+                  The longest period an activity can be disrupted before the
+                  resulting impact becomes unacceptable to the organisation.
+                </p>
+              </div>
+              <div>
+                <b>How the engine identifies it</b>
+                <p>
+                  The first time horizon where any impact score reaches the
+                  selected unacceptable-impact threshold becomes the indicative
+                  MTPD.
+                </p>
+              </div>
+              <div>
+                <b>Management confirmation required</b>
+                <p>
+                  Confirm the result using contractual, financial, regulatory,
+                  customer and operational evidence. Record assumptions or
+                  override reasoning below.
+                </p>
+              </div>
+            </div>
+            <div className="biaScale">
+              <b>Impact scale</b>
+              <span>0 N/A</span>
+              <span>1 Minimal</span>
+              <span>2 Minor</span>
+              <span>3 Material</span>
+              <span>4 Major</span>
+              <span>5 Severe</span>
+            </div>
+            <div className="biaRecords">
+              {included.map((x) => (
+                <ActivityCard
+                  key={x.id}
+                  item={x}
+                  activities={activities}
+                  setActivities={setActivities}
+                  mode="impact"
+                  hazards={hazardRecords}
+                  sourceDependencies={sourceDependencies}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {step === 3 && (
+          <section className="biaPanel">
+            <Intro
+              title="Set recovery objectives inside the tolerable disruption period."
+              text="RTO must be shorter than MTPD. Define the minimum acceptable operating capacity, full recovery time and maximum tolerable data loss."
+            />
+            <div className="biaMtpdGuide biaRecoveryGuide">
+              <div>
+                <small>RECOVERY OBJECTIVE GUIDANCE</small>
+                <b>MTPD — the outer tolerance</b>
+                <p>
+                  The maximum time the activity may remain disrupted before its
+                  impacts become unacceptable. Treat the indicative result from
+                  Step 3 as a management decision that must be supported by
+                  evidence.
+                </p>
+              </div>
+              <div>
+                <b>RTO and MBCO — minimum recovery</b>
+                <p>
+                  RTO is the target time to resume the activity and must be
+                  shorter than MTPD. MBCO is the minimum acceptable service or
+                  output capacity that must be available at that point.
+                </p>
+              </div>
+              <div>
+                <b>TRO and RPO — full recovery and data</b>
+                <p>
+                  TRO is the target time to restore normal operations and must
+                  not be earlier than RTO. RPO is the maximum tolerable data
+                  loss, measured backwards from the disruption.
+                </p>
+              </div>
+            </div>
+            <div className="biaGuidanceNote">
+              <b>Apply and evidence the sequence:</b>
+              <span>
+                Disruption → RTO: resume at MBCO → TRO: restore normal
+                operation. Confirm each target against contracts, customer
+                commitments, legal duties, dependencies, resource capability and
+                tested recovery arrangements.
+              </span>
+            </div>
+            <div className="biaRules">
+              <span>
+                <b>MTPD</b> impact becomes unacceptable
+              </span>
+              <span>›</span>
+              <span>
+                <b>RTO</b> activity resumes at MBCO
+              </span>
+              <span>›</span>
+              <span>
+                <b>TRO</b> full recovery achieved
+              </span>
+            </div>
+            <div className="biaRecords">
+              {included.map((x) => (
+                <ActivityCard
+                  key={x.id}
+                  item={x}
+                  activities={activities}
+                  setActivities={setActivities}
+                  mode="objectives"
+                  hazards={hazardRecords}
+                  sourceDependencies={sourceDependencies}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {step === 4 && (
+          <section className="biaPanel">
+            <Intro
+              title="Define the resources and dependencies required at the recovery target."
+              text="Connect people, premises, technology, data, equipment, utilities, suppliers and interdependencies to each prioritized activity."
+            />
+            <div className="biaMtpdGuide biaResourceGuide">
+              <div>
+                <small>RESOURCE &amp; DEPENDENCY GUIDANCE</small>
+                <b>Resources required at MBCO</b>
+                <p>
+                  Record the minimum people, competence, premises, technology,
+                  data, equipment, utilities and supplies needed to resume the
+                  activity at its minimum acceptable capacity by the RTO.
+                </p>
+              </div>
+              <div>
+                <b>Dependencies and disruption scenarios</b>
+                <p>
+                  Link the internal and external services the activity relies
+                  on, including suppliers, systems and upstream processes.
+                  Connect credible Module 5 scenarios that could prevent those
+                  dependencies from being available.
+                </p>
+              </div>
+              <div>
+                <b>Recovery strategy and evidence</b>
+                <p>
+                  Define how each requirement will be provided—for example an
+                  alternate site, cross-trained people, redundant systems or
+                  supplier arrangements—and cite contracts, inventories, test
+                  records or approved plans.
+                </p>
+              </div>
+            </div>
+            <div className="biaGuidanceNote">
+              <b>Use the minimum credible requirement:</b>
+              <span>
+                Do not select every possible resource. State what must be
+                available at MBCO, who controls it, when it is needed, its lead
+                time, any single point of failure and the tested workaround if
+                it is unavailable.
+              </span>
+            </div>
+            <div className="biaRecords">
+              {included.map((x) => (
+                <ActivityCard
+                  key={x.id}
+                  item={x}
+                  activities={activities}
+                  setActivities={setActivities}
+                  mode="resources"
+                  hazards={hazardRecords}
+                  sourceDependencies={sourceDependencies}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {step === 5 && (
+          <section className="biaPanel">
+            <Intro
+              title="Review the prioritized activity and recovery requirements register."
+              text="Approve only when impact evidence, timing logic, minimum capacity, resources and dependencies are complete and defensible."
+            />
+            <div className="biaSummary">
+              <article>
+                <b>{included.length}</b>
+                <span>activities</span>
+              </article>
+              <article>
+                <b>{derived.filter((x) => x.rto <= 24).length}</b>
+                <span>RTO ≤ 24 hours</span>
+              </article>
+              <article>
+                <b>{derived.filter((x) => !x.valid).length}</b>
+                <span>timing conflicts</span>
+              </article>
+              <article>
+                <b>
+                  {[...new Set(included.flatMap((x) => x.dependencies))].length}
+                </b>
+                <span>dependencies</span>
+              </article>
+            </div>
+            <div className="biaRegister">
+              <header>
+                <b>Priority</b>
+                <b>Activity / owner</b>
+                <b>Products & services</b>
+                <b>RTO</b>
+                <b>MTPD</b>
+                <b>MBCO</b>
+                <b>RPO</b>
+                <b>Assurance</b>
+              </header>
+              {derived.map((x, i) => (
+                <article key={x.item.id}>
+                  <b>{i + 1}</b>
+                  <span>
+                    <strong>{x.item.name}</strong>
+                    <small>{x.item.owner || "Owner not assigned"}</small>
+                  </span>
+                  <span>
+                    {x.item.products.join(", ") || "Support activity"}
+                  </span>
+                  <b>{x.rto || "-"}h</b>
+                  <b>{x.mtpd || "-"}h</b>
+                  <b>{x.item.mbcoPercent}%</b>
+                  <b>{x.item.rpoHours}h</b>
+                  <em className={x.valid ? "ok" : "warn"}>
+                    {x.valid ? "Validated" : "Review"}
+                  </em>
+                </article>
+              ))}
+            </div>
+            <div className="biaGrid">
+              <label>
+                Review frequency
+                <select
+                  name="review_frequency"
+                  defaultValue={initial?.review_frequency || "Every 6 months"}
+                >
+                  <option>Quarterly</option>
+                  <option>Every 6 months</option>
+                  <option>Annually</option>
+                  <option>After material change</option>
+                </select>
+              </label>
+              <label>
+                Competent reviewer / approver
+                <input
+                  name="reviewer_name"
+                  defaultValue={
+                    initial?.reviewed_by ||
+                    initial?.approved_by ||
+                    profile?.site_leader ||
+                    ""
+                  }
+                />
+              </label>
+              <label className="wide">
+                Review decision and limitations
+                <textarea
+                  name="review_comment"
+                  defaultValue={initial?.review_comment || ""}
+                />
+              </label>
+            </div>
+          </section>
+        )}
+        <footer>
+          <button
+            type="button"
+            disabled={!step || isPending}
+            onClick={() => go(step - 1)}
+          >
+            ← Previous
+          </button>
+          {initial?.id && (
+            <button
+              className="danger"
+              name="intent"
+              value="archive"
+              disabled={isPending}
+              onClick={(e) => {
+                if (!window.confirm("Archive this BIA?")) e.preventDefault();
+              }}
+            >
+              Archive
+            </button>
+          )}
+          <span>
+            {isPending
+              ? "Saving…"
+              : "Controlled progress saves to your account"}
+          </span>
+          {step < 5 ? (
+            <button
+              className="primary"
+              name="intent"
+              value="continue"
+              disabled={isPending || !profile}
+            >
+              Save &amp; continue →
+            </button>
+          ) : (
+            <>
+              <button
+                name="intent"
+                value="draft"
+                disabled={isPending || !profile}
+              >
+                Save draft
+              </button>
+              <button
+                name="intent"
+                value="review"
+                disabled={isPending || !profile}
+              >
+                Submit for review
+              </button>
+              <button
+                className="primary"
+                name="intent"
+                value="approve"
+                disabled={isPending || !profile}
+              >
+                Approve controlled BIA →
+              </button>
+            </>
+          )}
+        </footer>
+      </main>
+    </form>
+  );
 }
-function Intro({ title, text }) { return <div className="biaIntro"><b>{title}</b><p>{text}</p></div>; }
+function Intro({ title, text }) {
+  return (
+    <div className="biaIntro">
+      <b>{title}</b>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+const ownerStyles = `.biaOwnerGuide{display:block;margin-top:6px;color:#60778e;font-size:10px;font-weight:600;line-height:1.35}.biaActivityPick label{margin-top:5px;color:#173b60;font-size:10px;font-weight:850}.biaActivityPick select{width:100%;margin-top:5px;padding:8px;border:1px solid #bfd0df;border-radius:7px;background:#fff;color:#173b60}`;
 
 const activityEditStyles = `.biaActivityEdit{padding:17px;border:1px solid #b9d5ce;border-left:5px solid #16a085;border-radius:11px;background:#f8fffd}.biaActivityEdit>header{display:flex;justify-content:space-between;gap:15px;align-items:start}.biaActivityEdit>header div{display:grid;gap:4px}.biaActivityEdit>header span{color:#60778e;font-size:11px}.biaActivityEdit .remove{padding:7px 10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaActivityEdit input,.biaActivityEdit textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaActivityEdit textarea{min-height:80px}.biaCheck.compact{padding-top:12px}.biaMtpdGuide{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:1px;margin:12px 0 14px;overflow:hidden;border-radius:11px;background:#426a96;color:#fff}.biaMtpdGuide>div{padding:15px 17px;background:#0b2d56}.biaMtpdGuide>div:first-child{background:#123d70}.biaMtpdGuide small{display:block;margin-bottom:5px;color:#55e1d4;font-weight:950;letter-spacing:.12em}.biaMtpdGuide b{display:block;font-size:13px}.biaMtpdGuide p{margin:6px 0 0;color:#dce8f5;font-size:11px;line-height:1.45}.biaGuidanceNote{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:start;margin:-3px 0 14px;padding:12px 15px;border:1px solid #bfd4e8;border-radius:9px;background:#edf5fc;color:#173b60;font-size:11px;line-height:1.45}.biaGuidanceNote b{color:#0b2d56}.biaGuidanceNote span{color:#4e6d89}.biaPeopleSkills{display:grid;grid-template-columns:minmax(180px,.42fr) minmax(0,1.58fr);gap:14px;align-items:start}.biaPeopleSkills>label{font-size:12px;font-weight:850}.biaPeopleSkills>label input{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaStructuredEditor{margin-top:2px;padding:14px;border:1px solid #c9d9e7;border-radius:10px;background:#f7fbff}.biaEditorHead{display:flex;justify-content:space-between;gap:12px;align-items:center}.biaEditorHead>b{font-size:12px}.biaEditorHead>span{padding:5px 8px;border-radius:999px;background:#e7efff;color:#315fe6;font-size:10px;font-weight:850}.biaStructuredEditor>small{display:block;margin:5px 0 10px;color:#60778e;line-height:1.4}.biaInlineAdd{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.biaInlineAdd input,.biaEvidenceForm input,.biaEvidenceForm select,.biaEvidenceForm textarea{width:100%;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaInlineAdd button,.biaEvidenceForm>button{padding:10px 13px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaEvidenceEditor{margin-top:16px}.biaEvidenceList{display:grid;gap:8px;margin-bottom:12px}.biaEvidenceList article{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid #d2dfe9;border-left:4px solid #16a085;border-radius:8px;background:#fff}.biaEvidenceList article div{display:grid;gap:3px}.biaEvidenceList article small{color:#08775f;font-weight:850}.biaEvidenceList article p{margin:2px 0 0;color:#60778e;font-size:11px}.biaEvidenceList article button{align-self:center;padding:7px 9px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaEvidenceForm{display:grid;grid-template-columns:.7fr 1.3fr;gap:10px}.biaEvidenceForm label{font-size:11px;font-weight:850}.biaEvidenceForm label.wide{grid-column:1/-1}.biaEvidenceForm textarea{min-height:70px;margin-top:6px}.biaEvidenceForm input,.biaEvidenceForm select{margin-top:6px}.biaEvidenceForm>button{grid-column:1/-1;justify-self:start}.biaEvidenceForm>button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:900px){.biaMtpdGuide{grid-template-columns:1fr}.biaGuidanceNote,.biaPeopleSkills,.biaEvidenceForm{grid-template-columns:1fr}.biaEvidenceForm label.wide,.biaEvidenceForm>button{grid-column:auto}}`;
 
