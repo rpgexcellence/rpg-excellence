@@ -88,6 +88,7 @@ function makeActivity(source = {}) {
     id: source.id || uid(),
     sourceId: source.sourceId || source.id || "",
     name: source.name || "",
+    ownerPersonId: source.ownerPersonId || "",
     owner: source.owner || "",
     products: arr(source.products),
     rtoHours: Number(source.rtoHours) || 0,
@@ -578,7 +579,9 @@ export default function BCPStrategiesSolutions({
                         area
                         label="Selection rationale *"
                         guide="Explain why the selected strategies are proportionate to the activity's RTO, MBCO, dependencies and disruption risks. Record alternatives considered and why they were accepted or rejected."
-                        placeholder={"1. Recovery need and constraints\n2. Options considered\n3. Reason for the selected strategy"}
+                        placeholder={
+                          "1. Recovery need and constraints\n2. Options considered\n3. Reason for the selected strategy"
+                        }
                         value={item.strategyRationale}
                         onChange={(v) =>
                           updateActivity(item.id, "strategyRationale", v)
@@ -588,7 +591,9 @@ export default function BCPStrategiesSolutions({
                         area
                         label="Operational solution *"
                         guide="Describe how the selected strategies will operate during disruption, including activation, people, locations, technology, suppliers and the return to normal operations."
-                        placeholder={"1. Activation and escalation\n2. Recovery operating arrangement\n3. Resources, dependencies and restoration"}
+                        placeholder={
+                          "1. Activation and escalation\n2. Recovery operating arrangement\n3. Resources, dependencies and restoration"
+                        }
                         value={item.solutionDescription}
                         onChange={(v) =>
                           updateActivity(item.id, "solutionDescription", v)
@@ -760,7 +765,9 @@ export default function BCPStrategiesSolutions({
                         area
                         label="Objective evidence *"
                         guide="Identify verifiable evidence that the solution can achieve the stated recovery time and capacity, such as exercise results, supplier commitments, technical tests or approved plans."
-                        placeholder={"1. Evidence reviewed\n2. Result and date\n3. Document, test or contract reference"}
+                        placeholder={
+                          "1. Evidence reviewed\n2. Result and date\n3. Document, test or contract reference"
+                        }
                         value={item.evidence}
                         onChange={(v) => updateActivity(item.id, "evidence", v)}
                       />
@@ -768,7 +775,9 @@ export default function BCPStrategiesSolutions({
                         area
                         label="Assumptions / residual-risk rationale"
                         guide="Record assumptions, dependencies, limitations and remaining exposure after the solution. Explain the selected residual-risk score and who accepts any material risk."
-                        placeholder={"1. Key assumptions and dependencies\n2. Remaining vulnerabilities\n3. Basis for risk score and acceptance"}
+                        placeholder={
+                          "1. Key assumptions and dependencies\n2. Remaining vulnerabilities\n3. Basis for risk score and acceptance"
+                        }
                         value={item.risks}
                         onChange={(v) => updateActivity(item.id, "risks", v)}
                       />
@@ -1020,7 +1029,9 @@ export default function BCPStrategiesSolutions({
                 </small>
                 <textarea
                   name="review_comment"
-                  placeholder={"1. Approval decision and scope\n2. Limitations, conditions and open actions\n3. Residual risks, owner and review requirements"}
+                  placeholder={
+                    "1. Approval decision and scope\n2. Limitations, conditions and open actions\n3. Residual risks, owner and review requirements"
+                  }
                   defaultValue={initial?.review_comment || ""}
                 />
               </label>
