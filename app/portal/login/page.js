@@ -1,114 +1,29 @@
-"use server";
+import Image from "next/image";
+import Link from "next/link";
+import { signIn, signInWithApple, signInWithGoogle, signInWithMicrosoft, signUp } from "./actions";
+import NewsletterSignup from "../../../components/NewsletterSignup";
 
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { createClient } from "../../../lib/supabase/server";
-
+export const metadata = { title: "Sign in | RPG Intelligence", description: "Secure access to the RPG Intelligence business assurance workspace." };
 const safeNext=value=>{const next=String(value||"");return next.startsWith("/")&&!next.startsWith("//")?next:"/portal"};
-const loginError=(message,next="/portal")=>{const query=new URLSearchParams({error:message,next:safeNext(next)});redirect(`/portal/login?${query.toString()}`)};
 
-export async function signIn(formData) {
-  const supabase = await createClient();
-
-  const email = formData.get("email");
-  const password = formData.get("password");
-  const next = safeNext(formData.get("next"));
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    loginError(error.message,next);
-  }
-
-  redirect(next);
+export default async function LoginPage({searchParams}) {
+  const params=await searchParams,next=safeNext(params?.next),message=params?.error||params?.message||"",creating=params?.mode==="create";
+  return <main className="loginPage"><style>{styles}</style>
+    <section className="loginVisual" aria-label="RPG Intelligence business continuity command centre">
+      <Image src="/bcp/bcp-learning-command-centre.png" alt="Business continuity leaders using the RPG Intelligence command centre" fill priority sizes="(max-width: 900px) 100vw, 55vw"/>
+      <div className="visualShade"/><div className="visualBrand"><b>RPG</b> Excellence</div>
+      <div className="visualCopy"><span>RPG INTELLIGENCE</span><h1>Business assurance.<br/>Connected and controlled.</h1><p>Bring audits, risk, corrective action and business continuity into one evidence-led workspace.</p><div className="benefits"><b>✓ Guided ISO workflows</b><b>✓ Controlled evidence</b><b>✓ Management-ready reporting</b></div></div>
+    </section>
+    <section className="loginAccess"><div className="accessCard">
+      <Link className="homeLink" href="/">← RPG Excellence</Link><div className="eyebrow">SECURE CUSTOMER ACCESS</div><h2>{creating?"Create your free account":"Welcome back"}</h2><p className="intro">{creating?"Start your assurance journey. No payment card is required.":"Sign in to continue your assurance and compliance journey."}</p>
+      {message&&<div className="loginMessage" role="alert">{message}</div>}
+      <form className="loginForm"><input type="hidden" name="next" value={next}/><label>Email address<input type="email" name="email" placeholder="you@company.com" autoComplete="email" required/></label><label>Password<input type="password" name="password" placeholder="Minimum 8 characters" autoComplete={creating?"new-password":"current-password"} minLength={8} required/></label><div className="formOptions"><label className="remember"><input type="checkbox" name="remember"/> Keep me signed in</label><Link className="forgotButton" href={`/portal/forgot-password?next=${encodeURIComponent(next)}`}>Forgot password?</Link></div>{creating?<><button className="primaryButton" formAction={signUp}>Create free account →</button><button className="createButton" formAction={signIn}>Already registered? Sign in</button></>:<><button className="primaryButton" formAction={signIn}>Sign in securely →</button><button className="createButton" formAction={signUp}>Create an account</button></>}</form>
+      <div className="divider"><span>or continue with</span></div>
+      <form className="socialLogin"><input type="hidden" name="next" value={next}/><button className="socialButton googleButton" formAction={signInWithGoogle} aria-label="Continue with Google"><b className="googleMark">G</b>Continue with Google</button><button className="socialButton microsoftButton" formAction={signInWithMicrosoft} aria-label="Continue with Microsoft"><span className="microsoftMark" aria-hidden="true"><i/><i/><i/><i/></span>Continue with Microsoft</button><button className="socialButton appleButton" formAction={signInWithApple} aria-label="Continue with Apple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.79 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.1v-.01ZM12.03 7.25C11.88 5.02 13.69 3.18 15.77 3c.29 2.58-2.34 4.5-3.74 4.25Z"/></svg>Continue with Apple</button></form>
+      <p className="legal">By continuing, you agree to our <Link href="/en/terms">Terms</Link> and acknowledge our <Link href="/en/privacy">Privacy Policy</Link>.</p><div className="trust"><span>🔒 Encrypted access</span><span>UK GDPR aligned</span></div>
+      <div style={{marginTop:"18px",padding:"15px",border:"1px solid #d8e3ee",borderRadius:"10px",background:"#fff"}}><b style={{display:"block",marginBottom:"3px",fontSize:"12px"}}>RPG Insights</b><span style={{display:"block",marginBottom:"10px",color:"#6c8093",fontSize:"10px"}}>Optional ISO and assurance updates.</span><NewsletterSignup locale="en" source="login" compact /></div>
+    </div></section>
+  </main>;
 }
 
-export async function signUp(formData) {
-  const supabase = await createClient();
-
-  const email = formData.get("email");
-  const password = formData.get("password");
-  const next = safeNext(formData.get("next"));
-
-  if (!email || !password) loginError("Enter an email address and password before creating your account.",next);
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-
-  if (error) {
-    loginError(error.message,next);
-  }
-
-  redirect(next);
-}
-
-export async function requestPasswordReset(formData) {
-  const email = String(formData.get("email") || "")
-    .trim()
-    .toLowerCase();
-
-  if (!email) {
-    loginError(
-      "Enter your email address before requesting password recovery.",
-      formData.get("next")
-    );
-  }
-
-  const requestHeaders = await headers();
-  const origin =
-    requestHeaders.get("origin") ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "https://www.rpgexcellence.com";
-
-  const callback = new URL("/auth/callback", origin);
-  callback.searchParams.set(
-    "next",
-    "/portal/update-password"
-  );
-
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(
-    email,
-    { redirectTo: callback.toString() }
-  );
-
-  if (error) {
-    loginError(
-      "Password recovery could not be started. Please try again.",
-      formData.get("next")
-    );
-  }
-
-  const query = new URLSearchParams({
-    message:
-      "If the email is registered, a secure password-reset link has been sent.",
-  });
-  redirect(`/portal/login?${query.toString()}`);
-}
-
-async function signInWithProvider(formData, provider, scopes) {
-  const supabase=await createClient(),next=safeNext(formData.get("next")),requestHeaders=await headers();
-  const origin=requestHeaders.get("origin")||process.env.NEXT_PUBLIC_SITE_URL||"https://www.rpgexcellence.com";
-  const callback=new URL("/auth/callback",origin);callback.searchParams.set("next",next);
-  const options={redirectTo:callback.toString(),...(scopes?{scopes}:{})};
-  const {data,error}=await supabase.auth.signInWithOAuth({provider,options});
-  if(error||!data?.url)loginError(error?.message||"Social sign-in is not available. Please try email access.",next);
-  redirect(data.url);
-}
-
-export async function signInWithApple(formData) {
-  return signInWithProvider(formData,"apple");
-}
-
-export async function signInWithGoogle(formData) {
-  return signInWithProvider(formData,"google");
-}
-
-export async function signInWithMicrosoft(formData) {
-  return signInWithProvider(formData,"azure","openid email profile");
-}
+const styles=`*{box-sizing:border-box}.loginPage{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(430px,.85fr);background:#f4f7fb;color:#081b35;font-family:Arial,sans-serif}.loginVisual{position:relative;min-height:100vh;overflow:hidden;background:#061a35}.loginVisual>img{object-fit:cover}.visualShade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,19,40,.15),rgba(4,19,40,.15) 42%,rgba(4,19,40,.92))}.visualBrand{position:absolute;top:38px;left:44px;padding:11px 15px;border:1px solid rgba(255,255,255,.24);border-radius:9px;background:rgba(4,26,54,.64);backdrop-filter:blur(10px);color:#fff;font-size:19px}.visualBrand b{font-weight:950}.visualCopy{position:absolute;left:clamp(34px,5vw,78px);right:clamp(34px,6vw,90px);bottom:54px;color:#fff}.visualCopy>span{color:#63e7dc;font-size:12px;font-weight:900;letter-spacing:.18em}.visualCopy h1{max-width:700px;margin:13px 0 14px;font-size:clamp(35px,4vw,62px);line-height:1.02;letter-spacing:-.035em}.visualCopy p{max-width:680px;margin:0;color:#d8e5f1;font-size:17px;line-height:1.55}.benefits{display:flex;flex-wrap:wrap;gap:10px;margin-top:23px}.benefits b{padding:9px 12px;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(7,32,61,.65);font-size:11px}.loginAccess{display:grid;place-items:center;padding:42px;background:radial-gradient(circle at 85% 8%,#e2edff 0,transparent 30%),#f7f9fc}.accessCard{width:min(100%,475px);padding:10px}.homeLink{display:inline-block;margin-bottom:43px;color:#365474;text-decoration:none;font-size:13px;font-weight:800}.eyebrow{color:#315fe6;font-size:11px;font-weight:950;letter-spacing:.14em}.accessCard h2{margin:10px 0 8px;font-size:39px;letter-spacing:-.035em}.intro{margin:0 0 28px;color:#61758a;line-height:1.5}.loginMessage{margin-bottom:16px;padding:12px 14px;border:1px solid #efb4ad;border-radius:9px;background:#fff0ee;color:#9e281e;font-size:13px}.loginForm{display:grid;gap:16px}.loginForm>label{display:grid;gap:7px;font-size:12px;font-weight:850}.loginForm input:not([type=checkbox]){width:100%;padding:14px 15px;border:1px solid #bdccda;border-radius:9px;background:#fff;color:#0c294a;font:inherit;outline:none}.loginForm input:focus{border-color:#315fe6;box-shadow:0 0 0 3px rgba(49,95,230,.12)}.formOptions{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:11px}.formOptions a,.legal a{color:#245bd3}.remember{display:flex;gap:7px;align-items:center;color:#60758a}.forgotButton{padding:0;border:0;background:transparent;color:#245bd3;font:inherit;font-weight:850;cursor:pointer}.forgotButton:hover{text-decoration:underline}.primaryButton,.createButton,.socialButton{width:100%;min-height:49px;border-radius:9px;font-size:14px;font-weight:900;cursor:pointer}.primaryButton{border:1px solid #315fe6;background:#315fe6;color:#fff;box-shadow:0 9px 24px rgba(49,95,230,.22)}.primaryButton:hover{background:#214ecb}.createButton{border:1px solid #bdccda;background:#fff;color:#173b60}.createButton:hover{border-color:#315fe6;color:#315fe6}.divider{display:flex;align-items:center;gap:13px;margin:24px 0;color:#7b8da0;font-size:10px;text-transform:uppercase;letter-spacing:.09em}.divider:before,.divider:after{content:"";height:1px;flex:1;background:#d8e1ea}.socialLogin{display:grid;grid-template-columns:1fr 1fr;gap:10px}.socialButton{display:flex;justify-content:center;align-items:center;gap:9px;border:1px solid #bdccda;background:#fff;color:#102b49}.socialButton:hover{border-color:#315fe6;background:#f7f9ff}.appleButton{grid-column:1/-1;border-color:#111;background:#111;color:#fff}.appleButton:hover{background:#292929}.socialButton svg{width:20px;height:20px;fill:currentColor}.googleMark{font-size:18px;color:#4285f4}.microsoftMark{width:16px;height:16px;display:grid;grid-template-columns:1fr 1fr;gap:2px}.microsoftMark i:nth-child(1){background:#f25022}.microsoftMark i:nth-child(2){background:#7fba00}.microsoftMark i:nth-child(3){background:#00a4ef}.microsoftMark i:nth-child(4){background:#ffb900}.legal{margin:22px 0 14px;color:#8191a1;font-size:10px;line-height:1.5;text-align:center}.trust{display:flex;justify-content:center;gap:18px;padding-top:14px;border-top:1px solid #dfe6ed;color:#60758a;font-size:10px}@media(max-width:900px){.loginPage{grid-template-columns:1fr}.loginVisual{min-height:330px}.visualCopy{bottom:30px}.visualCopy h1{font-size:38px}.visualCopy p,.benefits{display:none}.loginAccess{padding:38px 22px}.homeLink{margin-bottom:28px}}@media(max-width:520px){.loginVisual{min-height:235px}.visualBrand{top:20px;left:20px}.visualCopy{left:20px;right:20px;bottom:22px}.visualCopy h1{font-size:29px}.loginAccess{padding:30px 20px}.accessCard h2{font-size:34px}.socialLogin{grid-template-columns:1fr}.appleButton{grid-column:auto}.trust{flex-wrap:wrap}}`;
