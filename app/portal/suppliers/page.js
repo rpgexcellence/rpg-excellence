@@ -151,6 +151,13 @@ export default async function SuppliersPage({ searchParams }) {
 
   return (
     <SupplierAssuranceWorkspace
+      key={
+        params?.new === "1"
+          ? "new-supplier"
+          : managementBoard
+            ? "management-board"
+            : selected?.id || "supplier-workspace"
+      }
       organization={organization}
       suppliers={suppliers}
       initial={params?.new === "1" ? null : selected}
