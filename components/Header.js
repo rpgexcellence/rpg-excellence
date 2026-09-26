@@ -90,6 +90,20 @@ export default function Header({ locale, nav, variant = "default" }) {
 
       <div className="headerActions">
         <a
+          className={`headerYouTube ${variant === "home" ? "headerYouTubeHome" : ""}`}
+          href="https://www.youtube.com/channel/UCZsXSCzL4ebrKafO2515Sow"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Visit RPG Excellence on YouTube (opens in a new tab)"
+          title="Visit RPG Excellence on YouTube"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path className="youtubeBody" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z" />
+            <path className="youtubePlay" d="m9.6 15.6 6.2-3.6-6.2-3.6v7.2Z" />
+          </svg>
+        </a>
+
+        <a
           href="/portal/login"
           className={`button buttonSmall ${variant === "home" ? "headerSignIn" : ""}`}
           style={variant === "home" ? undefined : { background: "transparent", color: "#071A33", border: "1px solid #d8e0ea" }}
