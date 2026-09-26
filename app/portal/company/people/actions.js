@@ -535,3 +535,68 @@ export async function suspendPerson(formData) {
     "/portal/company/people?suspended=1"
   );
 }
+
+export async function sendPasswordReset(formData) {
+  const { user, admin, organization } =
+    await requirePeopleAdmin();
+
+  const personId = clean(
+    formData.get("person_id"),
+    60
+  );
+
+  const { data: person } = await admin
+    .from("organization_people")
+    .select("id,first_name,last_name,email,account_type,account_status")
+    .eq("id", personId)
+    .eq("organization_id", organization.id)
+    .maybeSingle();
+
+  if (
+    !person ||
+    person.account_type !== "system" ||
+    ["suspended", "closed"].includes(person.account_status)
+  ) {
+    redirect(
+      "/portal/company/people?password_reset=unavailable"
+    );
+  }
+
+  const site =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://www.rpgexcellence.com";
+
+  const callback = new URL("/auth/callback", site);
+  callback.searchParams.set(
+    "next",
+    "/portal/update-password"
+  );
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    person.email,
+    { redirectTo: callback.toString() }
+  );
+
+  await admin
+    .from("organization_access_events")
+    .insert({
+      organization_id: organization.id,
+      person_id: person.id,
+      actor_id: user.id,
+      event_type: error
+        ? "password_reset_failed"
+        : "password_reset_requested",
+      event_summary: error
+        ? `Password recovery could not be sent to ${person.first_name} ${person.last_name}.`
+        : `Password recovery sent to ${person.first_name} ${person.last_name}.`,
+      event_data: {
+        requested_by_company_administrator: true,
+        delivery_status: error ? "failed" : "requested",
+      },
+    });
+
+  redirect(
+    `/portal/company/people?password_reset=${error ? "failed" : "sent"}`
+  );
+}
