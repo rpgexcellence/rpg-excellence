@@ -81,6 +81,9 @@ function PortalSidebar() {
             <Link href="/portal/business-continuity/outsourced-processes">
               Outsourced Processes
             </Link>
+            <Link href="/portal/business-continuity/strategies-solutions">
+              Strategies &amp; Solutions
+            </Link>
             <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
               ISO 22301 Assessment
             </Link>
@@ -116,7 +119,8 @@ export default async function BCPHub() {
     roles = [],
     hazards = [],
     bias = [],
-    outsourced = [];
+    outsourced = [],
+    strategies = [];
   if (org) {
     ({ data: profiles = [] } = await s
       .from("bcp_site_profiles")
@@ -168,6 +172,13 @@ export default async function BCPHub() {
       .neq("status", "archived")
       .order("updated_at", { ascending: false });
     outsourced = outsourcedResult.data || [];
+    const strategiesResult = await s
+      .from("bcp_strategy_assessments")
+      .select("id,assessment_reference,assessment_title,status,version,completion_percent,next_review_date,updated_at,feasibility_summary")
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false });
+    strategies = strategiesResult.data || [];
   }
   const done = training?.filter((x) => x.status === "complete").length || 0;
   const liveRisks = hazards.flatMap((x) =>
@@ -363,6 +374,26 @@ export default async function BCPHub() {
               {outsourced?.length
                 ? "Continue latest supplier assessment →"
                 : "Start outsourced-process control →"}
+            </strong>
+          </Link>
+          <Link
+            href={
+              strategies?.[0]?.id
+                ? `/portal/business-continuity/strategies-solutions?id=${strategies[0].id}`
+                : "/portal/business-continuity/strategies-solutions?new=1"
+            }
+          >
+            <small>MODULE 8 · CLAUSE 8.3</small>
+            <h2>Business Continuity Strategies &amp; Solutions</h2>
+            <p>
+              Convert approved BIA requirements, disruption risks and supplier
+              dependencies into feasible recovery options, resources, costs
+              and accountable implementation actions.
+            </p>
+            <strong>
+              {strategies?.length
+                ? "Continue latest strategy assessment →"
+                : "Start strategies and solutions →"}
             </strong>
           </Link>
           <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
