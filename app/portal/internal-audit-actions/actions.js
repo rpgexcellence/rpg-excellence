@@ -26,15 +26,22 @@ export async function createManualNonconformity(formData) {
   const failureStatement = clean(formData.get("failure_statement"));
   const riskLevel = clean(formData.get("risk_level")) || "medium";
   const supplierId = clean(formData.get("supplier_id"));
+  const supplierContactId = clean(formData.get("supplier_contact_id"));
   if (!MANUAL_NC_TYPES.has(findingType) || !MANUAL_NC_SOURCES.has(sourceCategory) || !title || !criteria || !objectiveEvidence || !failureStatement || !MANUAL_NC_RISKS.has(riskLevel)) {
     redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
   }
 
   const admin = createAdminClient();
   if (sourceCategory === "supplier") {
-    if (!supplierId) redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
+    if (!supplierId || !supplierContactId) redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
     const { data: supplier, error: supplierError } = await client.from("suppliers").select("id").eq("id", supplierId).eq("owner_id", user.id).maybeSingle();
     if (supplierError || !supplier) throw new Error(supplierError?.message || "The selected supplier is not available to this account.");
+  }
+  let supplierContact = null;
+  if (sourceCategory === "supplier") {
+    const { data, error } = await client.from("supplier_contacts").select("id,first_name,last_name,email,business_title,is_active").eq("id", supplierContactId).eq("supplier_id", supplierId).eq("owner_id", user.id).eq("is_active", true).maybeSingle();
+    if (error || !data) throw new Error(error?.message || "Select an active contact belonging to the chosen supplier.");
+    supplierContact = data;
   }
   const now = new Date();
   const reference = `MNC-${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}-${randomUUID().slice(0, 6).toUpperCase()}`;
@@ -42,6 +49,7 @@ export async function createManualNonconformity(formData) {
     owner_id: user.id,
     audit_id: null,
     supplier_id: sourceCategory === "supplier" ? supplierId : null,
+    supplier_contact_id: sourceCategory === "supplier" ? supplierContactId : null,
     finding_reference: reference,
     finding_type: findingType,
     title,
@@ -49,8 +57,8 @@ export async function createManualNonconformity(formData) {
     objective_evidence: objectiveEvidence,
     failure_statement: failureStatement,
     process_area: clean(formData.get("process_area")),
-    responsible_owner_name: clean(formData.get("responsible_owner_name")),
-    responsible_owner_email: clean(formData.get("responsible_owner_email")),
+    responsible_owner_name: supplierContact ? `${supplierContact.first_name} ${supplierContact.last_name || ""}`.trim() : clean(formData.get("responsible_owner_name")),
+    responsible_owner_email: supplierContact?.email || clean(formData.get("responsible_owner_email")),
     agreed_date: clean(formData.get("agreed_date")),
     risk_level: riskLevel,
     status: "response_due",
