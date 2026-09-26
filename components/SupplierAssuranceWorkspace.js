@@ -22,15 +22,6 @@ const tabs = [
 const n = (value, fallback = 3) =>
   Number.isFinite(Number(value)) ? Number(value) : fallback;
 
-const displayDate = (value) =>
-  value
-    ? new Intl.DateTimeFormat("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }).format(new Date(value))
-    : "Not recorded";
-
 const initialData = (source = {}) => ({
   legal_name: source.legal_name || "",
   trading_name: source.trading_name || "",
@@ -49,6 +40,7 @@ const initialData = (source = {}) => ({
   approval_scope: source.approval_scope || "",
   approval_conditions: source.approval_conditions || "",
   approved_by: source.approved_by || "",
+  approved_by_person_id: source.approved_by_person_id || "",
   approval_expiry: source.approval_expiry || "",
   next_review_date: source.next_review_date || "",
   review_frequency_months: source.review_frequency_months || 12,
@@ -103,6 +95,10 @@ export default function SupplierAssuranceWorkspace({
   suppliers = [],
   initial,
   documents = [],
+  approvers = [],
+  evidenceFiles = [],
+  subTierSuppliers = [],
+  supplierSites = [],
   action,
   generateAction,
   saved,
@@ -119,6 +115,9 @@ export default function SupplierAssuranceWorkspace({
   const [answers, setAnswers] = useState(
     () => initial?.due_diligence_answers || {},
   );
+  const [sites, setSites] = useState(() => supplierSites || []);
+  const [subTiers, setSubTiers] = useState(() => subTierSuppliers || []);
+  const [selectedFiles, setSelectedFiles] = useState({});
   const [risk, setRisk] = useState(() => ({
     likelihood: n(initial?.risk_inputs?.likelihood),
     consequence: n(initial?.risk_inputs?.consequence),
@@ -185,6 +184,24 @@ export default function SupplierAssuranceWorkspace({
       },
     }));
 
+  const addSite = () => setSites((current) => [
+    ...current,
+    { client_key: crypto.randomUUID(), site_name: "", address: "", scope: "", approval_status: "not_approved" },
+  ]);
+  const updateSite = (key, field, value) => setSites((current) =>
+    current.map((site) => (site.client_key === key ? { ...site, [field]: value } : site))
+  );
+  const removeSite = (key) => setSites((current) => current.filter((site) => site.client_key !== key));
+
+  const addSubTier = () => setSubTiers((current) => [
+    ...current,
+    { client_key: crypto.randomUUID(), legal_name: "", supply_scope: "", approval_status: "not_approved", certification_standard: "", certificate_number: "", certification_body: "", certificate_expiry: "", reminder_date: "" },
+  ]);
+  const updateSubTier = (key, field, value) => setSubTiers((current) =>
+    current.map((supplier) => (supplier.client_key === key ? { ...supplier, [field]: value } : supplier))
+  );
+  const removeSubTier = (key) => setSubTiers((current) => current.filter((supplier) => supplier.client_key !== key));
+
   const active = initial || null;
 
   const riskTone =
@@ -196,31 +213,9 @@ export default function SupplierAssuranceWorkspace({
           ? "blue"
           : "green";
 
-  const approvalStatus = String(active?.approval_status || "draft");
-  const approvalExpired = Boolean(
-    active?.approval_expiry &&
-      new Date(active.approval_expiry).getTime() < Date.now(),
-  );
-  const statusLabels = {
-    draft: "Draft",
-    pending_approval: "Pending approval",
-    conditionally_approved: "Conditionally approved",
-    approved: "Approved",
-    suspended: "Suspended",
-    rejected: "Rejected",
-    expired: "Expired",
-  };
-  const statusLabel = approvalExpired
-    ? "Approval expired"
-    : statusLabels[approvalStatus] || approvalStatus.replaceAll("_", " ");
-  const statusTone =
-    approvalExpired || ["suspended", "rejected", "expired"].includes(approvalStatus)
-      ? "red"
-      : approvalStatus === "approved"
-        ? "green"
-        : approvalStatus === "conditionally_approved" || approvalStatus === "pending_approval"
-          ? "amber"
-          : "blue";
+  const statusLabel = String(
+    active?.approval_status || "draft",
+  ).replaceAll("_", " ");
 
   return (
     <main className="saPage">
@@ -242,15 +237,9 @@ export default function SupplierAssuranceWorkspace({
   .saCocPreview>article>small{font-size:12px}
   .saGenerate p,.saSectionHead p{font-size:15px}
   .saGenerate form small{font-size:12px}
-  .saApprovalStatus{display:grid;grid-template-columns:minmax(230px,.72fr) minmax(0,1.7fr) auto;gap:18px;align-items:center;margin-top:12px;padding:18px 20px;border:1px solid #9fbce0;border-left:7px solid #315fe6;border-radius:14px;background:#f4f8ff;box-shadow:0 8px 24px rgba(18,57,95,.08)}
-  .saApprovalStatus.green{border-color:#9bd8bd;border-left-color:#07945d;background:#edfbf4}.saApprovalStatus.amber{border-color:#efc688;border-left-color:#dd8500;background:#fff8e9}.saApprovalStatus.red{border-color:#eba69f;border-left-color:#cf3c30;background:#fff1ef}
-  .saApprovalIdentity>span{display:block;color:#607991;font-size:10px;font-weight:950;letter-spacing:.12em}.saApprovalIdentity>strong{display:block;margin-top:4px;font-size:25px;line-height:1.15}.saApprovalIdentity>small{display:block;margin-top:4px;color:#61788e;font-size:11px}
-  .saApprovalFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.saApprovalFacts div{min-width:0;padding:10px;border-radius:9px;background:rgba(255,255,255,.78)}.saApprovalFacts span,.saApprovalFacts b{display:block}.saApprovalFacts span{color:#698096;font-size:9px;text-transform:uppercase}.saApprovalFacts b{margin-top:4px;overflow-wrap:anywhere;font-size:11px}
-  .saApprovalStatus>button{min-height:42px;padding:0 14px;border:1px solid #315fe6;border-radius:8px;background:#fff;color:#2059cd;font-weight:900;cursor:pointer}.saApprovalConditions{grid-column:1/-1;margin:0;padding-top:11px;border-top:1px solid rgba(70,103,133,.17);color:#526d84;font-size:12px}.saApprovalConditions b{color:#183b5b}
   @media(max-width:600px){
     .saCocPreview>header{padding:22px}
     .saCocPreview>article{grid-template-columns:1fr;padding:18px}
-    .saApprovalStatus{grid-template-columns:1fr}.saApprovalFacts{grid-template-columns:1fr 1fr}.saApprovalStatus>button{width:100%}
   }
 `}</style>
       <div className="saShell">
@@ -372,38 +361,6 @@ export default function SupplierAssuranceWorkspace({
             </aside>
           </section>
 
-          {active && (
-            <section
-              className={`saApprovalStatus ${statusTone}`}
-              aria-label="Controlled supplier approval status"
-            >
-              <div className="saApprovalIdentity">
-                <span>CONTROLLED SUPPLIER STATUS</span>
-                <strong>{statusLabel}</strong>
-                <small>{active.supplier_reference}</small>
-              </div>
-
-              <div className="saApprovalFacts">
-                <div><span>Decision date</span><b>{displayDate(active.approved_at)}</b></div>
-                <div><span>Approved by</span><b>{active.approved_by || "Not recorded"}</b></div>
-                <div><span>Next review</span><b>{displayDate(active.next_review_date)}</b></div>
-                <div><span>Approval expiry</span><b>{displayDate(active.approval_expiry)}</b></div>
-              </div>
-
-              <button type="button" onClick={() => setStep(4)}>
-                Review decision →
-              </button>
-
-              {(active.approval_scope || active.approval_conditions || result.blockers.length > 0) && (
-                <p className="saApprovalConditions">
-                  {active.approval_scope && <><b>Approved scope:</b> {active.approval_scope} </>}
-                  {active.approval_conditions && <><b>Conditions:</b> {active.approval_conditions} </>}
-                  {result.blockers.length > 0 && <><b>Current blockers:</b> {result.blockers.length}</>}
-                </p>
-              )}
-            </section>
-          )}
-
           <section className="saMetrics">
             <Metric
               label="Supplier portfolio"
@@ -508,6 +465,8 @@ export default function SupplierAssuranceWorkspace({
               name="performance"
               value={JSON.stringify(performance)}
             />
+            <input type="hidden" name="supplier_sites" value={JSON.stringify(sites)} />
+            <input type="hidden" name="subtier_suppliers" value={JSON.stringify(subTiers)} />
 
             {step !== 0 &&
               [
@@ -522,7 +481,6 @@ export default function SupplierAssuranceWorkspace({
                 "primary_contact_email",
                 "primary_contact_phone",
                 "supply_description",
-                "sites_and_scope",
               ].map((key) => (
                 <input
                   key={key}
@@ -552,7 +510,7 @@ export default function SupplierAssuranceWorkspace({
               [
                 "approval_scope",
                 "approval_conditions",
-                "approved_by",
+                "approved_by_person_id",
                 "approval_expiry",
                 "next_review_date",
                 "review_frequency_months",
@@ -683,17 +641,25 @@ export default function SupplierAssuranceWorkspace({
                     className="wide"
                     required
                   />
-                  <Field
-                    label="Approved sites and operational scope"
-                    name="sites_and_scope"
-                    value={data.sites_and_scope}
-                    onChange={(value) =>
-                      update("sites_and_scope", value)
-                    }
-                    area
-                    rows="3"
-                    className="wide"
-                  />
+                </div>
+
+                <div className="saRegisterHead">
+                  <div><h3>Supplier sites and approved scope</h3><p>Add each operating location separately and control its approval status.</p></div>
+                  <button type="button" onClick={addSite}>+ Add site</button>
+                </div>
+                <div className="saManagedList">
+                  {sites.length === 0 && <p className="saEmpty">No sites added. Add at least the principal supply location.</p>}
+                  {sites.map((site, index) => (
+                    <article key={site.client_key}>
+                      <header><b>Site {index + 1}</b><button type="button" onClick={() => removeSite(site.client_key)}>Remove</button></header>
+                      <div className="saManagedGrid">
+                        <label><span>Site name *</span><input value={site.site_name} onChange={(event) => updateSite(site.client_key, "site_name", event.target.value)} /></label>
+                        <label><span>Approval status</span><select value={site.approval_status} onChange={(event) => updateSite(site.client_key, "approval_status", event.target.value)}><option value="approved">Approved</option><option value="conditionally_approved">Conditionally approved</option><option value="not_approved">Not approved</option><option value="pending">Pending assessment</option><option value="suspended">Suspended</option></select></label>
+                        <label className="wide"><span>Full address *</span><textarea rows="2" value={site.address} onChange={(event) => updateSite(site.client_key, "address", event.target.value)} /></label>
+                        <label className="wide"><span>Approved operational scope *</span><textarea rows="2" value={site.scope} onChange={(event) => updateSite(site.client_key, "scope", event.target.value)} /></label>
+                      </div>
+                    </article>
+                  ))}
                 </div>
               </>
             )}
@@ -783,6 +749,34 @@ export default function SupplierAssuranceWorkspace({
                     </small>
                   </span>
                 </label>
+                {data.uses_subtier_suppliers && (
+                  <>
+                    <div className="saRegisterHead">
+                      <div><h3>Sub-tier supplier register</h3><p>Record controlled status, applicable certification and the manually selected renewal reminder date.</p></div>
+                      <button type="button" onClick={addSubTier}>+ Add sub-tier supplier</button>
+                    </div>
+                    <div className="saManagedList">
+                      {subTiers.length === 0 && <p className="saEmpty">No sub-tier suppliers added.</p>}
+                      {subTiers.map((supplier, index) => (
+                        <article key={supplier.client_key}>
+                          <header><b>Sub-tier supplier {index + 1}</b><button type="button" onClick={() => removeSubTier(supplier.client_key)}>Remove</button></header>
+                          <div className="saManagedGrid">
+                            <label><span>Legal name *</span><input value={supplier.legal_name} onChange={(event) => updateSubTier(supplier.client_key, "legal_name", event.target.value)} /></label>
+                            <label><span>Approval status</span><select value={supplier.approval_status} onChange={(event) => updateSubTier(supplier.client_key, "approval_status", event.target.value)}><option value="approved">Approved</option><option value="conditionally_approved">Conditionally approved</option><option value="not_approved">Not approved</option><option value="pending">Pending assessment</option><option value="suspended">Suspended</option><option value="expired">Approval expired</option></select></label>
+                            <label className="wide"><span>Products, services or process supplied *</span><textarea rows="2" value={supplier.supply_scope} onChange={(event) => updateSubTier(supplier.client_key, "supply_scope", event.target.value)} /></label>
+                            <label><span>Certification / standard</span><input value={supplier.certification_standard} onChange={(event) => updateSubTier(supplier.client_key, "certification_standard", event.target.value)} placeholder="e.g. ISO 9001:2015" /></label>
+                            <label><span>Certificate number</span><input value={supplier.certificate_number} onChange={(event) => updateSubTier(supplier.client_key, "certificate_number", event.target.value)} /></label>
+                            <label><span>Certification body</span><input value={supplier.certification_body} onChange={(event) => updateSubTier(supplier.client_key, "certification_body", event.target.value)} /></label>
+                            <label><span>Certificate renewal / expiry</span><input type="date" value={supplier.certificate_expiry} onChange={(event) => updateSubTier(supplier.client_key, "certificate_expiry", event.target.value)} /></label>
+                            <label><span>Send renewal reminder on</span><input type="date" value={supplier.reminder_date} onChange={(event) => updateSubTier(supplier.client_key, "reminder_date", event.target.value)} /></label>
+                            <label className="saFileButton"><span>Certification evidence</span><input type="file" name={`subtier_certificate_${supplier.client_key}`} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" /><b>+ Add certificate</b></label>
+                            {supplier.certificate_url && <a className="saDownload" href={supplier.certificate_url} target="_blank" rel="noreferrer">Download current certificate</a>}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -1008,6 +1002,20 @@ export default function SupplierAssuranceWorkspace({
                           />
                         </label>
 
+                        <div className="saEvidenceFiles">
+                          <label className="saFileButton">
+                            <input
+                              type="file"
+                              name={`evidence_file_${item.id}`}
+                              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                              onChange={(event) => setSelectedFiles((currentFiles) => ({ ...currentFiles, [item.id]: event.target.files?.[0]?.name || "" }))}
+                            />
+                            <b>+ Add evidence</b>
+                          </label>
+                          {selectedFiles[item.id] && <span>Ready to save: {selectedFiles[item.id]}</span>}
+                          {evidenceFiles.filter((file) => file.control_id === item.id).map((file) => <a key={file.id} href={file.download_url} target="_blank" rel="noreferrer">↧ {file.file_name}</a>)}
+                        </div>
+
                         <small>
                           Control {index + 1} of{" "}
                           {questions.length} · Weight{" "}
@@ -1107,14 +1115,12 @@ export default function SupplierAssuranceWorkspace({
                     rows="4"
                     className="wide"
                   />
-                  <Field
-                    label="Competent approver"
-                    name="approved_by"
-                    value={data.approved_by}
-                    onChange={(value) =>
-                      update("approved_by", value)
-                    }
-                  />
+                  <Field label="Competent approver" value={data.approved_by_person_id || ""} onChange={() => {}}>
+                    <select name="approved_by_person_id" value={data.approved_by_person_id || ""} onChange={(event) => update("approved_by_person_id", event.target.value)}>
+                      <option value="">Select an authorised company approver</option>
+                      {approvers.map((person) => <option key={person.id} value={person.id}>{person.first_name} {person.last_name} · {person.position || person.email}</option>)}
+                    </select>
+                  </Field>
                   <Field
                     label="Review frequency (months)"
                     name="review_frequency_months"
@@ -1519,6 +1525,9 @@ const styles = `
 .saResponses button.selected.no{border-color:#d94840;background:#ffe8e5;color:#a52b25}
 .saResponses button.selected.na{border-color:#7890a8;background:#edf1f5}
 .saQuestions article>small{display:block;margin-top:7px;color:#8a99a8;font-size:8px}
+.saRegisterHead{display:flex;justify-content:space-between;gap:18px;align-items:end;margin:24px 0 11px}.saRegisterHead h3{margin:0 0 5px}.saRegisterHead p{margin:0;color:#708397;font-size:12px}.saRegisterHead>button{padding:10px 13px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-weight:900;cursor:pointer}
+.saManagedList{display:grid;gap:12px}.saManagedList>article{padding:16px;border:1px solid #cfdae5;border-radius:12px;background:#f9fbfd}.saManagedList>article>header{display:flex;justify-content:space-between;margin-bottom:13px}.saManagedList>article>header button{border:0;background:transparent;color:#b52f29;font-weight:850;cursor:pointer}.saManagedGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.saManagedGrid label{display:grid;gap:6px}.saManagedGrid label>span{color:#3d566f;font-size:11px;font-weight:900}.saManagedGrid input,.saManagedGrid textarea,.saManagedGrid select{width:100%;padding:11px;border:1px solid #c8d6e3;border-radius:8px;background:#fff;font:inherit}.saManagedGrid .wide{grid-column:1/-1}.saEmpty{margin:0;padding:17px;border:1px dashed #b9c9d8;border-radius:10px;color:#708397;text-align:center}
+.saFileButton{position:relative;display:inline-grid!important;width:max-content;align-content:center}.saFileButton input{position:absolute!important;width:1px!important;height:1px!important;opacity:0}.saFileButton b{display:inline-flex;padding:9px 12px;border:1px solid #315fe6;border-radius:7px;background:#fff;color:#315fe6;cursor:pointer}.saDownload{align-self:end;padding:10px;color:#2059cd;font-weight:850}.saEvidenceFiles{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.saEvidenceFiles span{color:#607991;font-size:11px}.saEvidenceFiles a{padding:7px 9px;border-radius:7px;background:#edf3ff;color:#2059cd;text-decoration:none;font-size:11px;font-weight:800}
 .saDecision{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:20px}
 .saDecision article{display:grid;gap:4px;padding:16px;border:1px solid #d7e1ea;border-radius:11px;background:#f9fbfd}
 .saDecision span{color:#5e7287;font-size:10px;font-weight:900}
@@ -1569,6 +1578,8 @@ const styles = `
   .saTop>div:last-child{display:none}
   .saMetrics{grid-template-columns:1fr 1fr}
   .saGrid,.saStandardGrid,.saPerformance{grid-template-columns:1fr 1fr}
+  .saManagedGrid{grid-template-columns:1fr}
+  .saManagedGrid .wide{grid-column:auto}
   .saGenerate{grid-template-columns:1fr}
 }
 @media(max-width:600px){
@@ -1582,4 +1593,5 @@ const styles = `
   .saActions>div{display:grid;grid-template-columns:1fr 1fr}
   .saActions>div:last-child{grid-template-columns:1fr}
   .saGrid .wide{grid-column:auto}
+  .saRegisterHead{display:grid}.saRegisterHead>button{width:100%}
 }`;
