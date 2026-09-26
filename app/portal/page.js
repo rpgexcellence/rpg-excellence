@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
+import { createAdminClient } from "../../lib/supabase/admin";
 import {
   getUserSubscription,
   getPlanLabel,
@@ -94,6 +95,56 @@ export default async function PortalPage({ searchParams }) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login");
+
+  // Route company members before the customer-owner onboarding flow. A user
+  // invited into an existing organisation must never be asked to create a
+  // second organisation or site profile.
+  const admin = createAdminClient();
+  const normalizedEmail = String(user.email || "").trim().toLowerCase();
+  const { data: ownedOrganization } = await admin
+    .from("organizations")
+    .select("id")
+    .eq("owner_id", user.id)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+
+  if (!ownedOrganization) {
+    const { data: activeMembership } = await admin
+      .from("organization_people")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("account_status", "active")
+      .limit(1)
+      .maybeSingle();
+
+    if (activeMembership) redirect("/portal/my-access");
+
+    if (normalizedEmail) {
+      const { data: invitedPeople = [] } = await admin
+        .from("organization_people")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .eq("account_type", "system")
+        .eq("account_status", "invited")
+        .order("created_at", { ascending: false });
+
+      if (invitedPeople.length) {
+        const { data: activeInvitation } = await admin
+          .from("organization_invitations")
+          .select("id")
+          .in("person_id", invitedPeople.map((person) => person.id))
+          .eq("status", "active")
+          .gt("expires_at", new Date().toISOString())
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeInvitation) redirect("/portal/confirm-company-access");
+      }
+    }
+  }
+
   const subscription = await getUserSubscription(user.id);
   const assessmentPasses = await getAvailableAssessmentPasses(user.id);
   const standaloneSoaPasses = await getAvailableStandaloneSoaPasses(user.id);
