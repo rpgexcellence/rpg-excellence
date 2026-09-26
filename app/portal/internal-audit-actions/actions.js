@@ -33,7 +33,7 @@ export async function createManualNonconformity(formData) {
   const admin = createAdminClient();
   if (sourceCategory === "supplier") {
     if (!supplierId) redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
-    const { data: supplier, error: supplierError } = await admin.from("suppliers").select("id").eq("id", supplierId).eq("owner_id", user.id).maybeSingle();
+    const { data: supplier, error: supplierError } = await client.from("suppliers").select("id").eq("id", supplierId).eq("owner_id", user.id).maybeSingle();
     if (supplierError || !supplier) throw new Error(supplierError?.message || "The selected supplier is not available to this account.");
   }
   const now = new Date();
