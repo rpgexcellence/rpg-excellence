@@ -101,47 +101,6 @@ a {
   align-items: center;
   gap: 10px;
 }
-.headerYouTube {
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border: 1px solid #d8e0ea;
-  border-radius: 10px;
-  background: #fff;
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
-}
-.headerYouTube svg {
-  width: 24px;
-  height: 24px;
-}
-.headerYouTube .youtubeBody,
-.footerYouTube .youtubeBody {
-  fill: #ff0033;
-}
-.headerYouTube .youtubePlay,
-.footerYouTube .youtubePlay {
-  fill: #fff;
-}
-.headerYouTube:hover {
-  border-color: #ff0033;
-  background: #fff5f7;
-  transform: translateY(-1px);
-}
-.headerYouTube:focus-visible {
-  outline: 3px solid #ff8aa2;
-  outline-offset: 3px;
-}
-.headerYouTubeHome {
-  border-color: #8ba3c0;
-  background: rgba(255, 255, 255, 0.08);
-}
-.headerYouTubeHome:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: #fff;
-}
 .language {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -495,20 +454,35 @@ a {
 .footer {
   padding: 34px 6vw 44px;
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: minmax(240px, 1fr) auto auto auto auto;
   align-items: center;
   gap: 24px;
   border-top: 1px solid var(--line);
 }
-.footerSocials {
-  display: flex;
+.footerSaasBadge {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: nowrap;
-  margin-left: -36px;
+  justify-content: center;
+  min-height: 54px;
+  padding: 4px;
+  border-radius: 10px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.footerLinkedIn,
-.footerYouTube {
+.footerSaasBadge img {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+}
+.footerSaasBadge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(12, 48, 87, 0.12);
+}
+.footerSaasBadge:focus-visible {
+  outline: 3px solid #87bff2;
+  outline-offset: 3px;
+}
+.footerLinkedIn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -531,27 +505,12 @@ a {
   fill: currentColor;
   flex: 0 0 auto;
 }
-.footerYouTube {
-  color: #3a4657;
-}
-.footerYouTube svg {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-}
 .footerLinkedIn:hover {
   background: #eef6ff;
   border-color: #0a66c2;
   transform: translateY(-1px);
 }
-.footerYouTube:hover {
-  background: #fff5f7;
-  border-color: #ff0033;
-  color: #171717;
-  transform: translateY(-1px);
-}
-.footerLinkedIn:focus-visible,
-.footerYouTube:focus-visible {
+.footerLinkedIn:focus-visible {
   outline: 3px solid #87bff2;
   outline-offset: 3px;
 }
@@ -726,10 +685,7 @@ a {
   }
   .footer {
     grid-template-columns: 1fr;
-  }
-  .footerSocials {
-    margin-left: 0;
-    flex-wrap: wrap;
+    justify-items: start;
   }
   .footerLinks {
     flex-wrap: wrap;
