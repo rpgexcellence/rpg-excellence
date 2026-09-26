@@ -482,7 +482,14 @@ a {
   outline: 3px solid #87bff2;
   outline-offset: 3px;
 }
-.footerLinkedIn {
+.footerSocials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.footerLinkedIn,
+.footerYouTube {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -505,12 +512,33 @@ a {
   fill: currentColor;
   flex: 0 0 auto;
 }
+.footerYouTube {
+  color: #3a4657;
+}
+.footerYouTube svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+.footerYouTube .youtubeBody {
+  fill: #ff0033;
+}
+.footerYouTube .youtubePlay {
+  fill: #fff;
+}
 .footerLinkedIn:hover {
   background: #eef6ff;
   border-color: #0a66c2;
   transform: translateY(-1px);
 }
-.footerLinkedIn:focus-visible {
+.footerYouTube:hover {
+  background: #fff5f7;
+  border-color: #ff0033;
+  color: #171717;
+  transform: translateY(-1px);
+}
+.footerLinkedIn:focus-visible,
+.footerYouTube:focus-visible {
   outline: 3px solid #87bff2;
   outline-offset: 3px;
 }
@@ -686,6 +714,9 @@ a {
   .footer {
     grid-template-columns: 1fr;
     justify-items: start;
+  }
+  .footerSocials {
+    flex-wrap: wrap;
   }
   .footerLinks {
     flex-wrap: wrap;
