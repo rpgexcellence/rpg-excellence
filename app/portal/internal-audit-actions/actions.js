@@ -8,6 +8,75 @@ import { createClient } from "../../../lib/supabase/server";
 
 const clean = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
 
+const MANUAL_NC_TYPES = new Set(["major_nc", "minor_nc"]);
+const MANUAL_NC_SOURCES = new Set(["operations", "supplier", "customer_complaint", "product_service", "process_monitoring", "incident", "management_review", "external_audit", "other"]);
+const MANUAL_NC_RISKS = new Set(["low", "medium", "high", "critical"]);
+const MAX_MANUAL_EVIDENCE_BYTES = 10 * 1024 * 1024;
+
+export async function createManualNonconformity(formData) {
+  const client = await createClient();
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) redirect("/portal/login?next=/portal/internal-audit-actions?raise=1");
+
+  const findingType = clean(formData.get("finding_type"));
+  const sourceCategory = clean(formData.get("source_category"));
+  const title = clean(formData.get("title"));
+  const criteria = clean(formData.get("criteria"));
+  const objectiveEvidence = clean(formData.get("objective_evidence"));
+  const failureStatement = clean(formData.get("failure_statement"));
+  const riskLevel = clean(formData.get("risk_level")) || "medium";
+  if (!MANUAL_NC_TYPES.has(findingType) || !MANUAL_NC_SOURCES.has(sourceCategory) || !title || !criteria || !objectiveEvidence || !failureStatement || !MANUAL_NC_RISKS.has(riskLevel)) {
+    redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
+  }
+
+  const admin = createAdminClient();
+  const now = new Date();
+  const reference = `MNC-${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}-${randomUUID().slice(0, 6).toUpperCase()}`;
+  const { data: finding, error: findingError } = await admin.from("internal_audit_findings").insert({
+    owner_id: user.id,
+    audit_id: null,
+    finding_reference: reference,
+    finding_type: findingType,
+    title,
+    criteria,
+    objective_evidence: objectiveEvidence,
+    failure_statement: failureStatement,
+    process_area: clean(formData.get("process_area")),
+    responsible_owner_name: clean(formData.get("responsible_owner_name")),
+    responsible_owner_email: clean(formData.get("responsible_owner_email")),
+    agreed_date: clean(formData.get("agreed_date")),
+    risk_level: riskLevel,
+    status: "response_due",
+    source_type: "manual",
+    source_category: sourceCategory,
+    source_reference: clean(formData.get("source_reference")),
+    detected_at: clean(formData.get("detected_at")) || now.toISOString().slice(0, 10),
+    requirement_source: clean(formData.get("requirement_source")) || "other_criteria",
+    evidence_source: clean(formData.get("evidence_source")) || "multiple_sources",
+  }).select("id,finding_reference").single();
+  if (findingError || !finding) throw new Error(findingError?.message || "The manual nonconformity could not be created.");
+
+  const evidenceFile = formData.get("evidence_file");
+  if (evidenceFile instanceof File && evidenceFile.size > 0) {
+    if (evidenceFile.size > MAX_MANUAL_EVIDENCE_BYTES) redirect("/portal/internal-audit-actions?raise=1&error=file_size#raise-manual-nc");
+    const safeName = evidenceFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const storagePath = `${user.id}/manual-findings/${finding.id}/${randomUUID()}-${safeName}`;
+    const { error: uploadError } = await admin.storage.from("internal-audit-evidence").upload(storagePath, evidenceFile, { contentType: evidenceFile.type || "application/octet-stream" });
+    if (uploadError) throw new Error(`Manual NC created, but evidence upload failed: ${uploadError.message}`);
+    const { error: attachmentError } = await admin.from("internal_audit_findings").update({
+      evidence_attachment_path: storagePath,
+      evidence_attachment_name: evidenceFile.name,
+      evidence_attachment_type: evidenceFile.type || "application/octet-stream",
+      evidence_attachment_size: evidenceFile.size,
+      updated_at: new Date().toISOString(),
+    }).eq("id", finding.id).eq("owner_id", user.id);
+    if (attachmentError) throw new Error(`Manual NC created, but evidence metadata could not be saved: ${attachmentError.message}`);
+  }
+
+  revalidatePath("/portal/internal-audit-actions");
+  redirect(`/portal/internal-audit-actions?manual_created=${encodeURIComponent(reference)}#all-ncs`);
+}
+
 export async function submitPortalAuditAction(formData) {
   const accessId = clean(formData.get("action_access_id"));
   if (!accessId) throw new Error("Assigned action is required.");
