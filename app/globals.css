@@ -101,6 +101,45 @@ a {
   align-items: center;
   gap: 10px;
 }
+.headerYouTube {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid #d8e0ea;
+  border-radius: 10px;
+  background: #fff;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+.headerYouTube svg {
+  width: 24px;
+  height: 24px;
+}
+.headerYouTube .youtubeBody {
+  fill: #ff0033;
+}
+.headerYouTube .youtubePlay {
+  fill: #fff;
+}
+.headerYouTube:hover {
+  border-color: #ff0033;
+  background: #fff5f7;
+  transform: translateY(-1px);
+}
+.headerYouTube:focus-visible {
+  outline: 3px solid #ff8aa2;
+  outline-offset: 3px;
+}
+.headerYouTubeHome {
+  border-color: #8ba3c0;
+  background: rgba(255, 255, 255, 0.08);
+}
+.headerYouTubeHome:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: #fff;
+}
 .language {
   border: 1px solid var(--line);
   border-radius: 10px;
