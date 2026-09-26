@@ -47,6 +47,50 @@ export async function signUp(formData) {
   redirect(next);
 }
 
+export async function requestPasswordReset(formData) {
+  const email = String(formData.get("email") || "")
+    .trim()
+    .toLowerCase();
+
+  if (!email) {
+    loginError(
+      "Enter your email address before requesting password recovery.",
+      formData.get("next")
+    );
+  }
+
+  const requestHeaders = await headers();
+  const origin =
+    requestHeaders.get("origin") ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://www.rpgexcellence.com";
+
+  const callback = new URL("/auth/callback", origin);
+  callback.searchParams.set(
+    "next",
+    "/portal/update-password"
+  );
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email,
+    { redirectTo: callback.toString() }
+  );
+
+  if (error) {
+    loginError(
+      "Password recovery could not be started. Please try again.",
+      formData.get("next")
+    );
+  }
+
+  const query = new URLSearchParams({
+    message:
+      "If the email is registered, a secure password-reset link has been sent.",
+  });
+  redirect(`/portal/login?${query.toString()}`);
+}
+
 async function signInWithProvider(formData, provider, scopes) {
   const supabase=await createClient(),next=safeNext(formData.get("next")),requestHeaders=await headers();
   const origin=requestHeaders.get("origin")||process.env.NEXT_PUBLIC_SITE_URL||"https://www.rpgexcellence.com";
