@@ -67,7 +67,7 @@ export default async function SuppliersPage({ searchParams }) {
       .eq("organization_id", organization.id)
       .eq("function_key", "approver")
       .eq("status", "authorised");
-    const approverIds = authorisedApprovers.map((item) => item.person_id);
+    const approverIds = (authorisedApprovers || []).map((item) => item.person_id);
     if (approverIds.length) {
       const { data: people = [] } = await supabase
         .from("organization_people")
@@ -76,7 +76,7 @@ export default async function SuppliersPage({ searchParams }) {
         .in("id", approverIds)
         .in("account_status", ["active", "invited"])
         .order("last_name");
-      approvers = people;
+      approvers = people || [];
     }
 
     if (params?.id) {
@@ -111,16 +111,16 @@ export default async function SuppliersPage({ searchParams }) {
         supabase.from("supplier_subtier_suppliers").select("*").eq("supplier_id", selected.id).order("created_at"),
         supabase.from("supplier_sites").select("*").eq("supplier_id", selected.id).order("created_at"),
       ]);
-      evidenceFiles = await Promise.all(evidence.map(async (file) => {
+      evidenceFiles = await Promise.all((evidence || []).map(async (file) => {
         const { data: signed } = await supabase.storage.from("supplier-assurance-evidence").createSignedUrl(file.storage_path, 3600);
         return { ...file, download_url: signed?.signedUrl || "#" };
       }));
-      subTierSuppliers = await Promise.all(subtiers.map(async (supplier) => {
+      subTierSuppliers = await Promise.all((subtiers || []).map(async (supplier) => {
         if (!supplier.certificate_storage_path) return { ...supplier, client_key: supplier.id };
         const { data: signed } = await supabase.storage.from("supplier-assurance-evidence").createSignedUrl(supplier.certificate_storage_path, 3600);
         return { ...supplier, client_key: supplier.id, certificate_url: signed?.signedUrl || "#" };
       }));
-      supplierSites = sites.map((site) => ({ ...site, client_key: site.id }));
+      supplierSites = (sites || []).map((site) => ({ ...site, client_key: site.id }));
     }
   }
 
