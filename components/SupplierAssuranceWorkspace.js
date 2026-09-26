@@ -412,6 +412,16 @@ export default function SupplierAssuranceWorkspace({
               }
               tone="green"
             />
+            <Metric
+              label="Risk profile"
+              value={active ? result.riskBand : "—"}
+              detail={
+                active
+                  ? `${result.riskScore}/40 · Live supplier risk score`
+                  : "Select a supplier"
+              }
+              tone={active ? riskTone : "blue"}
+            />
           </section>
 
           {(saved || state?.error) && (
