@@ -102,6 +102,7 @@ export default function SupplierAssuranceWorkspace({
   supplierSites = [],
   supplierNcStats = {},
   supplierContacts = [],
+  managementBoard = false,
   action,
   generateAction,
   saved,
@@ -261,8 +262,8 @@ export default function SupplierAssuranceWorkspace({
 
           <nav>
             <Link
-              href="/portal/suppliers"
-              className={!active ? "active" : ""}
+              href="/portal/suppliers?view=board"
+              className={managementBoard ? "active" : ""}
             >
               Management board
             </Link>
@@ -315,12 +316,16 @@ export default function SupplierAssuranceWorkspace({
             <div>
               <small>INTEGRATED SUPPLIER ASSURANCE</small>
               <h1>
-                {active
+                {managementBoard
+                  ? "Supplier assurance management board"
+                  : active
                   ? active.legal_name
                   : "Create supplier assurance record"}
               </h1>
               <p>
-                {active
+                {managementBoard
+                  ? "Portfolio risk, approval and nonconformity oversight"
+                  : active
                   ? `${active.supplier_reference} · ${statusLabel}`
                   : "Classify once, then let the engine apply the right controls."}
               </p>
@@ -424,7 +429,45 @@ export default function SupplierAssuranceWorkspace({
             />
           </section>
 
-          {(saved || state?.error) && (
+          {managementBoard && (
+            <section className="saBoard">
+              <header>
+                <div>
+                  <small>CONTROLLED SUPPLIER PORTFOLIO</small>
+                  <h2>Supplier management board</h2>
+                  <p>Select a supplier to review its risk, approval, NC position and assurance record.</p>
+                </div>
+                <Link href="/portal/suppliers?new=1">+ Add supplier</Link>
+              </header>
+
+              {suppliers.length ? (
+                <div className="saBoardTable">
+                  <div className="saBoardRow heading">
+                    <span>Supplier</span><span>Approval</span><span>Risk profile</span><span>NC position</span><span>Next review</span><span>Action</span>
+                  </div>
+                  {suppliers.map((supplier) => {
+                    const stats = supplierNcStats[supplier.id] || { open: 0, pending: 0, closed: 0 };
+                    const band = supplier.risk_result?.riskBand || "Not assessed";
+                    const score = supplier.risk_result?.riskScore;
+                    return (
+                      <div className="saBoardRow" key={supplier.id}>
+                        <span><b>{supplier.legal_name}</b><small>{supplier.supplier_reference}</small></span>
+                        <span><Pill tone={supplier.approval_status === "approved" ? "green" : supplier.approval_status === "pending_approval" ? "amber" : "blue"}>{String(supplier.approval_status || "draft").replaceAll("_", " ")}</Pill></span>
+                        <span><b>{band}</b><small>{Number.isFinite(Number(score)) ? `${score}/40` : "Complete risk engine"}</small></span>
+                        <span><b>{stats.open} open · {stats.pending} pending</b><small>{stats.closed} closed</small></span>
+                        <span><b>{supplier.next_review_date || "Not set"}</b><small>{supplier.review_frequency_months || 12}-month cycle</small></span>
+                        <span><Link href={`/portal/suppliers?id=${supplier.id}`}>Open record →</Link></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="saBoardEmpty"><b>No suppliers yet</b><span>Create the first controlled supplier assurance record.</span></div>
+              )}
+            </section>
+          )}
+
+          {!managementBoard && (saved || state?.error) && (
             <div
               className={
                 state?.error
@@ -437,7 +480,7 @@ export default function SupplierAssuranceWorkspace({
             </div>
           )}
 
-          <div className="saTabs" role="tablist">
+          {!managementBoard && <div className="saTabs" role="tablist">
             {tabs.map((tab, index) => (
               <button
                 type="button"
@@ -451,9 +494,9 @@ export default function SupplierAssuranceWorkspace({
                 {tab}
               </button>
             ))}
-          </div>
+          </div>}
 
-          <form action={formAction} className="saPanel">
+          {!managementBoard && <form action={formAction} className="saPanel">
             <input
               type="hidden"
               name="supplier_id"
@@ -1359,7 +1402,7 @@ export default function SupplierAssuranceWorkspace({
                 </button>
               </div>
             </footer>
-          </form>
+          </form>}
 
           {active && (
             <section className="saGenerate">
@@ -1466,6 +1509,21 @@ const styles = `
 .saMetric .amber,.saDecision strong.amber{color:#cc7900}
 .saMetric .green,.saDecision strong.green{color:#008f60}
 .saMetric .blue,.saDecision strong.blue{color:#315fe6}
+.saBoard{margin-top:20px;padding:24px;border:1px solid #d2dee9;border-radius:16px;background:#fff;box-shadow:0 12px 30px #12395f0c}
+.saBoard>header{display:flex;justify-content:space-between;gap:20px;align-items:start;margin-bottom:18px}
+.saBoard>header small{color:#315fe6;font-size:10px;font-weight:950;letter-spacing:.13em}
+.saBoard>header h2{margin:5px 0 6px;font-size:24px}
+.saBoard>header p{margin:0;color:#687d92}
+.saBoard>header>a,.saBoardRow a{padding:10px 13px;border-radius:8px;background:#315fe6;color:#fff;text-decoration:none;font-size:12px;font-weight:850;white-space:nowrap}
+.saBoardTable{overflow:auto;border:1px solid #d9e3ec;border-radius:11px}
+.saBoardRow{display:grid;grid-template-columns:minmax(190px,1.5fr) minmax(120px,1fr) minmax(110px,.8fr) minmax(150px,1fr) minmax(130px,1fr) 115px;gap:14px;align-items:center;min-width:930px;padding:15px;border-top:1px solid #e1e8ef}
+.saBoardRow:first-child{border-top:0}
+.saBoardRow.heading{background:#f2f6fa;color:#526b83;font-size:11px;font-weight:900}
+.saBoardRow>span{display:grid;gap:4px;color:#16395d;font-size:12px}
+.saBoardRow>span small{color:#7890a6;font-size:10px}
+.saBoardRow>span:last-child{justify-items:start}
+.saBoardEmpty{display:grid;gap:6px;padding:35px;border:1px dashed #c9d6e2;border-radius:11px;color:#627990;text-align:center}
+.saBoardEmpty b{color:#173b60;font-size:18px}
 .saMessage{margin-top:13px;padding:12px 15px;border-radius:9px;font-weight:800}
 .saMessage.success{background:#e7f8f1;color:#08734f}
 .saMessage.error{background:#ffe9e6;color:#a72822}
