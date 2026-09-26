@@ -441,7 +441,7 @@ export default async function PortalPage({ searchParams }) {
             <div className="pdPanel pdCoverage">
               <div className="pdPanelHead"><div><small>CUSTOMER-SELECTED SCOPE</small><h2>Standards coverage</h2></div><Link href="/portal/history">View all →</Link></div>
               {standardsInUse.length?standardsInUse.map((standard)=><Link href={`/portal/history?standard=${encodeURIComponent(standard.value)}`} key={standard.value}><div><strong>{standard.name.split(" — ")[0]}</strong><small>{standard.name.split(" — ")[1]}</small></div><span>{standard.average===null?"Not scored":`${standard.average}%`} · {standard.count}</span></Link>):<p className="pdClear">Start an assessment to establish standards coverage.</p>}
-              <Link href={subscription?"/portal/billing":"/en/pricing"} className="pdPlanLine"><span>{getPlanLabel(subscription?.plan)} plan</span><small>{subscription?.status==="active"?"Active subscription":subscription?.status==="trialing"?"Free trial":"No active subscription"}</small></Link>
+              <Link href={subscription?.privileged_access?"/portal/admin":subscription?"/portal/billing":"/en/pricing"} className="pdPlanLine"><span>{getPlanLabel(subscription?.plan)}{subscription?.privileged_access?"":" plan"}</span><small>{subscription?.privileged_access?"Full unrestricted platform access":subscription?.status==="active"?"Active subscription":subscription?.status==="trialing"?"Free trial":"No active subscription"}</small></Link>
             </div>
           </section>
           <section className="pdPanel pdCreate" id="new-assessment">
