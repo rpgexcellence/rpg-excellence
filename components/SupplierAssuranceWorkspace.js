@@ -12,6 +12,7 @@ import {
 
 const tabs = [
   "Supplier profile",
+  "Contact details",
   "Standards & scope",
   "Risk engine",
   "Due diligence",
@@ -100,6 +101,7 @@ export default function SupplierAssuranceWorkspace({
   subTierSuppliers = [],
   supplierSites = [],
   supplierNcStats = {},
+  supplierContacts = [],
   action,
   generateAction,
   saved,
@@ -118,6 +120,7 @@ export default function SupplierAssuranceWorkspace({
   );
   const [sites, setSites] = useState(() => supplierSites || []);
   const [subTiers, setSubTiers] = useState(() => subTierSuppliers || []);
+  const [contacts, setContacts] = useState(() => supplierContacts || []);
   const [selectedFiles, setSelectedFiles] = useState({});
   const [risk, setRisk] = useState(() => ({
     likelihood: n(initial?.risk_inputs?.likelihood),
@@ -202,6 +205,10 @@ export default function SupplierAssuranceWorkspace({
     current.map((supplier) => (supplier.client_key === key ? { ...supplier, [field]: value } : supplier))
   );
   const removeSubTier = (key) => setSubTiers((current) => current.filter((supplier) => supplier.client_key !== key));
+  const addContact = () => setContacts((current) => [...current, { client_key: crypto.randomUUID(), first_name: "", last_name: "", business_title: "", department: "", telephone: "", mobile: "", email: "", is_primary: current.length === 0, is_active: true }]);
+  const updateContact = (key, field, value) => setContacts((current) => current.map((contact) => contact.client_key === key ? { ...contact, [field]: value } : contact));
+  const setPrimaryContact = (key) => setContacts((current) => current.map((contact) => ({ ...contact, is_primary: contact.client_key === key })));
+  const removeContact = (key) => setContacts((current) => current.filter((contact) => contact.client_key !== key));
 
   const active = initial || null;
 
@@ -474,6 +481,7 @@ export default function SupplierAssuranceWorkspace({
             />
             <input type="hidden" name="supplier_sites" value={JSON.stringify(sites)} />
             <input type="hidden" name="subtier_suppliers" value={JSON.stringify(subTiers)} />
+            <input type="hidden" name="supplier_contacts" value={JSON.stringify(contacts)} />
 
             {step !== 0 &&
               [
@@ -483,10 +491,6 @@ export default function SupplierAssuranceWorkspace({
                 "country",
                 "company_number",
                 "website",
-                "primary_contact_name",
-                "primary_contact_title",
-                "primary_contact_email",
-                "primary_contact_phone",
                 "supply_description",
               ].map((key) => (
                 <input
@@ -497,7 +501,7 @@ export default function SupplierAssuranceWorkspace({
                 />
               ))}
 
-            {step !== 1 && data.uses_subtier_suppliers && (
+            {step !== 2 && data.uses_subtier_suppliers && (
               <input
                 type="hidden"
                 name="uses_subtier_suppliers"
@@ -505,7 +509,7 @@ export default function SupplierAssuranceWorkspace({
               />
             )}
 
-            {step !== 2 && (
+            {step !== 3 && (
               <input
                 type="hidden"
                 name="criticality"
@@ -513,7 +517,7 @@ export default function SupplierAssuranceWorkspace({
               />
             )}
 
-            {step !== 4 &&
+            {step !== 5 &&
               [
                 "approval_scope",
                 "approval_conditions",
@@ -537,7 +541,7 @@ export default function SupplierAssuranceWorkspace({
                     <small>STEP 1</small>
                     <h2>Supplier identity and relationship</h2>
                     <p>
-                      Capture the legal entity, contact and exact
+                      Capture the legal entity and exact
                       scope before the engine determines applicable
                       controls.
                     </p>
@@ -604,39 +608,6 @@ export default function SupplierAssuranceWorkspace({
                     type="url"
                   />
                   <Field
-                    label="Primary contact"
-                    name="primary_contact_name"
-                    value={data.primary_contact_name}
-                    onChange={(value) =>
-                      update("primary_contact_name", value)
-                    }
-                  />
-                  <Field
-                    label="Contact title"
-                    name="primary_contact_title"
-                    value={data.primary_contact_title}
-                    onChange={(value) =>
-                      update("primary_contact_title", value)
-                    }
-                  />
-                  <Field
-                    label="Contact email"
-                    name="primary_contact_email"
-                    value={data.primary_contact_email}
-                    onChange={(value) =>
-                      update("primary_contact_email", value)
-                    }
-                    type="email"
-                  />
-                  <Field
-                    label="Contact phone"
-                    name="primary_contact_phone"
-                    value={data.primary_contact_phone}
-                    onChange={(value) =>
-                      update("primary_contact_phone", value)
-                    }
-                  />
-                  <Field
                     label="Products, services or outsourced process supplied *"
                     name="supply_description"
                     value={data.supply_description}
@@ -673,9 +644,30 @@ export default function SupplierAssuranceWorkspace({
 
             {step === 1 && (
               <>
+                <div className="saSectionHead"><div><small>STEP 2</small><h2>Supplier contact details</h2><p>Maintain the supplier people authorised for correspondence, issue ownership and escalation.</p></div><Pill tone="purple">{contacts.filter((contact) => contact.is_active !== false).length} active</Pill></div>
+                <div className="saRegisterHead"><div><h3>Contact register</h3><p>These contacts become available as Responsible Owner only when an NC source is Supplier issue.</p></div><button type="button" onClick={addContact}>+ Add contact</button></div>
+                <div className="saManagedList">
+                  {contacts.length === 0 && <p className="saEmpty">No supplier contacts recorded. Add at least one contact before raising a supplier issue.</p>}
+                  {contacts.map((contact, index) => <article key={contact.client_key}><header><b>Contact {index + 1}{contact.is_primary ? " · Primary" : ""}</b><button type="button" onClick={() => removeContact(contact.client_key)}>Remove</button></header><div className="saManagedGrid">
+                    <label><span>First name *</span><input value={contact.first_name || ""} onChange={(event) => updateContact(contact.client_key, "first_name", event.target.value)}/></label>
+                    <label><span>Surname</span><input value={contact.last_name || ""} onChange={(event) => updateContact(contact.client_key, "last_name", event.target.value)}/></label>
+                    <label><span>Business title</span><input value={contact.business_title || ""} onChange={(event) => updateContact(contact.client_key, "business_title", event.target.value)}/></label>
+                    <label><span>Department / function</span><input value={contact.department || ""} onChange={(event) => updateContact(contact.client_key, "department", event.target.value)}/></label>
+                    <label><span>Telephone</span><input value={contact.telephone || ""} onChange={(event) => updateContact(contact.client_key, "telephone", event.target.value)}/></label>
+                    <label><span>Mobile</span><input value={contact.mobile || ""} onChange={(event) => updateContact(contact.client_key, "mobile", event.target.value)}/></label>
+                    <label className="wide"><span>Email address *</span><input type="email" value={contact.email || ""} onChange={(event) => updateContact(contact.client_key, "email", event.target.value)}/></label>
+                    <label><span><input type="radio" name="primary_supplier_contact" checked={Boolean(contact.is_primary)} onChange={() => setPrimaryContact(contact.client_key)}/> Primary contact</span></label>
+                    <label><span><input type="checkbox" checked={contact.is_active !== false} onChange={(event) => updateContact(contact.client_key, "is_active", event.target.checked)}/> Active contact</span></label>
+                  </div></article>)}
+                </div>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
                 <div className="saSectionHead">
                   <div>
-                    <small>STEP 2</small>
+                    <small>STEP 3</small>
                     <h2>
                       Classification and applicable standards
                     </h2>
@@ -791,11 +783,11 @@ export default function SupplierAssuranceWorkspace({
               </>
             )}
 
-            {step === 2 && (
+            {step === 3 && (
               <>
                 <div className="saSectionHead">
                   <div>
-                    <small>STEP 3</small>
+                    <small>STEP 4</small>
                     <h2>Dynamic supplier risk engine</h2>
                     <p>
                       Score the relationship before controls.
@@ -902,11 +894,11 @@ export default function SupplierAssuranceWorkspace({
               </>
             )}
 
-            {step === 3 && (
+            {step === 4 && (
               <>
                 <div className="saSectionHead">
                   <div>
-                    <small>STEP 4</small>
+                    <small>STEP 5</small>
                     <h2>Risk-based due diligence</h2>
                     <p>
                       {questions.length} controls generated from the
@@ -1039,11 +1031,11 @@ export default function SupplierAssuranceWorkspace({
               </>
             )}
 
-            {step === 4 && (
+            {step === 5 && (
               <>
                 <div className="saSectionHead">
                   <div>
-                    <small>STEP 5</small>
+                    <small>STEP 6</small>
                     <h2>
                       Approval and monitoring decision
                     </h2>
@@ -1208,11 +1200,11 @@ export default function SupplierAssuranceWorkspace({
               </>
             )}
 
-            {step === 5 && (
+            {step === 6 && (
               <>
                 <div className="saSectionHead">
                   <div>
-                    <small>STEP 6</small>
+                    <small>STEP 7</small>
                     <h2>
                       Dynamic Supplier Code of Conduct
                     </h2>
@@ -1467,7 +1459,7 @@ const styles = `
 .saMessage{margin-top:13px;padding:12px 15px;border-radius:9px;font-weight:800}
 .saMessage.success{background:#e7f8f1;color:#08734f}
 .saMessage.error{background:#ffe9e6;color:#a72822}
-.saTabs{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-top:20px}
+.saTabs{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:20px}
 .saTabs button{display:flex;align-items:center;gap:7px;min-height:55px;padding:10px;border:1px solid #d3dfe9;border-radius:9px;background:#f9fbfd;color:#5f748a;font-size:10px;font-weight:850;cursor:pointer}
 .saTabs button b{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#e7edf4}
 .saTabs button.active{border-color:#315fe6;background:#fff;color:#16395d;box-shadow:0 7px 20px #133b6412}
