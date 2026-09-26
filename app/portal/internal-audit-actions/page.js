@@ -42,7 +42,7 @@ export default async function NonconformityRegister({ searchParams }) {
     admin.from("internal_audit_findings").select("id,audit_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,objective_evidence,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,created_at,closed_at,closure_verified_at,updated_at,source_type,source_category,source_reference,detected_at").eq("owner_id", user.id).in("finding_type", ["major_nc", "minor_nc"]).order("created_at", { ascending: false }),
     admin.from("internal_audit_action_access").select("*").eq("owner_id", user.id).order("updated_at", { ascending: false }),
     admin.from("internal_audits").select("id,audit_reference,title").eq("owner_id", user.id),
-    admin.from("suppliers").select("id,legal_name,supplier_reference,approval_status").eq("owner_id", user.id).order("legal_name"),
+    supabase.from("suppliers").select("id,legal_name,supplier_reference,approval_status").eq("owner_id", user.id).order("legal_name"),
   ]);
   for (const result of [findingsResult, accessResult, auditsResult, suppliersResult]) if (result.error) throw new Error(result.error.message);
 
