@@ -7,7 +7,7 @@ export const metadata = {
   title: "Business Continuity Planning Hub | RPG Excellence",
 };
 export const dynamic = "force-dynamic";
-const registerEnhancements = `.register>header{display:flex;justify-content:space-between;gap:18px;align-items:center}.register>header h2{margin:0}.register>header p{margin:6px 0 14px;color:#62788e;font-size:12px}.register .registerAdd{padding:10px 13px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-weight:850;white-space:nowrap}.registerEmpty{padding:18px;border:1px dashed #c6d5e3;border-radius:10px;background:#f8fbfe;color:#62788e}.cards>a{position:relative;padding-top:58px}.moduleProgress{position:absolute;top:16px;right:16px;display:flex;gap:7px;align-items:center;padding:7px 9px;border:1px solid #cad8e6;border-radius:999px;background:#f3f7fb;color:#47627d}.moduleProgress b{font-size:13px}.moduleProgress small{color:inherit;font-size:9px;letter-spacing:0;text-transform:uppercase}.moduleProgress.in_progress{border-color:#a9c1ff;background:#edf2ff;color:#315fe6}.moduleProgress.ready_for_review{border-color:#efd08b;background:#fff8df;color:#8a5b00}.moduleProgress.approved,.moduleProgress.complete{border-color:#9edbc9;background:#e9f8f3;color:#08765e}@media(max-width:720px){.register>header{align-items:flex-start;flex-direction:column}.register>a{gap:12px}.register>a>span{text-align:right}}`;
+const registerEnhancements = `.register>header{display:flex;justify-content:space-between;gap:18px;align-items:center}.register>header h2{margin:0}.register>header p{margin:6px 0 14px;color:#62788e;font-size:12px}.register .registerAdd{padding:10px 13px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-weight:850;white-space:nowrap}.registerEmpty{padding:18px;border:1px dashed #c6d5e3;border-radius:10px;background:#f8fbfe;color:#62788e}.cards>a{position:relative;padding-top:58px}.moduleProgress{position:absolute;top:16px;right:16px;display:flex;gap:7px;align-items:center;padding:7px 9px;border:1px solid #cad8e6;border-radius:999px;background:#f3f7fb;color:#47627d}.moduleProgress b{font-size:13px}.moduleProgress small{color:inherit;font-size:9px;letter-spacing:0;text-transform:uppercase}.moduleProgress.in_progress{border-color:#a9c1ff;background:#edf2ff;color:#315fe6}.moduleProgress.ready_for_review,.moduleProgress.due_soon{border-color:#efd08b;background:#fff8df;color:#8a5b00}.moduleProgress.approved,.moduleProgress.complete{border-color:#9edbc9;background:#e9f8f3;color:#08765e}.moduleProgress.due_today,.moduleProgress.changes_required{border-color:#f1a36e;background:#fff0e6;color:#a44308}.moduleProgress.overdue{border-color:#e99b94;background:#fff0ef;color:#b42318;box-shadow:0 0 0 3px #fff0ef}@media(max-width:720px){.register>header{align-items:flex-start;flex-direction:column}.register>a{gap:12px}.register>a>span{text-align:right}}`;
 
 const NavLink = ({ href, children, active = false }) => (
   <Link className={active ? "bcpNavLink active" : "bcpNavLink"} href={href}>
@@ -105,20 +105,43 @@ function ProgressStatus({ record, percent, status }) {
     0,
     Math.min(100, Number(percent ?? record?.completion_percent) || 0),
   );
-  const state =
+  let state =
     status || record?.status || (value ? "in_progress" : "not_started");
-  const label =
-    state === "approved"
-      ? "Approved"
-      : state === "ready_for_review"
-        ? "Review"
-        : state === "complete"
-          ? "Complete"
-          : value
-            ? "In progress"
-            : "Not started";
+  let label =
+    state === "changes_required"
+      ? "Review required"
+      : state === "approved"
+        ? "Approved"
+        : state === "ready_for_review"
+          ? "Review"
+          : state === "complete"
+            ? "Complete"
+            : value
+              ? "In progress"
+              : "Not started";
+  const dueValue = record?.review_due_date || record?.next_review_date;
+  let dueTitle = "";
+  if (dueValue) {
+    const due = new Date(`${dueValue}T12:00:00Z`);
+    const now = new Date();
+    const today = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12),
+    );
+    const days = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+    dueTitle = `Review date ${due.toLocaleDateString("en-GB", { timeZone: "UTC" })}`;
+    if (days < 0) {
+      state = "overdue";
+      label = `${Math.abs(days)}d overdue`;
+    } else if (days === 0) {
+      state = "due_today";
+      label = "Due today";
+    } else if (days <= 30) {
+      state = "due_soon";
+      label = `Due in ${days}d`;
+    }
+  }
   return (
-    <span className={`moduleProgress ${state}`}>
+    <span className={`moduleProgress ${state}`} title={dueTitle || label}>
       <b>{value}%</b>
       <small>{label}</small>
     </span>
