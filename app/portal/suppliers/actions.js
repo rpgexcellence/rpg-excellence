@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
+import { createAdminClient } from "../../../lib/supabase/admin";
 import {
   buildCodeOfConductSections,
   calculateSupplierAssurance,
@@ -82,6 +83,7 @@ async function context() {
 
 export async function saveSupplier(_state, fd) {
   const { supabase, user, organization } = await context();
+  const storageAdmin = createAdminClient();
 
   if (!organization) {
     return {
@@ -316,7 +318,7 @@ export async function saveSupplier(_state, fd) {
       const result = await supabase.from("supplier_subtier_suppliers").select("certificate_storage_path,certificate_file_name,reminder_date,reminder_sent_at").eq("id", existingId).eq("supplier_id", savedId).maybeSingle();
       existing = result.data;
     }
-    const certificate = await uploadEvidence(supabase, organization.id, savedId, fd.get(`subtier_certificate_${supplier.client_key}`), "subtier-certificates");
+    const certificate = await uploadEvidence(storageAdmin, organization.id, savedId, fd.get(`subtier_certificate_${supplier.client_key}`), "subtier-certificates");
     const row = {
       ...(existingId ? { id: existingId } : {}), supplier_id: savedId, organization_id: organization.id, owner_id: user.id,
       legal_name: clean(supplier.legal_name), supply_scope: clean(supplier.supply_scope),
@@ -335,7 +337,7 @@ export async function saveSupplier(_state, fd) {
   for (const [name, value] of fd.entries()) {
     if (!name.startsWith("evidence_file_") || !value || typeof value === "string" || value.size === 0) continue;
     const controlId = name.slice("evidence_file_".length).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 50);
-    const uploaded = await uploadEvidence(supabase, organization.id, savedId, value, "due-diligence");
+    const uploaded = await uploadEvidence(storageAdmin, organization.id, savedId, value, "due-diligence");
     const { error } = await supabase.from("supplier_evidence_files").insert({ supplier_id: savedId, organization_id: organization.id, owner_id: user.id, control_id: controlId, storage_path: uploaded.path, file_name: uploaded.file_name, mime_type: uploaded.mime_type, size_bytes: uploaded.size_bytes, uploaded_by: user.id });
     if (error) return { error: `Supplier saved, but evidence metadata could not be saved: ${error.message}` };
   }
