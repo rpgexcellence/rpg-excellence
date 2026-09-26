@@ -12,6 +12,10 @@ export const organizationSchema = {
     addressCountry: "GB"
   },
   areaServed: "Worldwide",
+  sameAs: [
+    "https://www.linkedin.com/in/rpg-excellence-b8971942b",
+    "https://www.youtube.com/channel/UCZsXSCzL4ebrKafO2515Sow"
+  ],
   knowsAbout: [
     "ISO 9001",
     "ISO 14001",
