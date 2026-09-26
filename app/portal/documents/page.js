@@ -228,8 +228,34 @@ export default async function DocumentRegisterPage({ searchParams }) {
           "#f3f6f9",
         fontFamily:
           "Arial, sans-serif",
+        display:
+          "grid",
+        gridTemplateColumns:
+          "238px minmax(0, 1fr)",
       }}
     >
+      <style>{`
+        *{box-sizing:border-box}.docSidebar{position:sticky;top:0;height:100vh;overflow-y:auto;padding:28px 18px 22px;background:linear-gradient(180deg,#082e59,#071d3a);color:#d7e5f4;display:flex;flex-direction:column}.docBrand{margin:0 8px 31px;color:#fff;font-size:23px;font-weight:950;text-decoration:none}.docBrand span{font-weight:400}.docCaption{margin:0 10px 12px;color:#7899ba;font-size:9px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}.docNav{display:grid;gap:5px}.docNav a{display:flex;align-items:center;gap:10px;padding:11px;border-radius:8px;color:#d1e0ef;text-decoration:none;font-size:13px;font-weight:800}.docNav a:before{content:"";width:11px;height:11px;border:1px solid currentColor;border-radius:3px}.docNav a:hover,.docNav a.active{background:#1d568e;color:#fff}.docNav a.active:before{background:#5de3d0;border-color:#5de3d0;box-shadow:inset 0 0 0 3px #1d568e}.docSideFoot{display:grid;gap:5px;margin-top:auto;padding:16px;border:1px solid #ffffff1d;border-radius:13px;background:#ffffff08}.docSideFoot small{color:#9eb4cb;line-height:1.45}.docWorkspace{min-width:0}.docWorkspace>header{display:none}@media(max-width:1050px){main{grid-template-columns:78px minmax(0,1fr)!important}.docSidebar{padding:24px 9px}.docBrand{font-size:0;text-align:center}.docBrand:before{content:"RPG";font-size:19px}.docCaption,.docSideFoot{display:none}.docNav a{justify-content:center;font-size:0}.docNav a:before{width:15px;height:15px}}@media(max-width:700px){main{display:block!important}.docSidebar{position:static;height:auto;padding:15px 18px}.docBrand{display:block;margin:0;font-size:20px;text-align:left}.docBrand:before{display:none}.docNav,.docCaption,.docSideFoot{display:none}}
+      `}</style>
+      <aside className="docSidebar">
+        <Link className="docBrand" href="/portal"><b>RPG</b> <span>Excellence</span></Link>
+        <div className="docCaption">ASSURANCE WORKSPACE</div>
+        <nav className="docNav">
+          <Link href="/portal">Dashboard</Link>
+          <Link href="/portal/history">Assessments</Link>
+          <Link href="/portal/internal-audits">Internal Audits</Link>
+          <Link href="/portal/internal-audit-actions">Findings &amp; Actions</Link>
+          <Link href="/portal/suppliers">Supplier Assurance</Link>
+          <Link href="/portal/rca">CAPA-8D</Link>
+          <Link href="/portal/health-safety">Health &amp; Safety Hub</Link>
+          <Link href="/portal/business-continuity">Business Continuity</Link>
+          <Link href="/portal/information-security">Information Security</Link>
+          <Link className="active" href="/portal/documents">Documents &amp; Evidence</Link>
+          <Link href="/portal/reports">Reports</Link>
+        </nav>
+        <div className="docSideFoot"><strong>Controlled evidence</strong><small>Current approved documents, secure access and traceable management-system support.</small></div>
+      </aside>
+      <div className="docWorkspace">
       <header
         style={{
           background:
@@ -243,7 +269,7 @@ export default async function DocumentRegisterPage({ searchParams }) {
         <div
           style={{
             maxWidth:
-              "1200px",
+              "1280px",
             margin:
               "0 auto",
             display:
@@ -360,11 +386,13 @@ export default async function DocumentRegisterPage({ searchParams }) {
       <section
         style={{
           maxWidth:
-            "1200px",
+            "1280px",
+          width:
+            "100%",
           margin:
             "0 auto",
           padding:
-            "40px",
+            "32px 40px 72px",
         }}
       >
         <div
@@ -993,6 +1021,7 @@ export default async function DocumentRegisterPage({ searchParams }) {
           </div>
         )}
       </section>
+      </div>
     </main>
   );
 }
