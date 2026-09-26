@@ -317,9 +317,15 @@ export async function saveSupplier(_state, fd) {
   let deleteContacts = supabase.from("supplier_contacts").delete().eq("supplier_id", savedId);
   if (retainedContactIds.length) deleteContacts = deleteContacts.not("id", "in", `(${retainedContactIds.join(",")})`);
   await deleteContacts;
-  if (contactRows.length) {
-    const { error } = await supabase.from("supplier_contacts").upsert(contactRows);
-    if (error) return { error: `Supplier saved, but contacts could not be saved: ${error.message}` };
+  for (const contact of contactRows.filter((item) => item.id)) {
+    const { id: contactId, ...values } = contact;
+    const { error } = await supabase.from("supplier_contacts").update(values).eq("id", contactId).eq("supplier_id", savedId).eq("owner_id", user.id);
+    if (error) return { error: `Supplier saved, but an existing contact could not be updated: ${error.message}` };
+  }
+  const newContacts = contactRows.filter((item) => !item.id).map(({ id: _unused, ...values }) => values);
+  if (newContacts.length) {
+    const { error } = await supabase.from("supplier_contacts").insert(newContacts);
+    if (error) return { error: `Supplier saved, but new contacts could not be added: ${error.message}` };
   }
 
   const retainedSubtierIds = subtiers.filter((supplier) => uuid(supplier.id)).map((supplier) => supplier.id);
