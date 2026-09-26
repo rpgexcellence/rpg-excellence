@@ -30,6 +30,7 @@
 .paRelations span{font-size:13px!important;line-height:1.4!important}.paRelations b{font-size:11px!important}
 .paFunctionStrip span,.paFunctionStrip small{font-size:12px!important;line-height:1.4!important}.paFunctionStrip p{font-size:13px!important}
 .paPeople footer{font-size:12px!important;line-height:1.5!important}.paPeople footer button{min-height:38px!important;font-size:13px!important}
+.paPeople footer .editAccess{display:inline-flex;align-items:center;min-height:38px;padding:7px 10px;border:1px solid #315fe6;border-radius:7px;background:#315fe6;color:#fff;text-decoration:none;font-size:13px;font-weight:850;white-space:nowrap}
 .paQr p{font-size:14px!important;line-height:1.5!important}.paQr dt{font-size:11px!important}.paQr dd{font-size:14px!important}.paQr .paSecurity{font-size:13px!important}.paQrImage a{font-size:14px!important}.paEmpty{font-size:15px!important}
 
 @media(max-width:1000px){.paPage .paPeople{grid-template-columns:1fr!important}.paPage .paChoice.paChoiceThree{grid-template-columns:1fr}}
