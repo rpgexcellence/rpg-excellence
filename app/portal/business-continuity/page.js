@@ -7,7 +7,7 @@ export const metadata = {
   title: "Business Continuity Planning Hub | RPG Excellence",
 };
 export const dynamic = "force-dynamic";
-const registerEnhancements = `.register>header{display:flex;justify-content:space-between;gap:18px;align-items:center}.register>header h2{margin:0}.register>header p{margin:6px 0 14px;color:#62788e;font-size:12px}.register .registerAdd{padding:10px 13px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-weight:850;white-space:nowrap}.registerEmpty{padding:18px;border:1px dashed #c6d5e3;border-radius:10px;background:#f8fbfe;color:#62788e}@media(max-width:720px){.register>header{align-items:flex-start;flex-direction:column}.register>a{gap:12px}.register>a>span{text-align:right}}`;
+const registerEnhancements = `.register>header{display:flex;justify-content:space-between;gap:18px;align-items:center}.register>header h2{margin:0}.register>header p{margin:6px 0 14px;color:#62788e;font-size:12px}.register .registerAdd{padding:10px 13px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-weight:850;white-space:nowrap}.registerEmpty{padding:18px;border:1px dashed #c6d5e3;border-radius:10px;background:#f8fbfe;color:#62788e}.cards>a{position:relative;padding-top:58px}.moduleProgress{position:absolute;top:16px;right:16px;display:flex;gap:7px;align-items:center;padding:7px 9px;border:1px solid #cad8e6;border-radius:999px;background:#f3f7fb;color:#47627d}.moduleProgress b{font-size:13px}.moduleProgress small{color:inherit;font-size:9px;letter-spacing:0;text-transform:uppercase}.moduleProgress.in_progress{border-color:#a9c1ff;background:#edf2ff;color:#315fe6}.moduleProgress.ready_for_review{border-color:#efd08b;background:#fff8df;color:#8a5b00}.moduleProgress.approved,.moduleProgress.complete{border-color:#9edbc9;background:#e9f8f3;color:#08765e}@media(max-width:720px){.register>header{align-items:flex-start;flex-direction:column}.register>a{gap:12px}.register>a>span{text-align:right}}`;
 
 const NavLink = ({ href, children, active = false }) => (
   <Link className={active ? "bcpNavLink active" : "bcpNavLink"} href={href}>
@@ -100,6 +100,31 @@ function PortalSidebar() {
   );
 }
 
+function ProgressStatus({ record, percent, status }) {
+  const value = Math.max(
+    0,
+    Math.min(100, Number(percent ?? record?.completion_percent) || 0),
+  );
+  const state =
+    status || record?.status || (value ? "in_progress" : "not_started");
+  const label =
+    state === "approved"
+      ? "Approved"
+      : state === "ready_for_review"
+        ? "Review"
+        : state === "complete"
+          ? "Complete"
+          : value
+            ? "In progress"
+            : "Not started";
+  return (
+    <span className={`moduleProgress ${state}`}>
+      <b>{value}%</b>
+      <small>{label}</small>
+    </span>
+  );
+}
+
 export default async function BCPHub() {
   const s = await createClient(),
     {
@@ -167,14 +192,18 @@ export default async function BCPHub() {
     bias = biaResult.data || [];
     const outsourcedResult = await s
       .from("bcp_outsourced_process_assessments")
-      .select("id,assessment_reference,assessment_title,status,version,completion_percent,next_review_date,updated_at,assurance_summary")
+      .select(
+        "id,assessment_reference,assessment_title,status,version,completion_percent,next_review_date,updated_at,assurance_summary",
+      )
       .eq("organization_id", org.id)
       .neq("status", "archived")
       .order("updated_at", { ascending: false });
     outsourced = outsourcedResult.data || [];
     const strategiesResult = await s
       .from("bcp_strategy_assessments")
-      .select("id,assessment_reference,assessment_title,status,version,completion_percent,next_review_date,updated_at,feasibility_summary")
+      .select(
+        "id,assessment_reference,assessment_title,status,version,completion_percent,next_review_date,updated_at,feasibility_summary",
+      )
       .eq("organization_id", org.id)
       .neq("status", "archived")
       .order("updated_at", { ascending: false });
@@ -255,6 +284,7 @@ export default async function BCPHub() {
                 : "/portal/business-continuity/site-profile?new=1"
             }
           >
+            <ProgressStatus record={profiles?.[0]} />
             <small>MODULE 1</small>
             <h2>Site Profile Assessment</h2>
             <p>
@@ -269,6 +299,12 @@ export default async function BCPHub() {
             </strong>
           </Link>
           <Link href="/portal/business-continuity/training">
+            <ProgressStatus
+              percent={Math.round((done / 6) * 100)}
+              status={
+                done === 6 ? "complete" : done ? "in_progress" : "not_started"
+              }
+            />
             <small>MODULE 2</small>
             <h2>BCP Learning Path</h2>
             <p>
@@ -284,6 +320,7 @@ export default async function BCPHub() {
                 : "/portal/business-continuity/context?new=1"
             }
           >
+            <ProgressStatus record={contexts?.[0]} />
             <small>MODULE 3 · CLAUSE 4</small>
             <h2>Context &amp; Interested Parties</h2>
             <p>
@@ -303,6 +340,7 @@ export default async function BCPHub() {
                 : "/portal/business-continuity/roles?new=1"
             }
           >
+            <ProgressStatus record={roles?.[0]} />
             <small>MODULE 4 · CLAUSE 5.3</small>
             <h2>Roles &amp; Responsibilities</h2>
             <p>
@@ -323,6 +361,7 @@ export default async function BCPHub() {
                 : "/portal/business-continuity/hazard-scenarios?new=1"
             }
           >
+            <ProgressStatus record={hazards?.[0]} />
             <small>MODULE 5 · CLAUSE 8.2.3</small>
             <h2>Risk Assessment - Hazard Scenarios</h2>
             <p>
@@ -343,12 +382,12 @@ export default async function BCPHub() {
                 : "/portal/business-continuity/bia?new=1"
             }
           >
+            <ProgressStatus record={bias?.[0]} />
             <small>MODULE 6 · CLAUSE 8.2.2</small>
             <h2>Business Impact Analysis</h2>
             <p>
-              Analyse disruption impacts over time, confirm MTPD, RTO, MBCO
-              and RPO, and control recovery priorities, resources and
-              dependencies.
+              Analyse disruption impacts over time, confirm MTPD, RTO, MBCO and
+              RPO, and control recovery priorities, resources and dependencies.
             </p>
             <strong>
               {bias?.length
@@ -363,12 +402,13 @@ export default async function BCPHub() {
                 : "/portal/business-continuity/outsourced-processes?new=1"
             }
           >
+            <ProgressStatus record={outsourced?.[0]} />
             <small>MODULE 7 · CLAUSE 8.1</small>
             <h2>Outsourced Process &amp; Supply Chain Control</h2>
             <p>
               Convert BIA dependencies and recovery objectives into supplier
-              controls, continuity-capability checks, performance assurance
-              and accountable actions.
+              controls, continuity-capability checks, performance assurance and
+              accountable actions.
             </p>
             <strong>
               {outsourced?.length
@@ -383,12 +423,13 @@ export default async function BCPHub() {
                 : "/portal/business-continuity/strategies-solutions?new=1"
             }
           >
+            <ProgressStatus record={strategies?.[0]} />
             <small>MODULE 8 · CLAUSE 8.3</small>
             <h2>Business Continuity Strategies &amp; Solutions</h2>
             <p>
               Convert approved BIA requirements, disruption risks and supplier
-              dependencies into feasible recovery options, resources, costs
-              and accountable implementation actions.
+              dependencies into feasible recovery options, resources, costs and
+              accountable implementation actions.
             </p>
             <strong>
               {strategies?.length
