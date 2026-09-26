@@ -51,12 +51,18 @@ export async function requestPasswordReset(formData) {
   const email = String(formData.get("email") || "")
     .trim()
     .toLowerCase();
+  const next = safeNext(formData.get("next"));
+
+  const recoveryError = (message) => {
+    const query = new URLSearchParams({
+      error: message,
+      next,
+    });
+    redirect(`/portal/forgot-password?${query.toString()}`);
+  };
 
   if (!email) {
-    loginError(
-      "Enter your email address before requesting password recovery.",
-      formData.get("next")
-    );
+    recoveryError("Enter your email address before requesting password recovery.");
   }
 
   const requestHeaders = await headers();
@@ -78,15 +84,13 @@ export async function requestPasswordReset(formData) {
   );
 
   if (error) {
-    loginError(
-      "Password recovery could not be started. Please try again.",
-      formData.get("next")
-    );
+    recoveryError("Password recovery could not be started. Please try again.");
   }
 
   const query = new URLSearchParams({
     message:
       "If the email is registered, a secure password-reset link has been sent.",
+    next,
   });
   redirect(`/portal/login?${query.toString()}`);
 }
