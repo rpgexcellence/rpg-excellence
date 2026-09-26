@@ -22,6 +22,15 @@ const tabs = [
 const n = (value, fallback = 3) =>
   Number.isFinite(Number(value)) ? Number(value) : fallback;
 
+const displayDate = (value) =>
+  value
+    ? new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(new Date(value))
+    : "Not recorded";
+
 const initialData = (source = {}) => ({
   legal_name: source.legal_name || "",
   trading_name: source.trading_name || "",
@@ -187,9 +196,31 @@ export default function SupplierAssuranceWorkspace({
           ? "blue"
           : "green";
 
-  const statusLabel = String(
-    active?.approval_status || "draft",
-  ).replaceAll("_", " ");
+  const approvalStatus = String(active?.approval_status || "draft");
+  const approvalExpired = Boolean(
+    active?.approval_expiry &&
+      new Date(active.approval_expiry).getTime() < Date.now(),
+  );
+  const statusLabels = {
+    draft: "Draft",
+    pending_approval: "Pending approval",
+    conditionally_approved: "Conditionally approved",
+    approved: "Approved",
+    suspended: "Suspended",
+    rejected: "Rejected",
+    expired: "Expired",
+  };
+  const statusLabel = approvalExpired
+    ? "Approval expired"
+    : statusLabels[approvalStatus] || approvalStatus.replaceAll("_", " ");
+  const statusTone =
+    approvalExpired || ["suspended", "rejected", "expired"].includes(approvalStatus)
+      ? "red"
+      : approvalStatus === "approved"
+        ? "green"
+        : approvalStatus === "conditionally_approved" || approvalStatus === "pending_approval"
+          ? "amber"
+          : "blue";
 
   return (
     <main className="saPage">
@@ -211,9 +242,15 @@ export default function SupplierAssuranceWorkspace({
   .saCocPreview>article>small{font-size:12px}
   .saGenerate p,.saSectionHead p{font-size:15px}
   .saGenerate form small{font-size:12px}
+  .saApprovalStatus{display:grid;grid-template-columns:minmax(230px,.72fr) minmax(0,1.7fr) auto;gap:18px;align-items:center;margin-top:12px;padding:18px 20px;border:1px solid #9fbce0;border-left:7px solid #315fe6;border-radius:14px;background:#f4f8ff;box-shadow:0 8px 24px rgba(18,57,95,.08)}
+  .saApprovalStatus.green{border-color:#9bd8bd;border-left-color:#07945d;background:#edfbf4}.saApprovalStatus.amber{border-color:#efc688;border-left-color:#dd8500;background:#fff8e9}.saApprovalStatus.red{border-color:#eba69f;border-left-color:#cf3c30;background:#fff1ef}
+  .saApprovalIdentity>span{display:block;color:#607991;font-size:10px;font-weight:950;letter-spacing:.12em}.saApprovalIdentity>strong{display:block;margin-top:4px;font-size:25px;line-height:1.15}.saApprovalIdentity>small{display:block;margin-top:4px;color:#61788e;font-size:11px}
+  .saApprovalFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.saApprovalFacts div{min-width:0;padding:10px;border-radius:9px;background:rgba(255,255,255,.78)}.saApprovalFacts span,.saApprovalFacts b{display:block}.saApprovalFacts span{color:#698096;font-size:9px;text-transform:uppercase}.saApprovalFacts b{margin-top:4px;overflow-wrap:anywhere;font-size:11px}
+  .saApprovalStatus>button{min-height:42px;padding:0 14px;border:1px solid #315fe6;border-radius:8px;background:#fff;color:#2059cd;font-weight:900;cursor:pointer}.saApprovalConditions{grid-column:1/-1;margin:0;padding-top:11px;border-top:1px solid rgba(70,103,133,.17);color:#526d84;font-size:12px}.saApprovalConditions b{color:#183b5b}
   @media(max-width:600px){
     .saCocPreview>header{padding:22px}
     .saCocPreview>article{grid-template-columns:1fr;padding:18px}
+    .saApprovalStatus{grid-template-columns:1fr}.saApprovalFacts{grid-template-columns:1fr 1fr}.saApprovalStatus>button{width:100%}
   }
 `}</style>
       <div className="saShell">
@@ -334,6 +371,38 @@ export default function SupplierAssuranceWorkspace({
               </article>
             </aside>
           </section>
+
+          {active && (
+            <section
+              className={`saApprovalStatus ${statusTone}`}
+              aria-label="Controlled supplier approval status"
+            >
+              <div className="saApprovalIdentity">
+                <span>CONTROLLED SUPPLIER STATUS</span>
+                <strong>{statusLabel}</strong>
+                <small>{active.supplier_reference}</small>
+              </div>
+
+              <div className="saApprovalFacts">
+                <div><span>Decision date</span><b>{displayDate(active.approved_at)}</b></div>
+                <div><span>Approved by</span><b>{active.approved_by || "Not recorded"}</b></div>
+                <div><span>Next review</span><b>{displayDate(active.next_review_date)}</b></div>
+                <div><span>Approval expiry</span><b>{displayDate(active.approval_expiry)}</b></div>
+              </div>
+
+              <button type="button" onClick={() => setStep(4)}>
+                Review decision →
+              </button>
+
+              {(active.approval_scope || active.approval_conditions || result.blockers.length > 0) && (
+                <p className="saApprovalConditions">
+                  {active.approval_scope && <><b>Approved scope:</b> {active.approval_scope} </>}
+                  {active.approval_conditions && <><b>Conditions:</b> {active.approval_conditions} </>}
+                  {result.blockers.length > 0 && <><b>Current blockers:</b> {result.blockers.length}</>}
+                </p>
+              )}
+            </section>
+          )}
 
           <section className="saMetrics">
             <Metric
