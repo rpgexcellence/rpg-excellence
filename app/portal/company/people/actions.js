@@ -33,7 +33,7 @@ const allowedStatuses = new Set(
 const tokenHash = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
 
-async function requirePeopleAdmin() {
+export async function requirePeopleAdmin() {
   const supabase = await createClient();
 
   const {
@@ -599,4 +599,106 @@ export async function sendPasswordReset(formData) {
   redirect(
     `/portal/company/people?password_reset=${error ? "failed" : "sent"}`
   );
+}
+
+export async function updatePersonAccess(formData) {
+  const { user, admin, organization } = await requirePeopleAdmin();
+  const personId = clean(formData.get("person_id"), 60);
+  const { data: person } = await admin.from("organization_people").select("*").eq("id", personId).eq("organization_id", organization.id).maybeSingle();
+  if (!person) redirect("/portal/company/people?error=person");
+
+  const firstName = clean(formData.get("first_name"), 100);
+  const lastName = clean(formData.get("last_name"), 100);
+  const submittedEmail = clean(formData.get("email"), 254).toLowerCase();
+  if (!firstName || !lastName || !validEmail(submittedEmail)) redirect(`/portal/company/people/${person.id}/edit?error=identity`);
+
+  const relationshipKeys = ["manager_person_id", "functional_manager_person_id", "deputy_person_id"];
+  const relationships = Object.fromEntries(relationshipKeys.map((key) => [key, clean(formData.get(key), 60) || null]));
+  const relationshipIds = Object.values(relationships).filter((id) => id && id !== person.id);
+  if (relationshipIds.length) {
+    const { data: validPeople = [] } = await admin.from("organization_people").select("id").eq("organization_id", organization.id).in("id", relationshipIds);
+    const validIds = new Set(validPeople.map((item) => item.id));
+    for (const key of relationshipKeys) if (relationships[key] === person.id || (relationships[key] && !validIds.has(relationships[key]))) relationships[key] = null;
+  }
+
+  const allowedAccountStatuses = new Set(["directory", "invited", "active", "suspended"]);
+  const submittedAccountStatus = clean(formData.get("account_status"), 30);
+  const accountStatus = allowedAccountStatuses.has(submittedAccountStatus) ? submittedAccountStatus : person.account_status;
+  const { error: personError } = await admin.from("organization_people").update({
+    first_name: firstName,
+    last_name: lastName,
+    email: person.user_id ? person.email : submittedEmail,
+    position: clean(formData.get("position"), 180) || null,
+    department: clean(formData.get("department"), 180) || null,
+    site: clean(formData.get("site"), 180) || null,
+    employee_reference: clean(formData.get("employee_reference"), 100) || null,
+    comments: clean(formData.get("comments"), 2000) || null,
+    account_status: accountStatus,
+    ...relationships,
+    updated_at: new Date().toISOString(),
+  }).eq("id", person.id);
+  if (personError) redirect(`/portal/company/people/${person.id}/edit?error=profile`);
+  if (accountStatus === "suspended") {
+    await admin.from("organization_invitations").update({ status: "revoked", revoked_at: new Date().toISOString() }).eq("person_id", person.id).eq("status", "active");
+  }
+
+  let selectedFunctions = formData.getAll("selected_functions").map(String).filter((key) => allowedFunctions.has(key));
+  const editingSelf = person.user_id === user.id;
+  if (editingSelf && !selectedFunctions.includes("company_administrator")) selectedFunctions = ["company_administrator", ...selectedFunctions];
+  selectedFunctions = Array.from(new Set(selectedFunctions));
+
+  const { data: existingAuthorizations = [] } = await admin.from("organization_person_authorizations").select("id,function_key").eq("person_id", person.id);
+  const removedIds = existingAuthorizations.filter((item) => !selectedFunctions.includes(item.function_key)).map((item) => item.id);
+  if (removedIds.length) await admin.from("organization_person_authorizations").delete().in("id", removedIds);
+
+  if (selectedFunctions.length) {
+    const authorizationRows = selectedFunctions.map((functionKey) => {
+      const submittedStatus = clean(formData.get(`function_status_${functionKey}`), 30);
+      const status = editingSelf && functionKey === "company_administrator" ? "authorised" : allowedStatuses.has(submittedStatus) ? submittedStatus : "proposed";
+      return {
+        organization_id: organization.id,
+        person_id: person.id,
+        function_key: functionKey,
+        status,
+        authorised_by: user.id,
+        authorised_at: status === "authorised" ? new Date().toISOString() : null,
+        expires_at: editingSelf && functionKey === "company_administrator" ? null : clean(formData.get(`function_expiry_${functionKey}`), 20) || null,
+        standards_scope: [],
+        competence_evidence: clean(formData.get(`function_evidence_${functionKey}`), 1000) || null,
+      };
+    });
+    const { error } = await admin.from("organization_person_authorizations").upsert(authorizationRows, { onConflict: "person_id,function_key" });
+    if (error) redirect(`/portal/company/people/${person.id}/edit?error=authorisations`);
+  }
+
+  const permissionRows = PLATFORM_MODULES.map(([moduleKey]) => {
+    const submittedLevel = clean(formData.get(`module_${moduleKey}`), 20);
+    return {
+      organization_id: organization.id,
+      person_id: person.id,
+      module_key: moduleKey,
+      access_level: editingSelf && moduleKey === "people_access" ? "admin" : allowedLevels.has(submittedLevel) ? submittedLevel : "none",
+      scope_type: "organisation",
+      scope_values: [],
+      granted_by: user.id,
+    };
+  });
+  const { error: permissionsError } = await admin.from("organization_person_permissions").upsert(permissionRows, { onConflict: "person_id,module_key" });
+  if (permissionsError) redirect(`/portal/company/people/${person.id}/edit?error=permissions`);
+
+  await admin.from("organization_access_events").insert({
+    organization_id: organization.id,
+    person_id: person.id,
+    actor_id: user.id,
+    event_type: "person_access_updated",
+    event_summary: `${firstName} ${lastName} profile, professional authorisations and module access updated.`,
+    event_data: {
+      previous_status: person.account_status,
+      account_status: accountStatus,
+      functions: selectedFunctions,
+      active_modules: permissionRows.filter((item) => item.access_level !== "none").length,
+      self_protection_applied: editingSelf,
+    },
+  });
+  redirect("/portal/company/people?updated=1");
 }
