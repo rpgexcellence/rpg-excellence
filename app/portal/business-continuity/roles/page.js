@@ -85,28 +85,48 @@ async function saveRoles(_previousState, fd) {
     .select("id,first_name,last_name")
     .eq("organization_id", org.id)
     .eq("account_status", "active");
+  const activePersonIds = new Set(activePeople.map((person) => person.id));
+  const activePersonIdByName = new Map(
+    activePeople.map((person) => [
+      `${person.first_name || ""} ${person.last_name || ""}`.trim().toLowerCase(),
+      person.id,
+    ]),
+  );
+  const resolvePersonId = (value) => {
+    const candidate = clean(value);
+    return activePersonIds.has(candidate)
+      ? candidate
+      : activePersonIdByName.get(candidate.toLowerCase()) || "";
+  };
+  const normalizedRoles = roles.map((role) => ({
+    ...role,
+    primaryHolder: resolvePersonId(role.primaryHolder),
+    people: (role.people || []).map(resolvePersonId).filter(Boolean),
+    deputies: (role.deputies || []).map(resolvePersonId).filter(Boolean),
+  }));
   const controlledPeople = new Set(
-    activePeople
-      .map((person) => `${person.first_name} ${person.last_name}`.trim()),
+    activePeople.map((person) =>
+      `${person.first_name || ""} ${person.last_name || ""}`.trim(),
+    ),
   );
   const roleNames = new Set(
-    roles.map((role) => clean(role.title)).filter(Boolean),
+    normalizedRoles.map((role) => clean(role.title)).filter(Boolean),
   );
-  const rolePeopleErrors = roles.flatMap((role, index) => {
+  const rolePeopleErrors = normalizedRoles.flatMap((role, index) => {
     const title = clean(role.title) || `Role ${index + 1}`,
       primary = clean(role.primaryHolder),
       assigned = (role.people || []).map(clean).filter(Boolean),
       deputies = (role.deputies || []).map(clean).filter(Boolean),
       errors = [];
     if (!primary) errors.push(`${title}: select a primary role holder`);
-    else if (!controlledPeople.has(primary))
-      errors.push(`${title}: primary holder “${primary}” is not an active Company User`);
+    else if (!activePersonIds.has(primary))
+      errors.push(`${title}: primary role holder is not an active Company User`);
     assigned
-      .filter((name) => !controlledPeople.has(name))
-      .forEach((name) => errors.push(`${title}: assigned person “${name}” is not an active Company User`));
+      .filter((personId) => !activePersonIds.has(personId))
+      .forEach(() => errors.push(`${title}: an assigned person is not an active Company User`));
     deputies
-      .filter((name) => !controlledPeople.has(name))
-      .forEach((name) => errors.push(`${title}: deputy “${name}” is not an active Company User`));
+      .filter((personId) => !activePersonIds.has(personId))
+      .forEach(() => errors.push(`${title}: deputy is not an active Company User`));
     if (primary && deputies.includes(primary))
       errors.push(`${title}: primary holder and deputy must be different people`);
     return errors;
@@ -137,7 +157,7 @@ async function saveRoles(_previousState, fd) {
     .filter(Boolean);
   const complete = [
     Boolean(profile),
-    roles.some(
+    normalizedRoles.some(
       (x) =>
         clean(x.title) &&
         clean(x.purpose) &&
@@ -156,15 +176,15 @@ async function saveRoles(_previousState, fd) {
     assignments.some(
       (x) => clean(x.activity) && clean(x.accountable) && x.responsible?.length,
     ),
-    roles.some(
+    normalizedRoles.some(
       (x) =>
         clean(x.authority) &&
         clean(x.escalation) &&
         clean(x.competence) &&
         clean(x.communication),
     ),
-    roles.length > 0 &&
-      roles.every(
+    normalizedRoles.length > 0 &&
+      normalizedRoles.every(
         (x) =>
           x.title &&
           x.purpose &&
@@ -243,7 +263,7 @@ async function saveRoles(_previousState, fd) {
     source_snapshot: { profile, context },
     assessment_title:
       t("assessment_title") || "BCMS roles and responsibilities",
-    roles,
+    roles: normalizedRoles,
     assignments,
     notes: t("notes"),
     distribution: t("distribution"),
