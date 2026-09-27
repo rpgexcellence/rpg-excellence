@@ -332,6 +332,7 @@ export default function SupplierAssuranceWorkspace({
             </div>
 
             <div>
+              {active?.approval_status === "approved" ? <Link className="audit" href={`/portal/internal-audits?supplier=${active.id}#audit-mandate`}>+ Create Supplier Audit</Link> : null}
               {active ? <Link className="issue" href={`/portal/internal-audit-actions?raise=1&supplier=${active.id}#raise-manual-nc`}>+ Raise Supplier Issue</Link> : null}
               <Link href="/portal">Product dashboard</Link>
               <Link
@@ -1491,6 +1492,7 @@ const styles = `
 .saTop a{padding:11px 14px;border:1px solid #c7d5e3;border-radius:9px;background:#fff;color:#173b60;text-decoration:none;font-size:12px;font-weight:850}
 .saTop a.primary{border-color:#315fe6;background:#315fe6;color:#fff}
 .saTop a.issue{border-color:#c87900;background:#fff4df;color:#8a5100}
+.saTop a.audit{border-color:#087d73;background:#e7faf7;color:#086a63}
 .saHero{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:25px;align-items:center;margin-top:22px;padding:28px 30px;border-radius:18px;background:linear-gradient(120deg,#06264d,#0a3a68);color:#fff;box-shadow:0 16px 36px #082a5426}
 .saHero>div>span{color:#61dfdc;font-size:10px;font-weight:950;letter-spacing:.12em}
 .saHero h2{margin:10px 0 8px;font-size:31px}
