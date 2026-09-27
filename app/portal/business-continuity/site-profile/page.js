@@ -69,6 +69,16 @@ function profileChecks({
     people.some(
       (x) => clean(x?.name) && clean(x?.role) && validEmail(clean(x?.email)),
     ),
+    Boolean(
+      information.emergencyReviewDueDate &&
+      information.emergencyContacts?.some(
+        (x) =>
+          clean(x?.serviceType) &&
+          clean(x?.serviceName) &&
+          clean(x?.emergencyNumber) &&
+          clean(x?.address),
+      ),
+    ),
   ];
 }
 
@@ -156,6 +166,11 @@ async function saveProfile(_previousState, fd) {
   );
   information.remoteSupport = withIds(
     Array.isArray(information.remoteSupport) ? information.remoteSupport : [],
+  );
+  information.emergencyContacts = withIds(
+    Array.isArray(information.emergencyContacts)
+      ? information.emergencyContacts
+      : [],
   );
   const location = t("location_name"),
     leader = t("site_leader"),
@@ -267,7 +282,7 @@ async function saveProfile(_previousState, fd) {
   if (["review", "approve"].includes(intent) && !checks.every(Boolean))
     return {
       error:
-        "Complete all seven controlled sections before submission: site accountability, services, owned value-chain and support processes, linked dependencies, owned information or systems, and valid participant records.",
+        "Complete all eight controlled sections before submission: site accountability, services, owned value-chain and support processes, linked dependencies, owned information or systems, valid participant records and the emergency-services directory.",
     };
   if (!validEmail(t("site_leader_email")))
     return { error: "Enter a valid site leader email address." };
@@ -399,7 +414,7 @@ async function saveProfile(_previousState, fd) {
   }
   if (intent === "continue")
     redirect(
-      `/portal/business-continuity/site-profile?id=${savedId}&step=${Math.max(0, Math.min(6, Number(t("next_step")) || 0))}`,
+      `/portal/business-continuity/site-profile?id=${savedId}&step=${Math.max(0, Math.min(7, Number(t("next_step")) || 0))}`,
     );
   redirect(`/portal/business-continuity/site-profile?id=${savedId}&step=6`);
 }
@@ -459,7 +474,6 @@ export default async function SiteProfile({ searchParams }) {
         .select("id,legal_name,supplier_reference,approval_status")
         .eq("organization_id", org.id)
         .eq("owner_id", user.id)
-        .eq("approval_status", "approved")
         .order("legal_name"),
       s
         .from("supplier_contacts")
@@ -478,11 +492,11 @@ export default async function SiteProfile({ searchParams }) {
       permittedIds.has(person.id),
     );
     suppliers = suppliersResult.data || [];
-    const approvedSupplierIds = new Set(
+    const currentSupplierIds = new Set(
       suppliers.map((supplier) => supplier.id),
     );
     supplierContacts = (supplierContactsResult.data || []).filter((contact) =>
-      approvedSupplierIds.has(contact.supplier_id),
+      currentSupplierIds.has(contact.supplier_id),
     );
   }
   return (
