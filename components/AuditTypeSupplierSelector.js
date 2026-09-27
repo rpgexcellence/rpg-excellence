@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useAuditSupplierLink } from "./AuditSupplierLinkProvider";
 
 const TYPE_LABELS = {
   internal_system: "Internal system audit",
@@ -12,15 +12,8 @@ const TYPE_LABELS = {
   integrated: "Integrated audit",
 };
 
-export default function AuditTypeSupplierSelector({
-  approvedSuppliers = [],
-  initialSupplierId = "",
-}) {
-  const [auditType, setAuditType] = useState(
-    initialSupplierId ? "supplier" : "internal_system",
-  );
-  const [supplierId, setSupplierId] = useState(initialSupplierId);
-  const supplierAudit = auditType === "supplier";
+export default function AuditTypeSupplierSelector() {
+  const { approvedSuppliers, auditType, setAuditType, supplierId, setSupplierId, supplierAudit } = useAuditSupplierLink();
 
   return (
     <>
