@@ -9,6 +9,32 @@ const clean=value=>String(value??"").trim();
 const parseArray=(fd,name)=>{try{const value=JSON.parse(clean(fd.get(name))||"[]");return Array.isArray(value)?value:[]}catch{return []}};
 const within=(value,min,max,fallback)=>{const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback};
 const riskMetrics=r=>{const impact=Math.max(...Object.values(r?.impact||{}).map(Number),1),likelihood=within(r?.likelihood,1,5,1),effectiveness=within(r?.controlEffectiveness,0,100,0),residualLikelihood=Math.max(1,Math.ceil(likelihood*(1-effectiveness/100)));return{impact,likelihood,inherent:impact*likelihood,residualLikelihood,residual:impact*residualLikelihood}};
+const riskName=(risk,index)=>clean(risk?.name)||`Scenario ${index+1}`;
+const validateAssessment=({profile,participants,risks,title,scope,nextReview,reviewer})=>{
+ const steps=[[],[],[],[],[],[]];
+ if(!profile)steps[0].push("Select a Module 1 Site Profile");
+ if(!participants.length)steps[0].push("Select at least one assessment participant");
+ if(!title)steps[0].push("Enter the assessment title");
+ if(!scope)steps[0].push("Describe the operational activities and local scope");
+ if(!nextReview)steps[0].push("Select the next review date");
+ if(!risks.length)steps[1].push("Select at least one credible hazard scenario");
+ risks.forEach((risk,index)=>{
+  const name=riskName(risk,index),residual=riskMetrics(risk).residual;
+  if(!clean(risk?.name))steps[1].push(`${name}: enter the scenario name`);
+  if(!clean(risk?.description))steps[2].push(`${name}: add a detailed risk / hazard description`);
+  if(!Array.isArray(risk?.affectedProcesses)||!risk.affectedProcesses.length)steps[2].push(`${name}: select at least one affected process`);
+  if(!Array.isArray(risk?.applicableSystems)||!risk.applicableSystems.length)steps[2].push(`${name}: select management-system applicability`);
+  if(!Array.isArray(risk?.existingControls)||!risk.existingControls.length)steps[3].push(`${name}: add at least one existing control`);
+  if(!clean(risk?.owner))steps[3].push(`${name}: select a risk owner from Company Users`);
+  if(!clean(risk?.treatment))steps[4].push(`${name}: select a treatment decision`);
+  if(!clean(risk?.decisionRationale))steps[4].push(`${name}: add the treatment and tolerability rationale`);
+  if(residual>=6&&(!Array.isArray(risk?.actions)||!risk.actions.length))steps[4].push(`${name}: add a treatment action because residual risk is elevated`);
+ });
+ if(!reviewer)steps[4].push("Select a reviewer or approver from Company Users");
+ steps[5]=[...steps[2],...steps[3],...steps[4]];
+ const complete=steps.map(items=>items.length===0);
+ return{steps,complete,percent:Math.round(complete.filter(Boolean).length/complete.length*100),firstIncomplete:complete.findIndex(value=>!value)};
+};
 
 async function saveHazards(_previousState,fd){
  "use server";
@@ -33,16 +59,13 @@ async function saveHazards(_previousState,fd){
  const controlledPeople=new Set((peopleResult.data||[]).filter(person=>permittedIds.has(person.id)).map(person=>`${person.first_name||""} ${person.last_name||""}`.trim()).filter(Boolean));
  const participants=parseArray(fd,"participants").map(clean).filter(Boolean),risks=parseArray(fd,"scenario_assessments").map(r=>({...r,calculated:riskMetrics(r)}));
  if(participants.some(name=>!controlledPeople.has(name)))return{error:"Remove invalid participant entries and select participants from active Company Users with Business Continuity access."};
- const analysisComplete=risks.length>0&&risks.every(r=>r.name&&r.description&&r.affectedProcesses?.length&&r.applicableSystems?.length);
- const controlsComplete=risks.length>0&&risks.every(r=>r.existingControls?.length&&r.owner);
- const treatmentComplete=risks.length>0&&risks.every(r=>r.treatment&&r.decisionRationale&&(r.calculated.residual<6||r.actions?.length))&&Boolean(t("reviewer_name"));
- const checks=[Boolean(profile)&&participants.length>0&&Boolean(t("assessment_title"))&&Boolean(t("operational_description"))&&Boolean(t("next_review_date")),risks.length>0,analysisComplete,controlsComplete,treatmentComplete,analysisComplete&&controlsComplete&&treatmentComplete];
- const completion=Math.round(checks.filter(Boolean).length/checks.length*100);
- if(["review","approve"].includes(intent)&&!checks.every(Boolean))return{error:"Complete the linked profile, participants, scenario selection, inherent analysis, control ownership, and treatment rationale/actions before submission."};
+ const reviewer=t("reviewer_name"),comment=t("review_comment"),validation=validateAssessment({profile,participants,risks,title:t("assessment_title"),scope:t("operational_description"),nextReview:t("next_review_date"),reviewer});
+ const completion=validation.percent;
+ if(["review","approve"].includes(intent)&&validation.firstIncomplete>=0){const step=validation.firstIncomplete,items=validation.steps[step];return{error:`Cannot submit: ${items.length} requirement${items.length===1?" is":"s are"} incomplete in Step ${step+1}.`,validation:{step,items}}};
  if(intent==="approve"&&profile?.status!=="approved")return{error:"Approve the linked Module 1 Site Profile before approving Module 5."};
  if(intent==="approve"&&context&&context.status!=="approved")return{error:"The linked Module 3 Context Assessment must be approved first."};
  if(intent==="approve"&&role&&role.status!=="approved")return{error:"The linked Module 4 Roles Assessment must be approved first."};
- const reviewer=t("reviewer_name"),comment=t("review_comment");if(["review","approve"].includes(intent)&&!reviewer)return{error:"Select the competent reviewer or approver from active Company Users."};if(reviewer&&!controlledPeople.has(reviewer))return{error:"Select the reviewer or approver from active Company Users with Business Continuity access."};
+ if(reviewer&&!controlledPeople.has(reviewer))return{error:"Select the reviewer or approver from active Company Users with Business Continuity access.",validation:{step:4,items:["Reviewer / approver is not an active Company User with Business Continuity access"]}};
  const now=new Date().toISOString(),currentVersion=Number(existing?.version)||1,editingApproved=existing?.status==="approved"&&intent!=="approve",version=editingApproved?currentVersion+1:currentVersion,status=intent==="approve"?"approved":intent==="review"?"ready_for_review":"draft";
  const data={owner_id:user.id,organization_id:org.id,site_profile_id:profile?.id||null,context_assessment_id:context?.id||null,role_assessment_id:role?.id||null,site_profile_version:profile?.version||null,context_assessment_version:context?.version||null,role_assessment_version:role?.version||null,source_snapshot:{profile,context,role},assessment_title:t("assessment_title")||"BC risk assessment - hazard scenarios",participants,operational_description:t("operational_description"),scenario_screening:risks.map(r=>({id:r.id,name:r.name,category:r.category,applicableSystems:r.applicableSystems})),scenario_assessments:risks,methodology:{impactMethod:"Highest applicable credible impact across injury, collision, environment, energy, assets, customer assets, reputation and legal/contractual",inherentFormula:"Impact x likelihood",residualMethod:"Control effectiveness adjusts likelihood",targetMethod:"Selected target impact x target likelihood",appetiteScore:within(t("risk_appetite_score"),1,25,9),scale:"5 x 5",bands:{low:"1-5",moderate:"6-11",high:"12-19",critical:"20-25"}},review_frequency:t("review_frequency")||"Semi-annually",next_review_date:t("next_review_date")||null,completion_percent:completion,status,version,prepared_by:existing?.prepared_by||user.email||"Account owner",reviewed_by:reviewer||existing?.reviewed_by||null,reviewed_at:intent==="approve"?now:existing?.reviewed_at||null,review_comment:comment||existing?.review_comment||null,approved_by:intent==="approve"?reviewer:existing?.approved_by||null,approved_at:intent==="approve"?now:existing?.approved_at||null,updated_at:now};
  if(editingApproved){const{error}=await s.from("bcp_hazard_assessment_versions").insert({assessment_id:existing.id,organization_id:org.id,owner_id:user.id,version:currentVersion,status:existing.status,snapshot:existing,change_reason:"Approved version superseded"});if(error)return{error:error.message}}
