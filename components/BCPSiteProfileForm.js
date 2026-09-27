@@ -845,9 +845,23 @@ function ProcessRepeater({
   );
 }
 
-function ParticipantRepeater({ items, setItems }) {
+function ParticipantRepeater({ items, setItems, companyPeople = [] }) {
   const update = (i, k, v) =>
     setItems(items.map((x, n) => (n === i ? { ...x, [k]: v } : x)));
+
+  const selectParticipant = (i, name, person) =>
+    setItems(
+      items.map((item, index) =>
+        index === i
+          ? {
+              ...item,
+              name,
+              role: person?.position || "",
+              email: person?.email || "",
+            }
+          : item,
+      ),
+    );
 
   return (
     <div className="spxRepeater">
@@ -867,17 +881,21 @@ function ParticipantRepeater({ items, setItems }) {
           </header>
           <div className="spxGrid">
             <label>
-              Name
-              <input
+              Company User *
+              <PersonSelect
                 value={x.name}
-                onChange={(e) => update(i, "name", e.target.value)}
+                people={companyPeople}
+                required
+                placeholder="Select participant from Company Users"
+                onChange={(name, person) => selectParticipant(i, name, person)}
               />
             </label>
             <label>
               Role
               <input
                 value={x.role}
-                onChange={(e) => update(i, "role", e.target.value)}
+                readOnly
+                placeholder="Populated from Company User profile"
               />
             </label>
             <label>
@@ -885,7 +903,8 @@ function ParticipantRepeater({ items, setItems }) {
               <input
                 type="email"
                 value={x.email}
-                onChange={(e) => update(i, "email", e.target.value)}
+                readOnly
+                placeholder="Populated from Company User profile"
               />
             </label>
             <label>
@@ -907,6 +926,10 @@ function ParticipantRepeater({ items, setItems }) {
               </select>
             </label>
           </div>
+          <small>
+            Name, role and email are controlled by the selected Company User
+            profile. Update the Company User record if these details change.
+          </small>
         </article>
       ))}
     </div>
@@ -2582,6 +2605,15 @@ export default function BCPSiteProfileForm({
     initial?.review_frequency || "Annually",
   );
 
+  const initialReviewer =
+    initial?.reviewed_by || initial?.approved_by || initial?.site_leader || "";
+
+  const [reviewerName, setReviewerName] = useState(
+    companyPeople.some((person) => personName(person) === initialReviewer)
+      ? initialReviewer
+      : "",
+  );
+
   const [siteLeader, setSiteLeader] = useState(
     companyPeople.some((person) => personName(person) === initial?.site_leader)
       ? initial.site_leader
@@ -3337,7 +3369,11 @@ export default function BCPSiteProfileForm({
                 so competence develops before each implementation activity.
               </p>
             </div>
-            <ParticipantRepeater items={people} setItems={setPeople} />
+            <ParticipantRepeater
+              items={people}
+              setItems={setPeople}
+              companyPeople={companyPeople}
+            />
             <button
               className="spxAddProcess"
               type="button"
@@ -3366,17 +3402,19 @@ export default function BCPSiteProfileForm({
               </header>
               <div className="spxGrid">
                 <label>
-                  Competent reviewer / approver
-                  <input
+                  Competent reviewer / approver *
+                  <PersonSelect
                     name="reviewer_name"
-                    defaultValue={
-                      initial?.reviewed_by ||
-                      initial?.approved_by ||
-                      initial?.site_leader ||
-                      ""
-                    }
-                    placeholder="Name or accountable role"
+                    value={reviewerName}
+                    people={companyPeople}
+                    required
+                    placeholder="Select reviewer from Company Users"
+                    onChange={setReviewerName}
                   />
+                  <small>
+                    Select an active Company User with Business Continuity
+                    access and suitable competence or authority.
+                  </small>
                 </label>
                 <label>
                   Review decision comment
@@ -3437,17 +3475,19 @@ export default function BCPSiteProfileForm({
               </header>
               <div className="spxGrid">
                 <label>
-                  Competent reviewer / approver
-                  <input
+                  Competent reviewer / approver *
+                  <PersonSelect
                     name="reviewer_name"
-                    defaultValue={
-                      initial?.reviewed_by ||
-                      initial?.approved_by ||
-                      initial?.site_leader ||
-                      ""
-                    }
-                    placeholder="Name or accountable role"
+                    value={reviewerName}
+                    people={companyPeople}
+                    required
+                    placeholder="Select reviewer from Company Users"
+                    onChange={setReviewerName}
                   />
+                  <small>
+                    Select an active Company User with Business Continuity
+                    access and suitable competence or authority.
+                  </small>
                 </label>
                 <label>
                   Review decision comment
