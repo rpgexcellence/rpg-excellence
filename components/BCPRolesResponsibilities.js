@@ -820,7 +820,27 @@ export default function BCPRolesResponsibilities({
       ),
     ]);
   };
-  const valid = (x) => x.activity && x.accountable && x.responsible?.length;
+  const actorKey = (value) => String(value || "").trim().toLocaleLowerCase();
+  const assignmentActorsValid = (assignment) => {
+    const allowed = new Set([
+      ...people.map(actorKey),
+      ...roles.map((role) => actorKey(role.title)).filter(Boolean),
+      ...arr(assignment.customActors).map(actorKey),
+    ]);
+    return [
+      assignment.accountable,
+      ...arr(assignment.responsible),
+      ...arr(assignment.consulted),
+      ...arr(assignment.informed),
+    ]
+      .filter(Boolean)
+      .every((actor) => allowed.has(actorKey(actor)));
+  };
+  const valid = (x) =>
+    x.activity &&
+    x.accountable &&
+    x.responsible?.length &&
+    assignmentActorsValid(x);
   const core = assignments.filter((x) =>
       x.source?.includes("Core management process"),
     ),
