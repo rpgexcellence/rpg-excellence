@@ -168,6 +168,13 @@ async function saveProfile(_previousState, fd) {
     facilitator,
     ...dependencyRecords.map((x) => clean(x?.owner)),
     ...(information.assets || []).map((x) => clean(x?.owner)),
+    ...(information.systems || []).flatMap((x) => [
+      clean(x?.businessOwner),
+      clean(x?.technicalOwner),
+      clean(x?.emergencyAccessPrimary),
+      clean(x?.emergencyAccessDeputy),
+      clean(x?.emergencyAccessApprover),
+    ]),
   ].filter(Boolean);
   if (
     ["review", "approve"].includes(intent) &&
@@ -177,6 +184,71 @@ async function saveProfile(_previousState, fd) {
       error:
         "Select site leaders, BCP facilitators, dependency owners and information-asset owners from active Company Users with Business Continuity access.",
     };
+  if (
+    ["review", "approve"].includes(intent) &&
+    information.systems.some(
+      (system) =>
+        clean(system?.name) &&
+        (!clean(system?.businessOwner) ||
+          !clean(system?.technicalOwner) ||
+          !clean(system?.authentication) ||
+          !clean(system?.supplierId) ||
+          !clean(system?.supplierContactId)),
+    )
+  )
+    return {
+      error:
+        "Every critical system requires a Business Owner, Technical Owner, authentication method, approved supplier and active supplier support contact before review or approval.",
+    };
+  if (["review", "approve"].includes(intent) && information.systems.length) {
+    const supplierIds = [
+      ...new Set(
+        information.systems.map((x) => clean(x?.supplierId)).filter(Boolean),
+      ),
+    ];
+    const contactIds = [
+      ...new Set(
+        information.systems
+          .map((x) => clean(x?.supplierContactId))
+          .filter(Boolean),
+      ),
+    ];
+    const [suppliersResult, contactsResult] = await Promise.all([
+      s
+        .from("suppliers")
+        .select("id")
+        .eq("organization_id", org.id)
+        .eq("owner_id", user.id)
+        .eq("approval_status", "approved")
+        .in("id", supplierIds),
+      s
+        .from("supplier_contacts")
+        .select("id,supplier_id")
+        .eq("owner_id", user.id)
+        .eq("is_active", true)
+        .in("id", contactIds),
+    ]);
+    if (suppliersResult.error || contactsResult.error)
+      return {
+        error: suppliersResult.error?.message || contactsResult.error?.message,
+      };
+    const validSuppliers = new Set(
+      (suppliersResult.data || []).map((x) => x.id),
+    );
+    const validContacts = new Map(
+      (contactsResult.data || []).map((x) => [x.id, x.supplier_id]),
+    );
+    const invalidLink = information.systems.some(
+      (system) =>
+        !validSuppliers.has(system.supplierId) ||
+        validContacts.get(system.supplierContactId) !== system.supplierId,
+    );
+    if (invalidLink)
+      return {
+        error:
+          "Select an approved supplier and an active contact belonging to that supplier for every critical system.",
+      };
+  }
   const checks = profileChecks({
       location,
       leader,
@@ -348,7 +420,9 @@ export default async function SiteProfile({ searchParams }) {
     .limit(1)
     .maybeSingle();
   let initial = null,
-    companyPeople = [];
+    companyPeople = [],
+    suppliers = [],
+    supplierContacts = [];
   if (org && params?.new !== "1") {
     let query = s
       .from("bcp_site_profiles")
@@ -362,7 +436,12 @@ export default async function SiteProfile({ searchParams }) {
       .maybeSingle());
   }
   if (org) {
-    const [peopleResult, permissionsResult] = await Promise.all([
+    const [
+      peopleResult,
+      permissionsResult,
+      suppliersResult,
+      supplierContactsResult,
+    ] = await Promise.all([
       s
         .from("organization_people")
         .select("id,first_name,last_name,email,position,account_status")
@@ -375,12 +454,35 @@ export default async function SiteProfile({ searchParams }) {
         .eq("organization_id", org.id)
         .eq("module_key", "business_continuity")
         .neq("access_level", "none"),
+      s
+        .from("suppliers")
+        .select("id,legal_name,supplier_reference,approval_status")
+        .eq("organization_id", org.id)
+        .eq("owner_id", user.id)
+        .eq("approval_status", "approved")
+        .order("legal_name"),
+      s
+        .from("supplier_contacts")
+        .select(
+          "id,supplier_id,first_name,last_name,business_title,department,email,is_primary,is_active",
+        )
+        .eq("owner_id", user.id)
+        .eq("is_active", true)
+        .order("is_primary", { ascending: false })
+        .order("last_name"),
     ]);
     const permittedIds = new Set(
       (permissionsResult.data || []).map((x) => x.person_id),
     );
     companyPeople = (peopleResult.data || []).filter((person) =>
       permittedIds.has(person.id),
+    );
+    suppliers = suppliersResult.data || [];
+    const approvedSupplierIds = new Set(
+      suppliers.map((supplier) => supplier.id),
+    );
+    supplierContacts = (supplierContactsResult.data || []).filter((contact) =>
+      approvedSupplierIds.has(contact.supplier_id),
     );
   }
   return (
@@ -462,6 +564,8 @@ export default async function SiteProfile({ searchParams }) {
           initial={initial}
           organisationName={org?.name || ""}
           companyPeople={companyPeople}
+          suppliers={suppliers}
+          supplierContacts={supplierContacts}
           startStep={params?.step || 0}
         />
       </div>
