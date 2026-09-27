@@ -176,7 +176,8 @@ async function saveProfile(_previousState, fd) {
     leader = t("site_leader"),
     facilitator = t("local_facilitator"),
     description = t("operational_description"),
-    services = t("critical_products_services");
+    services = t("critical_products_services"),
+    reviewer = t("reviewer_name");
   const controlledAssignments = [
     leader,
     t("regional_facilitator"),
@@ -190,6 +191,7 @@ async function saveProfile(_previousState, fd) {
       clean(x?.emergencyAccessDeputy),
       clean(x?.emergencyAccessApprover),
     ]),
+    ...people.map((person) => clean(person?.name)),
   ].filter(Boolean);
   if (
     ["review", "approve"].includes(intent) &&
@@ -197,7 +199,17 @@ async function saveProfile(_previousState, fd) {
   )
     return {
       error:
-        "Select site leaders, BCP facilitators, dependency owners and information-asset owners from active Company Users with Business Continuity access.",
+        "Select site leaders, BCP facilitators, dependency owners, information-asset owners and BCP participants from active Company Users with Business Continuity access.",
+    };
+
+  if (
+    ["review", "approve", "changes"].includes(intent) &&
+    reviewer &&
+    !controlledPeople.has(reviewer)
+  )
+    return {
+      error:
+        "Select the competent reviewer or approver from active Company Users with Business Continuity access.",
     };
   if (
     ["review", "approve"].includes(intent) &&
@@ -295,8 +307,7 @@ async function saveProfile(_previousState, fd) {
     return {
       error: "Dependency names must be unique within the site profile.",
     };
-  const reviewer = t("reviewer_name"),
-    comment = t("review_comment");
+  const comment = t("review_comment");
   if (intent === "approve" && !reviewer)
     return {
       error:
