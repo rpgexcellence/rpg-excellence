@@ -220,6 +220,7 @@ export async function createInternalAudit(formData) {
   const auditMethod = clean(
     formData.get("audit_method")
   );
+  const supplierId = clean(formData.get("supplier_id"));
   const plannedStart = clean(
     formData.get("planned_start_at")
   );
@@ -270,6 +271,10 @@ export async function createInternalAudit(formData) {
     throw new Error(
       "Select a valid audit method."
     );
+  }
+
+  if (auditType === "supplier" && !supplierId) {
+    redirect("/portal/internal-audits?create_error=supplier_required#audit-mandate");
   }
 
   if (
@@ -323,6 +328,23 @@ export async function createInternalAudit(formData) {
     );
   }
 
+  let approvedSupplier = null;
+  if (auditType === "supplier") {
+    const { data: supplier, error: supplierError } = await supabase
+      .from("suppliers")
+      .select("id,legal_name,organization_id,approval_status")
+      .eq("id", supplierId)
+      .eq("owner_id", user.id)
+      .eq("organization_id", organizationId)
+      .eq("approval_status", "approved")
+      .maybeSingle();
+
+    if (supplierError || !supplier) {
+      redirect("/portal/internal-audits?create_error=supplier_invalid#audit-mandate");
+    }
+    approvedSupplier = supplier;
+  }
+
   const {
     data: validStandards,
     error: standardsError,
@@ -367,6 +389,7 @@ export async function createInternalAudit(formData) {
       title,
       audit_type: auditType,
       audit_method: auditMethod,
+      supplier_id: approvedSupplier?.id || null,
       status: "draft",
       current_gate: "scope",
       purpose,
