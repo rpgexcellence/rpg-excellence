@@ -233,9 +233,11 @@ export async function createInternalAudit(formData) {
   const scopeStatement = clean(
     formData.get("scope_statement")
   );
-  const auditeeEmail = clean(
+  let auditeeEmail = clean(
     formData.get("auditee_contact_email")
   );
+  let auditeeContactName = clean(formData.get("auditee_contact_name"));
+  const supplierContactId = clean(formData.get("supplier_contact_id"));
   const standardIds = uniqueClean(
     formData.getAll("standard_ids")
   );
@@ -303,12 +305,6 @@ export async function createInternalAudit(formData) {
     );
   }
 
-  if (!validEmail(auditeeEmail)) {
-    throw new Error(
-      "Enter a valid auditee email address."
-    );
-  }
-
   const {
     data: organization,
     error: organizationError,
@@ -343,6 +339,27 @@ export async function createInternalAudit(formData) {
       redirect("/portal/internal-audits?create_error=supplier_invalid#audit-mandate");
     }
     approvedSupplier = supplier;
+
+    if (!supplierContactId) {
+      throw new Error("Select a responsible contact for the supplier audit.");
+    }
+    const { data: supplierContact, error: contactError } = await supabase
+      .from("supplier_contacts")
+      .select("id,first_name,last_name,email,is_active")
+      .eq("id", supplierContactId)
+      .eq("supplier_id", supplier.id)
+      .eq("owner_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (contactError || !supplierContact) {
+      throw new Error("The selected supplier contact is unavailable or does not belong to this supplier.");
+    }
+    auditeeContactName = `${supplierContact.first_name || ""} ${supplierContact.last_name || ""}`.trim();
+    auditeeEmail = supplierContact.email;
+  }
+
+  if (!validEmail(auditeeEmail)) {
+    throw new Error("Enter a valid auditee email address.");
   }
 
   const {
@@ -407,9 +424,7 @@ export async function createInternalAudit(formData) {
       known_risks_changes: clean(
         formData.get("known_risks_changes")
       ),
-      auditee_contact_name: clean(
-        formData.get("auditee_contact_name")
-      ),
+      auditee_contact_name: auditeeContactName,
       auditee_contact_email: auditeeEmail,
       planned_start_at:
         plannedStartDate.toISOString(),
