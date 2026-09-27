@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 
 const catalogue = {
   "People & security": [
@@ -333,6 +333,7 @@ const personName = (value) =>
     ? value
     : value?.name ||
       value?.fullName ||
+      `${value?.first_name || ""} ${value?.last_name || ""}`.trim() ||
       value?.title ||
       value?.role ||
       value?.email ||
@@ -533,6 +534,7 @@ function HazardIcon({ name, tone = "neutral", small = false }) {
 const iconCss = `.hazardIcon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:14px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6;box-shadow:0 5px 14px #143a6420}.hazardIcon svg{width:38px;height:38px}.hazardIcon.small{width:25px;height:25px;flex-basis:25px;border-radius:7px;box-shadow:none}.hazardIcon.small svg{width:17px;height:17px}.hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.riskIdentity{display:flex;align-items:center;gap:13px}.registerCopy{flex:1;min-width:0}.catalogue button{display:inline-flex;align-items:center;gap:6px}.custom{align-items:center;gap:7px}.register article>.hazardIcon{margin-right:13px}@media(max-width:900px){.hazardIcon{width:48px;height:48px;flex-basis:48px}.hazardIcon svg{width:32px;height:32px}.register article>.hazardIcon{margin:0 0 8px}}`;
 const heatCss = `.appetite{display:flex;justify-content:space-between;gap:20px;align-items:center;background:#eef5ff;border:1px solid #c9daee;border-radius:10px;padding:13px;margin-bottom:14px}.appetite label{min-width:320px}.appetite span{color:#607890}.heatHead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.heatHead h3{margin:4px 0}.heatHead p{margin:0;color:#607890}.heatHead>div:last-child{display:flex;background:#eef3f7;padding:4px;border-radius:9px}.heatHead button{border:0;background:transparent;padding:8px 11px;border-radius:7px;font-weight:800;color:#49637b}.heatHead button.active{background:#fff;color:#0b3155;box-shadow:0 1px 5px #16365220}.heat{max-width:760px}.heat .row,.heat footer{grid-template-columns:70px repeat(5,1fr)}.heat .row>label{align-content:center;text-align:right;padding-right:7px}.heat .row>label small,.heat footer small{display:block}.heat .row>button{height:65px;border:0;display:grid;place-items:center;position:relative;border-radius:7px;cursor:pointer}.heat .row>button.selected{outline:4px solid #112f50;outline-offset:1px}.heat .row i{position:absolute;left:7px;top:5px;font-style:normal;font-size:10px}.heat .row strong{font-size:22px}.heat .row em{position:absolute;right:5px;top:5px;font-size:8px;font-style:normal}@media(max-width:900px){.appetite,.heatHead{display:block}.appetite label{min-width:0}.heat{overflow:auto}}`;
 const riskCoreCss = `.risk>header{display:grid!important;grid-template-columns:minmax(240px,1fr) minmax(220px,280px) auto;align-items:center}.riskCore{display:grid;justify-self:start;padding:8px 13px;border:1px solid #cedce8;border-left:4px solid #2d60e6;border-radius:9px;background:#f1f6fb}.riskCore small{color:#285de4!important;font-size:9px;font-weight:950;letter-spacing:.1em}.riskCore b{font-size:17px;line-height:1.2}.riskCore span{font-size:9px;color:#607890}@media(max-width:1150px){.risk>header{grid-template-columns:1fr auto!important}.riskCore{grid-column:1/-1;width:100%}}@media(max-width:900px){.risk>header{display:flex!important}.riskCore{width:100%}}`;
+const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}`;
 
 export default function BCPHazardScenarioAssessment({
   action,
@@ -544,6 +546,8 @@ export default function BCPHazardScenarioAssessment({
   organisationName = "",
   startStep = 0,
 }) {
+  const formRef = useRef(null);
+  const [formTick, setFormTick] = useState(0);
   const [formState, formAction, isPending] = useActionState(action, {
       error: "",
     }),
@@ -582,24 +586,75 @@ export default function BCPHazardScenarioAssessment({
   const [appetite, setAppetite] = useState(
     clamp(initial?.methodology?.appetiteScore || 9, 1, 25),
   );
-  const selected = risks.map((x) => x.name),
-    completion =
-      ([
+  const selected = risks.map((x) => x.name);
+  const completion = useMemo(() => {
+    const form = formRef.current;
+    const get = (name, fallback = "") => {
+      const field = form?.elements?.namedItem(name);
+      return field
+        ? String(field.value ?? "").trim()
+        : String(fallback ?? "").trim();
+    };
+    const requirements = [
+      [
         Boolean(profile),
-        participants.length > 0 && risks.length > 0,
-        risks.length > 0 &&
-          risks.every((x) => x.description && x.affectedProcesses.length),
-        risks.every((x) => x.existingControls.length && x.owner),
-        risks.every(
-          (x) =>
-            x.treatment &&
-            x.decisionRationale &&
-            (metrics(x).residualBand === "Low" || x.actions.length),
+        participants.length > 0,
+        Boolean(get("assessment_title", initial?.assessment_title)),
+        Boolean(
+          get(
+            "operational_description",
+            initial?.operational_description || profile?.operational_description,
+          ),
         ),
+        Boolean(get("next_review_date", initial?.next_review_date)),
+      ],
+      [risks.length > 0, risks.every((risk) => risk.name.trim())],
+      [
         risks.length > 0,
-      ].filter(Boolean).length /
-        6) *
-      100;
+        risks.every((risk) => risk.description.trim()),
+        risks.every((risk) => risk.affectedProcesses.length > 0),
+        risks.every((risk) => risk.applicableSystems.length > 0),
+      ],
+      [
+        risks.length > 0,
+        risks.every((risk) => risk.existingControls.length > 0),
+        risks.every((risk) => risk.owner),
+      ],
+      [
+        risks.length > 0,
+        risks.every((risk) => risk.treatment),
+        risks.every((risk) => risk.decisionRationale.trim()),
+        risks.every(
+          (risk) =>
+            metrics(risk).residualBand === "Low" || risk.actions.length > 0,
+        ),
+        Boolean(get("reviewer_name", initial?.reviewed_by)),
+      ],
+      [
+        risks.length > 0,
+        risks.every(
+          (risk) =>
+            risk.description &&
+            risk.affectedProcesses.length &&
+            risk.existingControls.length &&
+            risk.owner &&
+            risk.treatment &&
+            risk.decisionRationale &&
+            (metrics(risk).residualBand === "Low" || risk.actions.length),
+        ),
+      ],
+    ];
+    const complete = requirements.map((items) => items.every(Boolean));
+    return {
+      complete,
+      remaining: requirements.map(
+        (items) => items.filter((item) => !item).length,
+      ),
+      percent: Math.round(
+        (complete.filter(Boolean).length / steps.length) * 100,
+      ),
+    };
+  }, [formTick, profile, participants, risks, initial]);
   const update = (id, changes) =>
     setRisks(risks.map((x) => (x.id === id ? { ...x, ...changes } : x)));
   const choose = (name) =>
@@ -626,11 +681,17 @@ export default function BCPHazardScenarioAssessment({
       })),
     );
   return (
-    <form action={formAction} className="hz">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="hz"
+      onInput={() => setFormTick((value) => value + 1)}
+    >
       <style>{css}</style>
       <style>{iconCss}</style>
       <style>{heatCss}</style>
       <style>{riskCoreCss}</style>
+      <style>{completionCss}</style>
       {[
         ["assessment_id", initial?.id || ""],
         ["site_profile_id", profileId],
@@ -655,22 +716,29 @@ export default function BCPHazardScenarioAssessment({
         </div>
         <small>BCP MODULE 5</small>
         <section>
-          <strong>{Math.round(completion)}%</strong>
+          <strong>{completion.percent}%</strong>
           <span>complete</span>
           <i>
-            <b style={{ width: `${completion}%` }} />
+            <b style={{ width: `${completion.percent}%` }} />
           </i>
         </section>
         <nav>
           {steps.map((x, i) => (
             <button
               type="button"
-              className={step === i ? "active" : ""}
+              className={`${step === i ? "active" : ""} ${completion.complete[i] ? "complete" : "incomplete"}`}
               onClick={() => setStep(i)}
               key={x}
             >
-              <b>{i + 1}</b>
-              <span>{x}</span>
+              <b>{completion.complete[i] ? "✓" : i + 1}</b>
+              <span>
+                <strong>{x}</strong>
+                <small>
+                  {completion.complete[i]
+                    ? "Complete"
+                    : `${completion.remaining[i]} requirement${completion.remaining[i] === 1 ? "" : "s"} remaining`}
+                </small>
+              </span>
             </button>
           ))}
         </nav>
@@ -703,7 +771,7 @@ export default function BCPHazardScenarioAssessment({
           <b>{initial?.status?.replaceAll("_", " ") || "draft"}</b>
         </header>
         <div className="progress">
-          <i style={{ width: `${completion}%` }} />
+          <i style={{ width: `${completion.percent}%` }} />
         </div>
         {step === 0 && (
           <Panel
@@ -950,10 +1018,21 @@ export default function BCPHazardScenarioAssessment({
             <div className="approval">
               <label>
                 Reviewer / approver
-                <input
+                <select
                   name="reviewer_name"
                   defaultValue={initial?.reviewed_by || ""}
-                />
+                >
+                  <option value="">Select reviewer from Company Users</option>
+                  {people.map((person) => (
+                    <option
+                      key={`${person.name}-${person.email}`}
+                      value={person.name}
+                    >
+                      {person.name}
+                      {person.position ? ` — ${person.position}` : ""}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="wide">
                 Review comment / approval rationale
@@ -1336,8 +1415,14 @@ function RiskCard({
               onChange={(e) => update(r.id, { owner: e.target.value })}
             >
               <option value="">Select accountable owner</option>
-              {people.map((x) => (
-                <option key={x}>{x}</option>
+              {people.map((person) => (
+                <option
+                  key={`${person.name}-${person.email}`}
+                  value={person.name}
+                >
+                  {person.name}
+                  {person.position ? ` — ${person.position}` : ""}
+                </option>
               ))}
             </select>
           </label>
