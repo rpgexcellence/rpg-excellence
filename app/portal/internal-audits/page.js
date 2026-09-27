@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import { createInternalAudit } from "./actions";
 import ProcessScopeSelector from "./ProcessScopeSelector";
+import AuditTypeSupplierSelector from "../../../components/AuditTypeSupplierSelector";
 
 const STATUS_LABELS = {
   draft: "Draft", scope_review: "Scope review", team_assignment: "Team assignment",
@@ -48,7 +49,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/internal-audits");
 
-  const [organizationsResult, standardsResult, auditsResult, findingsResult] = await Promise.all([
+  const [organizationsResult, standardsResult, auditsResult, findingsResult, suppliersResult] = await Promise.all([
     supabase.from("organizations").select("id, name").eq("owner_id", user.id).order("name"),
     supabase.from("internal_audit_standard_catalogue")
       .select("id, display_name, discipline, standard_code").eq("active", true)
@@ -62,9 +63,12 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
     `).eq("owner_id", user.id).order("updated_at", { ascending: false }).limit(30),
     supabase.from("internal_audit_findings").select("id, status, finding_type")
       .eq("owner_id", user.id).neq("status", "closed").neq("status", "withdrawn"),
+    supabase.from("suppliers")
+      .select("id, legal_name, supplier_reference, organization_id, approval_status")
+      .eq("owner_id", user.id).eq("approval_status", "approved").order("legal_name"),
   ]);
 
-  for (const result of [organizationsResult, standardsResult, auditsResult, findingsResult]) {
+  for (const result of [organizationsResult, standardsResult, auditsResult, findingsResult, suppliersResult]) {
     if (result.error) throw new Error(result.error.message);
   }
 
@@ -72,6 +76,8 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
   const standards = standardsResult.data ?? [];
   const audits = auditsResult.data ?? [];
   const openFindings = findingsResult.data ?? [];
+  const approvedSuppliers = suppliersResult.data ?? [];
+  const requestedSupplier = approvedSuppliers.find((supplier) => supplier.id === params?.supplier) || null;
   const activeAudits = audits.filter((a) => !["closed", "cancelled"].includes(a.status)).length;
   const scheduledAudits = audits.filter((a) => ["scheduled", "notification_sent", "documents_requested"].includes(a.status)).length;
   const fieldworkAudits = audits.filter((a) => ["fieldwork", "team_review", "technical_review"].includes(a.status)).length;
@@ -93,7 +99,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
         .iaPanel{overflow:hidden;margin-bottom:24px;border:1px solid var(--line);border-radius:25px;background:#fff;box-shadow:0 18px 55px #061a3511}.iaPanelHead{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:30px 34px;border-bottom:1px solid #e7edf4;background:linear-gradient(110deg,#fff,#f7faff)}.iaPanelHead .iaMini,.iaPortfolio .iaMini{color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.iaPanelHead h2,.iaPortfolio h2{margin:7px 0 5px;font-size:30px;letter-spacing:-.025em}.iaPanelHead p{margin:0;color:var(--muted)}.iaBadge{padding:9px 13px;border-radius:999px;background:#eaf8f6;color:#08736c;font-size:12px;font-weight:900;white-space:nowrap}
         .iaCreate{display:grid;grid-template-columns:250px minmax(0,1fr)}.iaRail{padding:30px 24px;border-right:1px solid #e6edf5;background:#f7f9fc}.iaRailTitle{margin-bottom:19px;color:#708096;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.iaRailItem{display:flex;gap:12px;margin-bottom:20px;color:#6b7c91}.iaRailItem:first-of-type{color:var(--navy)}.iaRailNo{display:flex;width:26px;height:26px;flex:0 0 26px;align-items:center;justify-content:center;border:1px solid #ccd8e6;border-radius:50%;background:#fff;font-size:11px;font-weight:900}.iaRailItem:first-of-type .iaRailNo{border-color:var(--blue);background:var(--blue);color:#fff;box-shadow:0 0 0 5px #e5eeff}.iaRailItem strong,.iaRailItem small{display:block}.iaRailItem strong{font-size:14px}.iaRailItem small{margin-top:2px;font-size:12px;line-height:1.35}
         .iaForm{padding:32px 34px 36px}.iaSectionTitle{display:flex;align-items:center;gap:12px;margin:4px 0 18px;font-size:17px;font-weight:900}.iaSectionTitle b{display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:8px;background:#e9f0ff;color:var(--blue);font-size:12px}.iaGrid2,.iaGrid3{display:grid;gap:17px}.iaGrid2{grid-template-columns:repeat(2,minmax(0,1fr))}.iaGrid3{grid-template-columns:repeat(3,minmax(0,1fr))}
-        .iaField{display:flex;flex-direction:column;gap:8px;min-width:0}.iaField>span{color:#263d5b;font-size:13px;font-weight:850}.iaField input,.iaField select,.iaField textarea{width:100%;min-height:50px;margin:0;padding:13px 14px;border:1px solid #cbd7e5;border-radius:11px;outline:0;background:#fff;color:#102944;font:inherit;font-size:15px;transition:.18s}.iaField textarea{min-height:112px;resize:vertical;line-height:1.5}.iaField input:focus,.iaField select:focus,.iaField textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px #1761e81c}.iaField input::placeholder,.iaField textarea::placeholder{color:#91a0b2}.iaDivider{height:1px;margin:30px 0;background:#e4eaf1}
+        .iaField{display:flex;flex-direction:column;gap:8px;min-width:0}.iaField>span{color:#263d5b;font-size:13px;font-weight:850}.iaField input,.iaField select,.iaField textarea{width:100%;min-height:50px;margin:0;padding:13px 14px;border:1px solid #cbd7e5;border-radius:11px;outline:0;background:#fff;color:#102944;font:inherit;font-size:15px;transition:.18s}.iaField textarea{min-height:112px;resize:vertical;line-height:1.5}.iaField input:focus,.iaField select:focus,.iaField textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px #1761e81c}.iaField input::placeholder,.iaField textarea::placeholder{color:#91a0b2}.iaField>small{color:#61738b;font-size:12px;line-height:1.4}.iaSupplierAuditSelector{padding:13px;border:1px solid #89d9cf;border-radius:12px;background:#effbf9}.iaSupplierAuditSelector>strong{color:#a24900;font-size:12px}.iaDivider{height:1px;margin:30px 0;background:#e4eaf1}
         .iaStandards{margin:0;padding:0;border:0}.iaStandards legend{width:100%;padding:0}.iaStandardGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.iaStandard{display:flex;gap:14px;min-height:82px;padding:17px;border:1px solid #d5e0ec;border-radius:14px;background:#f8fafd;cursor:pointer;transition:.18s}.iaStandard:hover{transform:translateY(-2px);border-color:#9fb9e7;box-shadow:0 10px 24px #11478e14}.iaStandard:has(input:checked){border-color:var(--blue);background:#eef4ff;box-shadow:inset 0 0 0 1px var(--blue)}.iaStandard input{width:19px;height:19px;flex:0 0 19px;accent-color:var(--blue)}.iaStandard strong,.iaStandard small{display:block}.iaStandard small{margin-top:5px;color:var(--muted);line-height:1.35}
         .iaActionBar{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-top:26px;padding:19px 20px;border-radius:16px;background:#071d39;color:#fff}.iaActionBar p{margin:0;color:#cbd9e9;font-size:13px;line-height:1.45}.iaSubmit{min-height:50px;padding:0 22px;border:0;border-radius:11px;background:linear-gradient(135deg,#1761e8,#0d4ec8);color:#fff;font:inherit;font-weight:900;cursor:pointer;box-shadow:0 12px 28px #1761e842;white-space:nowrap}.iaEmpty{margin:30px;padding:20px;border:1px solid #efd18c;border-radius:14px;background:#fff8e8;color:#6f5005}
         .iaPortfolio{padding:28px 32px 20px}.iaAudit{display:grid;grid-template-columns:minmax(270px,1.5fr) minmax(200px,1fr) 150px 140px;gap:20px;align-items:center;padding:22px 32px;border-top:1px solid #e5ebf2;transition:.18s}.iaAudit:hover{background:#f8faff}.iaAuditTitle{display:block;margin-bottom:5px;color:var(--navy);font-size:17px;font-weight:900;text-decoration:none}.iaAuditTitle:hover{color:var(--blue)}.iaOpenAudit{display:inline-flex;padding:10px 13px;border-radius:10px;background:#1761e8;color:#fff;font-size:13px;font-weight:900;text-decoration:none;white-space:nowrap}.iaMuted{color:var(--muted);font-size:13px;line-height:1.45}.iaCriteria{color:#3b526e;font-size:14px;line-height:1.45}.iaStatus{display:inline-block;padding:7px 10px;border-radius:999px;background:#eaf1ff;color:#1455c8;font-size:12px;font-weight:900}.iaNoAudits{padding:32px;border-top:1px solid #e5ebf2;color:var(--muted)}
@@ -139,6 +145,8 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
         {params?.created ? <div className="iaSuccess">✓ Audit created. The controlled scope record is ready for review.</div> : null}
         {params?.create_error === "date_order" ? <div className="iaError" role="alert"><strong>Check the planned audit dates.</strong>The planned end date and time must be later than the planned start date and time.</div> : null}
         {params?.create_error === "invalid_dates" ? <div className="iaError" role="alert"><strong>Planned dates are required.</strong>Enter a valid planned start and planned end date and time.</div> : null}
+        {params?.create_error === "supplier_required" ? <div className="iaError" role="alert"><strong>Select an approved supplier.</strong>A Supplier Audit must be linked to a supplier from the approved supplier register.</div> : null}
+        {params?.create_error === "supplier_invalid" ? <div className="iaError" role="alert"><strong>The supplier is unavailable.</strong>Choose an approved supplier belonging to the selected organisation.</div> : null}
 
         <section className="iaStats">
           <StatCard label="Active audits" value={activeAudits} detail="Across the controlled lifecycle" href="#audit-portfolio" />
@@ -163,9 +171,9 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
               <form className="iaForm" action={createInternalAudit}>
                 <div className="iaSectionTitle"><b>1</b>Audit mandate</div>
                 <div className="iaGrid3">
-                  <label className="iaField"><span>Organisation *</span><select name="organization_id" required defaultValue=""><option value="" disabled>Select organisation</option>{organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
-                  <label className="iaField"><span>Audit title *</span><input name="title" required placeholder="e.g. Integrated UK Operations Audit" /></label>
-                  <label className="iaField"><span>Audit type *</span><select name="audit_type" defaultValue="internal_system">{Object.entries(TYPE_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+                  <label className="iaField"><span>Organisation *</span><select name="organization_id" required defaultValue={requestedSupplier?.organization_id || ""}><option value="" disabled>Select organisation</option>{organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
+                  <label className="iaField"><span>Audit title *</span><input name="title" required defaultValue={requestedSupplier ? `${requestedSupplier.legal_name} Supplier Audit` : ""} placeholder="e.g. Integrated UK Operations Audit" /></label>
+                  <AuditTypeSupplierSelector approvedSuppliers={approvedSuppliers} initialSupplierId={requestedSupplier?.id || ""} />
                   <label className="iaField"><span>Delivery method *</span><select name="audit_method" defaultValue="onsite"><option value="onsite">On-site</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option></select></label>
                   <label className="iaField"><span>Planned start *</span><input name="planned_start_at" type="datetime-local" required /></label>
                   <label className="iaField"><span>Planned end *</span><input name="planned_end_at" type="datetime-local" required /></label>
