@@ -370,6 +370,52 @@ const scenarioGuidance = (name = "") => {
     warnings: ["Performance outside agreed limits", "Repeated incident or near miss", "Supplier, system or regulatory alert"],
   };
 };
+const treatmentGuidance = (name = "") => {
+  const value = name.toLowerCase();
+  if (/shooter|violence|terror|sabotage/.test(value))
+    return [
+      "Test lockdown, evacuation and emergency communication arrangements",
+      "Review access-control coverage and out-of-hours escalation",
+      "Exercise the incident command team with police liaison assumptions",
+    ];
+  if (/cyber|it-related|identity|software/.test(value))
+    return [
+      "Test recovery from an isolated and verified backup",
+      "Close critical vulnerabilities and verify detection coverage",
+      "Exercise the cyber incident and alternative-access procedure",
+    ];
+  if (/fire|explosion|spill|radiation/.test(value))
+    return [
+      "Close inspection, containment or alarm-system deficiencies",
+      "Exercise isolation, evacuation and emergency response arrangements",
+      "Verify competent responder coverage and emergency equipment",
+    ];
+  if (/flood|storm|weather|earthquake|landslide|tsunami|volcano/.test(value))
+    return [
+      "Protect or relocate continuity-critical equipment and records",
+      "Test site closure, remote-working and alternative-location arrangements",
+      "Verify alert thresholds and severe-weather escalation contacts",
+    ];
+  if (/supplier|transport|customs|export|import/.test(value))
+    return [
+      "Qualify an alternative supplier, carrier or route",
+      "Agree continuity, notification and recovery requirements with the supplier",
+      "Review minimum stock, lead time and single-source exposure",
+    ];
+  return [
+    "Implement and verify an additional preventive control",
+    "Test the response and recovery procedure",
+    "Assign an owner and confirm effectiveness by the target date",
+  ];
+};
+const revisionSuggestions = [
+  "Initial assessment completed",
+  "Impact rating reviewed",
+  "Likelihood rating updated",
+  "Controls reviewed or amended",
+  "Residual risk recalculated",
+  "Treatment decision changed",
+];
 const iconKey = (name) => {
   const n = String(name || "").toLowerCase();
   if (/active shooter|workplace violence|terrorism/.test(n)) return "security";
@@ -566,7 +612,7 @@ function HazardIcon({ name, tone = "neutral", small = false }) {
 const iconCss = `.hazardIcon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:14px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6;box-shadow:0 5px 14px #143a6420}.hazardIcon svg{width:38px;height:38px}.hazardIcon.small{width:25px;height:25px;flex-basis:25px;border-radius:7px;box-shadow:none}.hazardIcon.small svg{width:17px;height:17px}.hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.riskIdentity{display:flex;align-items:center;gap:13px}.registerCopy{flex:1;min-width:0}.catalogue button{display:inline-flex;align-items:center;gap:6px}.custom{align-items:center;gap:7px}.register article>.hazardIcon{margin-right:13px}@media(max-width:900px){.hazardIcon{width:48px;height:48px;flex-basis:48px}.hazardIcon svg{width:32px;height:32px}.register article>.hazardIcon{margin:0 0 8px}}`;
 const heatCss = `.appetite{display:flex;justify-content:space-between;gap:20px;align-items:center;background:#eef5ff;border:1px solid #c9daee;border-radius:10px;padding:13px;margin-bottom:14px}.appetite label{min-width:320px}.appetite span{color:#607890}.heatHead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.heatHead h3{margin:4px 0}.heatHead p{margin:0;color:#607890}.heatHead>div:last-child{display:flex;background:#eef3f7;padding:4px;border-radius:9px}.heatHead button{border:0;background:transparent;padding:8px 11px;border-radius:7px;font-weight:800;color:#49637b}.heatHead button.active{background:#fff;color:#0b3155;box-shadow:0 1px 5px #16365220}.heat{max-width:760px}.heat .row,.heat footer{grid-template-columns:70px repeat(5,1fr)}.heat .row>label{align-content:center;text-align:right;padding-right:7px}.heat .row>label small,.heat footer small{display:block}.heat .row>button{height:65px;border:0;display:grid;place-items:center;position:relative;border-radius:7px;cursor:pointer}.heat .row>button.selected{outline:4px solid #112f50;outline-offset:1px}.heat .row i{position:absolute;left:7px;top:5px;font-style:normal;font-size:10px}.heat .row strong{font-size:22px}.heat .row em{position:absolute;right:5px;top:5px;font-size:8px;font-style:normal}@media(max-width:900px){.appetite,.heatHead{display:block}.appetite label{min-width:0}.heat{overflow:auto}}`;
 const riskCoreCss = `.risk>header{display:grid!important;grid-template-columns:minmax(240px,1fr) minmax(220px,280px) auto;align-items:center}.riskCore{display:grid;justify-self:start;padding:8px 13px;border:1px solid #cedce8;border-left:4px solid #2d60e6;border-radius:9px;background:#f1f6fb}.riskCore small{color:#285de4!important;font-size:9px;font-weight:950;letter-spacing:.1em}.riskCore b{font-size:17px;line-height:1.2}.riskCore span{font-size:9px;color:#607890}@media(max-width:1150px){.risk>header{grid-template-columns:1fr auto!important}.riskCore{grid-column:1/-1;width:100%}}@media(max-width:900px){.risk>header{display:flex!important}.riskCore{width:100%}}`;
-const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}.stepRequirements{margin:16px 20px 0;padding:14px 18px;border:1px solid #efc66e;border-left:5px solid #e49a16;border-radius:10px;background:#fff8e8;color:#65450b}.stepRequirements>b{display:block;margin-bottom:6px}.stepRequirements ul{margin:0;padding-left:20px}.stepRequirements li{margin:4px 0;font-size:13px}.controlGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;align-items:start}.controlGrid .list{margin:0;padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.controlGrid label{padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.listGuide{display:block;margin:-3px 0 8px;color:#687e92;font-weight:500;line-height:1.35}.list .listSuggestions{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 9px}.list .listSuggestions button{width:auto;border:1px solid #bcd0e2;border-radius:999px;background:#eef4ff;color:#174da8;padding:6px 8px;font-size:10px;text-align:left}.list .listSuggestions:empty{display:none}.controlScale small{line-height:1.35}@media(max-width:900px){.stepRequirements{margin:10px 10px 0}.controlGrid{grid-template-columns:1fr}}`;
+const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}.stepRequirements{margin:16px 20px 0;padding:14px 18px;border:1px solid #efc66e;border-left:5px solid #e49a16;border-radius:10px;background:#fff8e8;color:#65450b}.stepRequirements>b{display:block;margin-bottom:6px}.stepRequirements ul{margin:0;padding-left:20px}.stepRequirements li{margin:4px 0;font-size:13px}.controlGrid,.treatmentSupportGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;align-items:start}.controlGrid .list,.treatmentSupportGrid .list{margin:0;padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.controlGrid label{padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.treatmentSupportGrid{margin:14px 0}.listGuide{display:block;margin:-3px 0 8px;color:#687e92;font-weight:500;line-height:1.35}.list .listSuggestions{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 9px}.list .listSuggestions button{width:auto;border:1px solid #bcd0e2;border-radius:999px;background:#eef4ff;color:#174da8;padding:6px 8px;font-size:10px;text-align:left}.list .listSuggestions:empty{display:none}.controlScale small{line-height:1.35}@media(max-width:900px){.stepRequirements{margin:10px 10px 0}.controlGrid,.treatmentSupportGrid{grid-template-columns:1fr}}`;
 
 export default function BCPHazardScenarioAssessment({
   action,
@@ -1633,16 +1679,22 @@ function RiskCard({
               </select>
             </label>
           </div>
-          <ListEditor
-            label="Risk-treatment actions"
-            items={r.actions}
-            onChange={(v) => update(r.id, { actions: v })}
-          />
-          <ListEditor
-            label="Revision history / changes to impacts, rating or controls"
-            items={r.revisionHistory}
-            onChange={(v) => update(r.id, { revisionHistory: v })}
-          />
+          <div className="treatmentSupportGrid">
+            <ListEditor
+              label="Risk-treatment actions"
+              guide="Select one or more proportionate actions, then add any site-specific action. Each action should later have an owner, evidence and target date."
+              suggestions={treatmentGuidance(r.name)}
+              items={r.actions}
+              onChange={(v) => update(r.id, { actions: v })}
+            />
+            <ListEditor
+              label="Revision history / changes to impacts, rating or controls"
+              guide="Record what changed and why so the controlled risk decision remains traceable."
+              suggestions={revisionSuggestions}
+              items={r.revisionHistory}
+              onChange={(v) => update(r.id, { revisionHistory: v })}
+            />
+          </div>
           <label>
             Decision and tolerability rationale *
             <textarea
@@ -1650,7 +1702,13 @@ function RiskCard({
               onChange={(e) =>
                 update(r.id, { decisionRationale: e.target.value })
               }
+              placeholder={`Explain why ${r.treatment.toLowerCase()} is appropriate, whether residual risk ${metrics(r).residual}/${metrics(r).residualBand} is tolerable, and who authorised the decision.`}
             />
+            <small>
+              State the decision basis, expected risk reduction, remaining exposure,
+              dependencies, approval authority and review trigger. Do not enter only
+              “acceptable” or “reviewed”.
+            </small>
           </label>
         </>
       )}
