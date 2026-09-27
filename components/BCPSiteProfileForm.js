@@ -112,6 +112,18 @@ const blankRemoteSupport = {
   lastTest: "",
 };
 
+const blankEmergencyContact = {
+  serviceType: "Fire and rescue service",
+  serviceName: "",
+  emergencyNumber: "",
+  nonEmergencyNumber: "",
+  address: "",
+  travelTimeMinutes: "",
+  accessNotes: "",
+  directionsReference: "",
+  lastVerified: "",
+};
+
 const serviceOptions = [
   "Customer support",
   "Manufacturing",
@@ -409,6 +421,12 @@ const steps = [
   ],
 
   ["learning", "BCP participants", "Awareness and role-specific learning"],
+
+  [
+    "emergency",
+    "Emergency services",
+    "Fire, hospital, police and emergency contacts",
+  ],
 ];
 
 const governanceStyles = `.spxFormError{display:grid;gap:4px;margin-bottom:14px;padding:13px 16px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.spxFormError span{font-size:12px}.spxGuide{display:grid;gap:4px;margin:0 0 16px;padding:13px 15px;border-left:4px solid #2863e7;border-radius:9px;background:#edf4ff;color:#234565}.spxGuide b{color:#174fb5;font-size:12px;text-transform:uppercase;letter-spacing:.06em}.spxGuide span{font-size:13px;line-height:1.5}.spxUnitField{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px}.spxScreenSelect{display:grid!important;grid-template-columns:minmax(0,1fr) 190px!important;align-items:center!important;padding:8px 0;border-bottom:1px solid #e1e8ef}.spxScreenSelect select{padding:10px!important}.spxSelectReset{justify-self:start;padding:5px 0;border:0;background:transparent;color:#1c5bd4;font-size:12px;font-weight:850;cursor:pointer;text-decoration:underline}.spxGovernance{margin-top:18px;padding:18px;border:1px solid #c9d8ea;border-radius:13px;background:#f3f7ff}.spxGovernance header div{display:grid;gap:4px}.spxGovernance header small{color:#536f8e;text-transform:capitalize}.spxGovernance p{margin:14px 0 0;color:#60778e;font-size:11px}.spxFooter>div:first-child{display:flex;gap:7px}.spxFooter button.danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}.spxFooter button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:600px){.spxGovernance{padding:13px}.spxFooter>div:first-child{display:grid}.spxUnitField,.spxScreenSelect{grid-template-columns:1fr!important}}`;
@@ -2070,6 +2088,199 @@ function ProcessChoices({ processes, selected = [], toggle }) {
   );
 }
 
+function EmergencyServicesContacts({ data, setData }) {
+  const contacts = Array.isArray(data.emergencyContacts)
+    ? data.emergencyContacts
+    : [];
+  const presets = [
+    "Fire and rescue service",
+    "Nearest hospital / emergency department",
+    "Police",
+    "Ambulance / emergency medical service",
+    "National emergency services",
+  ];
+  const setContacts = (next) => setData({ ...data, emergencyContacts: next });
+  const add = (serviceType = "Other emergency contact") =>
+    setContacts([...contacts, { ...blankEmergencyContact, serviceType }]);
+  const update = (index, key, value) =>
+    setContacts(
+      contacts.map((contact, itemIndex) =>
+        itemIndex === index ? { ...contact, [key]: value } : contact,
+      ),
+    );
+  const remove = (index) =>
+    setContacts(contacts.filter((_, itemIndex) => itemIndex !== index));
+
+  return (
+    <div className="spxEmergencyServices">
+      <Guidance>
+        Record locally verified emergency contacts for this site. Confirm the
+        telephone numbers, address, access route and expected travel time; do
+        not rely solely on a generic internet search during an emergency.
+      </Guidance>
+      <section className="spxEmergencyReview">
+        <label>
+          Contact review frequency
+          <select
+            value={data.emergencyReviewFrequency || "Every 6 months"}
+            onChange={(event) =>
+              setData({
+                ...data,
+                emergencyReviewFrequency: event.target.value,
+              })
+            }
+          >
+            <option>Monthly</option>
+            <option>Every 3 months</option>
+            <option>Every 6 months</option>
+            <option>Annually</option>
+          </select>
+        </label>
+        <label>
+          Next review date
+          <input
+            type="date"
+            value={data.emergencyReviewDueDate || ""}
+            onChange={(event) =>
+              setData({ ...data, emergencyReviewDueDate: event.target.value })
+            }
+          />
+        </label>
+      </section>
+      <div className="spxEmergencyPresets">
+        <span>Quick add:</span>
+        {presets.map((preset) => (
+          <button type="button" key={preset} onClick={() => add(preset)}>
+            + {preset}
+          </button>
+        ))}
+      </div>
+      <div className="spxEmergencyRecords">
+        {contacts.length ? (
+          contacts.map((contact, index) => (
+            <article key={`${contact.serviceType}-${index}`}>
+              <header>
+                <div>
+                  <b>{String(index + 1).padStart(2, "0")}</b>
+                  <strong>{contact.serviceType || "Emergency contact"}</strong>
+                </div>
+                <button type="button" onClick={() => remove(index)}>
+                  Remove
+                </button>
+              </header>
+              <div className="spxGrid">
+                <label>
+                  Service type *
+                  <select
+                    value={contact.serviceType || "Fire and rescue service"}
+                    onChange={(event) =>
+                      update(index, "serviceType", event.target.value)
+                    }
+                  >
+                    {presets.map((preset) => (
+                      <option key={preset}>{preset}</option>
+                    ))}
+                    <option>Other emergency contact</option>
+                  </select>
+                </label>
+                <label>
+                  Service or facility name *
+                  <input
+                    value={contact.serviceName || ""}
+                    onChange={(event) =>
+                      update(index, "serviceName", event.target.value)
+                    }
+                    placeholder="Local service, hospital or station name"
+                  />
+                </label>
+                <label>
+                  Emergency telephone *
+                  <input
+                    type="tel"
+                    value={contact.emergencyNumber || ""}
+                    onChange={(event) =>
+                      update(index, "emergencyNumber", event.target.value)
+                    }
+                    placeholder="e.g. 999 or 112"
+                  />
+                </label>
+                <label>
+                  Direct or non-emergency telephone
+                  <input
+                    type="tel"
+                    value={contact.nonEmergencyNumber || ""}
+                    onChange={(event) =>
+                      update(index, "nonEmergencyNumber", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="wide">
+                  Address or location *
+                  <textarea
+                    rows="2"
+                    value={contact.address || ""}
+                    onChange={(event) =>
+                      update(index, "address", event.target.value)
+                    }
+                    placeholder="Full address, entrance or emergency department"
+                  />
+                </label>
+                <label>
+                  Estimated travel time (minutes)
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={contact.travelTimeMinutes || ""}
+                    onChange={(event) =>
+                      update(index, "travelTimeMinutes", event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Last verified
+                  <input
+                    type="date"
+                    value={contact.lastVerified || ""}
+                    onChange={(event) =>
+                      update(index, "lastVerified", event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Access and arrival notes
+                  <input
+                    value={contact.accessNotes || ""}
+                    onChange={(event) =>
+                      update(index, "accessNotes", event.target.value)
+                    }
+                    placeholder="Gate, entrance, helipad or security instructions"
+                  />
+                </label>
+                <label>
+                  Route or controlled reference
+                  <input
+                    value={contact.directionsReference || ""}
+                    onChange={(event) =>
+                      update(index, "directionsReference", event.target.value)
+                    }
+                    placeholder="Map link, plan or emergency procedure reference"
+                  />
+                </label>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p>
+            No emergency contacts recorded. Use the quick-add buttons to build
+            the site emergency directory.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RetentionRequirement({ asset, onChange }) {
   const legacy = String(asset.retention || "").trim();
   const match = legacy.match(
@@ -2188,12 +2399,15 @@ function SupplierContactSelector({ system, suppliers, contacts, onChange }) {
             value={supplierId}
             onChange={(e) => setSupplier(e.target.value)}
           >
-            <option value="">Select approved supplier</option>
+            <option value="">Select supplier from current register</option>
             {suppliers.map((supplier) => (
               <option value={supplier.id} key={supplier.id}>
                 {supplier.legal_name}
                 {supplier.supplier_reference
                   ? ` · ${supplier.supplier_reference}`
+                  : ""}
+                {supplier.approval_status
+                  ? ` · ${String(supplier.approval_status).replaceAll("_", " ")}`
                   : ""}
               </option>
             ))}
@@ -2287,9 +2501,21 @@ export default function BCPSiteProfileForm({
         systems: parsed.systems || [],
         remoteSupport: parsed.remoteSupport || [],
         controls: parsed.controls || {},
+        emergencyContacts: parsed.emergencyContacts || [],
+        emergencyReviewFrequency:
+          parsed.emergencyReviewFrequency || "Every 6 months",
+        emergencyReviewDueDate: parsed.emergencyReviewDueDate || "",
       };
     } catch {
-      return { assets: [], systems: [], remoteSupport: [], controls: {} };
+      return {
+        assets: [],
+        systems: [],
+        remoteSupport: [],
+        controls: {},
+        emergencyContacts: [],
+        emergencyReviewFrequency: "Every 6 months",
+        emergencyReviewDueDate: "",
+      };
     }
   })();
 
@@ -2306,7 +2532,7 @@ export default function BCPSiteProfileForm({
   );
 
   const [step, setStep] = useState(
-    Math.max(0, Math.min(6, Number(startStep) || 0)),
+    Math.max(0, Math.min(7, Number(startStep) || 0)),
   );
 
   const [value, setValue] = useState(
@@ -2448,6 +2674,9 @@ export default function BCPSiteProfileForm({
           x.role &&
           (!x.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email)),
       ),
+      (information.emergencyContacts || []).some(
+        (x) => x.serviceType && x.serviceName && x.emergencyNumber && x.address,
+      ) && information.emergencyReviewDueDate,
     ].map(Boolean);
 
     return {
@@ -2600,7 +2829,7 @@ export default function BCPSiteProfileForm({
           </div>
         )}
         <input type="hidden" name="profile_id" value={initial?.id || ""} />
-        <input type="hidden" name="next_step" value={Math.min(6, step + 1)} />
+        <input type="hidden" name="next_step" value={Math.min(7, step + 1)} />
         <input type="hidden" name="region" value={region} />
         <input type="hidden" name="country" value={country} />
         <input type="hidden" name="country_custom" value={customCountry} />
@@ -3071,8 +3300,6 @@ export default function BCPSiteProfileForm({
               setItems={setDependencies}
               processes={[...value, ...support].filter((x) => x.name)}
               companyPeople={companyPeople}
-              suppliers={suppliers}
-              supplierContacts={supplierContacts}
             />
           </section>
         )}
@@ -3095,6 +3322,8 @@ export default function BCPSiteProfileForm({
               setData={setInformation}
               processes={[...value, ...support].filter((x) => x.name)}
               companyPeople={companyPeople}
+              suppliers={suppliers}
+              supplierContacts={supplierContacts}
             />
           </section>
         )}
@@ -3121,7 +3350,78 @@ export default function BCPSiteProfileForm({
               <strong>{completion.percent}%</strong>
               <p>
                 {completion.percent === 100
-                  ? "All seven sections contain the minimum information required for review."
+                  ? "All eight sections contain the minimum information required for review."
+                  : `${completion.complete.filter((x) => !x).length} section(s) still need minimum information before review.`}
+              </p>
+            </div>
+            <section className="spxGovernance">
+              <header>
+                <div>
+                  <b>Review, approval and document control</b>
+                  <small>
+                    Version {initial?.version || 1} ·{" "}
+                    {(initial?.status || "draft").replaceAll("_", " ")}
+                  </small>
+                </div>
+              </header>
+              <div className="spxGrid">
+                <label>
+                  Competent reviewer / approver
+                  <input
+                    name="reviewer_name"
+                    defaultValue={
+                      initial?.reviewed_by ||
+                      initial?.approved_by ||
+                      initial?.site_leader ||
+                      ""
+                    }
+                    placeholder="Name or accountable role"
+                  />
+                </label>
+                <label>
+                  Review decision comment
+                  <textarea
+                    name="review_comment"
+                    defaultValue={initial?.review_comment || ""}
+                    rows="3"
+                    placeholder="Approval rationale or changes required"
+                  />
+                </label>
+              </div>
+              <p>
+                Prepared by: {initial?.prepared_by || "Current account owner"} ·
+                Last reviewed:{" "}
+                {initial?.reviewed_at
+                  ? new Date(initial.reviewed_at).toLocaleDateString("en-GB")
+                  : "Not reviewed"}{" "}
+                · Approved:{" "}
+                {initial?.approved_at
+                  ? new Date(initial.approved_at).toLocaleDateString("en-GB")
+                  : "Not approved"}
+              </p>
+            </section>
+          </section>
+        )}
+
+        {step === 7 && (
+          <section className="spxCard">
+            <div className="spxIntro">
+              <b>Maintain the site emergency-services directory.</b>
+              <p>
+                Record verified fire, hospital, police, ambulance and other
+                emergency contacts required to support an effective response.
+              </p>
+            </div>
+            <EmergencyServicesContacts
+              data={information}
+              setData={setInformation}
+            />
+            <div className="spxReady">
+              <span>PROFILE READINESS</span>
+              <strong>{completion.percent}%</strong>
+              <p>
+                {completion.percent === 100
+                  ? "All eight sections contain the minimum information required for review."
                   : `${completion.complete.filter((x) => !x).length} section(s) still need minimum information before review.`}
               </p>
             </div>
@@ -3244,6 +3544,7 @@ export default function BCPSiteProfileForm({
         <style>{styles}</style>
         <style>{dependencyStyles}</style>
         <style>{informationStyles}</style>
+        <style>{emergencyStyles}</style>
         <style>{governanceStyles}</style>
         <style>{mobileStyles}</style>
       </form>
@@ -3254,6 +3555,8 @@ export default function BCPSiteProfileForm({
 const dependencyStyles = `.spxDependencyTool{display:grid;gap:16px}.spxDependencyTop{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end}.spxSiteWide{display:flex!important;align-items:center}.spxSiteWide input{width:auto!important}.spxProcessContext{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px;border-left:5px solid #315ee8;border-radius:10px;background:#eef4ff}.spxProcessContext b,.spxProcessContext span{display:block}.spxProcessContext span{font-size:12px;color:#526a82}.spxDependencyExamples{display:flex;flex-wrap:wrap;gap:7px;align-items:center}.spxDependencyExamples button{padding:8px 10px;border:1px solid #cbd9e5;border-radius:999px;background:#f6f9fc;color:#29465f;font-weight:800}.spxDependencyLayout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:14px;align-items:start}.spxDependencyLayout>aside{display:grid;gap:7px}.spxDependencyLayout>aside>button{display:grid;gap:3px;padding:11px;border:1px solid #d4e0ea;border-radius:9px;background:#fff;color:#29465f;text-align:left}.spxDependencyLayout>aside>button.active{border-color:#315ee8;background:#eef3ff}.spxDependencyLayout aside small{color:#71859a}.spxDependencyRecord{min-width:0;padding:18px;border:1px solid #d5e1eb;border-radius:13px;background:#f8fafc}.spxDependencyRecord>.spxGrid{align-items:start}.spxDependencyRecord input,.spxDependencyRecord select{min-height:48px}.spxDependencyRecord .spxTallControl textarea,.spxDependencyRecord .spxTallControl select{height:76px;min-height:76px}.spxDependencyRecord>header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.spxDependencyRecord>header small{display:block;color:#08785d}.spxDependencyRecord>header button{padding:7px 9px;border:0;border-radius:7px;background:#fff0ef;color:#b52c25;font-weight:800}.spxDependencyRecord .spxScreenRow button{padding:9px;border:1px solid #cbd9e5;border-radius:8px;background:#fff;color:#61758a}.spxDependencyRecord .spxScreenRow button.selected{border-color:#315ee8;background:#315ee8;color:#fff}.spxResilience{display:grid;gap:3px;margin-top:15px;padding:14px;border-radius:10px;background:#e7f7f1;color:#08795e}.spxResilience.vulnerable,.spxResilience.single-point-of-failure{background:#fff0ee;color:#ad3028}.spxResilience.partially-resilient{background:#fff6df;color:#916112}.spxResilience span{font-size:12px}.spxDependencyMap{display:grid;gap:7px;padding:17px;border:1px solid #d5e1eb;border-radius:12px;background:#0d315a;color:#fff}.spxDependencyMap>div{display:grid;grid-template-columns:1fr auto 1fr auto;gap:10px;align-items:center;padding:9px;border-radius:8px;background:#ffffff0b}.spxDependencyMap em{font-style:normal}.spxDependencyMap mark{padding:5px 7px;border-radius:6px;background:#e6f8f2;color:#08795e;font-size:10px;font-weight:900}@media(max-width:900px){.spxDependencyTop,.spxDependencyLayout,.spxProcessContext{grid-template-columns:1fr}.spxDependencyLayout>aside{grid-template-columns:repeat(2,minmax(0,1fr))}.spxDependencyMap>div{grid-template-columns:1fr auto}.spxDependencyMap mark{grid-column:1/-1}}@media(max-width:600px){.spxDependencyLayout>aside{grid-template-columns:1fr}.spxDependencyRecord .spxTallControl textarea,.spxDependencyRecord .spxTallControl select{height:auto;min-height:48px}}`;
 
 const informationStyles = `.spxInfoContinuity{display:grid;gap:18px}.spxInfoImport{display:grid;gap:5px;padding:15px;border-left:5px solid #315ee8;border-radius:10px;background:#eef4ff;color:#29465f}.spxInfoImport span{font-size:12px}.spxInfoRegister{display:grid;gap:12px;padding:18px;border:1px solid #d4e0ea;border-radius:13px;background:#f8fafc}.spxInfoRegister>header{display:flex;justify-content:space-between;align-items:center}.spxInfoRegister h2{margin:0;color:#143653;font-size:20px}.spxInfoRegister>header button{padding:9px 11px;border:1px solid #c8d8e5;border-radius:8px;background:#fff;color:#1c58d3;font-weight:900}.spxInfoRegister>article{min-width:0;padding:16px;border:1px solid #d8e3ec;border-radius:11px;background:#fff}.spxInfoRegister .spxGrid{align-items:start}.spxInfoRegister input,.spxInfoRegister select{min-height:48px}.spxAssetGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.spxAssetLocation{grid-column:1/-1}.spxAssetGrid .spxUnitField{min-width:0}.spxDurationField{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,.65fr);gap:8px;min-width:0}.spxDurationField input,.spxDurationField select{min-width:0}.spxEmergencyAccess,.spxSupplierContact{margin:0;padding:17px;border:1px solid #cbd9e5;border-radius:12px;background:#f8fbfe;min-width:0}.spxEmergencyAccess>legend,.spxSupplierContact>legend{padding:0 7px;color:#173a5d;font-weight:900}.spxEmergencyAccess .spxGuidance{margin-bottom:14px}.spxSupplierContact>small{display:block;margin-top:9px;color:#71849a}.spxRecordTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.spxRecordTitle button{padding:6px 8px;border:0;border-radius:6px;background:#fff0ef;color:#b52c25;font-weight:800}.spxJurisdictionWarning{padding:13px;border-radius:9px;background:#fff3dd;color:#87580b;font-weight:800}.spxControlRow{display:grid;grid-template-columns:1fr auto auto auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #e1e8ef}.spxControlRow button{padding:8px 10px;border:1px solid #cbd9e5;border-radius:8px;background:#fff;color:#61758a}.spxControlRow button.selected{border-color:#315ee8;background:#315ee8;color:#fff}.spxReadiness{display:grid;gap:6px;padding:20px;border-radius:13px;background:#fff5df;color:#8a5a0b}.spxReadiness.ready{background:#e3f8f0;color:#08775c}.spxReadiness.partially-ready{background:#fff0e9;color:#a84626}.spxReadiness span{font-size:10px;font-weight:950;letter-spacing:.13em}.spxReadiness strong{font-size:28px}.spxReadiness p{margin:0;line-height:1.5}@media(max-width:900px){.spxControlRow{grid-template-columns:1fr auto auto auto}.spxInfoRegister{padding:12px}.spxAssetGrid{grid-template-columns:minmax(0,1fr)}.spxAssetLocation{grid-column:auto}}@media(max-width:420px){.spxDurationField{grid-template-columns:minmax(0,1fr) minmax(105px,.8fr)}}`;
+
+const emergencyStyles = `.spxEmergencyServices{display:grid;gap:16px}.spxEmergencyReview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;padding:17px;border:1px solid #cbd9e5;border-radius:12px;background:#f8fbfe}.spxEmergencyPresets{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.spxEmergencyPresets span{color:#526b83;font-weight:850}.spxEmergencyPresets button{padding:9px 11px;border:1px solid #c5d6e5;border-radius:999px;background:#fff;color:#1b4f83;font-weight:850}.spxEmergencyRecords{display:grid;gap:13px}.spxEmergencyRecords>article{padding:17px;border:1px solid #d4e1eb;border-radius:13px;background:#f8fafc}.spxEmergencyRecords>article>header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.spxEmergencyRecords>article>header>div{display:flex;align-items:center;gap:10px}.spxEmergencyRecords>article>header b{display:grid;place-items:center;width:31px;height:31px;border-radius:8px;background:#e5edff;color:#235ddd}.spxEmergencyRecords>article>header button{padding:7px 9px;border:0;border-radius:7px;background:#fff0ef;color:#b52c25;font-weight:850}@media(max-width:900px){.spxEmergencyReview{grid-template-columns:minmax(0,1fr)}}@media(max-width:600px){.spxEmergencyPresets{display:grid;grid-template-columns:minmax(0,1fr)}.spxEmergencyPresets button{text-align:left;white-space:normal}.spxEmergencyRecords>article{padding:13px}.spxEmergencyRecords>article>header{align-items:flex-start;gap:8px}}`;
 
 const mobileStyles = `@media(max-width:1180px){.spxShell{grid-template-columns:1fr}.spxSide{position:static;min-height:auto}.spxSide nav{display:flex;gap:7px;overflow-x:auto;scroll-snap-type:x proximity}.spxSide nav button{min-width:190px;scroll-snap-align:start}.spxOutputs{display:none}}@media(max-width:1024px){.spxCard{padding:22px}.spxFooter{position:static}.spxProcessContext{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){html,body{max-width:100%;overflow-x:hidden}.spxShell,.spx,.spxMain,.spxCard,.spxRepeater,.spxRepeater article,.spxDependencyTool,.spxDependencyLayout,.spxDependencyRecord,.spxInfoContinuity,.spxInfoRegister,.spxInfoRegister>article{width:100%;max-width:100%;min-width:0}.spxShell{display:block}.spxSide{width:100%;margin:0 0 14px;padding:14px;border-radius:13px;overflow:hidden}.spxBrand,.spxSide>small,.spxOutputs{display:none}.spxOverall{margin:0 0 10px;padding:11px}.spxOverall strong{font-size:23px}.spxSide nav{display:flex;width:100%;gap:6px;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;padding-bottom:4px}.spxSide nav button{display:grid;grid-template-columns:25px 1fr;min-width:145px;padding:9px;scroll-snap-align:start}.spxSide nav button>b{width:24px;height:24px}.spxHeader{display:block;min-width:0}.spxHeader h1{font-size:28px;line-height:1.08;overflow-wrap:anywhere}.spxHeader p{font-size:14px}.spxSaved{margin-top:8px;font-size:11px}.spxBar{margin:14px 0}.spxCard{padding:14px;border-radius:13px;overflow:hidden}.spxIntro{margin:0 0 18px;padding:14px}.spxIntro b{font-size:17px}.spxIntro p{font-size:13px}.spxGrid,.spxDependencyTop,.spxDependencyLayout,.spxProcessContext{display:grid;grid-template-columns:minmax(0,1fr);width:100%}.spx label,.spx input,.spx select,.spx textarea{min-width:0;max-width:100%}.spx input,.spx select,.spx textarea{font-size:16px;padding:13px}.spxServices{margin:16px 0;padding:13px;min-width:0}.spxServices>div,.spxAssist,.spxDependencyExamples,.spxMiniChips{max-width:100%;overflow:hidden}.spxServices button,.spxAssist button,.spxAddProcess,.spxDependencyExamples button{white-space:normal;text-align:left}.spxServices .spxAdd{grid-template-columns:minmax(0,1fr) auto}.spxRepeater header,.spxDependencyRecord>header,.spxInfoRegister>header,.spxRecordTitle{align-items:flex-start;gap:8px}.spxRepeater header>div{min-width:0}.spxRepeater header strong,.spxRecordTitle strong{overflow-wrap:anywhere}.spxProcessSummary{grid-template-columns:minmax(0,1fr)!important}.spxProcessSummary>div,.spxProcessSummary span{min-width:0}.spxProcessSummary nav{flex-wrap:wrap}.spxChoice,.spxScreen{padding:12px;min-width:0}.spxScreenRow,.spxControlRow{grid-template-columns:minmax(0,1fr) auto auto!important;gap:5px}.spxControlRow button,.spxYesNo button{padding:8px;font-size:12px}.spxDependencyMap{padding:11px;overflow:hidden}.spxDependencyMap>div{grid-template-columns:minmax(0,1fr)!important;gap:6px}.spxDependencyMap em{display:none}.spxDependencyMap mark{grid-column:auto}.spxChain{width:100%;max-width:100%;overflow-x:auto}.spxFooter{position:static;display:grid;grid-template-columns:1fr;margin-top:12px;padding:10px}.spxFooter>div,.spxFooter>div:last-child,.spxFinal{grid-column:1;width:100%;justify-self:stretch}.spxFooter>div:first-child:empty{display:none}.spxFooter button,.spxFooter .primary{width:100%;min-height:46px}.spxFinal{display:grid;grid-template-columns:1fr;gap:7px}.spxInfoRegister h2{font-size:17px}.spxInfoRegister>header{flex-wrap:wrap}.spxInfoRegister>header button{width:100%}}`;
 
