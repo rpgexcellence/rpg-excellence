@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 const catalogue = {
   "People & security": [
@@ -788,6 +788,11 @@ export default function BCPHazardScenarioAssessment({
       ),
     };
   }, [formTick, profile, participants, risks, initial]);
+  useEffect(() => {
+    const failedStep = Number(formState?.validation?.step);
+    if (Number.isInteger(failedStep) && failedStep >= 0 && failedStep < steps.length)
+      setStep(failedStep);
+  }, [formState?.validation?.step]);
   const update = (id, changes) =>
     setRisks(risks.map((x) => (x.id === id ? { ...x, ...changes } : x)));
   const choose = (name) =>
@@ -837,9 +842,16 @@ export default function BCPHazardScenarioAssessment({
         <input type="hidden" name={name} value={value} key={name} />
       ))}
       {formState?.error && (
-        <div className="error">
+        <div className="error" role="alert">
           <b>Cannot save Module 5</b>
           <span>{formState.error}</span>
+          {formState?.validation?.items?.length > 0 && (
+            <ul>
+              {formState.validation.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       <aside>
