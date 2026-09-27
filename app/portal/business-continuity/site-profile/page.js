@@ -169,7 +169,10 @@ async function saveProfile(_previousState, fd) {
     ...dependencyRecords.map((x) => clean(x?.owner)),
     ...(information.assets || []).map((x) => clean(x?.owner)),
   ].filter(Boolean);
-  if (controlledAssignments.some((name) => !controlledPeople.has(name)))
+  if (
+    ["review", "approve"].includes(intent) &&
+    controlledAssignments.some((name) => !controlledPeople.has(name))
+  )
     return {
       error:
         "Select site leaders, BCP facilitators, dependency owners and information-asset owners from active Company Users with Business Continuity access.",
@@ -270,20 +273,18 @@ async function saveProfile(_previousState, fd) {
     updated_at: now,
   };
   if (editingApproved) {
-    const { error } = await s
-      .from("bcp_site_profile_versions")
-      .upsert(
-        {
-          profile_id: existing.id,
-          organization_id: org.id,
-          owner_id: user.id,
-          version: currentVersion,
-          status: existing.status,
-          snapshot: existing,
-          change_reason: "Approved profile superseded by a new revision",
-        },
-        { onConflict: "profile_id,version" },
-      );
+    const { error } = await s.from("bcp_site_profile_versions").upsert(
+      {
+        profile_id: existing.id,
+        organization_id: org.id,
+        owner_id: user.id,
+        version: currentVersion,
+        status: existing.status,
+        snapshot: existing,
+        change_reason: "Approved profile superseded by a new revision",
+      },
+      { onConflict: "profile_id,version" },
+    );
     if (error) return { error: error.message };
   }
   let savedId = existing?.id,
