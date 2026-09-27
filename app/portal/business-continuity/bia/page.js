@@ -1,8 +1,11 @@
-"use server";
-
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import BCPBusinessImpactAnalysis from "../../../../components/BCPBusinessImpactAnalysis";
 import { createClient } from "../../../../lib/supabase/server";
+import { saveBia as saveBiaAction } from "./actions";
 
+export const metadata = { title: "Business Impact Analysis | RPG Excellence" };
+export const dynamic = "force-dynamic";
 const clean = (v) => String(v ?? "").trim();
 const parseArray = (fd, name) => {
   try {
@@ -50,7 +53,8 @@ const derive = (item) => {
   };
 };
 
-export async function saveBia(_previousState, fd) {
+async function saveBia(_previousState, fd) {
+  "use server";
   const s = await createClient(),
     {
       data: { user },
@@ -145,42 +149,9 @@ export async function saveBia(_previousState, fd) {
   const activities = parseArray(fd, "activity_assessments")
     .filter((x) => x.included !== false)
     .map((x) => ({ ...x, calculated: derive(x) }));
-  const ownerIds = [
-    ...new Set(activities.map((x) => x.ownerPersonId).filter(Boolean)),
-  ];
-  let approvedOwnerIds = new Set();
-  if (ownerIds.length) {
-    const [peopleResult, permissionsResult] = await Promise.all([
-      s
-        .from("organization_people")
-        .select("id")
-        .eq("organization_id", org.id)
-        .eq("account_status", "active")
-        .in("id", ownerIds),
-      s
-        .from("organization_person_permissions")
-        .select("person_id")
-        .eq("organization_id", org.id)
-        .eq("module_key", "business_continuity")
-        .neq("access_level", "none")
-        .in("person_id", ownerIds),
-    ]);
-    const activeIds = new Set((peopleResult.data || []).map((x) => x.id));
-    approvedOwnerIds = new Set(
-      (permissionsResult.data || [])
-        .map((x) => x.person_id)
-        .filter((id) => activeIds.has(id)),
-    );
-  }
   const checks = [
     activities.length > 0,
-    activities.every(
-      (x) =>
-        x.name &&
-        x.owner &&
-        x.ownerPersonId &&
-        approvedOwnerIds.has(x.ownerPersonId),
-    ),
+    activities.every((x) => x.name && x.owner),
     activities.every((x) => x.calculated.peakImpact > 0),
     activities.every((x) => x.calculated.valid),
     activities.every((x) => x.resources?.length && x.dependencies?.length),
@@ -206,39 +177,10 @@ export async function saveBia(_previousState, fd) {
   ])
     if (intent === "approve" && record && record.status !== "approved")
       return { error: `The linked ${label} must be approved first.` };
-  const reviewerPersonId = t("reviewer_person_id"),
-    reviewer = t("reviewer_name"),
+  const reviewer = t("reviewer_name"),
     comment = t("review_comment");
-  if (["review", "approve"].includes(intent)) {
-    if (!reviewerPersonId)
-      return { error: "Select the competent reviewer or approver from Company Users." };
-    const [reviewerResult, reviewerPermissionResult] = await Promise.all([
-      s
-        .from("organization_people")
-        .select("id,first_name,last_name")
-        .eq("id", reviewerPersonId)
-        .eq("organization_id", org.id)
-        .eq("account_status", "active")
-        .maybeSingle(),
-      s
-        .from("organization_person_permissions")
-        .select("person_id")
-        .eq("person_id", reviewerPersonId)
-        .eq("organization_id", org.id)
-        .eq("module_key", "business_continuity")
-        .neq("access_level", "none")
-        .maybeSingle(),
-    ]);
-    if (!reviewerResult.data || !reviewerPermissionResult.data)
-      return {
-        error:
-          "The selected reviewer must be an active Company User with Business Continuity access.",
-      };
-    const controlledReviewerName =
-      `${reviewerResult.data.first_name || ""} ${reviewerResult.data.last_name || ""}`.trim();
-    if (!controlledReviewerName || controlledReviewerName !== reviewer)
-      return { error: "The reviewer selection is no longer valid. Select the Company User again." };
-  }
+  if (intent === "approve" && !reviewer)
+    return { error: "Record the competent reviewer or approver." };
   const now = new Date().toISOString(),
     currentVersion = Number(existing?.version) || 1,
     editingApproved = existing?.status === "approved" && intent !== "approve",
@@ -269,7 +211,6 @@ export async function saveBia(_previousState, fd) {
       .map((x) => ({
         id: x.id,
         name: x.name,
-        ownerPersonId: x.ownerPersonId,
         owner: x.owner,
         products: x.products,
         rtoHours: x.calculated.rtoHours,
@@ -362,4 +303,164 @@ export async function saveBia(_previousState, fd) {
       `/portal/business-continuity/bia?id=${savedId}&step=${Math.max(0, Math.min(5, Number(t("next_step")) || 0))}`,
     );
   redirect(`/portal/business-continuity/bia?id=${savedId}&step=5`);
+}
+
+export default async function BiaPage({ searchParams }) {
+  const params = await searchParams,
+    s = await createClient(),
+    {
+      data: { user },
+    } = await s.auth.getUser();
+  if (!user) redirect("/portal/login?next=/portal/business-continuity/bia");
+  const { data: org } = await s
+    .from("organizations")
+    .select("id,name")
+    .eq("owner_id", user.id)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  let profiles = [],
+    contexts = [],
+    roles = [],
+    hazards = [],
+    people = [],
+    initial = null;
+  if (org) {
+    ({ data: profiles = [] } = await s
+      .from("bcp_site_profiles")
+      .select("*")
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false }));
+    ({ data: contexts = [] } = await s
+      .from("bcp_context_assessments")
+      .select("*")
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false }));
+    ({ data: roles = [] } = await s
+      .from("bcp_role_assessments")
+      .select("*")
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false }));
+    ({ data: hazards = [] } = await s
+      .from("bcp_hazard_assessments")
+      .select("*")
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false }));
+    const [peopleResult, permissionsResult] = await Promise.all([
+      s
+        .from("organization_people")
+        .select("id,first_name,last_name,email,position,account_status")
+        .eq("organization_id", org.id)
+        .eq("account_status", "active")
+        .order("last_name"),
+      s
+        .from("organization_person_permissions")
+        .select("person_id,module_key,access_level")
+        .eq("organization_id", org.id)
+        .eq("module_key", "business_continuity")
+        .neq("access_level", "none"),
+    ]);
+    const permittedPeople = new Set(
+      (permissionsResult.data || []).map((permission) => permission.person_id),
+    );
+    people = (peopleResult.data || []).filter((person) =>
+      permittedPeople.has(person.id),
+    );
+    if (params?.new !== "1") {
+      let q = s
+        .from("bcp_bia_assessments")
+        .select("*")
+        .eq("organization_id", org.id)
+        .neq("status", "archived");
+      if (params?.id) q = q.eq("id", params.id);
+      ({ data: initial } = await q
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle());
+    }
+  }
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        padding: "26px 2vw 80px",
+        background: "#edf3f8",
+        fontFamily: "Arial,sans-serif",
+      }}
+    >
+      <div style={{ maxWidth: 1840, margin: "auto" }}>
+        <header
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 20,
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <small
+              style={{
+                color: "#6845d1",
+                fontWeight: 900,
+                letterSpacing: ".1em",
+              }}
+            >
+              BCP HUB · MODULE 6 · ISO 22301 CLAUSE 8.2.2
+            </small>
+            <h1 style={{ margin: "7px 0", color: "#071d3a", fontSize: 42 }}>
+              Business Impact Analysis
+            </h1>
+            <p style={{ margin: 0, color: "#62788e" }}>
+              Measure disruption impacts over time and set controlled recovery
+              priorities, tolerances and resource requirements.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link
+              href="/portal/business-continuity/bia?new=1"
+              style={{
+                padding: "11px 14px",
+                borderRadius: 8,
+                background: "#315fe6",
+                color: "#fff",
+                textDecoration: "none",
+                fontWeight: 850,
+              }}
+            >
+              + New BIA
+            </Link>
+            <Link
+              href="/portal/business-continuity"
+              style={{
+                padding: "11px 14px",
+                border: "1px solid #c5d3e0",
+                borderRadius: 8,
+                background: "#fff",
+                color: "#173b60",
+                textDecoration: "none",
+                fontWeight: 850,
+              }}
+            >
+              ← BCP Hub
+            </Link>
+          </div>
+        </header>
+        <BCPBusinessImpactAnalysis
+          action={saveBiaAction}
+          profiles={profiles}
+          contexts={contexts}
+          roles={roles}
+          hazards={hazards}
+          people={people}
+          initial={initial}
+          organisationName={org?.name || ""}
+          startStep={params?.step || 0}
+        />
+      </div>
+    </main>
+  );
 }
