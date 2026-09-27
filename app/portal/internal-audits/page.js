@@ -5,6 +5,8 @@ import { createClient } from "../../../lib/supabase/server";
 import { createInternalAudit } from "./actions";
 import ProcessScopeSelector from "./ProcessScopeSelector";
 import AuditTypeSupplierSelector from "../../../components/AuditTypeSupplierSelector";
+import AuditSupplierLinkProvider from "../../../components/AuditSupplierLinkProvider";
+import SupplierAuditeeContactFields from "../../../components/SupplierAuditeeContactFields";
 
 const STATUS_LABELS = {
   draft: "Draft", scope_review: "Scope review", team_assignment: "Team assignment",
@@ -77,6 +79,20 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
   const audits = auditsResult.data ?? [];
   const openFindings = findingsResult.data ?? [];
   const approvedSuppliers = suppliersResult.data ?? [];
+  if (approvedSuppliers.length) {
+    const { data: supplierContacts = [], error: contactsError } = await supabase
+      .from("supplier_contacts")
+      .select("id,supplier_id,first_name,last_name,business_title,department,email,is_primary,is_active")
+      .eq("owner_id", user.id)
+      .eq("is_active", true)
+      .in("supplier_id", approvedSuppliers.map((supplier) => supplier.id))
+      .order("is_primary", { ascending: false })
+      .order("last_name");
+    if (contactsError) throw new Error(contactsError.message);
+    for (const supplier of approvedSuppliers) {
+      supplier.contacts = supplierContacts.filter((contact) => contact.supplier_id === supplier.id);
+    }
+  }
   const requestedSupplier = approvedSuppliers.find((supplier) => supplier.id === params?.supplier) || null;
   const activeAudits = audits.filter((a) => !["closed", "cancelled"].includes(a.status)).length;
   const scheduledAudits = audits.filter((a) => ["scheduled", "notification_sent", "documents_requested"].includes(a.status)).length;
@@ -168,12 +184,13 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
                 ["1","Mandate","Purpose, type and timing"],["2","Boundaries","Processes and locations"],["3","Criteria","Standards and obligations"],["4","Governance","Team and plan review next"]
               ].map(([n,t,d]) => <div className="iaRailItem" key={n}><span className="iaRailNo">{n}</span><span><strong>{t}</strong><small>{d}</small></span></div>)}</aside>
 
+              <AuditSupplierLinkProvider approvedSuppliers={approvedSuppliers} initialSupplierId={requestedSupplier?.id || ""}>
               <form className="iaForm" action={createInternalAudit}>
                 <div className="iaSectionTitle"><b>1</b>Audit mandate</div>
                 <div className="iaGrid3">
                   <label className="iaField"><span>Organisation *</span><select name="organization_id" required defaultValue={requestedSupplier?.organization_id || ""}><option value="" disabled>Select organisation</option>{organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
                   <label className="iaField"><span>Audit title *</span><input name="title" required defaultValue={requestedSupplier ? `${requestedSupplier.legal_name} Supplier Audit` : ""} placeholder="e.g. Integrated UK Operations Audit" /></label>
-                  <AuditTypeSupplierSelector approvedSuppliers={approvedSuppliers} initialSupplierId={requestedSupplier?.id || ""} />
+                  <AuditTypeSupplierSelector />
                   <label className="iaField"><span>Delivery method *</span><select name="audit_method" defaultValue="onsite"><option value="onsite">On-site</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option></select></label>
                   <label className="iaField"><span>Planned start *</span><input name="planned_start_at" type="datetime-local" required /></label>
                   <label className="iaField"><span>Planned end *</span><input name="planned_end_at" type="datetime-local" required /></label>
@@ -189,14 +206,14 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
                 <div className="iaGrid3" style={{marginTop:"17px"}}>
                   <label className="iaField"><span>Sites and locations</span><input name="sites" placeholder="e.g. Cambridge, Port Talbot" /></label>
                   <label className="iaField"><span>Functions and departments</span><input name="departments" placeholder="e.g. Operations, QHSE, Procurement" /></label>
-                  <label className="iaField"><span>Primary auditee contact</span><input name="auditee_contact_name" placeholder="Full name" /></label>
-                  <label className="iaField"><span>Auditee email</span><input name="auditee_contact_email" type="email" placeholder="name@example.com" /></label>
+                  <SupplierAuditeeContactFields />
                 </div>
 
                 <div className="iaDivider" />
                 <ProcessScopeSelector standards={standards} />
                 <div className="iaActionBar"><p><strong>Next:</strong> confirm detailed clauses, appoint an independent and competent audit team, then approve the risk-based audit plan.</p><button className="iaSubmit" type="submit">Create Audit & Open Scope Review →</button></div>
               </form>
+              </AuditSupplierLinkProvider>
             </div>
           )}
         </section>
