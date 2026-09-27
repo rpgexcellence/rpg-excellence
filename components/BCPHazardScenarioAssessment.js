@@ -534,7 +534,7 @@ function HazardIcon({ name, tone = "neutral", small = false }) {
 const iconCss = `.hazardIcon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:14px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6;box-shadow:0 5px 14px #143a6420}.hazardIcon svg{width:38px;height:38px}.hazardIcon.small{width:25px;height:25px;flex-basis:25px;border-radius:7px;box-shadow:none}.hazardIcon.small svg{width:17px;height:17px}.hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.riskIdentity{display:flex;align-items:center;gap:13px}.registerCopy{flex:1;min-width:0}.catalogue button{display:inline-flex;align-items:center;gap:6px}.custom{align-items:center;gap:7px}.register article>.hazardIcon{margin-right:13px}@media(max-width:900px){.hazardIcon{width:48px;height:48px;flex-basis:48px}.hazardIcon svg{width:32px;height:32px}.register article>.hazardIcon{margin:0 0 8px}}`;
 const heatCss = `.appetite{display:flex;justify-content:space-between;gap:20px;align-items:center;background:#eef5ff;border:1px solid #c9daee;border-radius:10px;padding:13px;margin-bottom:14px}.appetite label{min-width:320px}.appetite span{color:#607890}.heatHead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.heatHead h3{margin:4px 0}.heatHead p{margin:0;color:#607890}.heatHead>div:last-child{display:flex;background:#eef3f7;padding:4px;border-radius:9px}.heatHead button{border:0;background:transparent;padding:8px 11px;border-radius:7px;font-weight:800;color:#49637b}.heatHead button.active{background:#fff;color:#0b3155;box-shadow:0 1px 5px #16365220}.heat{max-width:760px}.heat .row,.heat footer{grid-template-columns:70px repeat(5,1fr)}.heat .row>label{align-content:center;text-align:right;padding-right:7px}.heat .row>label small,.heat footer small{display:block}.heat .row>button{height:65px;border:0;display:grid;place-items:center;position:relative;border-radius:7px;cursor:pointer}.heat .row>button.selected{outline:4px solid #112f50;outline-offset:1px}.heat .row i{position:absolute;left:7px;top:5px;font-style:normal;font-size:10px}.heat .row strong{font-size:22px}.heat .row em{position:absolute;right:5px;top:5px;font-size:8px;font-style:normal}@media(max-width:900px){.appetite,.heatHead{display:block}.appetite label{min-width:0}.heat{overflow:auto}}`;
 const riskCoreCss = `.risk>header{display:grid!important;grid-template-columns:minmax(240px,1fr) minmax(220px,280px) auto;align-items:center}.riskCore{display:grid;justify-self:start;padding:8px 13px;border:1px solid #cedce8;border-left:4px solid #2d60e6;border-radius:9px;background:#f1f6fb}.riskCore small{color:#285de4!important;font-size:9px;font-weight:950;letter-spacing:.1em}.riskCore b{font-size:17px;line-height:1.2}.riskCore span{font-size:9px;color:#607890}@media(max-width:1150px){.risk>header{grid-template-columns:1fr auto!important}.riskCore{grid-column:1/-1;width:100%}}@media(max-width:900px){.risk>header{display:flex!important}.riskCore{width:100%}}`;
-const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}`;
+const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}.stepRequirements{margin:16px 20px 0;padding:14px 18px;border:1px solid #efc66e;border-left:5px solid #e49a16;border-radius:10px;background:#fff8e8;color:#65450b}.stepRequirements>b{display:block;margin-bottom:6px}.stepRequirements ul{margin:0;padding-left:20px}.stepRequirements li{margin:4px 0;font-size:13px}@media(max-width:900px){.stepRequirements{margin:10px 10px 0}}`;
 
 export default function BCPHazardScenarioAssessment({
   action,
@@ -645,8 +645,63 @@ export default function BCPHazardScenarioAssessment({
       ],
     ];
     const complete = requirements.map((items) => items.every(Boolean));
+    const countMissing = (test) => risks.filter((risk) => !test(risk)).length;
+    const plural = (count, singular, multiple = `${singular}s`) =>
+      `${count} ${count === 1 ? singular : multiple}`;
+    const details = [
+      [
+        !profile && "Select a Module 1 Site Profile",
+        !participants.length && "Select at least one assessment participant",
+        !get("assessment_title", initial?.assessment_title) &&
+          "Enter the assessment title",
+        !get(
+          "operational_description",
+          initial?.operational_description || profile?.operational_description,
+        ) && "Describe the operational activities and local scope",
+        !get("next_review_date", initial?.next_review_date) &&
+          "Select the next review date",
+      ],
+      [!risks.length && "Select at least one credible hazard scenario"],
+      [
+        !risks.length && "Select at least one credible hazard scenario",
+        countMissing((risk) => risk.description.trim()) > 0 &&
+          `${plural(countMissing((risk) => risk.description.trim()), "scenario")} need a detailed risk / hazard description`,
+        countMissing((risk) => risk.affectedProcesses.length > 0) > 0 &&
+          `${plural(countMissing((risk) => risk.affectedProcesses.length > 0), "scenario")} need at least one affected process`,
+        countMissing((risk) => risk.applicableSystems.length > 0) > 0 &&
+          `${plural(countMissing((risk) => risk.applicableSystems.length > 0), "scenario")} need management-system applicability`,
+      ],
+      [
+        !risks.length && "Select at least one credible hazard scenario",
+        countMissing((risk) => risk.existingControls.length > 0) > 0 &&
+          `${plural(countMissing((risk) => risk.existingControls.length > 0), "scenario")} need an existing control`,
+        countMissing((risk) => risk.owner) > 0 &&
+          `${plural(countMissing((risk) => risk.owner), "scenario")} need a risk owner`,
+      ],
+      [
+        !risks.length && "Select at least one credible hazard scenario",
+        countMissing((risk) => risk.treatment) > 0 &&
+          `${plural(countMissing((risk) => risk.treatment), "scenario")} need a treatment decision`,
+        countMissing((risk) => risk.decisionRationale.trim()) > 0 &&
+          `${plural(countMissing((risk) => risk.decisionRationale.trim()), "scenario")} need a decision and tolerability rationale`,
+        countMissing(
+          (risk) =>
+            metrics(risk).residualBand === "Low" || risk.actions.length > 0,
+        ) > 0 &&
+          `${plural(countMissing((risk) => metrics(risk).residualBand === "Low" || risk.actions.length > 0), "elevated scenario")} need a treatment action`,
+        !get("reviewer_name", initial?.reviewed_by) &&
+          "Select a reviewer or approver from Company Users",
+      ],
+      [
+        !requirements[5][0] && "Select at least one credible hazard scenario",
+        requirements[5][0] &&
+          !requirements[5][1] &&
+          "Complete the analysis, controls and treatment requirements for every scenario",
+      ],
+    ].map((items) => items.filter(Boolean));
     return {
       complete,
+      details,
       remaining: requirements.map(
         (items) => items.filter((item) => !item).length,
       ),
@@ -761,7 +816,10 @@ export default function BCPHazardScenarioAssessment({
       <main>
         <header>
           <div>
-            <small>STEP {step + 1} OF 6 · ISO 22301 CLAUSE 8.2.3</small>
+            <small>
+              STEP {step + 1} OF 6 · {completion.percent}% COMPLETE · ISO 22301
+              CLAUSE 8.2.3
+            </small>
             <h1>{steps[step]}</h1>
             <p>
               Identify disruption threats, evaluate controls and maintain a
@@ -773,6 +831,16 @@ export default function BCPHazardScenarioAssessment({
         <div className="progress">
           <i style={{ width: `${completion.percent}%` }} />
         </div>
+        {!completion.complete[step] && completion.details[step]?.length > 0 && (
+          <section className="stepRequirements" aria-live="polite">
+            <b>To complete {steps[step]}</b>
+            <ul>
+              {completion.details[step].map((requirement) => (
+                <li key={requirement}>{requirement}</li>
+              ))}
+            </ul>
+          </section>
+        )}
         {step === 0 && (
           <Panel
             title="Connect the controlled source records"
