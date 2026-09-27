@@ -2238,7 +2238,7 @@ export default function BCPSiteProfileForm({
         ref={formRef}
         action={formAction}
         className="spx"
-        onInput={() => setTick((x) => x + 1)}
+        onChange={() => setTick((x) => x + 1)}
       >
         {formState?.error && (
           <div className="spxFormError" role="alert">
