@@ -104,8 +104,18 @@ async function saveRoles(_previousState, fd) {
   const roleNames = new Set(
     roles.map((role) => clean(role.title)).filter(Boolean),
   );
-  const rolesUseControlledPeople = roles.every((role) =>
-    (role.people || []).every((name) => controlledPeople.has(clean(name))),
+  const rolesUseControlledPeople = roles.every(
+    (role) =>
+      controlledPeople.has(clean(role.primaryHolder)) &&
+      (role.people || []).every((name) => controlledPeople.has(clean(name))) &&
+      (role.deputies || []).every((name) => controlledPeople.has(clean(name))),
+  );
+  const roleHolderDeputyConflict = roles.some(
+    (role) =>
+      clean(role.primaryHolder) &&
+      (role.deputies || []).some(
+        (deputy) => clean(deputy) === clean(role.primaryHolder),
+      ),
   );
   const assignmentsUseControlledActors = assignments.every((assignment) => {
     const external = new Set((assignment.customActors || []).map(clean));
@@ -133,7 +143,13 @@ async function saveRoles(_previousState, fd) {
     .filter(Boolean);
   const complete = [
     Boolean(profile),
-    roles.some((x) => clean(x.title) && clean(x.purpose) && x.people?.length),
+    roles.some(
+      (x) =>
+        clean(x.title) &&
+        clean(x.purpose) &&
+        clean(x.primaryHolder) &&
+        x.people?.length,
+    ),
     processNames.length > 0 &&
       processNames.every((name) =>
         assignments.some(
@@ -155,7 +171,12 @@ async function saveRoles(_previousState, fd) {
     ),
     roles.length > 0 &&
       roles.every(
-        (x) => x.title && x.purpose && x.people?.length && x.authority,
+        (x) =>
+          x.title &&
+          x.purpose &&
+          x.primaryHolder &&
+          x.people?.length &&
+          x.authority,
       ) &&
       assignments.length > 0 &&
       assignments.every(
@@ -165,11 +186,13 @@ async function saveRoles(_previousState, fd) {
   const completion = Math.round((complete.filter(Boolean).length / 6) * 100);
   if (
     ["review", "approve"].includes(intent) &&
-    (!rolesUseControlledPeople || !assignmentsUseControlledActors)
+    (!rolesUseControlledPeople ||
+      !assignmentsUseControlledActors ||
+      roleHolderDeputyConflict)
   )
     return {
       error:
-        "Replace uncontrolled names with active Company People profiles. Add genuine third parties explicitly as External / manual actors.",
+        "Select each primary role holder and deputy from active Company Users. A primary role holder cannot also be the deputy for the same role.",
     };
   if (["review", "approve"].includes(intent) && !complete.every(Boolean))
     return {
@@ -188,7 +211,16 @@ async function saveRoles(_previousState, fd) {
     };
   const reviewer = t("reviewer_name"),
     comment = t("review_comment");
-  if (intent === "approve" && !reviewer)
+  if (
+    ["review", "approve", "changes"].includes(intent) &&
+    reviewer &&
+    !controlledPeople.has(reviewer)
+  )
+    return {
+      error:
+        "Select the competent reviewer or approver from active Company Users with Business Continuity access.",
+    };
+  if (["review", "approve"].includes(intent) && !reviewer)
     return { error: "Record the competent reviewer or approver." };
   if (intent === "changes" && (!reviewer || !comment))
     return { error: "Record the reviewer and the changes required." };
@@ -223,11 +255,16 @@ async function saveRoles(_previousState, fd) {
     status,
     version,
     prepared_by: existing?.prepared_by || user.email || "Account owner",
-    reviewed_by: ["approve", "changes"].includes(intent) ? reviewer : null,
-    reviewed_at: ["approve", "changes"].includes(intent) ? now : null,
-    review_comment: ["approve", "changes"].includes(intent) ? comment : null,
-    approved_by: intent === "approve" ? reviewer : null,
-    approved_at: intent === "approve" ? now : null,
+    reviewed_by: reviewer || existing?.reviewed_by || null,
+    reviewed_at: ["approve", "changes"].includes(intent)
+      ? now
+      : existing?.reviewed_at || null,
+    review_comment: ["approve", "changes"].includes(intent)
+      ? comment
+      : existing?.review_comment || null,
+    approved_by:
+      intent === "approve" ? reviewer : existing?.approved_by || null,
+    approved_at: intent === "approve" ? now : existing?.approved_at || null,
     updated_at: now,
   };
   if (editingApproved) {
