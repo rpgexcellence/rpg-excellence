@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 const uid = () => crypto.randomUUID();
 const arr = (value) => (Array.isArray(value) ? value : []);
@@ -794,6 +794,11 @@ export default function BCPRolesResponsibilities({
   const completion = Math.round(
     (completionChecks.filter(Boolean).length / 6) * 100,
   );
+  useEffect(() => {
+    const failedStep = Number(formState?.validation?.step);
+    if (Number.isInteger(failedStep) && failedStep >= 0 && failedStep < steps.length)
+      setStep(failedStep);
+  }, [formState?.validation?.step]);
   const go = (n) => {
     setStep(Math.max(0, Math.min(5, n)));
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -815,9 +820,16 @@ export default function BCPRolesResponsibilities({
         <input key={name} type="hidden" name={name} value={value} />
       ))}
       {formState?.error && (
-        <div className="r4Error">
+        <div className="r4Error" role="alert">
           <b>Cannot save Module 4</b>
           <span>{formState.error}</span>
+          {formState?.validation?.items?.length > 0 && (
+            <ul>
+              {formState.validation.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       <aside>
