@@ -107,9 +107,6 @@ export default function AuditTeamAssignmentForm({ auditId, auditors = [], standa
     </fieldset>
 
     <div className="grid3">
-      <label className="field"><span>Standards competence rationale</span><textarea name="standards_competence" placeholder="Optional audit-specific rationale; controlled authorisation is checked by the system."/></label>
-      <label className="field"><span>Sector competence</span><textarea name="sector_competence"/></label>
-      <label className="field"><span>Technical competence</span><textarea name="technical_competence"/></label>
       <label className="check"><input type="checkbox" checked readOnly/><span>Current register verification confirmed by the system</span></label>
       <label className="check"><input type="checkbox" name="independence_confirmed" required/><span>Independence and impartiality confirmed for this audit</span></label>
       <label className="check"><input type="checkbox" name="confidentiality_confirmed" required/><span>Confidentiality obligations confirmed</span></label>
