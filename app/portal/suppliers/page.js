@@ -49,6 +49,7 @@ export default async function SuppliersPage({ searchParams }) {
   let supplierSites = [];
   let supplierNcStats = {};
   let supplierContacts = [];
+  let supplierAudits = [];
 
   if (organization) {
     const { data, error } = await supabase
@@ -129,12 +130,14 @@ export default async function SuppliersPage({ searchParams }) {
 
       documents = docs || [];
 
-      const [{ data: evidence = [] }, { data: subtiers = [] }, { data: sites = [] }, { data: contacts = [] }] = await Promise.all([
+      const [{ data: evidence = [] }, { data: subtiers = [] }, { data: sites = [] }, { data: contacts = [] }, { data: audits = [], error: auditsError }] = await Promise.all([
         supabase.from("supplier_evidence_files").select("id,control_id,file_name,storage_path,uploaded_at").eq("supplier_id", selected.id).order("uploaded_at", { ascending: false }),
         supabase.from("supplier_subtier_suppliers").select("*").eq("supplier_id", selected.id).order("created_at"),
         supabase.from("supplier_sites").select("*").eq("supplier_id", selected.id).order("created_at"),
         supabase.from("supplier_contacts").select("*").eq("supplier_id", selected.id).order("is_primary", { ascending: false }).order("last_name"),
+        supabase.from("internal_audits").select("id,audit_reference,title,status,current_gate,audit_method,planned_start_at,planned_end_at,updated_at").eq("supplier_id", selected.id).eq("owner_id", user.id).order("updated_at", { ascending: false }),
       ]);
+      if (auditsError) throw new Error(auditsError.message);
       evidenceFiles = await Promise.all((evidence || []).map(async (file) => {
         const { data: signed } = await supabase.storage.from("supplier-assurance-evidence").createSignedUrl(file.storage_path, 3600);
         return { ...file, download_url: signed?.signedUrl || "#" };
@@ -146,6 +149,7 @@ export default async function SuppliersPage({ searchParams }) {
       }));
       supplierSites = (sites || []).map((site) => ({ ...site, client_key: site.id }));
       supplierContacts = (contacts || []).map((contact) => ({ ...contact, client_key: contact.id }));
+      supplierAudits = audits || [];
     }
   }
 
@@ -168,6 +172,7 @@ export default async function SuppliersPage({ searchParams }) {
       supplierSites={supplierSites}
       supplierNcStats={supplierNcStats}
       supplierContacts={supplierContacts}
+      supplierAudits={supplierAudits}
       managementBoard={managementBoard}
       action={saveSupplier}
       generateAction={generateSupplierCodeOfConduct}
