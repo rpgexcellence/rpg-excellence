@@ -206,10 +206,39 @@ export async function saveBia(_previousState, fd) {
   ])
     if (intent === "approve" && record && record.status !== "approved")
       return { error: `The linked ${label} must be approved first.` };
-  const reviewer = t("reviewer_name"),
+  const reviewerPersonId = t("reviewer_person_id"),
+    reviewer = t("reviewer_name"),
     comment = t("review_comment");
-  if (intent === "approve" && !reviewer)
-    return { error: "Record the competent reviewer or approver." };
+  if (["review", "approve"].includes(intent)) {
+    if (!reviewerPersonId)
+      return { error: "Select the competent reviewer or approver from Company Users." };
+    const [reviewerResult, reviewerPermissionResult] = await Promise.all([
+      s
+        .from("organization_people")
+        .select("id,first_name,last_name")
+        .eq("id", reviewerPersonId)
+        .eq("organization_id", org.id)
+        .eq("account_status", "active")
+        .maybeSingle(),
+      s
+        .from("organization_person_permissions")
+        .select("person_id")
+        .eq("person_id", reviewerPersonId)
+        .eq("organization_id", org.id)
+        .eq("module_key", "business_continuity")
+        .neq("access_level", "none")
+        .maybeSingle(),
+    ]);
+    if (!reviewerResult.data || !reviewerPermissionResult.data)
+      return {
+        error:
+          "The selected reviewer must be an active Company User with Business Continuity access.",
+      };
+    const controlledReviewerName =
+      `${reviewerResult.data.first_name || ""} ${reviewerResult.data.last_name || ""}`.trim();
+    if (!controlledReviewerName || controlledReviewerName !== reviewer)
+      return { error: "The reviewer selection is no longer valid. Select the Company User again." };
+  }
   const now = new Date().toISOString(),
     currentVersion = Number(existing?.version) || 1,
     editingApproved = existing?.status === "approved" && intent !== "approve",
