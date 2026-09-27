@@ -202,10 +202,11 @@ function Chips({ items, selected = [], toggle, prefix = "+" }) {
     </div>
   );
 }
-function Field({ label, value, onChange, area = false, placeholder = "" }) {
+function Field({ label, value, onChange, area = false, placeholder = "", invalid = false }) {
   return (
-    <label>
+    <label className={invalid ? "r4FieldMissing" : ""}>
       {label}
+      {invalid && <em>Required</em>}
       {area ? (
         <textarea
           value={value || ""}
@@ -260,13 +261,26 @@ function RoleCard({ role, roles, setRoles, people }) {
         ? arr(role[key]).filter((x) => x !== value)
         : [...arr(role[key]), value],
     );
+  const missing = [
+    !role.title && "Role title",
+    !role.purpose && "Purpose and responsibility",
+    !role.primaryHolder && "Primary role holder",
+    !arr(role.people).length && "Assigned people",
+    !role.authority && "Decision authority",
+    !role.escalation && "Escalation route",
+    !role.competence && "Competence requirement",
+    !role.communication && "Communication / acknowledgement",
+  ].filter(Boolean);
   return (
-    <article className="r4Card">
+    <article className={`r4Card ${missing.length ? "roleIncomplete" : "roleComplete"}`}>
       <header>
         <div>
           <b>{role.title || "New role"}</b>
           <small>{role.source}</small>
         </div>
+        <span className={`r4RoleStatus ${missing.length ? "missing" : "ready"}`}>
+          {missing.length ? `${missing.length} required field${missing.length === 1 ? "" : "s"} missing` : "✓ Complete"}
+        </span>
         <button
           type="button"
           onClick={() => setRoles(roles.filter((x) => x.id !== role.id))}
@@ -274,20 +288,28 @@ function RoleCard({ role, roles, setRoles, people }) {
           Remove
         </button>
       </header>
+      {missing.length > 0 && (
+        <div className="r4RoleMissing" role="status">
+          <b>Complete this role:</b> {missing.join(" · ")}
+        </div>
+      )}
       <div className="r4Grid">
         <Field
           label="Role title"
           value={role.title}
+          invalid={!role.title}
           onChange={(v) => change("title", v)}
         />
         <Field
           label="Purpose and responsibility"
           area
           value={role.purpose}
+          invalid={!role.purpose}
           onChange={(v) => change("purpose", v)}
         />
-        <label>
+        <label className={!role.primaryHolder ? "r4FieldMissing" : ""}>
           Primary role holder *
+          {!role.primaryHolder && <em>Required</em>}
           <PersonSelect
             value={role.primaryHolder || ""}
             people={people}
@@ -325,12 +347,15 @@ function RoleCard({ role, roles, setRoles, people }) {
         selected={arr(role.systems)}
         toggle={(v) => toggle("systems", v)}
       />
-      <b className="r4Label">Assigned people — select one or more</b>
-      <Chips
-        items={people}
-        selected={arr(role.people)}
-        toggle={(v) => toggle("people", v)}
-      />
+      <div className={!arr(role.people).length ? "r4ChoiceMissing" : ""}>
+        <b className="r4Label">Assigned people — select one or more</b>
+        {!arr(role.people).length && <em>Required</em>}
+        <Chips
+          items={people}
+          selected={arr(role.people)}
+          toggle={(v) => toggle("people", v)}
+        />
+      </div>
       <div className="r4Grid">
         <label>
           Deputy / alternate
@@ -346,22 +371,26 @@ function RoleCard({ role, roles, setRoles, people }) {
         <Field
           label="Decision authority"
           value={role.authority}
+          invalid={!role.authority}
           onChange={(v) => change("authority", v)}
           placeholder="What may this role authorise?"
         />
         <Field
           label="Escalation route"
           value={role.escalation}
+          invalid={!role.escalation}
           onChange={(v) => change("escalation", v)}
         />
         <Field
           label="Competence requirement"
           value={role.competence}
+          invalid={!role.competence}
           onChange={(v) => change("competence", v)}
         />
         <Field
           label="Communication / acknowledgement"
           value={role.communication}
+          invalid={!role.communication}
           onChange={(v) => change("communication", v)}
           placeholder="Briefing, role card, exercise, annual confirmation..."
         />
@@ -1320,4 +1349,4 @@ function Intro({ title, text }) {
     </div>
   );
 }
-const styles = `*{box-sizing:border-box}.r4Shell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.r4Shell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.r4Brand{font-size:21px;font-weight:950}.r4Brand span{font-weight:500}.r4Shell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.r4Shell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.r4Shell>aside>section strong{font-size:28px}.r4Shell>aside>section span{float:right;margin-top:10px;font-size:10px}.r4Shell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.r4Shell>aside>section i b{display:block;height:100%;background:#55e1d4}.r4Shell nav{display:grid;gap:6px;margin-top:18px}.r4Shell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.r4Shell nav button.active{background:#245d97}.r4Shell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.r4Outputs{display:grid;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25}.r4Outputs span{padding:8px;border-radius:7px;background:#ffffff08;color:#7997b5;font-size:10px}.r4Outputs span.ready{color:#63e2d4}.r4Shell main{min-width:0}.r4Top{display:flex;justify-content:space-between;align-items:end}.r4Top small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.r4Top h1{margin:7px 0 4px;font-size:37px}.r4Top p{margin:0;color:#607890}.r4Top>b{text-transform:capitalize;color:#087c61}.r4Progress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.r4Progress i{display:block;height:100%;background:#315fe6}.r4Panel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.r4Intro{padding:20px;border-radius:12px;background:#eff5fa}.r4Intro b{font-size:17px}.r4Intro p{margin:7px 0 0;color:#60778e}.r4Grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.r4Grid label{font-size:12px;font-weight:850}.r4Grid input,.r4Grid select,.r4Grid textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.r4Grid textarea{min-height:75px}.r4Source{display:grid;gap:6px;margin-top:16px;padding:16px;border-left:5px solid #315fe6;border-radius:10px;background:#f2f6ff}.r4Source span,.r4Source small{color:#60778e}.r4Toolbar{display:flex;gap:9px;margin:16px 0}.r4Toolbar button,.r4Generate{padding:10px 13px;border:1px solid #b9cce0;border-radius:8px;background:#fff;color:#17436f;font-weight:850}.r4Generate{margin:16px 0;background:#315fe6;color:#fff}.r4Records{display:grid;gap:14px}.r4Card,.r4Assignment{padding:17px;border:1px solid #cfdae6;border-radius:12px}.r4Card>header,.r4Assignment>header{display:flex;justify-content:space-between;gap:12px}.r4Card header div,.r4Assignment header div{display:grid;gap:3px}.r4Card header small,.r4Assignment header small{color:#71869a}.r4Card header button,.r4Assignment header button{border:0;border-radius:7px;background:#fff0ed;color:#b42318;font-weight:850}.r4Label{display:block;margin:14px 0 7px;font-size:11px}.r4Chips{display:flex;flex-wrap:wrap;gap:7px}.r4Chips button{padding:7px 9px;border:1px solid #c1d2e2;border-radius:999px;background:#fff;color:#31516f;font-size:10px}.r4Chips button.selected{border-color:#315fe6;background:#315fe6;color:#fff}.r4GapGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.r4GapGrid article{padding:15px;border:1px solid #d2deea;border-radius:10px;background:#f8fbfe}.r4GapGrid strong,.r4GapGrid span{display:block}.r4GapGrid strong{color:#315fe6;font-size:25px}.r4GapGrid span{font-size:10px;color:#60778e}.r4Gap{margin:16px 0;padding:16px;border:1px solid #e4cf9b;border-radius:11px;background:#fff9e9}.r4Gap header{display:flex;justify-content:space-between}.r4Gap li{margin:5px 0}.r4Register{margin-top:15px;padding:17px;border:1px solid #d1dce8;border-radius:12px;background:#fafdff}.r4Register h2{margin-top:0}.r4Register article{padding:11px 0;border-top:1px solid #e0e8ef}.r4Register article p{margin:6px 0}.r4Register article small,.r4Register article em{display:block;color:#687f94;font-size:10px}.r4Register article em{margin-top:4px}.r4Control{color:#60778e;font-size:11px}.r4Empty{padding:20px;border:1px dashed #c5d5e3;border-radius:10px}.r4Error{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.r4Shell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.r4Shell footer span{margin-left:auto;color:#6f8396;font-size:11px}.r4Shell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.r4Shell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.r4Shell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:950px){.r4Shell{grid-template-columns:80px 1fr}.r4Brand,.r4Shell>aside>small,.r4Shell nav span,.r4Outputs{display:none}.r4Shell nav button{justify-content:center}}@media(max-width:700px){.r4Shell{display:block}.r4Shell>aside{position:static;height:auto;margin-bottom:15px}.r4Shell nav{display:flex;overflow:auto}.r4Grid,.r4GapGrid{grid-template-columns:1fr}.r4Top h1{font-size:29px}.r4Shell footer{flex-wrap:wrap}.r4Shell footer span{display:none}.r4Toolbar{flex-wrap:wrap}}`;
+const styles = `*{box-sizing:border-box}.r4Shell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.r4Shell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.r4Brand{font-size:21px;font-weight:950}.r4Brand span{font-weight:500}.r4Shell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.r4Shell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.r4Shell>aside>section strong{font-size:28px}.r4Shell>aside>section span{float:right;margin-top:10px;font-size:10px}.r4Shell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.r4Shell>aside>section i b{display:block;height:100%;background:#55e1d4}.r4Shell nav{display:grid;gap:6px;margin-top:18px}.r4Shell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.r4Shell nav button.active{background:#245d97}.r4Shell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.r4Outputs{display:grid;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25}.r4Outputs span{padding:8px;border-radius:7px;background:#ffffff08;color:#7997b5;font-size:10px}.r4Outputs span.ready{color:#63e2d4}.r4Shell main{min-width:0}.r4Top{display:flex;justify-content:space-between;align-items:end}.r4Top small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.r4Top h1{margin:7px 0 4px;font-size:37px}.r4Top p{margin:0;color:#607890}.r4Top>b{text-transform:capitalize;color:#087c61}.r4Progress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.r4Progress i{display:block;height:100%;background:#315fe6}.r4Panel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.r4Intro{padding:20px;border-radius:12px;background:#eff5fa}.r4Intro b{font-size:17px}.r4Intro p{margin:7px 0 0;color:#60778e}.r4Grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.r4Grid label{font-size:12px;font-weight:850}.r4Grid input,.r4Grid select,.r4Grid textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.r4Grid textarea{min-height:75px}.r4Source{display:grid;gap:6px;margin-top:16px;padding:16px;border-left:5px solid #315fe6;border-radius:10px;background:#f2f6ff}.r4Source span,.r4Source small{color:#60778e}.r4Toolbar{display:flex;gap:9px;margin:16px 0}.r4Toolbar button,.r4Generate{padding:10px 13px;border:1px solid #b9cce0;border-radius:8px;background:#fff;color:#17436f;font-weight:850}.r4Generate{margin:16px 0;background:#315fe6;color:#fff}.r4Records{display:grid;gap:14px}.r4Card,.r4Assignment{padding:17px;border:1px solid #cfdae6;border-radius:12px}.r4Card.roleIncomplete{border:2px solid #e6a33a;background:#fffdf7}.r4Card.roleComplete{border-left:5px solid #11a786}.r4Card>header,.r4Assignment>header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.r4Card header div,.r4Assignment header div{display:grid;gap:3px;flex:1}.r4Card header small,.r4Assignment header small{color:#71869a}.r4Card header button,.r4Assignment header button{border:0;border-radius:7px;background:#fff0ed;color:#b42318;font-weight:850}.r4RoleStatus{padding:6px 9px;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap}.r4RoleStatus.ready{background:#daf5e9;color:#08745d}.r4RoleStatus.missing{background:#fff0d5;color:#8a5300}.r4RoleMissing{margin:12px 0 4px;padding:10px 12px;border-left:4px solid #e39a22;border-radius:7px;background:#fff4df;color:#704400;font-size:11px}.r4FieldMissing{padding:9px;border:1px solid #e5a13a;border-radius:9px;background:#fff8e9}.r4FieldMissing>em,.r4ChoiceMissing>em{float:right;color:#b45b00;font-size:9px;font-style:normal;text-transform:uppercase}.r4FieldMissing input,.r4FieldMissing select,.r4FieldMissing textarea{border-color:#dd8c22!important;background:#fff!important}.r4ChoiceMissing{margin-top:10px;padding:9px;border:1px solid #e5a13a;border-radius:9px;background:#fff8e9}.r4Label{display:block;margin:14px 0 7px;font-size:11px}.r4ChoiceMissing .r4Label{display:inline-block;margin-top:0}.r4Chips{display:flex;flex-wrap:wrap;gap:7px}.r4Chips button{padding:7px 9px;border:1px solid #c1d2e2;border-radius:999px;background:#fff;color:#31516f;font-size:10px}.r4Chips button.selected{border-color:#315fe6;background:#315fe6;color:#fff}.r4GapGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.r4GapGrid article{padding:15px;border:1px solid #d2deea;border-radius:10px;background:#f8fbfe}.r4GapGrid strong,.r4GapGrid span{display:block}.r4GapGrid strong{color:#315fe6;font-size:25px}.r4GapGrid span{font-size:10px;color:#60778e}.r4Gap{margin:16px 0;padding:16px;border:1px solid #e4cf9b;border-radius:11px;background:#fff9e9}.r4Gap header{display:flex;justify-content:space-between}.r4Gap li{margin:5px 0}.r4Register{margin-top:15px;padding:17px;border:1px solid #d1dce8;border-radius:12px;background:#fafdff}.r4Register h2{margin-top:0}.r4Register article{padding:11px 0;border-top:1px solid #e0e8ef}.r4Register article p{margin:6px 0}.r4Register article small,.r4Register article em{display:block;color:#687f94;font-size:10px}.r4Register article em{margin-top:4px}.r4Control{color:#60778e;font-size:11px}.r4Empty{padding:20px;border:1px dashed #c5d5e3;border-radius:10px}.r4Error{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.r4Shell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.r4Shell footer span{margin-left:auto;color:#6f8396;font-size:11px}.r4Shell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.r4Shell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.r4Shell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:950px){.r4Shell{grid-template-columns:80px 1fr}.r4Brand,.r4Shell>aside>small,.r4Shell nav span,.r4Outputs{display:none}.r4Shell nav button{justify-content:center}}@media(max-width:700px){.r4Shell{display:block}.r4Shell>aside{position:static;height:auto;margin-bottom:15px}.r4Shell nav{display:flex;overflow:auto}.r4Grid,.r4GapGrid{grid-template-columns:1fr}.r4Top h1{font-size:29px}.r4Shell footer{flex-wrap:wrap}.r4Shell footer span{display:none}.r4Toolbar{flex-wrap:wrap}.r4Card>header{flex-wrap:wrap}.r4RoleStatus{order:3;width:100%;text-align:center}}`;
