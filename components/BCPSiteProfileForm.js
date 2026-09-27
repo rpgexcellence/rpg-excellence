@@ -77,11 +77,25 @@ const blankSystem = {
   processes: [],
   authentication: "",
   backupFrequency: "",
+  backupFrequencyValue: "",
+  backupFrequencyUnit: "days",
   lastRestoreTest: "",
   redundancy: "",
   emergencyAccess: "",
+  emergencyAccessRoute: "Break-glass admin account",
+  emergencyAccessTrigger: "",
+  emergencyAccessPrimary: "",
+  emergencyAccessDeputy: "",
+  emergencyAccessApprover: "",
+  emergencyProcedureLocation: "",
+  emergencyAccessLastTest: "",
+  emergencyAccessTestResult: "Not tested",
+  emergencyPostUseAction:
+    "Record the incident, review activity, rotate credentials and revoke temporary access.",
   workaround: "",
   supplierContact: "",
+  supplierId: "",
+  supplierContactId: "",
 };
 
 const blankRemoteSupport = {
@@ -1279,6 +1293,8 @@ function InformationContinuity({
   setData,
   processes = [],
   companyPeople = [],
+  suppliers = [],
+  supplierContacts = [],
 }) {
   const controls = [
     [
@@ -1339,6 +1355,21 @@ function InformationContinuity({
           : asset,
       ),
     );
+
+  const updateSystemFields = (i, values) =>
+    set(
+      "systems",
+      data.systems.map((system, index) =>
+        index === i ? { ...system, ...values } : system,
+      ),
+    );
+
+  const updateBackupFrequency = (i, value, unit) =>
+    updateSystemFields(i, {
+      backupFrequencyValue: value,
+      backupFrequencyUnit: unit,
+      backupFrequency: value ? `${value} ${unit}` : "",
+    });
 
   const toggleProcess = (key, i, name) => {
     const row = data[key][i],
@@ -1601,22 +1632,28 @@ function InformationContinuity({
               />
             </label>
             <label>
-              Business owner
-              <input
-                value={x.businessOwner}
-                onChange={(e) =>
-                  update("systems", i, "businessOwner", e.target.value)
+              Business owner *
+              <PersonSelect
+                value={x.businessOwner || ""}
+                onChange={(value) =>
+                  update("systems", i, "businessOwner", value)
                 }
+                people={companyPeople}
               />
+              <small>Approved Company User accountable for the service.</small>
             </label>
             <label>
-              Technical owner
-              <input
-                value={x.technicalOwner}
-                onChange={(e) =>
-                  update("systems", i, "technicalOwner", e.target.value)
+              Technical owner *
+              <PersonSelect
+                value={x.technicalOwner || ""}
+                onChange={(value) =>
+                  update("systems", i, "technicalOwner", value)
                 }
+                people={companyPeople}
               />
+              <small>
+                Approved Company User responsible for technical recovery.
+              </small>
             </label>
             <label>
               Hosting model
@@ -1647,20 +1684,26 @@ function InformationContinuity({
               toggle={(name) => toggleProcess("systems", i, name)}
             />
             <label>
-              Authentication method
+              Authentication method *
               <input
-                value={x.authentication}
+                value={x.authentication || ""}
                 onChange={(e) =>
                   update("systems", i, "authentication", e.target.value)
                 }
+                placeholder="e.g. SSO with MFA, local account or identity provider"
               />
+              <small>
+                Record the normal sign-in method and any dependency on SSO, MFA,
+                identity provider, network or supplier. Do not enter passwords,
+                codes or secret keys.
+              </small>
             </label>
             <label>
               Backup frequency
-              <input
-                value={x.backupFrequency}
-                onChange={(e) =>
-                  update("systems", i, "backupFrequency", e.target.value)
+              <BackupFrequency
+                system={x}
+                onChange={(value, unit) =>
+                  updateBackupFrequency(i, value, unit)
                 }
               />
             </label>
@@ -1684,15 +1727,6 @@ function InformationContinuity({
               />
             </label>
             <label>
-              Emergency access method
-              <input
-                value={x.emergencyAccess}
-                onChange={(e) =>
-                  update("systems", i, "emergencyAccess", e.target.value)
-                }
-              />
-            </label>
-            <label>
               Alternative/manual workaround
               <input
                 value={x.workaround}
@@ -1701,15 +1735,156 @@ function InformationContinuity({
                 }
               />
             </label>
-            <label className="wide">
-              Supplier and support contact
-              <input
-                value={x.supplierContact}
-                onChange={(e) =>
-                  update("systems", i, "supplierContact", e.target.value)
-                }
-              />
-            </label>
+            <fieldset className="wide spxEmergencyAccess">
+              <legend>Emergency access method *</legend>
+              <Guidance>
+                Describe how authorised personnel regain access if normal
+                authentication fails. Reference the secure procedure; do not
+                enter passwords, recovery codes or secret keys here.
+              </Guidance>
+              <div className="spxGrid">
+                <label>
+                  Access route
+                  <select
+                    value={
+                      x.emergencyAccessRoute ||
+                      x.emergencyAccess ||
+                      "Break-glass admin account"
+                    }
+                    onChange={(e) =>
+                      updateSystemFields(i, {
+                        emergencyAccessRoute: e.target.value,
+                        emergencyAccess: e.target.value,
+                      })
+                    }
+                  >
+                    <option>Break-glass admin account</option>
+                    <option>Supplier-assisted recovery</option>
+                    <option>Alternative identity provider</option>
+                    <option>Emergency local administrator</option>
+                    <option>Other controlled recovery route</option>
+                  </select>
+                </label>
+                <label>
+                  Trigger for use
+                  <input
+                    value={x.emergencyAccessTrigger || ""}
+                    onChange={(e) =>
+                      update(
+                        "systems",
+                        i,
+                        "emergencyAccessTrigger",
+                        e.target.value,
+                      )
+                    }
+                    placeholder="e.g. Normal sign-in or SSO is unavailable"
+                  />
+                </label>
+                <label>
+                  Primary authorised person
+                  <PersonSelect
+                    value={x.emergencyAccessPrimary || ""}
+                    onChange={(value) =>
+                      update("systems", i, "emergencyAccessPrimary", value)
+                    }
+                    people={companyPeople}
+                  />
+                </label>
+                <label>
+                  Deputy authorised person
+                  <PersonSelect
+                    value={x.emergencyAccessDeputy || ""}
+                    onChange={(value) =>
+                      update("systems", i, "emergencyAccessDeputy", value)
+                    }
+                    people={companyPeople}
+                  />
+                </label>
+                <label>
+                  Approval and out-of-hours contact
+                  <PersonSelect
+                    value={x.emergencyAccessApprover || ""}
+                    onChange={(value) =>
+                      update("systems", i, "emergencyAccessApprover", value)
+                    }
+                    people={companyPeople}
+                  />
+                </label>
+                <label>
+                  Procedure location
+                  <input
+                    value={x.emergencyProcedureLocation || ""}
+                    onChange={(e) =>
+                      update(
+                        "systems",
+                        i,
+                        "emergencyProcedureLocation",
+                        e.target.value,
+                      )
+                    }
+                    placeholder="Controlled procedure reference or secure link"
+                  />
+                </label>
+                <label>
+                  Last access test
+                  <input
+                    type="date"
+                    value={x.emergencyAccessLastTest || ""}
+                    onChange={(e) =>
+                      update(
+                        "systems",
+                        i,
+                        "emergencyAccessLastTest",
+                        e.target.value,
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Test result
+                  <select
+                    value={x.emergencyAccessTestResult || "Not tested"}
+                    onChange={(e) =>
+                      update(
+                        "systems",
+                        i,
+                        "emergencyAccessTestResult",
+                        e.target.value,
+                      )
+                    }
+                  >
+                    <option>Not tested</option>
+                    <option>Successful</option>
+                    <option>Partially successful</option>
+                    <option>Failed - action required</option>
+                  </select>
+                </label>
+                <label className="wide">
+                  Post-use action
+                  <textarea
+                    rows="2"
+                    value={
+                      x.emergencyPostUseAction ||
+                      "Record the incident, review activity, rotate credentials and revoke temporary access."
+                    }
+                    onChange={(e) =>
+                      update(
+                        "systems",
+                        i,
+                        "emergencyPostUseAction",
+                        e.target.value,
+                      )
+                    }
+                  />
+                </label>
+              </div>
+            </fieldset>
+            <SupplierContactSelector
+              system={x}
+              suppliers={suppliers}
+              contacts={supplierContacts}
+              onChange={(values) => updateSystemFields(i, values)}
+            />
           </div>
         )}
       </InfoRegister>
@@ -1933,6 +2108,131 @@ function RetentionRequirement({ asset, onChange }) {
   );
 }
 
+function BackupFrequency({ system, onChange }) {
+  const legacy = String(system.backupFrequency || "").trim();
+  const match = legacy.match(
+    /^(\d+(?:\.\d+)?)\s*(hours?|days?|weeks?|months?|years?)?$/i,
+  );
+  const value = system.backupFrequencyValue ?? match?.[1] ?? "";
+  const legacyUnit = match?.[2]?.toLowerCase();
+  const unit =
+    system.backupFrequencyUnit ||
+    (legacyUnit ? `${legacyUnit.replace(/s$/, "")}s` : "days");
+
+  return (
+    <div className="spxDurationField">
+      <input
+        type="number"
+        min="1"
+        step="1"
+        inputMode="numeric"
+        value={value}
+        onChange={(event) => onChange(event.target.value, unit)}
+        placeholder="Number"
+        aria-label="Backup frequency number"
+      />
+      <select
+        value={unit}
+        onChange={(event) => onChange(value, event.target.value)}
+        aria-label="Backup frequency unit"
+      >
+        <option value="hours">Hours</option>
+        <option value="days">Days</option>
+        <option value="weeks">Weeks</option>
+        <option value="months">Months</option>
+        <option value="years">Years</option>
+      </select>
+    </div>
+  );
+}
+
+function SupplierContactSelector({ system, suppliers, contacts, onChange }) {
+  const supplierId = system.supplierId || "";
+  const availableContacts = contacts.filter(
+    (contact) =>
+      contact.supplier_id === supplierId && contact.is_active !== false,
+  );
+  const selectedSupplier = suppliers.find(
+    (supplier) => supplier.id === supplierId,
+  );
+
+  const setSupplier = (nextSupplierId) => {
+    const supplier = suppliers.find((item) => item.id === nextSupplierId);
+    onChange({
+      supplierId: nextSupplierId,
+      supplierContactId: "",
+      supplierContact: supplier?.legal_name || "",
+    });
+  };
+
+  const setContact = (contactId) => {
+    const contact = availableContacts.find((item) => item.id === contactId);
+    const contactName = contact
+      ? `${contact.first_name || ""} ${contact.last_name || ""}`.trim()
+      : "";
+    onChange({
+      supplierContactId: contactId,
+      supplierContact: [selectedSupplier?.legal_name, contactName]
+        .filter(Boolean)
+        .join(" · "),
+    });
+  };
+
+  return (
+    <fieldset className="wide spxSupplierContact">
+      <legend>Supplier and support contact *</legend>
+      <div className="spxGrid">
+        <label>
+          Supplier name
+          <select
+            value={supplierId}
+            onChange={(e) => setSupplier(e.target.value)}
+          >
+            <option value="">Select approved supplier</option>
+            {suppliers.map((supplier) => (
+              <option value={supplier.id} key={supplier.id}>
+                {supplier.legal_name}
+                {supplier.supplier_reference
+                  ? ` · ${supplier.supplier_reference}`
+                  : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Support contact
+          <select
+            value={system.supplierContactId || ""}
+            onChange={(e) => setContact(e.target.value)}
+            disabled={!supplierId}
+          >
+            <option value="">
+              {supplierId
+                ? "Select active supplier contact"
+                : "Select supplier first"}
+            </option>
+            {availableContacts.map((contact) => (
+              <option value={contact.id} key={contact.id}>
+                {`${contact.first_name || ""} ${contact.last_name || ""}`.trim()}
+                {contact.business_title ? ` · ${contact.business_title}` : ""}
+                {contact.email ? ` · ${contact.email}` : ""}
+              </option>
+            ))}
+          </select>
+          <small>
+            {supplierId && !availableContacts.length
+              ? "No active contacts exist for this supplier. Add one in Supplier Assurance first."
+              : "Contacts are filtered from the selected Supplier Assurance record."}
+          </small>
+        </label>
+      </div>
+      {!supplierId && system.supplierContact ? (
+        <small>Previously recorded value: {system.supplierContact}</small>
+      ) : null}
+    </fieldset>
+  );
+}
+
 function InfoRegister({ title, items, add, remove, children, guide }) {
   return (
     <section className="spxInfoRegister">
@@ -1969,6 +2269,8 @@ export default function BCPSiteProfileForm({
   initial,
   organisationName = "",
   companyPeople = [],
+  suppliers = [],
+  supplierContacts = [],
   startStep = 0,
 }) {
   const [formState, formAction, isPending] = useActionState(action, {
@@ -2769,6 +3071,8 @@ export default function BCPSiteProfileForm({
               setItems={setDependencies}
               processes={[...value, ...support].filter((x) => x.name)}
               companyPeople={companyPeople}
+              suppliers={suppliers}
+              supplierContacts={supplierContacts}
             />
           </section>
         )}
@@ -2949,7 +3253,7 @@ export default function BCPSiteProfileForm({
 
 const dependencyStyles = `.spxDependencyTool{display:grid;gap:16px}.spxDependencyTop{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end}.spxSiteWide{display:flex!important;align-items:center}.spxSiteWide input{width:auto!important}.spxProcessContext{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px;border-left:5px solid #315ee8;border-radius:10px;background:#eef4ff}.spxProcessContext b,.spxProcessContext span{display:block}.spxProcessContext span{font-size:12px;color:#526a82}.spxDependencyExamples{display:flex;flex-wrap:wrap;gap:7px;align-items:center}.spxDependencyExamples button{padding:8px 10px;border:1px solid #cbd9e5;border-radius:999px;background:#f6f9fc;color:#29465f;font-weight:800}.spxDependencyLayout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:14px;align-items:start}.spxDependencyLayout>aside{display:grid;gap:7px}.spxDependencyLayout>aside>button{display:grid;gap:3px;padding:11px;border:1px solid #d4e0ea;border-radius:9px;background:#fff;color:#29465f;text-align:left}.spxDependencyLayout>aside>button.active{border-color:#315ee8;background:#eef3ff}.spxDependencyLayout aside small{color:#71859a}.spxDependencyRecord{min-width:0;padding:18px;border:1px solid #d5e1eb;border-radius:13px;background:#f8fafc}.spxDependencyRecord>.spxGrid{align-items:start}.spxDependencyRecord input,.spxDependencyRecord select{min-height:48px}.spxDependencyRecord .spxTallControl textarea,.spxDependencyRecord .spxTallControl select{height:76px;min-height:76px}.spxDependencyRecord>header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.spxDependencyRecord>header small{display:block;color:#08785d}.spxDependencyRecord>header button{padding:7px 9px;border:0;border-radius:7px;background:#fff0ef;color:#b52c25;font-weight:800}.spxDependencyRecord .spxScreenRow button{padding:9px;border:1px solid #cbd9e5;border-radius:8px;background:#fff;color:#61758a}.spxDependencyRecord .spxScreenRow button.selected{border-color:#315ee8;background:#315ee8;color:#fff}.spxResilience{display:grid;gap:3px;margin-top:15px;padding:14px;border-radius:10px;background:#e7f7f1;color:#08795e}.spxResilience.vulnerable,.spxResilience.single-point-of-failure{background:#fff0ee;color:#ad3028}.spxResilience.partially-resilient{background:#fff6df;color:#916112}.spxResilience span{font-size:12px}.spxDependencyMap{display:grid;gap:7px;padding:17px;border:1px solid #d5e1eb;border-radius:12px;background:#0d315a;color:#fff}.spxDependencyMap>div{display:grid;grid-template-columns:1fr auto 1fr auto;gap:10px;align-items:center;padding:9px;border-radius:8px;background:#ffffff0b}.spxDependencyMap em{font-style:normal}.spxDependencyMap mark{padding:5px 7px;border-radius:6px;background:#e6f8f2;color:#08795e;font-size:10px;font-weight:900}@media(max-width:900px){.spxDependencyTop,.spxDependencyLayout,.spxProcessContext{grid-template-columns:1fr}.spxDependencyLayout>aside{grid-template-columns:repeat(2,minmax(0,1fr))}.spxDependencyMap>div{grid-template-columns:1fr auto}.spxDependencyMap mark{grid-column:1/-1}}@media(max-width:600px){.spxDependencyLayout>aside{grid-template-columns:1fr}.spxDependencyRecord .spxTallControl textarea,.spxDependencyRecord .spxTallControl select{height:auto;min-height:48px}}`;
 
-const informationStyles = `.spxInfoContinuity{display:grid;gap:18px}.spxInfoImport{display:grid;gap:5px;padding:15px;border-left:5px solid #315ee8;border-radius:10px;background:#eef4ff;color:#29465f}.spxInfoImport span{font-size:12px}.spxInfoRegister{display:grid;gap:12px;padding:18px;border:1px solid #d4e0ea;border-radius:13px;background:#f8fafc}.spxInfoRegister>header{display:flex;justify-content:space-between;align-items:center}.spxInfoRegister h2{margin:0;color:#143653;font-size:20px}.spxInfoRegister>header button{padding:9px 11px;border:1px solid #c8d8e5;border-radius:8px;background:#fff;color:#1c58d3;font-weight:900}.spxInfoRegister>article{min-width:0;padding:16px;border:1px solid #d8e3ec;border-radius:11px;background:#fff}.spxInfoRegister .spxGrid{align-items:start}.spxInfoRegister input,.spxInfoRegister select{min-height:48px}.spxAssetGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.spxAssetLocation{grid-column:1/-1}.spxAssetGrid .spxUnitField{min-width:0}.spxDurationField{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,.65fr);gap:8px;min-width:0}.spxDurationField input,.spxDurationField select{min-width:0}.spxRecordTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.spxRecordTitle button{padding:6px 8px;border:0;border-radius:6px;background:#fff0ef;color:#b52c25;font-weight:800}.spxJurisdictionWarning{padding:13px;border-radius:9px;background:#fff3dd;color:#87580b;font-weight:800}.spxControlRow{display:grid;grid-template-columns:1fr auto auto auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #e1e8ef}.spxControlRow button{padding:8px 10px;border:1px solid #cbd9e5;border-radius:8px;background:#fff;color:#61758a}.spxControlRow button.selected{border-color:#315ee8;background:#315ee8;color:#fff}.spxReadiness{display:grid;gap:6px;padding:20px;border-radius:13px;background:#fff5df;color:#8a5a0b}.spxReadiness.ready{background:#e3f8f0;color:#08775c}.spxReadiness.partially-ready{background:#fff0e9;color:#a84626}.spxReadiness span{font-size:10px;font-weight:950;letter-spacing:.13em}.spxReadiness strong{font-size:28px}.spxReadiness p{margin:0;line-height:1.5}@media(max-width:900px){.spxControlRow{grid-template-columns:1fr auto auto auto}.spxInfoRegister{padding:12px}.spxAssetGrid{grid-template-columns:minmax(0,1fr)}.spxAssetLocation{grid-column:auto}}@media(max-width:420px){.spxDurationField{grid-template-columns:minmax(0,1fr) minmax(105px,.8fr)}}`;
+const informationStyles = `.spxInfoContinuity{display:grid;gap:18px}.spxInfoImport{display:grid;gap:5px;padding:15px;border-left:5px solid #315ee8;border-radius:10px;background:#eef4ff;color:#29465f}.spxInfoImport span{font-size:12px}.spxInfoRegister{display:grid;gap:12px;padding:18px;border:1px solid #d4e0ea;border-radius:13px;background:#f8fafc}.spxInfoRegister>header{display:flex;justify-content:space-between;align-items:center}.spxInfoRegister h2{margin:0;color:#143653;font-size:20px}.spxInfoRegister>header button{padding:9px 11px;border:1px solid #c8d8e5;border-radius:8px;background:#fff;color:#1c58d3;font-weight:900}.spxInfoRegister>article{min-width:0;padding:16px;border:1px solid #d8e3ec;border-radius:11px;background:#fff}.spxInfoRegister .spxGrid{align-items:start}.spxInfoRegister input,.spxInfoRegister select{min-height:48px}.spxAssetGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.spxAssetLocation{grid-column:1/-1}.spxAssetGrid .spxUnitField{min-width:0}.spxDurationField{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,.65fr);gap:8px;min-width:0}.spxDurationField input,.spxDurationField select{min-width:0}.spxEmergencyAccess,.spxSupplierContact{margin:0;padding:17px;border:1px solid #cbd9e5;border-radius:12px;background:#f8fbfe;min-width:0}.spxEmergencyAccess>legend,.spxSupplierContact>legend{padding:0 7px;color:#173a5d;font-weight:900}.spxEmergencyAccess .spxGuidance{margin-bottom:14px}.spxSupplierContact>small{display:block;margin-top:9px;color:#71849a}.spxRecordTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.spxRecordTitle button{padding:6px 8px;border:0;border-radius:6px;background:#fff0ef;color:#b52c25;font-weight:800}.spxJurisdictionWarning{padding:13px;border-radius:9px;background:#fff3dd;color:#87580b;font-weight:800}.spxControlRow{display:grid;grid-template-columns:1fr auto auto auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #e1e8ef}.spxControlRow button{padding:8px 10px;border:1px solid #cbd9e5;border-radius:8px;background:#fff;color:#61758a}.spxControlRow button.selected{border-color:#315ee8;background:#315ee8;color:#fff}.spxReadiness{display:grid;gap:6px;padding:20px;border-radius:13px;background:#fff5df;color:#8a5a0b}.spxReadiness.ready{background:#e3f8f0;color:#08775c}.spxReadiness.partially-ready{background:#fff0e9;color:#a84626}.spxReadiness span{font-size:10px;font-weight:950;letter-spacing:.13em}.spxReadiness strong{font-size:28px}.spxReadiness p{margin:0;line-height:1.5}@media(max-width:900px){.spxControlRow{grid-template-columns:1fr auto auto auto}.spxInfoRegister{padding:12px}.spxAssetGrid{grid-template-columns:minmax(0,1fr)}.spxAssetLocation{grid-column:auto}}@media(max-width:420px){.spxDurationField{grid-template-columns:minmax(0,1fr) minmax(105px,.8fr)}}`;
 
 const mobileStyles = `@media(max-width:1180px){.spxShell{grid-template-columns:1fr}.spxSide{position:static;min-height:auto}.spxSide nav{display:flex;gap:7px;overflow-x:auto;scroll-snap-type:x proximity}.spxSide nav button{min-width:190px;scroll-snap-align:start}.spxOutputs{display:none}}@media(max-width:1024px){.spxCard{padding:22px}.spxFooter{position:static}.spxProcessContext{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){html,body{max-width:100%;overflow-x:hidden}.spxShell,.spx,.spxMain,.spxCard,.spxRepeater,.spxRepeater article,.spxDependencyTool,.spxDependencyLayout,.spxDependencyRecord,.spxInfoContinuity,.spxInfoRegister,.spxInfoRegister>article{width:100%;max-width:100%;min-width:0}.spxShell{display:block}.spxSide{width:100%;margin:0 0 14px;padding:14px;border-radius:13px;overflow:hidden}.spxBrand,.spxSide>small,.spxOutputs{display:none}.spxOverall{margin:0 0 10px;padding:11px}.spxOverall strong{font-size:23px}.spxSide nav{display:flex;width:100%;gap:6px;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;padding-bottom:4px}.spxSide nav button{display:grid;grid-template-columns:25px 1fr;min-width:145px;padding:9px;scroll-snap-align:start}.spxSide nav button>b{width:24px;height:24px}.spxHeader{display:block;min-width:0}.spxHeader h1{font-size:28px;line-height:1.08;overflow-wrap:anywhere}.spxHeader p{font-size:14px}.spxSaved{margin-top:8px;font-size:11px}.spxBar{margin:14px 0}.spxCard{padding:14px;border-radius:13px;overflow:hidden}.spxIntro{margin:0 0 18px;padding:14px}.spxIntro b{font-size:17px}.spxIntro p{font-size:13px}.spxGrid,.spxDependencyTop,.spxDependencyLayout,.spxProcessContext{display:grid;grid-template-columns:minmax(0,1fr);width:100%}.spx label,.spx input,.spx select,.spx textarea{min-width:0;max-width:100%}.spx input,.spx select,.spx textarea{font-size:16px;padding:13px}.spxServices{margin:16px 0;padding:13px;min-width:0}.spxServices>div,.spxAssist,.spxDependencyExamples,.spxMiniChips{max-width:100%;overflow:hidden}.spxServices button,.spxAssist button,.spxAddProcess,.spxDependencyExamples button{white-space:normal;text-align:left}.spxServices .spxAdd{grid-template-columns:minmax(0,1fr) auto}.spxRepeater header,.spxDependencyRecord>header,.spxInfoRegister>header,.spxRecordTitle{align-items:flex-start;gap:8px}.spxRepeater header>div{min-width:0}.spxRepeater header strong,.spxRecordTitle strong{overflow-wrap:anywhere}.spxProcessSummary{grid-template-columns:minmax(0,1fr)!important}.spxProcessSummary>div,.spxProcessSummary span{min-width:0}.spxProcessSummary nav{flex-wrap:wrap}.spxChoice,.spxScreen{padding:12px;min-width:0}.spxScreenRow,.spxControlRow{grid-template-columns:minmax(0,1fr) auto auto!important;gap:5px}.spxControlRow button,.spxYesNo button{padding:8px;font-size:12px}.spxDependencyMap{padding:11px;overflow:hidden}.spxDependencyMap>div{grid-template-columns:minmax(0,1fr)!important;gap:6px}.spxDependencyMap em{display:none}.spxDependencyMap mark{grid-column:auto}.spxChain{width:100%;max-width:100%;overflow-x:auto}.spxFooter{position:static;display:grid;grid-template-columns:1fr;margin-top:12px;padding:10px}.spxFooter>div,.spxFooter>div:last-child,.spxFinal{grid-column:1;width:100%;justify-self:stretch}.spxFooter>div:first-child:empty{display:none}.spxFooter button,.spxFooter .primary{width:100%;min-height:46px}.spxFinal{display:grid;grid-template-columns:1fr;gap:7px}.spxInfoRegister h2{font-size:17px}.spxInfoRegister>header{flex-wrap:wrap}.spxInfoRegister>header button{width:100%}}`;
 
