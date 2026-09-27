@@ -104,13 +104,14 @@ async function saveRoles(_previousState, fd) {
     people: (role.people || []).map(resolvePersonId).filter(Boolean),
     deputies: (role.deputies || []).map(resolvePersonId).filter(Boolean),
   }));
-  const controlledPeople = new Set(
+  const actorKey = (value) => clean(value).toLocaleLowerCase(),
+    controlledPeople = new Set(
     activePeople.map((person) =>
-      `${person.first_name || ""} ${person.last_name || ""}`.trim(),
+      actorKey(`${person.first_name || ""} ${person.last_name || ""}`),
     ),
   );
   const roleNames = new Set(
-    normalizedRoles.map((role) => clean(role.title)).filter(Boolean),
+    normalizedRoles.map((role) => actorKey(role.title)).filter(Boolean),
   );
   const rolePeopleErrors = normalizedRoles.flatMap((role, index) => {
     const title = clean(role.title) || `Role ${index + 1}`,
@@ -131,20 +132,30 @@ async function saveRoles(_previousState, fd) {
       errors.push(`${title}: primary holder and deputy must be different people`);
     return errors;
   });
-  const assignmentsUseControlledActors = assignments.every((assignment) => {
-    const external = new Set((assignment.customActors || []).map(clean));
+  const assignmentActorErrors = assignments.flatMap((assignment, index) => {
+    const activity = clean(assignment.activity) || `Activity ${index + 1}`,
+      external = new Set((assignment.customActors || []).map(actorKey));
     const allowed = (name) =>
       !name ||
-      roleNames.has(clean(name)) ||
-      controlledPeople.has(clean(name)) ||
-      external.has(clean(name));
-    return (
-      allowed(assignment.accountable) &&
-      (assignment.responsible || []).every(allowed) &&
-      (assignment.consulted || []).every(allowed) &&
-      (assignment.informed || []).every(allowed)
+      roleNames.has(actorKey(name)) ||
+      controlledPeople.has(actorKey(name)) ||
+      external.has(actorKey(name));
+    return [
+      ["Accountable", [assignment.accountable]],
+      ["Responsible", assignment.responsible || []],
+      ["Consulted", assignment.consulted || []],
+      ["Informed", assignment.informed || []],
+    ].flatMap(([column, actors]) =>
+      actors
+        .filter(Boolean)
+        .filter((actor) => !allowed(actor))
+        .map(
+          (actor) =>
+            `${activity}: ${column} actor “${clean(actor)}” is not an active Company User, BCMS role or approved local actor`,
+        ),
     );
   });
+  const assignmentsUseControlledActors = assignmentActorErrors.length === 0;
   const processNames = [
     ...(Array.isArray(profile?.value_chain_processes)
       ? profile.value_chain_processes
@@ -206,9 +217,7 @@ async function saveRoles(_previousState, fd) {
       error: `Cannot submit: ${rolePeopleErrors.length || 1} role assignment requirement${(rolePeopleErrors.length || 1) === 1 ? " is" : "s are"} incomplete.`,
       validation: {
         step: 4,
-        items: rolePeopleErrors.length
-          ? rolePeopleErrors
-          : ["A RACI assignment contains a person who is not an active Company User or approved local actor"],
+        items: rolePeopleErrors.length ? rolePeopleErrors : assignmentActorErrors,
       },
     };
   if (["review", "approve"].includes(intent) && !complete.every(Boolean))
@@ -231,7 +240,7 @@ async function saveRoles(_previousState, fd) {
   if (
     ["review", "approve", "changes"].includes(intent) &&
     reviewer &&
-    !controlledPeople.has(reviewer)
+    !controlledPeople.has(actorKey(reviewer))
   )
     return {
       error:
