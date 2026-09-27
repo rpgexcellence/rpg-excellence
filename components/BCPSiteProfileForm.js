@@ -395,7 +395,7 @@ const steps = [
   ["learning", "BCP participants", "Awareness and role-specific learning"],
 ];
 
-const governanceStyles = `.spxFormError{display:grid;gap:4px;margin-bottom:14px;padding:13px 16px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.spxFormError span{font-size:12px}.spxGuide{display:grid;gap:4px;margin:0 0 16px;padding:13px 15px;border-left:4px solid #2863e7;border-radius:9px;background:#edf4ff;color:#234565}.spxGuide b{color:#174fb5;font-size:12px;text-transform:uppercase;letter-spacing:.06em}.spxGuide span{font-size:13px;line-height:1.5}.spxUnitField{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px}.spxScreenSelect{display:grid!important;grid-template-columns:minmax(0,1fr) 190px!important;align-items:center!important;padding:8px 0;border-bottom:1px solid #e1e8ef}.spxScreenSelect select{padding:10px!important}.spxGovernance{margin-top:18px;padding:18px;border:1px solid #c9d8ea;border-radius:13px;background:#f3f7ff}.spxGovernance header div{display:grid;gap:4px}.spxGovernance header small{color:#536f8e;text-transform:capitalize}.spxGovernance p{margin:14px 0 0;color:#60778e;font-size:11px}.spxFooter>div:first-child{display:flex;gap:7px}.spxFooter button.danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}.spxFooter button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:600px){.spxGovernance{padding:13px}.spxFooter>div:first-child{display:grid}.spxUnitField,.spxScreenSelect{grid-template-columns:1fr!important}}`;
+const governanceStyles = `.spxFormError{display:grid;gap:4px;margin-bottom:14px;padding:13px 16px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.spxFormError span{font-size:12px}.spxGuide{display:grid;gap:4px;margin:0 0 16px;padding:13px 15px;border-left:4px solid #2863e7;border-radius:9px;background:#edf4ff;color:#234565}.spxGuide b{color:#174fb5;font-size:12px;text-transform:uppercase;letter-spacing:.06em}.spxGuide span{font-size:13px;line-height:1.5}.spxUnitField{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px}.spxScreenSelect{display:grid!important;grid-template-columns:minmax(0,1fr) 190px!important;align-items:center!important;padding:8px 0;border-bottom:1px solid #e1e8ef}.spxScreenSelect select{padding:10px!important}.spxSelectReset{justify-self:start;padding:5px 0;border:0;background:transparent;color:#1c5bd4;font-size:12px;font-weight:850;cursor:pointer;text-decoration:underline}.spxGovernance{margin-top:18px;padding:18px;border:1px solid #c9d8ea;border-radius:13px;background:#f3f7ff}.spxGovernance header div{display:grid;gap:4px}.spxGovernance header small{color:#536f8e;text-transform:capitalize}.spxGovernance p{margin:14px 0 0;color:#60778e;font-size:11px}.spxFooter>div:first-child{display:flex;gap:7px}.spxFooter button.danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}.spxFooter button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:600px){.spxGovernance{padding:13px}.spxFooter>div:first-child{display:grid}.spxUnitField,.spxScreenSelect{grid-template-columns:1fr!important}}`;
 
 function ProcessRepeater({
   items,
@@ -2040,6 +2040,8 @@ export default function BCPSiteProfileForm({
     storedCountry ? (countryIsListed ? storedCountry : "Other") : "",
   );
 
+  const [countryControlVersion, setCountryControlVersion] = useState(0);
+
   const [customCountry, setCustomCountry] = useState(
     storedCountry && !countryIsListed ? storedCountry : "",
   );
@@ -2387,6 +2389,7 @@ export default function BCPSiteProfileForm({
               <label>
                 Country *
                 <select
+                  key={`country-${region}-${countryControlVersion}`}
                   value={country}
                   disabled={!region}
                   onChange={(e) => {
@@ -2405,6 +2408,21 @@ export default function BCPSiteProfileForm({
                   ))}
                   <option value="Other">Other</option>
                 </select>
+                {country && (
+                  <button
+                    type="button"
+                    className="spxSelectReset"
+                    onClick={() => {
+                      setCountry("");
+                      setCustomCountry("");
+                      setLocation("");
+                      setCustomLocation("");
+                      setCountryControlVersion((version) => version + 1);
+                    }}
+                  >
+                    Change country
+                  </button>
+                )}
               </label>
               {country === "Other" && (
                 <label>
@@ -2421,6 +2439,7 @@ export default function BCPSiteProfileForm({
                   ? "Location / nearest city *"
                   : "Location name *"}
                 <select
+                  key={`location-${effectiveCountry}-${countryControlVersion}`}
                   value={location}
                   disabled={!effectiveCountry}
                   onChange={(e) => setLocation(e.currentTarget.value)}
