@@ -140,7 +140,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     .filter(Boolean);
   const today = new Date().toISOString().slice(0, 10);
   const eligibleAuditorsResult = await supabase.from("internal_auditor_register")
-    .select("id, full_name, email, verified_until, sector_competence, technical_competence, standard_authorisations:internal_auditor_standard_authorisations(standard_id, authorisation_status, authorised_until)")
+    .select("id, full_name, email, verified_until, standard_authorisations:internal_auditor_standard_authorisations(standard_id, authorisation_status, authorised_until)")
     .eq("owner_id", user.id).eq("organization_id", audit.organization_id).eq("active", true)
     .eq("verification_status", "verified").gte("verified_until", today).order("full_name");
   if (eligibleAuditorsResult.error) throw new Error(`${eligibleAuditorsResult.error.message}. Run internal-auditor-verification.sql in Supabase before assigning the team.`);
