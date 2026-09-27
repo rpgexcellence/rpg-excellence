@@ -338,6 +338,38 @@ const personName = (value) =>
       value?.role ||
       value?.email ||
       "";
+const scenarioGuidance = (name = "") => {
+  const value = name.toLowerCase();
+  if (/shooter|violence|terror|sabotage/.test(value))
+    return {
+      causes: ["Unauthorised access", "Threat escalation", "Security intelligence not acted upon"],
+      warnings: ["Threatening behaviour or communication", "Access-control alert", "Change in official threat level"],
+    };
+  if (/cyber|it-related|identity|software/.test(value))
+    return {
+      causes: ["Unpatched vulnerability", "Credential compromise", "Third-party service failure"],
+      warnings: ["Repeated failed sign-ins", "Security monitoring alert", "Unexpected system degradation"],
+    };
+  if (/fire|explosion|spill|radiation/.test(value))
+    return {
+      causes: ["Equipment or containment failure", "Unsafe condition or activity", "Inspection defect not corrected"],
+      warnings: ["Alarm or detector activation", "Abnormal heat, pressure, odour or reading", "Inspection or maintenance exception"],
+    };
+  if (/flood|storm|weather|earthquake|landslide|tsunami|volcano/.test(value))
+    return {
+      causes: ["Severe-weather or natural-hazard event", "Site exposure or drainage weakness", "Critical utility disruption"],
+      warnings: ["Official weather or hazard warning", "Rising water or abnormal site condition", "Utility-provider alert"],
+    };
+  if (/supplier|transport|customs|export|import/.test(value))
+    return {
+      causes: ["Single-source dependency", "Supplier capacity or financial failure", "Route, border or logistics disruption"],
+      warnings: ["Late or missed delivery", "Supplier performance deterioration", "Carrier, customs or border alert"],
+    };
+  return {
+    causes: ["Equipment, people or process failure", "External dependency disruption", "Control not implemented or ineffective"],
+    warnings: ["Performance outside agreed limits", "Repeated incident or near miss", "Supplier, system or regulatory alert"],
+  };
+};
 const iconKey = (name) => {
   const n = String(name || "").toLowerCase();
   if (/active shooter|workplace violence|terrorism/.test(n)) return "security";
@@ -534,7 +566,7 @@ function HazardIcon({ name, tone = "neutral", small = false }) {
 const iconCss = `.hazardIcon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:14px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6;box-shadow:0 5px 14px #143a6420}.hazardIcon svg{width:38px;height:38px}.hazardIcon.small{width:25px;height:25px;flex-basis:25px;border-radius:7px;box-shadow:none}.hazardIcon.small svg{width:17px;height:17px}.hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.riskIdentity{display:flex;align-items:center;gap:13px}.registerCopy{flex:1;min-width:0}.catalogue button{display:inline-flex;align-items:center;gap:6px}.custom{align-items:center;gap:7px}.register article>.hazardIcon{margin-right:13px}@media(max-width:900px){.hazardIcon{width:48px;height:48px;flex-basis:48px}.hazardIcon svg{width:32px;height:32px}.register article>.hazardIcon{margin:0 0 8px}}`;
 const heatCss = `.appetite{display:flex;justify-content:space-between;gap:20px;align-items:center;background:#eef5ff;border:1px solid #c9daee;border-radius:10px;padding:13px;margin-bottom:14px}.appetite label{min-width:320px}.appetite span{color:#607890}.heatHead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.heatHead h3{margin:4px 0}.heatHead p{margin:0;color:#607890}.heatHead>div:last-child{display:flex;background:#eef3f7;padding:4px;border-radius:9px}.heatHead button{border:0;background:transparent;padding:8px 11px;border-radius:7px;font-weight:800;color:#49637b}.heatHead button.active{background:#fff;color:#0b3155;box-shadow:0 1px 5px #16365220}.heat{max-width:760px}.heat .row,.heat footer{grid-template-columns:70px repeat(5,1fr)}.heat .row>label{align-content:center;text-align:right;padding-right:7px}.heat .row>label small,.heat footer small{display:block}.heat .row>button{height:65px;border:0;display:grid;place-items:center;position:relative;border-radius:7px;cursor:pointer}.heat .row>button.selected{outline:4px solid #112f50;outline-offset:1px}.heat .row i{position:absolute;left:7px;top:5px;font-style:normal;font-size:10px}.heat .row strong{font-size:22px}.heat .row em{position:absolute;right:5px;top:5px;font-size:8px;font-style:normal}@media(max-width:900px){.appetite,.heatHead{display:block}.appetite label{min-width:0}.heat{overflow:auto}}`;
 const riskCoreCss = `.risk>header{display:grid!important;grid-template-columns:minmax(240px,1fr) minmax(220px,280px) auto;align-items:center}.riskCore{display:grid;justify-self:start;padding:8px 13px;border:1px solid #cedce8;border-left:4px solid #2d60e6;border-radius:9px;background:#f1f6fb}.riskCore small{color:#285de4!important;font-size:9px;font-weight:950;letter-spacing:.1em}.riskCore b{font-size:17px;line-height:1.2}.riskCore span{font-size:9px;color:#607890}@media(max-width:1150px){.risk>header{grid-template-columns:1fr auto!important}.riskCore{grid-column:1/-1;width:100%}}@media(max-width:900px){.risk>header{display:flex!important}.riskCore{width:100%}}`;
-const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}.stepRequirements{margin:16px 20px 0;padding:14px 18px;border:1px solid #efc66e;border-left:5px solid #e49a16;border-radius:10px;background:#fff8e8;color:#65450b}.stepRequirements>b{display:block;margin-bottom:6px}.stepRequirements ul{margin:0;padding-left:20px}.stepRequirements li{margin:4px 0;font-size:13px}@media(max-width:900px){.stepRequirements{margin:10px 10px 0}}`;
+const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}.stepRequirements{margin:16px 20px 0;padding:14px 18px;border:1px solid #efc66e;border-left:5px solid #e49a16;border-radius:10px;background:#fff8e8;color:#65450b}.stepRequirements>b{display:block;margin-bottom:6px}.stepRequirements ul{margin:0;padding-left:20px}.stepRequirements li{margin:4px 0;font-size:13px}.controlGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;align-items:start}.controlGrid .list{margin:0;padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.controlGrid label{padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.listGuide{display:block;margin:-3px 0 8px;color:#687e92;font-weight:500;line-height:1.35}.list .listSuggestions{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 9px}.list .listSuggestions button{width:auto;border:1px solid #bcd0e2;border-radius:999px;background:#eef4ff;color:#174da8;padding:6px 8px;font-size:10px;text-align:left}.list .listSuggestions:empty{display:none}.controlScale small{line-height:1.35}@media(max-width:900px){.stepRequirements{margin:10px 10px 0}.controlGrid{grid-template-columns:1fr}}`;
 
 export default function BCPHazardScenarioAssessment({
   action,
@@ -740,7 +772,6 @@ export default function BCPHazardScenarioAssessment({
       ref={formRef}
       action={formAction}
       className="hz"
-      onInput={() => setFormTick((value) => value + 1)}
     >
       <style>{css}</style>
       <style>{iconCss}</style>
@@ -901,6 +932,7 @@ export default function BCPHazardScenarioAssessment({
                 Assessment title
                 <input
                   name="assessment_title"
+                  onInput={() => setFormTick((value) => value + 1)}
                   defaultValue={
                     initial?.assessment_title ||
                     `${organisationName || "Organisation"} disruption hazard assessment`
@@ -924,6 +956,7 @@ export default function BCPHazardScenarioAssessment({
                 <input
                   type="date"
                   name="next_review_date"
+                  onInput={() => setFormTick((value) => value + 1)}
                   defaultValue={initial?.next_review_date || ""}
                 />
               </label>
@@ -932,6 +965,7 @@ export default function BCPHazardScenarioAssessment({
               Operational activities and local scope
               <textarea
                 name="operational_description"
+                onInput={() => setFormTick((value) => value + 1)}
                 rows="5"
                 defaultValue={
                   initial?.operational_description ||
@@ -1088,6 +1122,7 @@ export default function BCPHazardScenarioAssessment({
                 Reviewer / approver
                 <select
                   name="reviewer_name"
+                  onChange={() => setFormTick((value) => value + 1)}
                   defaultValue={initial?.reviewed_by || ""}
                 >
                   <option value="">Select reviewer from Company Users</option>
@@ -1449,61 +1484,73 @@ function RiskCard({
       )}
       {stage === "controls" && (
         <>
-          <ListEditor
-            label="Controls already implemented *"
-            items={r.existingControls}
-            onChange={(v) => update(r.id, { existingControls: v })}
-          />
-          <ListEditor
-            label="Controls to be implemented"
-            items={r.plannedControls}
-            onChange={(v) => update(r.id, { plannedControls: v })}
-          />
-          <label>
-            Control effectiveness <b>{r.controlEffectiveness}%</b>
-            <input
-              type="range"
-              min="0"
-              max="80"
-              step="10"
-              value={r.controlEffectiveness}
-              onChange={(e) =>
-                update(r.id, { controlEffectiveness: +e.target.value })
-              }
+          <div className="controlGrid">
+            <ListEditor
+              label="Controls already implemented *"
+              guide="Select only controls that currently operate and can be evidenced."
+              suggestions={starter[r.name]?.controls || []}
+              items={r.existingControls}
+              onChange={(v) => update(r.id, { existingControls: v })}
             />
-            <small>
-              0 None · 20 Weak · 40 Partial · 60 Substantial · 80 Strong and
-              evidenced
-            </small>
-          </label>
-          <label>
-            Risk owner *
-            <select
-              value={r.owner}
-              onChange={(e) => update(r.id, { owner: e.target.value })}
-            >
-              <option value="">Select accountable owner</option>
-              {people.map((person) => (
-                <option
-                  key={`${person.name}-${person.email}`}
-                  value={person.name}
-                >
-                  {person.name}
-                  {person.position ? ` — ${person.position}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ListEditor
-            label="Causes and contributing factors"
-            items={r.causes}
-            onChange={(v) => update(r.id, { causes: v })}
-          />
-          <ListEditor
-            label="Early-warning indicators"
-            items={r.warningIndicators}
-            onChange={(v) => update(r.id, { warningIndicators: v })}
-          />
+            <ListEditor
+              label="Controls to be implemented"
+              guide="Record additional prevention, detection or response controls required."
+              suggestions={(starter[r.name]?.controls || []).filter(
+                (item) => !r.existingControls.includes(item),
+              )}
+              items={r.plannedControls}
+              onChange={(v) => update(r.id, { plannedControls: v })}
+            />
+            <label className="controlScale">
+              Control effectiveness <b>{r.controlEffectiveness}%</b>
+              <input
+                type="range"
+                min="0"
+                max="80"
+                step="10"
+                value={r.controlEffectiveness}
+                onChange={(e) =>
+                  update(r.id, { controlEffectiveness: +e.target.value })
+                }
+              />
+              <small>
+                0 None · 20 Weak · 40 Partial · 60 Substantial · 80 Strong and evidenced
+              </small>
+            </label>
+            <label>
+              Risk owner *
+              <select
+                value={r.owner}
+                onChange={(e) => update(r.id, { owner: e.target.value })}
+              >
+                <option value="">Select accountable owner</option>
+                {people.map((person) => (
+                  <option
+                    key={`${person.name}-${person.email}`}
+                    value={person.name}
+                  >
+                    {person.name}
+                    {person.position ? ` — ${person.position}` : ""}
+                  </option>
+                ))}
+              </select>
+              <small>Select an active Company User with Business Continuity access.</small>
+            </label>
+            <ListEditor
+              label="Causes and contributing factors"
+              guide="Choose credible initiating causes, then add any site-specific cause."
+              suggestions={scenarioGuidance(r.name).causes}
+              items={r.causes}
+              onChange={(v) => update(r.id, { causes: v })}
+            />
+            <ListEditor
+              label="Early-warning indicators"
+              guide="Choose observable signals that would trigger escalation or preparation."
+              suggestions={scenarioGuidance(r.name).warnings}
+              items={r.warningIndicators}
+              onChange={(v) => update(r.id, { warningIndicators: v })}
+            />
+          </div>
         </>
       )}
       {stage === "treatment" && (
@@ -1610,11 +1657,27 @@ function RiskCard({
     </article>
   );
 }
-function ListEditor({ label, items, onChange }) {
+function ListEditor({ label, guide = "", suggestions = [], items, onChange }) {
   const [value, setValue] = useState("");
   return (
     <div className="list">
       <b>{label}</b>
+      {guide && <small className="listGuide">{guide}</small>}
+      {suggestions.length > 0 && (
+        <div className="listSuggestions">
+          {suggestions
+            .filter((suggestion) => !items.includes(suggestion))
+            .map((suggestion) => (
+              <button
+                type="button"
+                key={suggestion}
+                onClick={() => onChange([...items, suggestion])}
+              >
+                + {suggestion}
+              </button>
+            ))}
+        </div>
+      )}
       {items.map((x, i) => (
         <span key={`${x}-${i}`}>
           {x}
