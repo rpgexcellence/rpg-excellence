@@ -232,7 +232,10 @@ function PersonSelect({
   exclude = [],
   placeholder = "Select a Company User",
 }) {
-  const options = people.filter((person) => !exclude.includes(person));
+  const options = people.filter((person) => {
+    const value = typeof person === "string" ? person : person.id;
+    return !exclude.includes(value);
+  });
   return (
     <select
       name={name}
@@ -243,11 +246,15 @@ function PersonSelect({
       <option value="">
         {options.length ? placeholder : "No eligible Company Users available"}
       </option>
-      {options.map((person) => (
-        <option key={person} value={person}>
-          {person}
+      {options.map((person) => {
+        const value = typeof person === "string" ? person : person.id;
+        const label = typeof person === "string" ? person : person.label;
+        return (
+        <option key={value} value={value}>
+          {label}
         </option>
-      ))}
+        );
+      })}
     </select>
   );
 }
@@ -351,7 +358,10 @@ function RoleCard({ role, roles, setRoles, people }) {
         <b className="r4Label">Assigned people — select one or more</b>
         {!arr(role.people).length && <em>Required</em>}
         <Chips
-          items={people}
+          items={people.map((person) => ({
+            value: person.id,
+            label: person.label,
+          }))}
           selected={arr(role.people)}
           toggle={(v) => toggle("people", v)}
         />
@@ -677,16 +687,35 @@ export default function BCPRolesResponsibilities({
       ...arr(profile?.value_chain_processes),
       ...arr(profile?.support_processes),
     ].filter((x) => x.name),
-    people = [
-      ...new Set(
-        companyPeople
-          .map((person) =>
-            `${person.first_name || ""} ${person.last_name || ""}`.trim(),
-          )
-          .filter(Boolean),
-      ),
-    ];
-  const [roles, setRoles] = useState(arr(initial?.roles)),
+    companyUsers = companyPeople
+      .map((person) => ({
+        id: person.id,
+        label: `${person.first_name || ""} ${person.last_name || ""}`.trim(),
+      }))
+      .filter((person) => person.id && person.label),
+    people = [...new Set(companyUsers.map((person) => person.label))],
+    userIdByLabel = new Map(
+      companyUsers.map((person) => [person.label.toLowerCase(), person.id]),
+    ),
+    userLabelById = new Map(
+      companyUsers.map((person) => [person.id, person.label]),
+    ),
+    resolveUserId = (value) => {
+      const candidate = String(value || "").trim();
+      return userLabelById.has(candidate)
+        ? candidate
+        : userIdByLabel.get(candidate.toLowerCase()) || "";
+    },
+    userLabel = (value) =>
+      userLabelById.get(value) || value || "Not assigned";
+  const [roles, setRoles] = useState(() =>
+      arr(initial?.roles).map((role) => ({
+        ...role,
+        primaryHolder: resolveUserId(role.primaryHolder),
+        people: arr(role.people).map(resolveUserId).filter(Boolean),
+        deputies: arr(role.deputies).map(resolveUserId).filter(Boolean),
+      })),
+    ),
     [assignments, setAssignments] = useState(arr(initial?.assignments)),
     [notes, setNotes] = useState(initial?.notes || ""),
     [distribution, setDistribution] = useState(
@@ -722,7 +751,7 @@ export default function BCPRolesResponsibilities({
     [roles, assignments],
   );
   const generate = () => {
-    const approvedPerson = (name) => (people.includes(name) ? name : "");
+    const approvedPerson = (name) => resolveUserId(name);
     const generatedRoles = roleLibrary.map(
       ([title, purpose, roleSystems, category]) => {
         const existing = roles.find((x) => x.title === title);
@@ -737,13 +766,15 @@ export default function BCPRolesResponsibilities({
         else if (title === "Information security lead")
           suggested = arr(profile?.information_continuity?.systems)
             .map((x) => x.technicalOwner || x.businessOwner)
-            .filter((name) => people.includes(name));
+            .map(resolveUserId)
+            .filter(Boolean);
         else if (title === "Process owner")
           suggested = [
             ...new Set(
               processRecords
                 .map((x) => x.owner)
-                .filter((name) => people.includes(name)),
+                .map(resolveUserId)
+                .filter(Boolean),
             ),
           ];
         return {
@@ -1167,7 +1198,7 @@ export default function BCPRolesResponsibilities({
                   role={x}
                   roles={roles}
                   setRoles={setRoles}
-                  people={people}
+                  people={companyUsers}
                 />
               ))}
             </div>
@@ -1228,9 +1259,9 @@ export default function BCPRolesResponsibilities({
                   </b>
                   <p>{x.purpose}</p>
                   <small>
-                    Primary holder: {x.primaryHolder || "Not assigned"} ·
-                    Assigned: {x.people.join(", ") || "Not assigned"} · Deputy:{" "}
-                    {x.deputies.join(", ") || "Not recorded"} · Systems:{" "}
+                    Primary holder: {userLabel(x.primaryHolder)} · Assigned:{" "}
+                    {x.people.map(userLabel).join(", ") || "Not assigned"} · Deputy:{" "}
+                    {x.deputies.map(userLabel).join(", ") || "Not recorded"} · Systems:{" "}
                     {x.systems.join(", ")}
                   </small>
                   <em>Authority: {x.authority || "Not recorded"}</em>
