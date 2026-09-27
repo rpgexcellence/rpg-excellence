@@ -866,6 +866,23 @@ export default function BCPBusinessImpactAnalysis({
   const [hazardId, setHazardId] = useState(initial?.hazard_assessment_id || "");
   const profile = profiles.find((x) => x.id === profileId),
     hazard = hazards.find((x) => x.id === hazardId);
+  const storedReviewer =
+    initial?.reviewed_by || initial?.approved_by || profile?.site_leader || "";
+  const [reviewerPersonId, setReviewerPersonId] = useState(() => {
+    const storedId = people.find((person) => person.id === storedReviewer)?.id;
+    if (storedId) return storedId;
+    return (
+      people.find(
+        (person) =>
+          `${person.first_name || ""} ${person.last_name || ""}`.trim() ===
+          storedReviewer,
+      )?.id || ""
+    );
+  });
+  const reviewer = people.find((person) => person.id === reviewerPersonId);
+  const reviewerName = reviewer
+    ? `${reviewer.first_name || ""} ${reviewer.last_name || ""}`.trim()
+    : "";
   const processSource = [
     ...arr(profile?.value_chain_processes).map((x) => ({
       ...x,
@@ -938,6 +955,8 @@ export default function BCPBusinessImpactAnalysis({
         ["context_assessment_id", contextId],
         ["role_assessment_id", roleId],
         ["hazard_assessment_id", hazardId],
+        ["reviewer_person_id", reviewerPersonId],
+        ["reviewer_name", reviewerName],
         ["activity_assessments", JSON.stringify(activities)],
         ["next_step", Math.min(5, step + 1)],
       ].map(([name, value]) => (
@@ -1434,16 +1453,22 @@ export default function BCPBusinessImpactAnalysis({
                 </select>
               </label>
               <label>
-                Competent reviewer / approver
-                <input
-                  name="reviewer_name"
-                  defaultValue={
-                    initial?.reviewed_by ||
-                    initial?.approved_by ||
-                    profile?.site_leader ||
-                    ""
-                  }
-                />
+                Competent reviewer / approver *
+                <select
+                  value={reviewerPersonId}
+                  onChange={(event) => setReviewerPersonId(event.target.value)}
+                >
+                  <option value="">Select from Company Users</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {`${person.first_name || ""} ${person.last_name || ""}`.trim()}
+                      {person.position ? ` · ${person.position}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <small>
+                  Only active Company Users with Business Continuity access are available.
+                </small>
               </label>
               <label className="wide">
                 Review decision and limitations
