@@ -521,6 +521,23 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
   const roleNames = roles.map((x) => x.title).filter(Boolean),
     customActors = arr(item.customActors),
     actors = [...new Set([...roleNames, ...people, ...customActors])];
+  const actorKey = (value) => String(value || "").trim().toLocaleLowerCase();
+  const allowedActors = new Set(actors.map(actorKey));
+  const invalidActors = [
+    item.accountable,
+    ...arr(item.responsible),
+    ...arr(item.consulted),
+    ...arr(item.informed),
+  ]
+    .filter(Boolean)
+    .filter((actor) => !allowedActors.has(actorKey(actor)));
+  const missing = [
+    !item.activity && "Process / activity name",
+    !item.accountable && "Accountable owner (A)",
+    !arr(item.responsible).length && "Responsible person or role (R)",
+    invalidActors.length > 0 &&
+      `Invalid or unavailable actor: ${[...new Set(invalidActors)].join(", ")}`,
+  ].filter(Boolean);
   const toggleSystem = (code) =>
     change(
       "systems",
@@ -550,12 +567,19 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
       ),
     );
   return (
-    <article className="r4Assignment">
+    <article
+      className={`r4Assignment ${missing.length ? "assignmentIncomplete" : "assignmentComplete"}`}
+    >
       <header>
         <div>
           <b>{item.activity || "New responsibility"}</b>
           <small>{item.source}</small>
         </div>
+        <span className={`r4RoleStatus ${missing.length ? "missing" : "ready"}`}>
+          {missing.length
+            ? `${missing.length} requirement${missing.length === 1 ? "" : "s"} missing`
+            : "✓ Complete"}
+        </span>
         <button
           type="button"
           onClick={() => setItems(items.filter((x) => x.id !== item.id))}
@@ -563,6 +587,11 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
           Remove
         </button>
       </header>
+      {missing.length > 0 && (
+        <div className="r4RoleMissing" role="status">
+          <b>Complete this process:</b> {missing.join(" · ")}
+        </div>
+      )}
       <Field
         label="Process / activity"
         value={item.activity}
@@ -841,6 +870,14 @@ export default function BCPRolesResponsibilities({
     x.accountable &&
     x.responsible?.length &&
     assignmentActorsValid(x);
+  const assignmentIssueText = (item) => {
+    const issues = [];
+    if (!item.activity) issues.push("process name");
+    if (!item.accountable) issues.push("Accountable (A)");
+    if (!arr(item.responsible).length) issues.push("Responsible (R)");
+    if (!assignmentActorsValid(item)) issues.push("invalid or unavailable actor");
+    return issues;
+  };
   const core = assignments.filter((x) =>
       x.source?.includes("Core management process"),
     ),
@@ -887,6 +924,7 @@ export default function BCPRolesResponsibilities({
     <form action={formAction} className="r4Shell">
       <style>{styles}</style>
       <style>{peopleStyles}</style>
+      <style>{assignmentStatusStyles}</style>
       {[
         ["assessment_id", initial?.id || ""],
         ["site_profile_id", profileId],
@@ -1075,6 +1113,21 @@ export default function BCPRolesResponsibilities({
                 + Add core process
               </button>
             </div>
+            {core.some((item) => !valid(item)) && (
+              <div className="r4StepIssues" role="alert">
+                <b>Module 2 cannot complete yet</b>
+                <span>Correct the following core-process records:</span>
+                <ul>
+                  {core
+                    .filter((item) => !valid(item))
+                    .map((item) => (
+                      <li key={item.id}>
+                        {item.activity || "Unnamed process"}: {assignmentIssueText(item).join(", ")}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
             <div className="r4Records">
               {core.map((x) => (
                 <AssignmentCard
@@ -1392,6 +1445,16 @@ export default function BCPRolesResponsibilities({
   );
 }
 const peopleStyles = `.r4External{display:block;margin-top:3px;color:#a05a00;font-size:8px;font-weight:850;text-transform:uppercase}`;
+const assignmentStatusStyles = `
+.r4StepIssues{margin:0 0 14px;padding:13px 15px;border:1px solid #e7a23d;border-radius:10px;background:#fff7e7;color:#704400}
+.r4StepIssues b,.r4StepIssues span{display:block}
+.r4StepIssues span{margin-top:4px;font-size:11px}
+.r4StepIssues ul{margin:8px 0 0;padding-left:20px}
+.r4StepIssues li{margin:4px 0;font-size:11px}
+.r4Assignment.assignmentIncomplete{border:2px solid #e6a33a;background:#fffdf7}
+.r4Assignment.assignmentComplete{border-left:5px solid #11a786}
+@media(max-width:700px){.r4Assignment>header{flex-wrap:wrap}}
+`;
 function Intro({ title, text }) {
   return (
     <div className="r4Intro">
