@@ -407,27 +407,6 @@ export async function addAuditTeamMember(
       audit_role:
         auditRole,
 
-      standards_competence:
-        clean(
-          formData.get(
-            "standards_competence"
-          )
-        ),
-
-      sector_competence:
-        clean(
-          formData.get(
-            "sector_competence"
-          )
-        ),
-
-      technical_competence:
-        clean(
-          formData.get(
-            "technical_competence"
-          )
-        ),
-
       assigned_scope:
         clean(
           formData.get(
