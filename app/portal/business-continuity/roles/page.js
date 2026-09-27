@@ -80,43 +80,37 @@ async function saveRoles(_previousState, fd) {
         .neq("status", "archived")
         .maybeSingle()
     : { data: null };
-  const [peopleResult, permissionsResult] = await Promise.all([
-    s
-      .from("organization_people")
-      .select("id,first_name,last_name")
-      .eq("organization_id", org.id)
-      .eq("account_status", "active"),
-    s
-      .from("organization_person_permissions")
-      .select("person_id")
-      .eq("organization_id", org.id)
-      .eq("module_key", "business_continuity")
-      .neq("access_level", "none"),
-  ]);
-  const permittedIds = new Set(
-    (permissionsResult.data || []).map((x) => x.person_id),
-  );
+  const { data: activePeople = [] } = await s
+    .from("organization_people")
+    .select("id,first_name,last_name")
+    .eq("organization_id", org.id)
+    .eq("account_status", "active");
   const controlledPeople = new Set(
-    (peopleResult.data || [])
-      .filter((person) => permittedIds.has(person.id))
+    activePeople
       .map((person) => `${person.first_name} ${person.last_name}`.trim()),
   );
   const roleNames = new Set(
     roles.map((role) => clean(role.title)).filter(Boolean),
   );
-  const rolesUseControlledPeople = roles.every(
-    (role) =>
-      controlledPeople.has(clean(role.primaryHolder)) &&
-      (role.people || []).every((name) => controlledPeople.has(clean(name))) &&
-      (role.deputies || []).every((name) => controlledPeople.has(clean(name))),
-  );
-  const roleHolderDeputyConflict = roles.some(
-    (role) =>
-      clean(role.primaryHolder) &&
-      (role.deputies || []).some(
-        (deputy) => clean(deputy) === clean(role.primaryHolder),
-      ),
-  );
+  const rolePeopleErrors = roles.flatMap((role, index) => {
+    const title = clean(role.title) || `Role ${index + 1}`,
+      primary = clean(role.primaryHolder),
+      assigned = (role.people || []).map(clean).filter(Boolean),
+      deputies = (role.deputies || []).map(clean).filter(Boolean),
+      errors = [];
+    if (!primary) errors.push(`${title}: select a primary role holder`);
+    else if (!controlledPeople.has(primary))
+      errors.push(`${title}: primary holder “${primary}” is not an active Company User`);
+    assigned
+      .filter((name) => !controlledPeople.has(name))
+      .forEach((name) => errors.push(`${title}: assigned person “${name}” is not an active Company User`));
+    deputies
+      .filter((name) => !controlledPeople.has(name))
+      .forEach((name) => errors.push(`${title}: deputy “${name}” is not an active Company User`));
+    if (primary && deputies.includes(primary))
+      errors.push(`${title}: primary holder and deputy must be different people`);
+    return errors;
+  });
   const assignmentsUseControlledActors = assignments.every((assignment) => {
     const external = new Set((assignment.customActors || []).map(clean));
     const allowed = (name) =>
@@ -186,13 +180,16 @@ async function saveRoles(_previousState, fd) {
   const completion = Math.round((complete.filter(Boolean).length / 6) * 100);
   if (
     ["review", "approve"].includes(intent) &&
-    (!rolesUseControlledPeople ||
-      !assignmentsUseControlledActors ||
-      roleHolderDeputyConflict)
+    (rolePeopleErrors.length || !assignmentsUseControlledActors)
   )
     return {
-      error:
-        "Select each primary role holder and deputy from active Company Users. A primary role holder cannot also be the deputy for the same role.",
+      error: `Cannot submit: ${rolePeopleErrors.length || 1} role assignment requirement${(rolePeopleErrors.length || 1) === 1 ? " is" : "s are"} incomplete.`,
+      validation: {
+        step: 4,
+        items: rolePeopleErrors.length
+          ? rolePeopleErrors
+          : ["A RACI assignment contains a person who is not an active Company User or approved local actor"],
+      },
     };
   if (["review", "approve"].includes(intent) && !complete.every(Boolean))
     return {
@@ -354,26 +351,13 @@ export default async function RolesPage({ searchParams }) {
       .eq("organization_id", org.id)
       .neq("status", "archived")
       .order("updated_at", { ascending: false }));
-    const [peopleResult, permissionsResult] = await Promise.all([
-      s
-        .from("organization_people")
-        .select("id,first_name,last_name,email,position,account_status")
-        .eq("organization_id", org.id)
-        .eq("account_status", "active")
-        .order("last_name"),
-      s
-        .from("organization_person_permissions")
-        .select("person_id")
-        .eq("organization_id", org.id)
-        .eq("module_key", "business_continuity")
-        .neq("access_level", "none"),
-    ]);
-    const permittedIds = new Set(
-      (permissionsResult.data || []).map((permission) => permission.person_id),
-    );
-    companyPeople = (peopleResult.data || []).filter((person) =>
-      permittedIds.has(person.id),
-    );
+    const { data: peopleResult = [] } = await s
+      .from("organization_people")
+      .select("id,first_name,last_name,email,position,account_status")
+      .eq("organization_id", org.id)
+      .eq("account_status", "active")
+      .order("last_name");
+    companyPeople = peopleResult;
     if (params?.new !== "1") {
       let query = s
         .from("bcp_role_assessments")
