@@ -102,6 +102,7 @@ export default function SupplierAssuranceWorkspace({
   supplierSites = [],
   supplierNcStats = {},
   supplierContacts = [],
+  supplierAudits = [],
   managementBoard = false,
   action,
   generateAction,
@@ -1251,6 +1252,31 @@ export default function SupplierAssuranceWorkspace({
                     </label>
                   ))}
                 </div>
+
+                <section className="saAuditHistory">
+                  <header>
+                    <div>
+                      <span>LIVE LINKED ASSURANCE</span>
+                      <h3>Supplier audit history</h3>
+                      <p>Audits created for this supplier remain visible against its approval and monitoring record.</p>
+                    </div>
+                    {active?.approval_status === "approved" ? <Link href={`/portal/internal-audits?supplier=${active.id}#audit-mandate`}>+ Create Supplier Audit</Link> : null}
+                  </header>
+                  {supplierAudits.length ? (
+                    <div className="saAuditList">
+                      {supplierAudits.map((audit) => (
+                        <article key={audit.id}>
+                          <div><b>{audit.audit_reference} · {audit.title}</b><small>{String(audit.audit_method || "").replaceAll("_", " ")} · Gate: {String(audit.current_gate || "scope").replaceAll("_", " ")}</small></div>
+                          <div><Pill tone={["closed", "report_approved"].includes(audit.status) ? "green" : ["cancelled"].includes(audit.status) ? "red" : "blue"}>{String(audit.status || "draft").replaceAll("_", " ")}</Pill></div>
+                          <div><b>{audit.planned_start_at ? new Date(audit.planned_start_at).toLocaleDateString("en-GB") : "Not scheduled"}</b><small>{audit.planned_end_at ? `to ${new Date(audit.planned_end_at).toLocaleDateString("en-GB")}` : "End date not set"}</small></div>
+                          <Link href={`/portal/internal-audits/${audit.id}`}>Open Audit →</Link>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="saAuditEmpty">No supplier audits have been created for this supplier.</div>
+                  )}
+                </section>
               </>
             )}
 
@@ -1526,6 +1552,18 @@ const styles = `
 .saBoardRow>span:last-child{justify-items:start}
 .saBoardEmpty{display:grid;gap:6px;padding:35px;border:1px dashed #c9d6e2;border-radius:11px;color:#627990;text-align:center}
 .saBoardEmpty b{color:#173b60;font-size:18px}
+.saAuditHistory{margin-top:25px;border:1px solid #d5e1eb;border-radius:14px;background:#f8fbfe;overflow:hidden}
+.saAuditHistory>header{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:20px 22px;border-bottom:1px solid #dce6ef;background:#fff}
+.saAuditHistory>header span{color:#087d73;font-size:9px;font-weight:950;letter-spacing:.12em}
+.saAuditHistory>header h3{margin:4px 0 5px}
+.saAuditHistory>header p{margin:0;color:#6b7f93;font-size:13px}
+.saAuditHistory>header>a,.saAuditList>article>a{padding:10px 13px;border-radius:8px;background:#087d73;color:#fff;text-decoration:none;font-size:12px;font-weight:850;white-space:nowrap}
+.saAuditList>article{display:grid;grid-template-columns:minmax(260px,1.5fr) 130px 160px 110px;gap:15px;align-items:center;padding:16px 22px;border-top:1px solid #e0e8ef}
+.saAuditList>article:first-child{border-top:0}
+.saAuditList>article>div{display:grid;gap:4px}
+.saAuditList>article small{color:#71869a;font-size:10px}
+.saAuditList>article>a{justify-self:start;background:#315fe6}
+.saAuditEmpty{padding:22px;color:#71869a}
 .saMessage{margin-top:13px;padding:12px 15px;border-radius:9px;font-weight:800}
 .saMessage.success{background:#e7f8f1;color:#08734f}
 .saMessage.error{background:#ffe9e6;color:#a72822}
