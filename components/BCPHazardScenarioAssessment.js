@@ -539,6 +539,7 @@ export default function BCPHazardScenarioAssessment({
   profiles = [],
   contexts = [],
   roles = [],
+  companyPeople = [],
   initial,
   organisationName = "",
   startStep = 0,
@@ -553,22 +554,17 @@ export default function BCPHazardScenarioAssessment({
   const profile = profiles.find((x) => x.id === profileId),
     context = contexts.find((x) => x.id === contextId),
     role = roles.find((x) => x.id === roleId);
-  const people = useMemo(() => {
-    const values = [
-      profile?.site_leader,
-      profile?.local_facilitator,
-      ...arr(profile?.training_participants),
-      ...arr(role?.roles).flatMap((x) => arr(x.people)),
-    ];
-    return [
-      ...new Set(
-        values
-          .map(personName)
-          .map((x) => String(x).trim())
-          .filter((x) => x && x !== "[object Object]"),
-      ),
-    ];
-  }, [profile, role]);
+  const people = useMemo(
+    () =>
+      companyPeople
+        .map((person) => ({
+          name: personName(person),
+          email: person.email || "",
+          position: person.position || "",
+        }))
+        .filter((person) => person.name),
+    [companyPeople],
+  );
   const processes = [
       ...profileItems(profile, "value_chain_processes"),
       ...profileItems(profile, "support_processes"),
@@ -1076,52 +1072,58 @@ function Panel({ title, text, children }) {
   );
 }
 function Multi({ title, values, options, onChange }) {
-  const [custom, setCustom] = useState("");
+  const [selected, setSelected] = useState("");
+  const available = options.filter((person) => !values.includes(person.name));
+  const validNames = new Set(options.map((person) => person.name));
+  const legacyValues = values.filter((value) => !validNames.has(value));
   return (
     <div className="multi">
       <b>{title}</b>
-      <div>
-        {options.map((x) => (
-          <button
-            type="button"
-            className={values.includes(x) ? "selected" : ""}
-            onClick={() => onChange(toggle(values, x))}
-            key={x}
-          >
-            {values.includes(x) ? "✓ " : "+ "}
-            {x}
-          </button>
-        ))}
-      </div>
+      <small>Select active Company Users with Business Continuity access.</small>
       <span>
-        <input
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          placeholder="Add another participant or role"
-        />
+        <select value={selected} onChange={(event) => setSelected(event.target.value)}>
+          <option value="">
+            {available.length
+              ? "Select participant from Company Users"
+              : "No additional Company Users available"}
+          </option>
+          {available.map((person) => (
+            <option key={`${person.name}-${person.email}`} value={person.name}>
+              {person.name}{person.position ? ` — ${person.position}` : ""}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={() => {
-            if (custom.trim() && !values.includes(custom.trim()))
-              onChange([...values, custom.trim()]);
-            setCustom("");
+            if (selected && !values.includes(selected))
+              onChange([...values, selected]);
+            setSelected("");
           }}
+          disabled={!selected}
         >
-          Add
+          Add participant
         </button>
       </span>
-      {values
-        .filter((x) => !options.includes(x))
-        .map((x) => (
+      <div>
+        {values.map((value) => (
           <button
             type="button"
-            className="chip"
-            onClick={() => onChange(values.filter((v) => v !== x))}
-            key={x}
+            className={legacyValues.includes(value) ? "chip legacy" : "selected"}
+            onClick={() => onChange(values.filter((item) => item !== value))}
+            key={value}
+            title={legacyValues.includes(value) ? "Invalid legacy entry — click to remove" : "Click to remove"}
           >
-            {x} ×
+            {legacyValues.includes(value) ? "⚠ " : "✓ "}{value} ×
           </button>
         ))}
+      </div>
+      {legacyValues.length > 0 && (
+        <em>Remove the highlighted legacy entry before saving.</em>
+      )}
+      {!options.length && (
+        <em>No active Company Users with Business Continuity access are available.</em>
+      )}
     </div>
   );
 }
