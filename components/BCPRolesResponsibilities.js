@@ -152,6 +152,7 @@ const newRole = (title = "") => ({
   title,
   purpose: "",
   people: [],
+  primaryHolder: "",
   deputies: [],
   systems: ["B"],
   authority: "",
@@ -221,6 +222,34 @@ function Field({ label, value, onChange, area = false, placeholder = "" }) {
     </label>
   );
 }
+function PersonSelect({
+  value = "",
+  onChange,
+  name,
+  people = [],
+  required = false,
+  exclude = [],
+  placeholder = "Select a Company User",
+}) {
+  const options = people.filter((person) => !exclude.includes(person));
+  return (
+    <select
+      name={name}
+      value={value}
+      required={required}
+      onChange={(event) => onChange?.(event.target.value)}
+    >
+      <option value="">
+        {options.length ? placeholder : "No eligible Company Users available"}
+      </option>
+      {options.map((person) => (
+        <option key={person} value={person}>
+          {person}
+        </option>
+      ))}
+    </select>
+  );
+}
 function RoleCard({ role, roles, setRoles, people }) {
   const change = (key, value) =>
     setRoles(roles.map((x) => (x.id === role.id ? { ...x, [key]: value } : x)));
@@ -257,6 +286,35 @@ function RoleCard({ role, roles, setRoles, people }) {
           value={role.purpose}
           onChange={(v) => change("purpose", v)}
         />
+        <label>
+          Primary role holder *
+          <PersonSelect
+            value={role.primaryHolder || ""}
+            people={people}
+            required
+            onChange={(value) =>
+              setRoles(
+                roles.map((item) =>
+                  item.id === role.id
+                    ? {
+                        ...item,
+                        primaryHolder: value,
+                        people: value
+                          ? [...new Set([...arr(item.people), value])]
+                          : arr(item.people),
+                        deputies: arr(item.deputies).filter(
+                          (deputy) => deputy !== value,
+                        ),
+                      }
+                    : item,
+                ),
+              )
+            }
+          />
+          <small>
+            The nominated Company User accountable for acting in this role.
+          </small>
+        </label>
       </div>
       <b className="r4Label">Applicable management systems</b>
       <Chips
@@ -274,20 +332,17 @@ function RoleCard({ role, roles, setRoles, people }) {
         toggle={(v) => toggle("people", v)}
       />
       <div className="r4Grid">
-        <Field
-          label="Deputy / alternate"
-          value={arr(role.deputies).join(", ")}
-          onChange={(v) =>
-            change(
-              "deputies",
-              v
-                .split(",")
-                .map((x) => x.trim())
-                .filter(Boolean),
-            )
-          }
-          placeholder="Name or role"
-        />
+        <label>
+          Deputy / alternate
+          <PersonSelect
+            value={arr(role.deputies)[0] || ""}
+            people={people}
+            exclude={[role.primaryHolder].filter(Boolean)}
+            placeholder="Select a different Company User"
+            onChange={(value) => change("deputies", value ? [value] : [])}
+          />
+          <small>The primary role holder cannot also be their deputy.</small>
+        </label>
         <Field
           label="Decision authority"
           value={role.authority}
@@ -607,12 +662,25 @@ export default function BCPRolesResponsibilities({
     [notes, setNotes] = useState(initial?.notes || ""),
     [distribution, setDistribution] = useState(
       initial?.distribution || "Electronic controlled copy",
-    );
+    ),
+    [reviewerName, setReviewerName] = useState(() => {
+      const stored =
+        initial?.reviewed_by ||
+        initial?.approved_by ||
+        profile?.site_leader ||
+        "";
+      return people.includes(stored) ? stored : "";
+    });
   const gaps = useMemo(
     () => [
       ...roles
         .filter(
-          (x) => !x.title || !x.purpose || !x.people?.length || !x.authority,
+          (x) =>
+            !x.title ||
+            !x.purpose ||
+            !x.primaryHolder ||
+            !x.people?.length ||
+            !x.authority,
         )
         .map((x) => `${x.title || "Unnamed role"}: incomplete role assignment`),
       ...assignments
@@ -654,6 +722,7 @@ export default function BCPRolesResponsibilities({
           purpose,
           systems: roleSystems,
           people: suggested,
+          primaryHolder: suggested[0] || "",
           source: `BCMS operational responsibility · ${category}`,
         };
       },
@@ -711,6 +780,7 @@ export default function BCPRolesResponsibilities({
         (x) =>
           x.title &&
           x.purpose &&
+          x.primaryHolder &&
           x.people?.length &&
           x.authority &&
           x.escalation &&
@@ -1117,6 +1187,7 @@ export default function BCPRolesResponsibilities({
                   </b>
                   <p>{x.purpose}</p>
                   <small>
+                    Primary holder: {x.primaryHolder || "Not assigned"} ·
                     Assigned: {x.people.join(", ") || "Not assigned"} · Deputy:{" "}
                     {x.deputies.join(", ") || "Not recorded"} · Systems:{" "}
                     {x.systems.join(", ")}
@@ -1139,15 +1210,14 @@ export default function BCPRolesResponsibilities({
                 onChange={setDistribution}
               />
               <label>
-                Competent reviewer / approver
-                <input
+                Competent reviewer / approver *
+                <PersonSelect
                   name="reviewer_name"
-                  defaultValue={
-                    initial?.reviewed_by ||
-                    initial?.approved_by ||
-                    profile?.site_leader ||
-                    ""
-                  }
+                  value={reviewerName}
+                  people={people}
+                  required
+                  placeholder="Select reviewer from Company Users"
+                  onChange={setReviewerName}
                 />
               </label>
               <label>
