@@ -109,8 +109,8 @@ export async function saveSupplier(_state, fd) {
   const gapContactIds = [...new Set(Object.values(answers).map((gap) => clean(gap?.gap_owner_contact_id)).filter(Boolean))];
   const gapReviewerIds = [...new Set(Object.values(answers).map((gap) => clean(gap?.gap_reviewer_person_id)).filter(Boolean))];
   const [{ data: validGapContacts = [] }, { data: validGapReviewers = [] }] = await Promise.all([
-    gapContactIds.length && id ? supabase.from("supplier_contacts").select("id,first_name,last_name").eq("organization_id", organization.id).eq("supplier_id", id).in("id", gapContactIds) : { data: [] },
-    gapReviewerIds.length ? supabase.from("organization_people").select("id,first_name,last_name").eq("organization_id", organization.id).in("id", gapReviewerIds).in("account_status", ["active", "invited"]) : { data: [] },
+    gapContactIds.length && id ? storageAdmin.from("supplier_contacts").select("id,first_name,last_name").eq("organization_id", organization.id).eq("supplier_id", id).in("id", gapContactIds) : { data: [] },
+    gapReviewerIds.length ? storageAdmin.from("organization_people").select("id,first_name,last_name").eq("organization_id", organization.id).in("id", gapReviewerIds).in("account_status", ["active", "invited"]) : { data: [] },
   ]);
   const contactMap = new Map(validGapContacts.map((person) => [person.id, person]));
   const reviewerMap = new Map(validGapReviewers.map((person) => [person.id, person]));
