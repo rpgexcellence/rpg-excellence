@@ -111,6 +111,8 @@ export default function SupplierAssuranceWorkspace({
   supplierContacts = [],
   supplierAudits = [],
   quarterlyReviews = [],
+  companyPeople = [],
+  dueDiligenceEvents = [],
   managementBoard = false,
   action,
   generateAction,
@@ -1078,8 +1080,11 @@ export default function SupplierAssuranceWorkspace({
                         {["partial", "no"].includes(current.response) && (
                           <div className="saGapFields">
                             <label><span>Gap severity</span><select value={current.gap_severity || (item.blocker || current.response === "no" ? "High" : "Medium")} onChange={(event) => answer(item.id, "gap_severity", event.target.value)}><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></label>
-                            <label><span>Gap owner</span><input value={current.gap_owner || ""} onChange={(event) => answer(item.id, "gap_owner", event.target.value)} placeholder="Responsible person" /></label>
+                            <label><span>Responsible supplier contact</span><select value={current.gap_owner_contact_id || ""} onChange={(event) => { const contact = supplierContacts.find((person) => person.id === event.target.value); answer(item.id, "gap_owner_contact_id", event.target.value); answer(item.id, "gap_owner", contact ? `${contact.first_name} ${contact.last_name || ""}`.trim() : ""); }}><option value="">Select supplier contact</option>{supplierContacts.filter((person) => person.is_active !== false).map((person) => <option key={person.id} value={person.id}>{person.first_name} {person.last_name || ""} · {person.business_title || person.email}</option>)}</select></label>
                             <label><span>Due date</span><input type="date" value={current.gap_due_date || ""} onChange={(event) => answer(item.id, "gap_due_date", event.target.value)} /></label>
+                            <label><span>Company reviewer</span><select value={current.gap_reviewer_person_id || ""} onChange={(event) => { const person = companyPeople.find((entry) => entry.id === event.target.value); answer(item.id, "gap_reviewer_person_id", event.target.value); answer(item.id, "gap_reviewer", person ? `${person.first_name} ${person.last_name}` : ""); }}><option value="">Select independent reviewer</option>{companyPeople.map((person) => <option key={person.id} value={person.id}>{person.first_name} {person.last_name} · {person.position || person.email}</option>)}</select></label>
+                            <label><span>Review date</span><input type="date" value={current.gap_review_date || ""} onChange={(event) => answer(item.id, "gap_review_date", event.target.value)} /></label>
+                            <label><span>Review outcome</span><select value={current.gap_review_outcome || "open"} onChange={(event) => answer(item.id, "gap_review_outcome", event.target.value)}><option value="open">Open — action required</option><option value="awaiting_review">Awaiting reviewer assessment</option><option value="effective">Effective — verified closed</option><option value="partially_effective">Partially effective — further action</option><option value="not_effective">Not effective — reopen action</option></select></label>
                           </div>
                         )}
 
@@ -1116,6 +1121,7 @@ export default function SupplierAssuranceWorkspace({
                           {selectedFiles[item.id] && <span>Ready to save: {selectedFiles[item.id]}</span>}
                           {evidenceFiles.filter((file) => file.control_id === item.id).map((file) => <a key={file.id} href={file.download_url} target="_blank" rel="noreferrer">↧ {file.file_name}</a>)}
                         </div>
+                        <details className="saControlTrail"><summary>View control audit trail ({dueDiligenceEvents.filter((event) => event.control_id === item.id).length})</summary>{dueDiligenceEvents.filter((event) => event.control_id === item.id).map((event) => <div key={event.id}><b>{String(event.event_type).replaceAll("_", " ")}</b><span>{event.event_summary}</span><small>{new Date(event.created_at).toLocaleString("en-GB")} · {event.actor_name || "Recorded user"}</small></div>)}</details>
 
                         <small>
                           Control {index + 1} of{" "}
@@ -1616,8 +1622,9 @@ const styles = `
 .saGapPanel article small{display:block;color:#6d8195;font-size:10px}
 .saGapPanel article a,.saGapPanel article button{display:inline-block;margin-top:7px;padding:0;border:0;background:none;color:#315fe6;font:inherit;font-size:11px;font-weight:850;text-decoration:none;cursor:pointer}
 .saGapPanel .clear{margin:8px 0 0;color:#087450;font-size:11px}
-.saGapFields{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:9px;margin:10px 0;padding:12px;border:1px solid #efd28e;border-radius:9px;background:#fff9e9}
+.saGapFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:10px 0;padding:12px;border:1px solid #efd28e;border-radius:9px;background:#fff9e9}
 .saGapFields label{display:grid;gap:5px}.saGapFields label span{color:#5c6f82;font-size:10px;font-weight:850}.saGapFields input,.saGapFields select{width:100%;padding:9px;border:1px solid #ccd8e3;border-radius:7px;background:#fff;color:#173b60}
+.saControlTrail{margin-top:10px;padding-top:9px;border-top:1px solid #e0e7ee}.saControlTrail summary{cursor:pointer;color:#2459c5;font-size:11px;font-weight:900}.saControlTrail>div{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;padding:9px 0;border-top:1px solid #e7edf2}.saControlTrail>div:first-of-type{margin-top:8px}.saControlTrail span,.saControlTrail small{color:#687d91;font-size:10px}.saControlTrail b{font-size:10px;text-transform:capitalize}
 .saReviewLogic{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-top:16px;padding:15px 17px;border:1px solid #a9ddcc;border-radius:11px;background:#effaf6}
 .saReviewLogic>div{display:grid;gap:5px}.saReviewLogic b{color:#0a5f4c}.saReviewLogic span{color:#526d68;font-size:12px;line-height:1.45}.saReviewLogic strong{color:#087450;font-size:12px}.saReviewLogic em{color:#a63128;font-size:12px;font-style:normal;font-weight:850}
 .saReviewLogic.warning{border-color:#edc36d;background:#fff8e8}.saReviewLogic.warning b,.saReviewLogic.warning strong{color:#875300}
