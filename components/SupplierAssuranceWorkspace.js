@@ -88,14 +88,15 @@ function Pill({ tone = "blue", children }) {
   return <span className={`saPill ${tone}`}>{children}</span>;
 }
 
-function Metric({ label, value, detail, tone = "blue" }) {
-  return (
-    <article className="saMetric">
+function Metric({ label, value, detail, tone = "blue", href, onClick }) {
+  const content = <>
       <span>{label}</span>
       <strong className={tone}>{value}</strong>
       <small>{detail}</small>
-    </article>
-  );
+    </>;
+  if (href) return <Link className="saMetric clickable" href={href}>{content}</Link>;
+  if (onClick) return <button type="button" className="saMetric clickable" onClick={onClick}>{content}</button>;
+  return <article className="saMetric">{content}</article>;
 }
 
 export default function SupplierAssuranceWorkspace({
@@ -420,10 +421,11 @@ export default function SupplierAssuranceWorkspace({
               label={quarterlyReviews.length ? "Last QBR date" : "Next QBR date"}
               value={quarterlyReviews[0]?.review_date || active?.next_review_date || "Not set"}
               detail={quarterlyReviews.length ? `Next QBR ${quarterlyReviews[0].next_qbr_date}` : active ? "No completed QBR recorded" : "Select a supplier"}
+              href={active ? `/portal/suppliers/${active.id}/qbr${quarterlyReviews[0]?.id ? `?review=${quarterlyReviews[0].id}` : ""}` : undefined}
             />
-            <Metric label="NCs open" value={activeNc.open} detail={active ? "Action required" : "Select a supplier"} tone="red" />
-            <Metric label="NCs pending" value={activeNc.pending} detail={active ? "CAPA or verification" : "Select a supplier"} tone="amber" />
-            <Metric label="NCs closed" value={activeNc.closed} detail={active ? "Effectiveness verified" : "Select a supplier"} tone="green" />
+            <Metric label="NCs open" value={activeNc.open} detail={active ? "Action required" : "Select a supplier"} tone="red" href={active ? `/portal/internal-audit-actions?supplier=${active.id}&status=open#all-ncs` : undefined} />
+            <Metric label="NCs pending" value={activeNc.pending} detail={active ? "CAPA or verification" : "Select a supplier"} tone="amber" href={active ? `/portal/internal-audit-actions?supplier=${active.id}&status=pending#all-ncs` : undefined} />
+            <Metric label="NCs closed" value={activeNc.closed} detail={active ? "Effectiveness verified" : "Select a supplier"} tone="green" href={active ? `/portal/internal-audit-actions?supplier=${active.id}&status=closed#all-ncs` : undefined} />
             <Metric
               label="High / critical"
               value={
@@ -435,6 +437,7 @@ export default function SupplierAssuranceWorkspace({
               }
               detail="Enhanced assurance required"
               tone="red"
+              onClick={() => setStep(3)}
             />
             <Metric
               label="Pending approval"
@@ -446,6 +449,7 @@ export default function SupplierAssuranceWorkspace({
               }
               detail="Decision required"
               tone="amber"
+              onClick={() => setStep(5)}
             />
             <Metric
               label="Codes issued"
@@ -454,6 +458,7 @@ export default function SupplierAssuranceWorkspace({
                 active ? "For selected supplier" : "Select a supplier"
               }
               tone="green"
+              onClick={() => setStep(6)}
             />
             <Metric
               label="Risk profile"
@@ -464,6 +469,7 @@ export default function SupplierAssuranceWorkspace({
                   : "Select a supplier"
               }
               tone={active ? riskTone : "blue"}
+              onClick={active ? () => setStep(3) : undefined}
             />
           </section>
 
@@ -1580,6 +1586,7 @@ const styles = `
 .saHero article span{margin-top:3px;color:#b8ccdf;font-size:9px}
 .saMetrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:13px}
 .saMetric{display:flex;min-height:112px;flex-direction:column;justify-content:space-between;padding:17px;border:1px solid #d6e1eb;border-radius:13px;background:#fff}
+.saMetric.clickable{color:inherit;text-align:left;text-decoration:none;font:inherit;cursor:pointer;transition:transform .16s,border-color .16s,box-shadow .16s}.saMetric.clickable:hover,.saMetric.clickable:focus-visible{transform:translateY(-2px);border-color:#315fe6;box-shadow:0 10px 24px #173b6018;outline:none}.saMetric.clickable small::after{content:"  →";color:#315fe6;font-weight:950}
 .saMetric>span{color:#5f748a;font-size:11px;font-weight:850}
 .saMetric strong{font-size:28px}
 .saMetric small{color:#8292a3;font-size:9px}
