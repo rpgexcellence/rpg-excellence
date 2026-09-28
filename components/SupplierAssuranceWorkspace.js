@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import {
   SUPPLIER_STANDARDS,
   SUPPLIER_TYPES,
@@ -22,6 +22,13 @@ const tabs = [
 
 const n = (value, fallback = 3) =>
   Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+const addMonths = (dateValue, months) => {
+  const source = dateValue ? new Date(`${dateValue}T12:00:00Z`) : new Date();
+  if (Number.isNaN(source.getTime())) return "";
+  source.setUTCMonth(source.getUTCMonth() + Math.max(1, Number(months) || 1));
+  return source.toISOString().slice(0, 10);
+};
 
 const initialData = (source = {}) => ({
   legal_name: source.legal_name || "",
@@ -164,12 +171,32 @@ export default function SupplierAssuranceWorkspace({
     [standards, types, data.legal_name],
   );
 
+  const active = initial || null;
+
   const averagePerformance = Math.round(
     Object.values(performance).reduce(
       (sum, value) => sum + n(value, 0),
       0,
     ) / 4,
   );
+
+  const reviewBaseDate = active?.approved_at?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const selectedReviewMonths = Math.max(1, Number(data.review_frequency_months) || result.reviewMonths);
+  const recommendedReviewDate = addMonths(reviewBaseDate, result.reviewMonths);
+  const reviewDeviation = selectedReviewMonths !== result.reviewMonths;
+  const expiryBeforeReview = Boolean(data.approval_expiry && data.next_review_date && data.approval_expiry < data.next_review_date);
+  const gapDetails = result.gaps.map((id) => {
+    const question = questions.find((item) => item.id === id);
+    const current = answers[id] || {};
+    const files = evidenceFiles.filter((file) => file.control_id === id);
+    const defaultSeverity = question?.blocker || current.response === "no" ? "High" : current.response === "partial" ? "Medium" : "Unrated";
+    return { id, question, current, files, severity: current.gap_severity || defaultSeverity };
+  });
+
+  useEffect(() => {
+    const calculated = addMonths(reviewBaseDate, selectedReviewMonths);
+    setData((current) => current.next_review_date === calculated ? current : { ...current, next_review_date: calculated });
+  }, [reviewBaseDate, selectedReviewMonths]);
 
   const update = (key, value) =>
     setData((current) => ({ ...current, [key]: value }));
@@ -189,6 +216,11 @@ export default function SupplierAssuranceWorkspace({
         [key]: value,
       },
     }));
+
+  const openGapControl = (id) => {
+    setStep(4);
+    setTimeout(() => document.getElementById(`supplier-control-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+  };
 
   const addSite = () => setSites((current) => [
     ...current,
@@ -211,8 +243,6 @@ export default function SupplierAssuranceWorkspace({
   const updateContact = (key, field, value) => setContacts((current) => current.map((contact) => contact.client_key === key ? { ...contact, [field]: value } : contact));
   const setPrimaryContact = (key) => setContacts((current) => current.map((contact) => ({ ...contact, is_primary: contact.client_key === key })));
   const removeContact = (key) => setContacts((current) => current.filter((contact) => contact.client_key !== key));
-
-  const active = initial || null;
 
   const riskTone =
     result.riskBand === "Critical"
@@ -990,6 +1020,7 @@ export default function SupplierAssuranceWorkspace({
                     return (
                       <article
                         key={item.id}
+                        id={`supplier-control-${item.id}`}
                         className={
                           item.blocker &&
                           [
@@ -1039,6 +1070,14 @@ export default function SupplierAssuranceWorkspace({
                             </button>
                           ))}
                         </div>
+
+                        {["partial", "no"].includes(current.response) && (
+                          <div className="saGapFields">
+                            <label><span>Gap severity</span><select value={current.gap_severity || (item.blocker || current.response === "no" ? "High" : "Medium")} onChange={(event) => answer(item.id, "gap_severity", event.target.value)}><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></label>
+                            <label><span>Gap owner</span><input value={current.gap_owner || ""} onChange={(event) => answer(item.id, "gap_owner", event.target.value)} placeholder="Responsible person" /></label>
+                            <label><span>Due date</span><input type="date" value={current.gap_due_date || ""} onChange={(event) => answer(item.id, "gap_due_date", event.target.value)} /></label>
+                          </div>
+                        )}
 
                         <label>
                           <span>
@@ -1100,15 +1139,17 @@ export default function SupplierAssuranceWorkspace({
                       monitoring plan.
                     </p>
                   </div>
-                  <Pill
-                    tone={
-                      result.blockers.length ? "red" : "green"
-                    }
-                  >
-                    {result.blockers.length
-                      ? "Approval blocked"
-                      : "Eligible for approval"}
-                  </Pill>
+                  <aside className="saGapPanel">
+                    <div><b>Assurance gaps · {gapDetails.length}</b><Pill tone={result.blockers.length ? "red" : "green"}>{result.blockers.length ? "Approval blocked" : "Eligible for approval"}</Pill></div>
+                    {gapDetails.length ? gapDetails.map((gap) => (
+                      <article key={gap.id}>
+                        <header><strong>{gap.id} · {gap.question?.category || "Due diligence"}</strong><Pill tone={["High", "Critical"].includes(gap.severity) ? "red" : gap.severity === "Medium" ? "amber" : "blue"}>{gap.severity}</Pill></header>
+                        <p>{gap.question?.question || "Assurance response requires resolution."}</p>
+                        <small>Owner: {gap.current.gap_owner || "Unassigned"} · Due: {gap.current.gap_due_date ? new Date(`${gap.current.gap_due_date}T12:00:00Z`).toLocaleDateString("en-GB") : "Not set"}</small>
+                        {gap.files[0] ? <a href={gap.files[0].download_url} target="_blank" rel="noreferrer">Open evidence →</a> : <button type="button" onClick={() => openGapControl(gap.id)}>Open control evidence →</button>}
+                      </article>
+                    )) : <p className="clear">No open assurance gaps.</p>}
+                  </aside>
                 </div>
 
                 <div className="saDecision">
@@ -1185,12 +1226,7 @@ export default function SupplierAssuranceWorkspace({
                     value={String(
                       data.review_frequency_months,
                     )}
-                    onChange={(value) =>
-                      update(
-                        "review_frequency_months",
-                        value,
-                      )
-                    }
+                    onChange={(value) => setData((current) => ({ ...current, review_frequency_months: value, next_review_date: addMonths(reviewBaseDate, value) }))}
                     type="number"
                     min="1"
                     max="60"
@@ -1208,11 +1244,15 @@ export default function SupplierAssuranceWorkspace({
                     label="Next review date"
                     name="next_review_date"
                     value={data.next_review_date}
-                    onChange={(value) =>
-                      update("next_review_date", value)
-                    }
+                    onChange={() => {}}
                     type="date"
+                    readOnly
                   />
+                </div>
+
+                <div className={`saReviewLogic ${reviewDeviation || expiryBeforeReview ? "warning" : "aligned"}`}>
+                  <div><b>Engine recommendation: review every {result.reviewMonths} months</b><span>{result.riskBand} risk produces a recommended review date of {new Date(`${recommendedReviewDate}T12:00:00Z`).toLocaleDateString("en-GB")}. Approval expiry is the end of approval validity; the next review date controls periodic monitoring.</span></div>
+                  <div>{reviewDeviation ? <strong>Approver override: {selectedReviewMonths} months selected instead of {result.reviewMonths}. The next review date has been recalculated automatically.</strong> : <strong>Selected interval matches the risk-engine recommendation.</strong>}{expiryBeforeReview ? <em>Approval expires before the calculated review date. Extend approval validity or shorten the review interval.</em> : null}</div>
                 </div>
 
                 <h3>Performance snapshot</h3>
@@ -1564,6 +1604,19 @@ const styles = `
 .saAuditList>article small{color:#71869a;font-size:10px}
 .saAuditList>article>a{justify-self:start;background:#315fe6}
 .saAuditEmpty{padding:22px;color:#71869a}
+.saGapPanel{width:min(520px,48vw);padding:13px;border:1px solid #d7e2eb;border-radius:13px;background:#f8fbfe}
+.saGapPanel>div{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.saGapPanel article{margin-top:9px;padding:10px;border:1px solid #e0e7ee;border-radius:9px;background:#fff}
+.saGapPanel article header{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.saGapPanel article p{margin:6px 0;color:#435d76;font-size:11px;line-height:1.4}
+.saGapPanel article small{display:block;color:#6d8195;font-size:10px}
+.saGapPanel article a,.saGapPanel article button{display:inline-block;margin-top:7px;padding:0;border:0;background:none;color:#315fe6;font:inherit;font-size:11px;font-weight:850;text-decoration:none;cursor:pointer}
+.saGapPanel .clear{margin:8px 0 0;color:#087450;font-size:11px}
+.saGapFields{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:9px;margin:10px 0;padding:12px;border:1px solid #efd28e;border-radius:9px;background:#fff9e9}
+.saGapFields label{display:grid;gap:5px}.saGapFields label span{color:#5c6f82;font-size:10px;font-weight:850}.saGapFields input,.saGapFields select{width:100%;padding:9px;border:1px solid #ccd8e3;border-radius:7px;background:#fff;color:#173b60}
+.saReviewLogic{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-top:16px;padding:15px 17px;border:1px solid #a9ddcc;border-radius:11px;background:#effaf6}
+.saReviewLogic>div{display:grid;gap:5px}.saReviewLogic b{color:#0a5f4c}.saReviewLogic span{color:#526d68;font-size:12px;line-height:1.45}.saReviewLogic strong{color:#087450;font-size:12px}.saReviewLogic em{color:#a63128;font-size:12px;font-style:normal;font-weight:850}
+.saReviewLogic.warning{border-color:#edc36d;background:#fff8e8}.saReviewLogic.warning b,.saReviewLogic.warning strong{color:#875300}
 .saMessage{margin-top:13px;padding:12px 15px;border-radius:9px;font-weight:800}
 .saMessage.success{background:#e7f8f1;color:#08734f}
 .saMessage.error{background:#ffe9e6;color:#a72822}
