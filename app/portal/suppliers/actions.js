@@ -98,7 +98,7 @@ export async function saveSupplier(_state, fd) {
   const supplyDescription = clean(fd.get("supply_description"));
   const types = json(fd, "supplier_types", []);
   const standards = json(fd, "applicable_standards", []);
-  const answers = json(fd, "due_diligence_answers", {});
+  let answers = json(fd, "due_diligence_answers", {});
   const riskInputs = json(fd, "risk_inputs", {});
   const documents = json(fd, "documents", []);
   const performance = json(fd, "performance", {});
@@ -106,6 +106,21 @@ export async function saveSupplier(_state, fd) {
   const subtiers = json(fd, "subtier_suppliers", []);
   const contacts = json(fd, "supplier_contacts", []);
   const criticality = clean(fd.get("criticality")) || "medium";
+  const gapContactIds = [...new Set(Object.values(answers).map((gap) => clean(gap?.gap_owner_contact_id)).filter(Boolean))];
+  const gapReviewerIds = [...new Set(Object.values(answers).map((gap) => clean(gap?.gap_reviewer_person_id)).filter(Boolean))];
+  const [{ data: validGapContacts = [] }, { data: validGapReviewers = [] }] = await Promise.all([
+    gapContactIds.length && id ? supabase.from("supplier_contacts").select("id,first_name,last_name").eq("organization_id", organization.id).eq("supplier_id", id).in("id", gapContactIds) : { data: [] },
+    gapReviewerIds.length ? supabase.from("organization_people").select("id,first_name,last_name").eq("organization_id", organization.id).in("id", gapReviewerIds).in("account_status", ["active", "invited"]) : { data: [] },
+  ]);
+  const contactMap = new Map(validGapContacts.map((person) => [person.id, person]));
+  const reviewerMap = new Map(validGapReviewers.map((person) => [person.id, person]));
+  answers = Object.fromEntries(Object.entries(answers).map(([controlId, gap]) => {
+    const contact = contactMap.get(clean(gap?.gap_owner_contact_id));
+    const reviewer = reviewerMap.get(clean(gap?.gap_reviewer_person_id));
+    return [controlId, { ...gap, gap_owner_contact_id: contact?.id || "", gap_owner: contact ? `${contact.first_name} ${contact.last_name || ""}`.trim() : "", gap_reviewer_person_id: reviewer?.id || "", gap_reviewer: reviewer ? `${reviewer.first_name} ${reviewer.last_name}` : "" }];
+  }));
+  const invalidClosedReview = Object.entries(answers).find(([, gap]) => gap?.gap_review_outcome === "effective" && (!gap.gap_reviewer_person_id || !gap.gap_review_date));
+  if (invalidClosedReview) return { error: `Control ${invalidClosedReview[0]} requires a company reviewer and review date before it can be verified effective.` };
 
   if (!legalName || !address || !supplyDescription) {
     return {
@@ -145,7 +160,7 @@ export async function saveSupplier(_state, fd) {
   if (intent === "approve") {
     const uncontrolledGaps = result.gaps.filter((gapId) => {
       const gap = answers[gapId] || {};
-      return ["partial", "no"].includes(gap.response) && (!gap.gap_severity || !gap.gap_owner || !gap.gap_due_date);
+      return ["partial", "no"].includes(gap.response) && (!gap.gap_severity || !gap.gap_owner_contact_id || !gap.gap_due_date);
     });
     if (uncontrolledGaps.length) {
       return { error: `Assign severity, owner and due date to assurance gap${uncontrolledGaps.length === 1 ? "" : "s"}: ${uncontrolledGaps.join(", ")}.` };
@@ -252,11 +267,12 @@ export async function saveSupplier(_state, fd) {
   };
 
   let savedId = id;
+  let previousAnswers = {};
 
   if (id) {
     const { data: existing } = await supabase
       .from("suppliers")
-      .select("id,version")
+      .select("id,version,due_diligence_answers")
       .eq("id", id)
       .eq("owner_id", user.id)
       .maybeSingle();
@@ -264,6 +280,7 @@ export async function saveSupplier(_state, fd) {
     if (!existing) {
       return { error: "Supplier record not found." };
     }
+    previousAnswers = existing.due_diligence_answers || {};
 
     const { error } = await supabase
       .from("suppliers")
@@ -298,6 +315,21 @@ export async function saveSupplier(_state, fd) {
     }
 
     savedId = created.id;
+  }
+
+  const changedControls = Object.keys(answers).filter((controlId) => JSON.stringify(previousAnswers[controlId] || {}) !== JSON.stringify(answers[controlId] || {}));
+  if (changedControls.length) {
+    const eventRows = changedControls.map((controlId) => {
+      const before = previousAnswers[controlId] || null;
+      const after = answers[controlId] || {};
+      const outcome = after.gap_review_outcome || "open";
+      return { supplier_id: savedId, organization_id: organization.id, owner_id: user.id, control_id: controlId,
+        event_type: before ? (before.gap_review_outcome !== outcome ? "review_outcome_changed" : "control_updated") : "control_assessed",
+        previous_value: before, new_value: after,
+        event_summary: `${controlId} saved as ${String(after.response || "unanswered").replaceAll("_", " ")}; owner ${after.gap_owner || "unassigned"}; reviewer ${after.gap_reviewer || "unassigned"}; outcome ${String(outcome).replaceAll("_", " ")}.`,
+        actor_user_id: user.id, actor_name: user.email || "Authenticated user" };
+    });
+    await supabase.from("supplier_due_diligence_events").insert(eventRows);
   }
 
   const siteRows = sites.filter((site) => clean(site.site_name) || clean(site.address) || clean(site.scope)).map((site) => ({
