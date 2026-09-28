@@ -50,6 +50,7 @@ export default async function SuppliersPage({ searchParams }) {
   let supplierNcStats = {};
   let supplierContacts = [];
   let supplierAudits = [];
+  let quarterlyReviews = [];
 
   if (organization) {
     const { data, error } = await supabase
@@ -130,14 +131,16 @@ export default async function SuppliersPage({ searchParams }) {
 
       documents = docs || [];
 
-      const [{ data: evidence = [] }, { data: subtiers = [] }, { data: sites = [] }, { data: contacts = [] }, { data: audits = [], error: auditsError }] = await Promise.all([
+      const [{ data: evidence = [] }, { data: subtiers = [] }, { data: sites = [] }, { data: contacts = [] }, { data: audits = [], error: auditsError }, { data: qbrs = [], error: qbrError }] = await Promise.all([
         supabase.from("supplier_evidence_files").select("id,control_id,file_name,storage_path,uploaded_at").eq("supplier_id", selected.id).order("uploaded_at", { ascending: false }),
         supabase.from("supplier_subtier_suppliers").select("*").eq("supplier_id", selected.id).order("created_at"),
         supabase.from("supplier_sites").select("*").eq("supplier_id", selected.id).order("created_at"),
         supabase.from("supplier_contacts").select("*").eq("supplier_id", selected.id).order("is_primary", { ascending: false }).order("last_name"),
         supabase.from("internal_audits").select("id,audit_reference,title,status,current_gate,audit_method,planned_start_at,planned_end_at,updated_at").eq("supplier_id", selected.id).eq("owner_id", user.id).order("updated_at", { ascending: false }),
+        supabase.from("supplier_quarterly_business_reviews").select("id,qbr_reference,quarter,review_date,next_qbr_date,status").eq("supplier_id", selected.id).eq("owner_id", user.id).eq("status", "completed").order("review_date", { ascending: false }),
       ]);
       if (auditsError) throw new Error(auditsError.message);
+      if (qbrError) throw new Error(qbrError.message);
       evidenceFiles = await Promise.all((evidence || []).map(async (file) => {
         const { data: signed } = await supabase.storage.from("supplier-assurance-evidence").createSignedUrl(file.storage_path, 3600);
         return { ...file, download_url: signed?.signedUrl || "#" };
@@ -150,6 +153,7 @@ export default async function SuppliersPage({ searchParams }) {
       supplierSites = (sites || []).map((site) => ({ ...site, client_key: site.id }));
       supplierContacts = (contacts || []).map((contact) => ({ ...contact, client_key: contact.id }));
       supplierAudits = audits || [];
+      quarterlyReviews = qbrs || [];
     }
   }
 
@@ -173,6 +177,7 @@ export default async function SuppliersPage({ searchParams }) {
       supplierNcStats={supplierNcStats}
       supplierContacts={supplierContacts}
       supplierAudits={supplierAudits}
+      quarterlyReviews={quarterlyReviews}
       managementBoard={managementBoard}
       action={saveSupplier}
       generateAction={generateSupplierCodeOfConduct}
