@@ -142,6 +142,16 @@ export async function saveSupplier(_state, fd) {
     };
   }
 
+  if (intent === "approve") {
+    const uncontrolledGaps = result.gaps.filter((gapId) => {
+      const gap = answers[gapId] || {};
+      return ["partial", "no"].includes(gap.response) && (!gap.gap_severity || !gap.gap_owner || !gap.gap_due_date);
+    });
+    if (uncontrolledGaps.length) {
+      return { error: `Assign severity, owner and due date to assurance gap${uncontrolledGaps.length === 1 ? "" : "s"}: ${uncontrolledGaps.join(", ")}.` };
+    }
+  }
+
   const approverPersonId = clean(fd.get("approved_by_person_id"));
   let approver = null;
 
@@ -169,9 +179,15 @@ export async function saveSupplier(_state, fd) {
             ? "suspended"
             : "draft";
 
-  const reviewMonths =
-    Number(fd.get("review_frequency_months")) ||
-    result.reviewMonths;
+  const reviewMonths = Math.min(60, Math.max(1,
+    Number(fd.get("review_frequency_months")) || result.reviewMonths
+  ));
+  const nextReviewDate = clean(fd.get("next_review_date")) || futureDate(reviewMonths);
+  const approvalExpiry = clean(fd.get("approval_expiry")) || (intent === "approve" ? futureDate(reviewMonths) : null);
+
+  if (intent === "approve" && approvalExpiry && nextReviewDate && approvalExpiry < nextReviewDate) {
+    return { error: "Approval expiry cannot be earlier than the calculated next review date." };
+  }
 
   const now = new Date().toISOString();
 
@@ -216,17 +232,13 @@ export async function saveSupplier(_state, fd) {
     approved_by_person_id: approverPersonId || null,
     approved_by: approver || null,
     approved_at: intent === "approve" ? now : null,
-    approval_expiry:
-      clean(fd.get("approval_expiry")) ||
-      (intent === "approve"
-        ? futureDate(reviewMonths)
-        : null),
+    approval_expiry: approvalExpiry,
     review_frequency_months: reviewMonths,
-    next_review_date:
-      clean(fd.get("next_review_date")) ||
-      futureDate(reviewMonths),
+    next_review_date: nextReviewDate,
     monitoring_plan: {
       reviewMonths,
+      engineRecommendedReviewMonths: result.reviewMonths,
+      approverOverride: reviewMonths !== result.reviewMonths,
       auditRequired: ["High", "Critical"].includes(
         result.riskBand
       ),
