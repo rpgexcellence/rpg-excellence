@@ -108,12 +108,14 @@ export async function saveSupplier(_state, fd) {
   const criticality = clean(fd.get("criticality")) || "medium";
   const gapContactIds = [...new Set(Object.values(answers).map((gap) => clean(gap?.gap_owner_contact_id)).filter(Boolean))];
   const gapReviewerIds = [...new Set(Object.values(answers).map((gap) => clean(gap?.gap_reviewer_person_id)).filter(Boolean))];
-  const [{ data: validGapContacts = [] }, { data: validGapReviewers = [] }] = await Promise.all([
+  const [gapContactsResult, gapReviewersResult] = await Promise.all([
     gapContactIds.length && id ? storageAdmin.from("supplier_contacts").select("id,first_name,last_name").eq("organization_id", organization.id).eq("supplier_id", id).in("id", gapContactIds) : { data: [] },
     gapReviewerIds.length ? storageAdmin.from("organization_people").select("id,first_name,last_name").eq("organization_id", organization.id).in("id", gapReviewerIds).in("account_status", ["active", "invited"]) : { data: [] },
   ]);
-  const contactMap = new Map(validGapContacts.map((person) => [person.id, person]));
-  const reviewerMap = new Map(validGapReviewers.map((person) => [person.id, person]));
+  if (gapContactsResult.error) return { error: `Supplier contact validation failed: ${gapContactsResult.error.message}` };
+  if (gapReviewersResult.error) return { error: `Company reviewer validation failed: ${gapReviewersResult.error.message}` };
+  const contactMap = new Map((gapContactsResult.data || []).map((person) => [person.id, person]));
+  const reviewerMap = new Map((gapReviewersResult.data || []).map((person) => [person.id, person]));
   answers = Object.fromEntries(Object.entries(answers).map(([controlId, gap]) => {
     const contact = contactMap.get(clean(gap?.gap_owner_contact_id));
     const reviewer = reviewerMap.get(clean(gap?.gap_reviewer_person_id));
