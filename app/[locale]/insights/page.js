@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "019",
+      title: "Supplier Assurance from Approval to Evidence-Based Review",
+      description: "How RPG Excellence connects supplier risk, due diligence, approval, performance, audits, NC/CAPA and controlled quarterly business reviews in one assurance position.",
+      href: "supplier-assurance-hub",
+    },
+    {
       number: "018",
       title: "Building Business Continuity as a Capability: Our Full Implementation Programme Begins",
       description: "RPG Excellence begins a full business continuity implementation programme with a connected Site Profile Assessment and role-based ISO 22301 learning.",
