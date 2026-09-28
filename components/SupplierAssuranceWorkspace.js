@@ -110,6 +110,7 @@ export default function SupplierAssuranceWorkspace({
   supplierNcStats = {},
   supplierContacts = [],
   supplierAudits = [],
+  quarterlyReviews = [],
   managementBoard = false,
   action,
   generateAction,
@@ -306,6 +307,8 @@ export default function SupplierAssuranceWorkspace({
               + New supplier
             </Link>
 
+            {active && <Link href={`/portal/suppliers/${active.id}/qbr`}>Quarterly business reviews</Link>}
+
             <span>SUPPLIER REGISTER</span>
 
             {suppliers.map((supplier) => (
@@ -365,6 +368,7 @@ export default function SupplierAssuranceWorkspace({
             <div>
               {active?.approval_status === "approved" ? <Link className="audit" href={`/portal/internal-audits?supplier=${active.id}#audit-mandate`}>+ Create Supplier Audit</Link> : null}
               {active ? <Link className="issue" href={`/portal/internal-audit-actions?raise=1&supplier=${active.id}#raise-manual-nc`}>+ Raise Supplier Issue</Link> : null}
+              {active ? <Link href={`/portal/suppliers/${active.id}/qbr`}>+ Create QBR</Link> : null}
               <Link href="/portal">Product dashboard</Link>
               <Link
                 className="primary"
@@ -411,9 +415,9 @@ export default function SupplierAssuranceWorkspace({
 
           <section className="saMetrics">
             <Metric
-              label="Supplier portfolio"
-              value={suppliers.length}
-              detail="Controlled supplier records"
+              label={quarterlyReviews.length ? "Last QBR date" : "Next QBR date"}
+              value={quarterlyReviews[0]?.review_date || active?.next_review_date || "Not set"}
+              detail={quarterlyReviews.length ? `Next QBR ${quarterlyReviews[0].next_qbr_date}` : active ? "No completed QBR recorded" : "Select a supplier"}
             />
             <Metric label="NCs open" value={activeNc.open} detail={active ? "Action required" : "Select a supplier"} tone="red" />
             <Metric label="NCs pending" value={activeNc.pending} detail={active ? "CAPA or verification" : "Select a supplier"} tone="amber" />
