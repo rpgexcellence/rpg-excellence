@@ -35,6 +35,8 @@ export async function saveSupplierQbr(supplierId, _previousState, fd) {
   const decision = clean(fd.get("recommended_decision"), 30);
   const monitoring = clean(fd.get("monitoring_level"), 30);
   const approverPersonId = clean(fd.get("approver_person_id"), 60) || null;
+  const buyerPersonId = clean(fd.get("buyer_person_id"), 60) || null;
+  const supplierContactId = clean(fd.get("supplier_contact_id"), 60) || null;
   if (intent === "complete" && (!approverPersonId || !clean(fd.get("executive_conclusion")) || !clean(fd.get("decision_rationale")))) {
     return { error: "Complete the executive conclusion, decision rationale and authorised approver before completing the QBR." };
   }
@@ -42,13 +44,22 @@ export async function saveSupplierQbr(supplierId, _previousState, fd) {
     const { data: approver } = await supabase.from("organization_people").select("id").eq("id", approverPersonId).eq("organization_id", supplier.organization_id).maybeSingle();
     if (!approver) return { error: "Select a valid company approver." };
   }
+  if (buyerPersonId) {
+    const { data: buyer } = await supabase.from("organization_people").select("id").eq("id", buyerPersonId).eq("organization_id", supplier.organization_id).maybeSingle();
+    if (!buyer) return { error: "Select a valid buyer from the company user list." };
+  }
+  if (supplierContactId) {
+    const { data: contact } = await supabase.from("supplier_contacts").select("id").eq("id", supplierContactId).eq("supplier_id", supplier.id).eq("is_active", true).maybeSingle();
+    if (!contact) return { error: "Select a valid active supplier contact." };
+  }
 
   const now = new Date().toISOString();
   const reference = clean(fd.get("qbr_reference"), 50) || `QBR-${new Date(reviewDate).getUTCFullYear()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
   const row = {
     supplier_id: supplier.id, organization_id: supplier.organization_id, owner_id: user.id,
     qbr_reference: reference, quarter, review_date: reviewDate, next_qbr_date: nextQbrDate,
-    participants: clean(fd.get("participants")) || null, approver_person_id: approverPersonId,
+    participants: clean(fd.get("participants")) || null, buyer_person_id: buyerPersonId,
+    supplier_contact_id: supplierContactId, approver_person_id: approverPersonId,
     executive_conclusion: clean(fd.get("executive_conclusion")) || null,
     recommended_decision: allowedDecisions.has(decision) ? decision : "maintain",
     decision_rationale: clean(fd.get("decision_rationale")) || null,
