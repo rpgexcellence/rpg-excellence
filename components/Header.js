@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ISO9001ReleaseBar from "./ISO9001ReleaseBar";
 
 const MICROSOFT_BOOKING_URL =
   "https://bookings.cloud.microsoft/bookwithme/user/3e31957cbcf643eb8e7e828a5eac6aaa%40rpgexcellence.com?anonymous&ismsaljsauthenabled";
@@ -13,6 +14,7 @@ const ISO_AT_A_GLANCE = [
 
 export default function Header({ locale, nav, variant = "default" }) {
   return (
+    <>
     <header className={`header ${variant === "home" ? "homeHeader" : ""}`}>
       <style>{`
         .isoAtGlance{position:relative;margin:0}
@@ -122,5 +124,7 @@ export default function Header({ locale, nav, variant = "default" }) {
         </a>
       </div>
     </header>
+    <ISO9001ReleaseBar locale={locale} />
+    </>
   );
 }
