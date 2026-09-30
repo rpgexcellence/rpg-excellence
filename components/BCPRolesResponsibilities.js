@@ -408,7 +408,13 @@ function RoleCard({ role, roles, setRoles, people }) {
     </article>
   );
 }
-function RaciMatrix({ item, actors, externalActors = [], change }) {
+function RaciMatrix({
+  item,
+  actors,
+  externalActors = [],
+  unavailableActors = [],
+  change,
+}) {
   const assignments = {
     R: arr(item.responsible),
     C: arr(item.consulted),
@@ -470,11 +476,19 @@ function RaciMatrix({ item, actors, externalActors = [], change }) {
             </thead>
             <tbody>
               {actors.map((actor) => (
-                <tr key={actor}>
+                <tr
+                  key={actor}
+                  className={unavailableActors.includes(actor) ? "unavailable" : ""}
+                >
                   <th>
                     {actor}
                     {externalActors.includes(actor) && (
                       <small className="r4External">External / manual</small>
+                    )}
+                    {unavailableActors.includes(actor) && (
+                      <small className="r4Unavailable">
+                        Unavailable — clear assigned cells or remove below
+                      </small>
                     )}
                   </th>
                   {["R", "A", "C", "I"].map((code) => (
@@ -520,9 +534,9 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
   const [roleDraft, setRoleDraft] = useState("");
   const roleNames = roles.map((x) => x.title).filter(Boolean),
     customActors = arr(item.customActors),
-    actors = [...new Set([...roleNames, ...people, ...customActors])];
+    availableActors = [...new Set([...roleNames, ...people, ...customActors])];
   const actorKey = (value) => String(value || "").trim().toLocaleLowerCase();
-  const allowedActors = new Set(actors.map(actorKey));
+  const allowedActors = new Set(availableActors.map(actorKey));
   const invalidActors = [
     item.accountable,
     ...arr(item.responsible),
@@ -531,6 +545,8 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
   ]
     .filter(Boolean)
     .filter((actor) => !allowedActors.has(actorKey(actor)));
+  const unavailableActors = [...new Set(invalidActors)];
+  const actors = [...new Set([...availableActors, ...unavailableActors])];
   const missing = [
     !item.activity && "Process / activity name",
     !item.accountable && "Accountable owner (A)",
@@ -566,6 +582,30 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
           : x,
       ),
     );
+  const removeUnavailableActors = () => {
+    const unavailableKeys = new Set(unavailableActors.map(actorKey));
+    setItems(
+      items.map((x) =>
+        x.id === item.id
+          ? {
+              ...x,
+              accountable: unavailableKeys.has(actorKey(x.accountable))
+                ? ""
+                : x.accountable,
+              responsible: arr(x.responsible).filter(
+                (name) => !unavailableKeys.has(actorKey(name)),
+              ),
+              consulted: arr(x.consulted).filter(
+                (name) => !unavailableKeys.has(actorKey(name)),
+              ),
+              informed: arr(x.informed).filter(
+                (name) => !unavailableKeys.has(actorKey(name)),
+              ),
+            }
+          : x,
+      ),
+    );
+  };
   return (
     <article
       className={`r4Assignment ${missing.length ? "assignmentIncomplete" : "assignmentComplete"}`}
@@ -588,8 +628,16 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
         </button>
       </header>
       {missing.length > 0 && (
-        <div className="r4RoleMissing" role="status">
-          <b>Complete this process:</b> {missing.join(" · ")}
+        <div className="r4RoleMissing r4ActorWarning" role="status">
+          <span>
+            <b>Complete this process:</b> {missing.join(" · ")}
+          </span>
+          {unavailableActors.length > 0 && (
+            <button type="button" onClick={removeUnavailableActors}>
+              Remove {unavailableActors.length} unavailable actor
+              {unavailableActors.length === 1 ? "" : "s"}
+            </button>
+          )}
         </div>
       )}
       <Field
@@ -675,6 +723,7 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
         item={item}
         actors={actors}
         externalActors={customActors}
+        unavailableActors={unavailableActors}
         change={change}
       />
       <details className="r4ControlDetails">
@@ -1444,7 +1493,7 @@ export default function BCPRolesResponsibilities({
     </form>
   );
 }
-const peopleStyles = `.r4External{display:block;margin-top:3px;color:#a05a00;font-size:8px;font-weight:850;text-transform:uppercase}`;
+const peopleStyles = `.r4External{display:block;margin-top:3px;color:#a05a00;font-size:8px;font-weight:850;text-transform:uppercase}.r4Unavailable{display:block;margin-top:3px;color:#b42318;font-size:8px;font-weight:900;text-transform:uppercase}.r4Raci tr.unavailable{background:#fff4f2}.r4Raci tr.unavailable>th{color:#8f241c}`;
 const assignmentStatusStyles = `
 .r4StepIssues{margin:0 0 14px;padding:13px 15px;border:1px solid #e7a23d;border-radius:10px;background:#fff7e7;color:#704400}
 .r4StepIssues b,.r4StepIssues span{display:block}
@@ -1453,6 +1502,10 @@ const assignmentStatusStyles = `
 .r4StepIssues li{margin:4px 0;font-size:11px}
 .r4Assignment.assignmentIncomplete{border:2px solid #e6a33a;background:#fffdf7}
 .r4Assignment.assignmentComplete{border-left:5px solid #11a786}
+.r4ActorWarning{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.r4ActorWarning>span{min-width:0}
+.r4ActorWarning>button{flex:0 0 auto;padding:8px 11px;border:1px solid #d92d20;border-radius:7px;background:#fff;color:#b42318;font-size:10px;font-weight:900;cursor:pointer}
+.r4ActorWarning>button:hover{background:#fff0ed}
 @media(max-width:700px){.r4Assignment>header{flex-wrap:wrap}}
 `;
 function Intro({ title, text }) {
