@@ -28,6 +28,13 @@ const derive = (item) => {
     );
   const maxAt = (key) =>
     Math.max(0, ...types.map((x) => Number(x?.[key] || 0)));
+  const impactTrendValid = types.every((scores) =>
+    horizons.slice(1).every(
+      (h, index) =>
+        Number(scores?.[h.key] || 0) >=
+        Number(scores?.[horizons[index].key] || 0),
+    ),
+  );
   const hitIndex = horizons.findIndex((h) => maxAt(h.key) >= threshold),
     detected = hitIndex >= 0 ? horizons[hitIndex].hours : 0;
   const mtpd = Number(item?.mtpdHours) || detected,
@@ -39,6 +46,7 @@ const derive = (item) => {
     detectedMtpdHours: detected,
     mtpdHours: mtpd,
     rtoHours: rto,
+    impactTrendValid,
     valid: Boolean(
       mtpd &&
       rto &&
@@ -181,7 +189,9 @@ export async function saveBia(_previousState, fd) {
         x.ownerPersonId &&
         approvedOwnerIds.has(x.ownerPersonId),
     ),
-    activities.every((x) => x.calculated.peakImpact > 0),
+    activities.every(
+      (x) => x.calculated.peakImpact > 0 && x.calculated.impactTrendValid,
+    ),
     activities.every((x) => x.calculated.valid),
     activities.every(
       (x) =>
@@ -196,7 +206,7 @@ export async function saveBia(_previousState, fd) {
   if (["review", "approve"].includes(intent) && !checks.every(Boolean))
     return {
       error:
-        "Complete activity ownership, impact-over-time scoring, valid recovery objectives, resources, dependencies, evidence and assumptions before submission.",
+        "Complete activity ownership, non-decreasing impact-over-time scoring, valid recovery objectives, resources, dependencies, evidence and assumptions before submission.",
     };
   if (intent === "approve" && profile.status !== "approved")
     return {
