@@ -88,6 +88,7 @@ const emptyActivity = (source = {}) => ({
   requiredSkills: [],
   resources: [],
   dependencies: [],
+  dependencyNotApplicable: false,
   hazards: [],
   recoveryPriority: "",
   assumptions: "",
@@ -125,6 +126,22 @@ const maxAt = (item, key) =>
   Math.max(
     ...impactTypes.map((t) => Number(item.impactScores?.[t]?.[key] || 0)),
   );
+const recoveryObjectiveIssues = (item, mtpd, rto) => {
+  const issues = [];
+  if (!mtpd) issues.push("Set an MTPD greater than zero");
+  if (!rto) issues.push("Set an RTO greater than zero");
+  if (mtpd && rto && rto >= mtpd)
+    issues.push(`RTO ${rto}h must be shorter than MTPD ${mtpd}h`);
+  if (Number(item.mbcoPercent) <= 0)
+    issues.push("MBCO must be greater than 0%");
+  if (rto && Number(item.troHours) < rto)
+    issues.push(
+      `TRO ${Number(item.troHours) || 0}h cannot be earlier than RTO ${rto}h`,
+    );
+  if (Number(item.rpoHours) < 0)
+    issues.push("RPO cannot be negative");
+  return issues;
+};
 const derive = (item) => {
   const threshold = clamp(item.unacceptableThreshold, 3, 5);
   const hit = horizons.find((h) => maxAt(item, h.key) >= threshold);
@@ -142,15 +159,9 @@ const derive = (item) => {
           : rto <= 168
             ? "P4 Within 1 week"
             : "P5 Planned recovery";
-  const valid = Boolean(
-    mtpd &&
-    rto &&
-    rto < mtpd &&
-    Number(item.mbcoPercent) > 0 &&
-    Number(item.troHours) >= rto &&
-    Number(item.rpoHours) >= 0,
-  );
-  return { mtpd, rto, peak, priority, valid };
+  const issues = recoveryObjectiveIssues(item, mtpd, rto);
+  const valid = issues.length === 0;
+  return { mtpd, rto, peak, priority, valid, issues };
 };
 const split = (v) =>
   String(v || "")
@@ -702,6 +713,16 @@ function ActivityCard({
           <i />
           <b>MTPD {d.mtpd || "-"}h</b>
         </div>
+        {!d.valid && (
+          <div className="biaObjectiveIssues" role="alert">
+            <b>Why this objective is not valid</b>
+            <ul>
+              {d.issues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="biaGrid three">
           <Field
             type="number"
@@ -775,7 +796,14 @@ function ActivityCard({
         </div>
       </article>
     );
-  if (mode === "resources")
+  if (mode === "resources") {
+    const resourceIssues = [
+      !item.resources.length && "Select at least one required resource",
+      !item.dependencies.length &&
+        !item.dependencyNotApplicable &&
+        "Link a dependency or confirm that no critical dependency applies",
+      !item.evidence.length && "Add at least one evidence reference",
+    ].filter(Boolean);
     return (
       <article className="biaRecord">
         <header>
@@ -785,8 +813,22 @@ function ActivityCard({
               {d.priority} · MBCO {item.mbcoPercent}%
             </span>
           </div>
-          <strong>{item.resources.length} resources</strong>
+          <strong className={resourceIssues.length ? "invalid" : "valid"}>
+            {resourceIssues.length
+              ? `${resourceIssues.length} requirement${resourceIssues.length === 1 ? "" : "s"} missing`
+              : "Resources complete"}
+          </strong>
         </header>
+        {resourceIssues.length > 0 && (
+          <div className="biaObjectiveIssues" role="status">
+            <b>Complete this activity</b>
+            <ul>
+              {resourceIssues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="biaPeopleSkills">
           <Field
             type="number"
@@ -816,8 +858,28 @@ function ActivityCard({
               ...arr(item.dependencies),
             ]),
           ]}
-          onChange={(v) => change("dependencies", v)}
+          onChange={(v) => {
+            change({
+              dependencies: v,
+              dependencyNotApplicable: v.length
+                ? false
+                : item.dependencyNotApplicable,
+            });
+          }}
         />
+        <label className="biaNoDependency">
+          <input
+            type="checkbox"
+            checked={Boolean(item.dependencyNotApplicable)}
+            onChange={(event) => {
+              change({
+                dependencyNotApplicable: event.target.checked,
+                dependencies: event.target.checked ? [] : item.dependencies,
+              });
+            }}
+          />
+          No critical dependency applies to this activity
+        </label>
         <b className="biaLabel">Linked Module 5 disruption scenarios</b>
         <Chips
           values={item.hazards}
@@ -840,6 +902,7 @@ function ActivityCard({
         <EvidenceEditor item={item} change={change} />
       </article>
     );
+  }
   return null;
 }
 
@@ -932,9 +995,26 @@ export default function BCPBusinessImpactAnalysis({
       included.every((x) => x.name && x.owner && x.ownerPersonId),
     included.length > 0 && included.every((x) => derive(x).peak > 0),
     included.every((x) => derive(x).valid),
-    included.every((x) => x.resources.length && x.dependencies.length),
+    included.every(
+      (x) =>
+        x.resources.length &&
+        (x.dependencies.length || x.dependencyNotApplicable),
+    ),
     included.length > 0 &&
       included.every((x) => x.evidence.length && x.assumptions),
+  ];
+  const completionIssues = [
+    !checks[0] && "Select a Site Profile and generate or add activities",
+    !checks[1] &&
+      `${included.filter((x) => !x.name || !x.owner || !x.ownerPersonId).length || included.length} activities need a valid Company User owner`,
+    !checks[2] &&
+      `${included.filter((x) => derive(x).peak <= 0).length || included.length} activities need impact scores`,
+    !checks[3] &&
+      `${included.filter((x) => !derive(x).valid).length} activities have invalid recovery-objective timing`,
+    !checks[4] &&
+      `${included.filter((x) => !x.resources.length || (!x.dependencies.length && !x.dependencyNotApplicable)).length} activities need resources or a dependency decision`,
+    !checks[5] &&
+      `${included.filter((x) => !x.evidence.length || !x.assumptions).length || included.length} activities need evidence and assumptions`,
   ];
   const completion = Math.round(
     (checks.filter(Boolean).length / checks.length) * 100,
@@ -1019,6 +1099,34 @@ export default function BCPBusinessImpactAnalysis({
         <div className="biaProgress">
           <i style={{ width: `${completion}%` }} />
         </div>
+        {completion < 100 && (
+          <section className="biaCompletionPanel" aria-label="Completion requirements">
+            <header>
+              <div>
+                <b>Why completion is {completion}%</b>
+                <span>
+                  {checks.filter(Boolean).length} of {checks.length} module stages
+                  are complete. Select an incomplete stage to correct it.
+                </span>
+              </div>
+            </header>
+            <div>
+              {steps.map((name, index) => (
+                <button
+                  type="button"
+                  key={name}
+                  className={checks[index] ? "complete" : "incomplete"}
+                  onClick={() => go(index)}
+                >
+                  <b>{checks[index] ? "✓" : "!"} {name}</b>
+                  <small>
+                    {checks[index] ? "Complete" : completionIssues[index]}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         {step === 0 && (
           <section className="biaPanel">
             <Intro
@@ -1555,8 +1663,8 @@ function Intro({ title, text }) {
   );
 }
 
-const ownerStyles = `.biaOwnerGuide{display:block;margin-top:6px;color:#60778e;font-size:10px;font-weight:600;line-height:1.35}.biaActivityPick label{margin-top:5px;color:#173b60;font-size:10px;font-weight:850}.biaActivityPick select{width:100%;margin-top:5px;padding:8px;border:1px solid #bfd0df;border-radius:7px;background:#fff;color:#173b60}`;
+const ownerStyles = `.biaOwnerGuide{display:block;margin-top:6px;color:#60778e;font-size:10px;font-weight:600;line-height:1.35}.biaActivityPick label{margin-top:5px;color:#173b60;font-size:10px;font-weight:850}.biaActivityPick select{width:100%;margin-top:5px;padding:8px;border:1px solid #bfd0df;border-radius:7px;background:#fff;color:#173b60}.biaNoDependency{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid #cbd9e7;border-radius:8px;background:#f8fbfe;color:#31516f;font-size:11px;font-weight:850}.biaNoDependency input{width:auto!important;margin:0!important}`;
 
-const activityEditStyles = `.biaActivityEdit{padding:17px;border:1px solid #b9d5ce;border-left:5px solid #16a085;border-radius:11px;background:#f8fffd}.biaActivityEdit>header{display:flex;justify-content:space-between;gap:15px;align-items:start}.biaActivityEdit>header div{display:grid;gap:4px}.biaActivityEdit>header span{color:#60778e;font-size:11px}.biaActivityEdit .remove{padding:7px 10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaActivityEdit input,.biaActivityEdit textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaActivityEdit textarea{min-height:80px}.biaCheck.compact{padding-top:12px}.biaMtpdGuide{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:1px;margin:12px 0 14px;overflow:hidden;border-radius:11px;background:#426a96;color:#fff}.biaMtpdGuide>div{padding:15px 17px;background:#0b2d56}.biaMtpdGuide>div:first-child{background:#123d70}.biaMtpdGuide small{display:block;margin-bottom:5px;color:#55e1d4;font-weight:950;letter-spacing:.12em}.biaMtpdGuide b{display:block;font-size:13px}.biaMtpdGuide p{margin:6px 0 0;color:#dce8f5;font-size:11px;line-height:1.45}.biaGuidanceNote{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:start;margin:-3px 0 14px;padding:12px 15px;border:1px solid #bfd4e8;border-radius:9px;background:#edf5fc;color:#173b60;font-size:11px;line-height:1.45}.biaGuidanceNote b{color:#0b2d56}.biaGuidanceNote span{color:#4e6d89}.biaPeopleSkills{display:grid;grid-template-columns:minmax(180px,.42fr) minmax(0,1.58fr);gap:14px;align-items:start}.biaPeopleSkills>label{font-size:12px;font-weight:850}.biaPeopleSkills>label input{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaStructuredEditor{margin-top:2px;padding:14px;border:1px solid #c9d9e7;border-radius:10px;background:#f7fbff}.biaEditorHead{display:flex;justify-content:space-between;gap:12px;align-items:center}.biaEditorHead>b{font-size:12px}.biaEditorHead>span{padding:5px 8px;border-radius:999px;background:#e7efff;color:#315fe6;font-size:10px;font-weight:850}.biaStructuredEditor>small{display:block;margin:5px 0 10px;color:#60778e;line-height:1.4}.biaInlineAdd{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.biaInlineAdd input,.biaEvidenceForm input,.biaEvidenceForm select,.biaEvidenceForm textarea{width:100%;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaInlineAdd button,.biaEvidenceForm>button{padding:10px 13px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaEvidenceEditor{margin-top:16px}.biaEvidenceList{display:grid;gap:8px;margin-bottom:12px}.biaEvidenceList article{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid #d2dfe9;border-left:4px solid #16a085;border-radius:8px;background:#fff}.biaEvidenceList article div{display:grid;gap:3px}.biaEvidenceList article small{color:#08775f;font-weight:850}.biaEvidenceList article p{margin:2px 0 0;color:#60778e;font-size:11px}.biaEvidenceList article button{align-self:center;padding:7px 9px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaEvidenceForm{display:grid;grid-template-columns:.7fr 1.3fr;gap:10px}.biaEvidenceForm label{font-size:11px;font-weight:850}.biaEvidenceForm label.wide{grid-column:1/-1}.biaEvidenceForm textarea{min-height:70px;margin-top:6px}.biaEvidenceForm input,.biaEvidenceForm select{margin-top:6px}.biaEvidenceForm>button{grid-column:1/-1;justify-self:start}.biaEvidenceForm>button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:900px){.biaMtpdGuide{grid-template-columns:1fr}.biaGuidanceNote,.biaPeopleSkills,.biaEvidenceForm{grid-template-columns:1fr}.biaEvidenceForm label.wide,.biaEvidenceForm>button{grid-column:auto}}`;
+const activityEditStyles = `.biaActivityEdit{padding:17px;border:1px solid #b9d5ce;border-left:5px solid #16a085;border-radius:11px;background:#f8fffd}.biaActivityEdit>header{display:flex;justify-content:space-between;gap:15px;align-items:start}.biaActivityEdit>header div{display:grid;gap:4px}.biaActivityEdit>header span{color:#60778e;font-size:11px}.biaActivityEdit .remove{padding:7px 10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaActivityEdit input,.biaActivityEdit textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaActivityEdit textarea{min-height:80px}.biaCheck.compact{padding-top:12px}.biaMtpdGuide{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:1px;margin:12px 0 14px;overflow:hidden;border-radius:11px;background:#426a96;color:#fff}.biaMtpdGuide>div{padding:15px 17px;background:#0b2d56}.biaMtpdGuide>div:first-child{background:#123d70}.biaMtpdGuide small{display:block;margin-bottom:5px;color:#55e1d4;font-weight:950;letter-spacing:.12em}.biaMtpdGuide b{display:block;font-size:13px}.biaMtpdGuide p{margin:6px 0 0;color:#dce8f5;font-size:11px;line-height:1.45}.biaGuidanceNote{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:start;margin:-3px 0 14px;padding:12px 15px;border:1px solid #bfd4e8;border-radius:9px;background:#edf5fc;color:#173b60;font-size:11px;line-height:1.45}.biaGuidanceNote b{color:#0b2d56}.biaGuidanceNote span{color:#4e6d89}.biaObjectiveIssues{margin:10px 0 0;padding:11px 14px;border:1px solid #f1b5ad;border-left:5px solid #d92d20;border-radius:8px;background:#fff3f1;color:#8f241c}.biaObjectiveIssues b{font-size:11px}.biaObjectiveIssues ul{margin:6px 0 0;padding-left:19px}.biaObjectiveIssues li{margin:3px 0;font-size:11px}.biaCompletionPanel{margin:0 0 16px;padding:16px;border:1px solid #bfd0df;border-radius:12px;background:#f8fbfe}.biaCompletionPanel>header b,.biaCompletionPanel>header span{display:block}.biaCompletionPanel>header b{font-size:15px}.biaCompletionPanel>header span{margin-top:4px;color:#60778e;font-size:11px}.biaCompletionPanel>div{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.biaCompletionPanel button{display:grid;gap:4px;min-height:67px;padding:10px;border:1px solid #cbd9e7;border-radius:8px;background:#fff;color:#173b60;text-align:left;cursor:pointer}.biaCompletionPanel button.complete{border-color:#a5d8c5;background:#eefaf5}.biaCompletionPanel button.incomplete{border-color:#efc57a;background:#fff8e9}.biaCompletionPanel button b{font-size:10px}.biaCompletionPanel button small{color:#60778e;font-size:9px;line-height:1.35}.biaPeopleSkills{display:grid;grid-template-columns:minmax(180px,.42fr) minmax(0,1.58fr);gap:14px;align-items:start}.biaPeopleSkills>label{font-size:12px;font-weight:850}.biaPeopleSkills>label input{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaStructuredEditor{margin-top:2px;padding:14px;border:1px solid #c9d9e7;border-radius:10px;background:#f7fbff}.biaEditorHead{display:flex;justify-content:space-between;gap:12px;align-items:center}.biaEditorHead>b{font-size:12px}.biaEditorHead>span{padding:5px 8px;border-radius:999px;background:#e7efff;color:#315fe6;font-size:10px;font-weight:850}.biaStructuredEditor>small{display:block;margin:5px 0 10px;color:#60778e;line-height:1.4}.biaInlineAdd{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.biaInlineAdd input,.biaEvidenceForm input,.biaEvidenceForm select,.biaEvidenceForm textarea{width:100%;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaInlineAdd button,.biaEvidenceForm>button{padding:10px 13px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaEvidenceEditor{margin-top:16px}.biaEvidenceList{display:grid;gap:8px;margin-bottom:12px}.biaEvidenceList article{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid #d2dfe9;border-left:4px solid #16a085;border-radius:8px;background:#fff}.biaEvidenceList article div{display:grid;gap:3px}.biaEvidenceList article small{color:#08775f;font-weight:850}.biaEvidenceList article p{margin:2px 0 0;color:#60778e;font-size:11px}.biaEvidenceList article button{align-self:center;padding:7px 9px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaEvidenceForm{display:grid;grid-template-columns:.7fr 1.3fr;gap:10px}.biaEvidenceForm label{font-size:11px;font-weight:850}.biaEvidenceForm label.wide{grid-column:1/-1}.biaEvidenceForm textarea{min-height:70px;margin-top:6px}.biaEvidenceForm input,.biaEvidenceForm select{margin-top:6px}.biaEvidenceForm>button{grid-column:1/-1;justify-self:start}.biaEvidenceForm>button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:900px){.biaMtpdGuide{grid-template-columns:1fr}.biaGuidanceNote,.biaPeopleSkills,.biaEvidenceForm,.biaCompletionPanel>div{grid-template-columns:1fr}.biaEvidenceForm label.wide,.biaEvidenceForm>button{grid-column:auto}}`;
 
 const styles = `*{box-sizing:border-box}.biaShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.biaShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.biaBrand{font-size:21px;font-weight:950}.biaBrand span{font-weight:500}.biaShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.biaShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.biaShell>aside>section strong{font-size:28px}.biaShell>aside>section span{float:right;margin-top:10px;font-size:10px}.biaShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.biaShell>aside>section i b{display:block;height:100%;background:#55e1d4}.biaShell nav{display:grid;gap:6px;margin-top:18px}.biaShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.biaShell nav button.active{background:#245d97}.biaShell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.biaLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.biaLive b{color:#55e1d4}.biaShell main{min-width:0}.biaTop{display:flex;justify-content:space-between;align-items:end}.biaTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.biaTop h1{margin:7px 0 4px;font-size:37px}.biaTop p{margin:0;color:#607890}.biaTop>b{text-transform:capitalize;color:#087c61}.biaProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.biaProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.biaPanel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.biaIntro{padding:20px;border-radius:12px;background:#eff5fa}.biaIntro b{font-size:18px}.biaIntro p{margin:7px 0 0;color:#60778e}.biaGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.biaGrid.three{grid-template-columns:repeat(3,1fr)}.biaGrid label{font-size:12px;font-weight:850}.biaGrid input,.biaGrid select,.biaGrid textarea,.biaRecord input,.biaRecord select{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaGrid textarea{min-height:80px}.biaGrid .wide{grid-column:1/-1}.biaSource,.biaSummary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:17px}.biaSource article,.biaSummary article{padding:15px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.biaSource b,.biaSummary b{display:block;color:#315fe6;font-size:27px}.biaSource span,.biaSummary span{color:#60778e;font-size:11px}.biaGenerate,.biaAdd{margin:16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaAdd{background:#fff;color:#17436f;border:1px solid #b9cce0}.biaPicks,.biaRecords{display:grid;gap:12px}.biaActivityPick{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:16px;border:1px solid #d2dfe9;border-radius:11px}.biaActivityPick.included{border-left:5px solid #16a085}.biaActivityPick div{display:grid;gap:4px}.biaActivityPick span,.biaActivityPick small{color:#6a8095}.biaActivityPick button{padding:9px 12px;border:1px solid #b9cce0;border-radius:8px;background:#fff;color:#315fe6;font-weight:850}.biaActivityPick.included button{background:#e7f8f4;color:#08775f}.biaEmpty{padding:20px;border:1px dashed #c6d5e3;border-radius:10px;color:#62788e}.biaScale{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;padding:12px;border-radius:9px;background:#f7f9fc}.biaScale span{font-size:11px;color:#60778e}.biaRecord{padding:18px;border:1px solid #cfdae6;border-radius:13px}.biaRecord>header{display:flex;justify-content:space-between;gap:15px;margin-bottom:13px}.biaRecord header div{display:grid;gap:4px}.biaRecord header span{color:#617991}.biaRecord header strong{align-self:center;padding:7px 10px;border-radius:999px;background:#eef4ff;color:#315fe6;font-size:11px}.biaRecord header .valid{background:#e1f5eb;color:#087453}.biaRecord header .invalid{background:#fff1d7;color:#925d00}.biaImpactWrap{overflow:auto}.biaImpact{min-width:1200px;width:100%;border-collapse:separate;border-spacing:3px}.biaImpact th{padding:8px;background:#edf3f8;text-align:left;font-size:10px}.biaImpact td{padding:3px}.biaImpact td select,.biaImpact td input{margin:0;padding:8px;font-size:10px}.biaEngine{display:grid;gap:4px;padding:13px;border-left:5px solid #f0b22e;border-radius:8px;background:#fff7df}.biaEngine small{color:#886000;font-weight:900}.biaEngine b{font-size:20px}.biaEngine span{font-size:10px;color:#6e7f8e}.biaTimeline{display:flex;align-items:center;gap:10px;padding:14px;border-radius:9px;background:#eef5ff}.biaTimeline i{height:5px;min-width:30px;flex:1;background:#315fe6;border-radius:5px}.biaRules{display:flex;align-items:center;justify-content:center;gap:13px;margin:16px 0;padding:16px;border-radius:10px;background:#0b2d56;color:#fff}.biaRules span{display:grid;text-align:center}.biaRules b{color:#55e1d4}.biaCheck{display:flex;align-items:center;gap:8px;padding-top:25px}.biaCheck input{width:auto;margin:0}.biaLabel{display:block;margin:16px 0 8px}.biaChips{display:flex;flex-wrap:wrap;gap:7px}.biaChips button{padding:7px 9px;border:1px solid #c1d2e2;border-radius:999px;background:#fff;color:#31516f;font-size:10px}.biaChips button.selected{border-color:#0aa588;background:#e2f8f3;color:#08755f}.biaRegister{margin-top:16px;border:1px solid #d2dde8;border-radius:11px;overflow:auto}.biaRegister header,.biaRegister article{min-width:950px;display:grid;grid-template-columns:55px 1.4fr 1.4fr repeat(5,.55fr);gap:9px;align-items:center;padding:11px}.biaRegister header{background:#0b2d56;color:#fff;font-size:10px}.biaRegister article{border-top:1px solid #e0e8ef;font-size:11px}.biaRegister article span{display:grid}.biaRegister small{color:#6e8296}.biaRegister em{padding:6px;border-radius:7px;text-align:center;font-style:normal}.biaRegister .ok{background:#e1f5eb;color:#087453}.biaRegister .warn{background:#fff0d6;color:#8b5700}.biaError{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.biaShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.biaShell footer span{margin-left:auto;color:#6f8396;font-size:11px}.biaShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.biaShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.biaShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:1050px){.biaShell{grid-template-columns:80px 1fr}.biaBrand,.biaShell>aside>small,.biaShell nav span,.biaLive{display:none}.biaShell nav button{justify-content:center}.biaGrid.three{grid-template-columns:1fr 1fr}}@media(max-width:720px){.biaShell{display:block}.biaShell>aside{position:static;height:auto;margin-bottom:15px}.biaShell nav{display:flex;overflow:auto}.biaGrid,.biaGrid.three,.biaSource,.biaSummary{grid-template-columns:1fr}.biaTop h1{font-size:29px}.biaShell footer,.biaRules{flex-wrap:wrap}.biaShell footer span{display:none}}`;
