@@ -126,6 +126,19 @@ const maxAt = (item, key) =>
   Math.max(
     ...impactTypes.map((t) => Number(item.impactScores?.[t]?.[key] || 0)),
   );
+const impactTrendIssues = (item) =>
+  impactTypes.flatMap((type) => {
+    const scores = horizons.map((h) =>
+      Number(item.impactScores?.[type]?.[h.key] || 0),
+    );
+    return horizons.slice(1).flatMap((h, index) =>
+      scores[index + 1] < scores[index]
+        ? [
+            `${type} reduces from ${scores[index]}/5 at ${horizons[index].label} to ${scores[index + 1]}/5 at ${h.label}`,
+          ]
+        : [],
+    );
+  });
 const recoveryObjectiveIssues = (item, mtpd, rto) => {
   const issues = [];
   if (!mtpd) issues.push("Set an MTPD greater than zero");
@@ -160,8 +173,9 @@ const derive = (item) => {
             ? "P4 Within 1 week"
             : "P5 Planned recovery";
   const issues = recoveryObjectiveIssues(item, mtpd, rto);
+  const trendIssues = impactTrendIssues(item);
   const valid = issues.length === 0;
-  return { mtpd, rto, peak, priority, valid, issues };
+  return { mtpd, rto, peak, priority, valid, issues, trendIssues };
 };
 const split = (v) =>
   String(v || "")
@@ -494,11 +508,18 @@ function EvidenceEditor({ item, change }) {
   );
 }
 function ImpactEditor({ item, change }) {
-  const setScore = (type, key, value) =>
+  const setScore = (type, key, value) => {
+    const selected = Number(value);
+    const selectedIndex = horizons.findIndex((h) => h.key === key);
+    const current = { ...(item.impactScores[type] || {}), [key]: selected };
+    horizons.slice(selectedIndex + 1).forEach((h) => {
+      if (Number(current[h.key] || 0) < selected) current[h.key] = selected;
+    });
     change("impactScores", {
       ...item.impactScores,
-      [type]: { ...(item.impactScores[type] || {}), [key]: Number(value) },
+      [type]: current,
     });
+  };
   return (
     <div className="biaImpactWrap">
       <table className="biaImpact">
@@ -653,6 +674,20 @@ function ActivityCard({
           </div>
           <strong className={`score s${d.peak}`}>Peak {d.peak}/5</strong>
         </header>
+        {d.trendIssues.length > 0 && (
+          <div className="biaTrendWarning" role="alert">
+            <b>Impact pattern needs correction</b>
+            <span>
+              Scores must not reduce while the disruption continues without
+              recovery. Correct these entries before completing the BIA.
+            </span>
+            <ul>
+              {d.trendIssues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <ImpactEditor item={item} change={change} />
         <div className="biaGrid three">
           <Field
@@ -993,7 +1028,10 @@ export default function BCPBusinessImpactAnalysis({
     Boolean(profileId && activities.length),
     included.length > 0 &&
       included.every((x) => x.name && x.owner && x.ownerPersonId),
-    included.length > 0 && included.every((x) => derive(x).peak > 0),
+    included.length > 0 &&
+      included.every(
+        (x) => derive(x).peak > 0 && derive(x).trendIssues.length === 0,
+      ),
     included.every((x) => derive(x).valid),
     included.every(
       (x) =>
@@ -1008,7 +1046,7 @@ export default function BCPBusinessImpactAnalysis({
     !checks[1] &&
       `${included.filter((x) => !x.name || !x.owner || !x.ownerPersonId).length || included.length} activities need a valid Company User owner`,
     !checks[2] &&
-      `${included.filter((x) => derive(x).peak <= 0).length || included.length} activities need impact scores`,
+      `${included.filter((x) => derive(x).peak <= 0 || derive(x).trendIssues.length).length || included.length} activities need complete, non-decreasing impact scores`,
     !checks[3] &&
       `${included.filter((x) => !derive(x).valid).length} activities have invalid recovery-objective timing`,
     !checks[4] &&
@@ -1029,6 +1067,7 @@ export default function BCPBusinessImpactAnalysis({
       <style>{styles}</style>
       <style>{activityEditStyles}</style>
       <style>{ownerStyles}</style>
+      <style>{trendStyles}</style>
       {[
         ["assessment_id", initial?.id || ""],
         ["site_profile_id", profileId],
@@ -1654,6 +1693,8 @@ export default function BCPBusinessImpactAnalysis({
     </form>
   );
 }
+const trendStyles = `.biaTrendWarning{display:grid;gap:6px;margin:0 0 14px;padding:13px 15px;border:1px solid #efb044;border-left:5px solid #e59a13;border-radius:9px;background:#fff7e4;color:#714900}.biaTrendWarning span{font-size:12px}.biaTrendWarning ul{margin:2px 0 0;padding-left:19px;font-size:11px}`;
+
 function Intro({ title, text }) {
   return (
     <div className="biaIntro">
