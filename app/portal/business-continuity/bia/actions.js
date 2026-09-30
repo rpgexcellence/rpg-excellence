@@ -183,7 +183,11 @@ export async function saveBia(_previousState, fd) {
     ),
     activities.every((x) => x.calculated.peakImpact > 0),
     activities.every((x) => x.calculated.valid),
-    activities.every((x) => x.resources?.length && x.dependencies?.length),
+    activities.every(
+      (x) =>
+        x.resources?.length &&
+        (x.dependencies?.length || x.dependencyNotApplicable),
+    ),
     activities.every((x) => x.evidence?.length && x.assumptions),
   ];
   const completion = Math.round(
