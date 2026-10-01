@@ -41,6 +41,7 @@ export default async function OutsourcedProcessesPage({
   let bias = [];
   let initial = null;
   let approvedSuppliers = [];
+  let people = [];
 
   if (organization) {
     const fetchRecords = (table) =>
@@ -97,6 +98,27 @@ export default async function OutsourcedProcessesPage({
     }
 
     approvedSuppliers = data || [];
+
+    const [peopleResult, permissionsResult] = await Promise.all([
+      supabase
+        .from("organization_people")
+        .select("id,first_name,last_name,email,position,account_status")
+        .eq("organization_id", organization.id)
+        .eq("account_status", "active")
+        .order("last_name"),
+      supabase
+        .from("organization_person_permissions")
+        .select("person_id")
+        .eq("organization_id", organization.id)
+        .eq("module_key", "business_continuity")
+        .neq("access_level", "none"),
+    ]);
+    const permittedPeople = new Set(
+      (permissionsResult.data || []).map((permission) => permission.person_id),
+    );
+    people = (peopleResult.data || []).filter((person) =>
+      permittedPeople.has(person.id),
+    );
   }
 
   return (
@@ -182,6 +204,7 @@ export default async function OutsourcedProcessesPage({
           hazards={hazards}
           bias={bias}
           approvedSuppliers={approvedSuppliers}
+          people={people}
           initial={initial}
           organisationName={organization?.name || ""}
           startStep={params?.step || 0}
