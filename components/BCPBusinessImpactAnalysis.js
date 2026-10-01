@@ -1010,6 +1010,16 @@ export default function BCPBusinessImpactAnalysis({
   const [activities, setActivities] = useState(
     arr(initial?.activity_assessments).map(normalise),
   );
+  const [assumptionEditorId, setAssumptionEditorId] = useState("");
+  const assumptionActivity = activities.find(
+    (item) => item.id === assumptionEditorId,
+  );
+  const updateActivityAssumptions = (id, value) =>
+    setActivities((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, assumptions: value } : item,
+      ),
+    );
   const sourceDependencies = arr(profile?.site_dependencies?.records);
   const hazardRecords = arr(hazard?.scenario_assessments);
   const generate = () =>
@@ -1084,6 +1094,7 @@ export default function BCPBusinessImpactAnalysis({
       <style>{activityEditStyles}</style>
       <style>{ownerStyles}</style>
       <style>{trendStyles}</style>
+      <style>{registerEditStyles}</style>
       {[
         ["assessment_id", initial?.id || ""],
         ["site_profile_id", profileId],
@@ -1596,15 +1607,46 @@ export default function BCPBusinessImpactAnalysis({
                   <b>{x.mtpd || "-"}h</b>
                   <b>{x.item.mbcoPercent}%</b>
                   <b>{x.item.rpoHours}h</b>
-                  <em
-                    className={x.assurance.complete ? "ok" : "warn"}
+                  <button
+                    type="button"
+                    className={`biaAssuranceStatus ${x.assurance.complete ? "ok" : "warn"}`}
                     title={x.assurance.detail}
+                    onClick={() => setAssumptionEditorId(x.item.id)}
                   >
                     {x.assurance.label}
-                  </em>
+                  </button>
                 </article>
               ))}
             </div>
+            {assumptionActivity && (
+              <section className="biaRegisterEditor" aria-label="Edit activity assumptions">
+                <header>
+                  <div>
+                    <small>ACTIVITY ASSURANCE</small>
+                    <b>{assumptionActivity.name}</b>
+                  </div>
+                  <button type="button" onClick={() => setAssumptionEditorId("")}>
+                    Close
+                  </button>
+                </header>
+                <label>
+                  Assumptions, limitations and evidence basis *
+                  <textarea
+                    value={assumptionActivity.assumptions || ""}
+                    onChange={(event) =>
+                      updateActivityAssumptions(
+                        assumptionActivity.id,
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Record the assumptions used, known limitations, operating conditions and the evidence supporting the recovery requirement."
+                  />
+                </label>
+                <span>
+                  This entry is held in the current form. Select Save draft below to retain it.
+                </span>
+              </section>
+            )}
             <div className="biaGrid">
               <label>
                 Review frequency
@@ -1712,6 +1754,8 @@ export default function BCPBusinessImpactAnalysis({
     </form>
   );
 }
+const registerEditStyles = `.biaAssuranceStatus{width:100%;padding:7px 8px;border:0;border-radius:7px;font:inherit;cursor:pointer}.biaAssuranceStatus.ok{background:#e1f5eb;color:#087453}.biaAssuranceStatus.warn{background:#fff0d6;color:#8b5700}.biaRegisterEditor{display:grid;gap:12px;margin-top:14px;padding:17px;border:1px solid #efc57a;border-left:5px solid #e7a522;border-radius:11px;background:#fffaf0}.biaRegisterEditor>header{display:flex;align-items:center;justify-content:space-between;gap:12px}.biaRegisterEditor>header div{display:grid;gap:3px}.biaRegisterEditor>header small{color:#8b5700;font-size:10px;font-weight:950;letter-spacing:.1em}.biaRegisterEditor>header button{padding:7px 10px;border:1px solid #d0dce7;border-radius:7px;background:#fff;color:#173b60;font-weight:800}.biaRegisterEditor label{font-size:12px;font-weight:900}.biaRegisterEditor textarea{display:block;width:100%;min-height:120px;margin-top:7px;padding:12px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaRegisterEditor>span{color:#60778e;font-size:10px}`;
+
 const trendStyles = `.biaTrendWarning{display:grid;gap:6px;margin:0 0 14px;padding:13px 15px;border:1px solid #efb044;border-left:5px solid #e59a13;border-radius:9px;background:#fff7e4;color:#714900}.biaTrendWarning span{font-size:12px}.biaTrendWarning ul{margin:2px 0 0;padding-left:19px;font-size:11px}`;
 
 function Intro({ title, text }) {
