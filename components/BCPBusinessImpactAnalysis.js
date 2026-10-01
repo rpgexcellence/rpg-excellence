@@ -177,6 +177,22 @@ const derive = (item) => {
   const valid = issues.length === 0;
   return { mtpd, rto, peak, priority, valid, issues, trendIssues };
 };
+const assuranceState = (item) => {
+  const result = derive(item);
+  if (result.trendIssues.length)
+    return { complete: false, label: "Impact review", detail: result.trendIssues.join("; ") };
+  if (!result.valid)
+    return { complete: false, label: "Timing review", detail: result.issues.join("; ") };
+  if (!item.resources.length || (!item.dependencies.length && !item.dependencyNotApplicable))
+    return { complete: false, label: "Resources required", detail: "Complete resources and the dependency decision." };
+  if (!item.evidence.length && !item.assumptions)
+    return { complete: false, label: "Evidence & assumptions", detail: "Add evidence and record assumptions." };
+  if (!item.evidence.length)
+    return { complete: false, label: "Evidence required", detail: "Add at least one evidence reference." };
+  if (!item.assumptions)
+    return { complete: false, label: "Assumptions required", detail: "Record the assumptions and limitations." };
+  return { complete: true, label: "Assured", detail: "All activity assurance requirements are complete." };
+};
 const split = (v) =>
   String(v || "")
     .split(/[,\n]+/)
@@ -1022,7 +1038,7 @@ export default function BCPBusinessImpactAnalysis({
     );
   const included = activities.filter((x) => x.included),
     derived = included
-      .map((x) => ({ item: x, ...derive(x) }))
+      .map((x) => ({ item: x, ...derive(x), assurance: assuranceState(x) }))
       .sort((a, b) => a.rto - b.rto);
   const checks = [
     Boolean(profileId && activities.length),
@@ -1580,8 +1596,11 @@ export default function BCPBusinessImpactAnalysis({
                   <b>{x.mtpd || "-"}h</b>
                   <b>{x.item.mbcoPercent}%</b>
                   <b>{x.item.rpoHours}h</b>
-                  <em className={x.valid ? "ok" : "warn"}>
-                    {x.valid ? "Validated" : "Review"}
+                  <em
+                    className={x.assurance.complete ? "ok" : "warn"}
+                    title={x.assurance.detail}
+                  >
+                    {x.assurance.label}
                   </em>
                 </article>
               ))}
