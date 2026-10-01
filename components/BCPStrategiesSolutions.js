@@ -114,7 +114,10 @@ function makeActivity(source = {}) {
     expectedCapacity: Number(source.expectedCapacity) || 0,
     evidence: source.evidence || "",
     risks: source.risks || "",
-    residualRisk: Number(source.residualRisk) || 1,
+    residualRisk: Math.min(
+      5,
+      Math.max(1, Number(source.residualRisk) || 1),
+    ),
     status: source.status || "planned",
   };
 }
@@ -137,17 +140,31 @@ function analyse(item) {
   const lead = Number(item.recoveryLeadHours) || 0,
     rto = Number(item.rtoHours) || 0,
     capacity = Number(item.expectedCapacity) || 0,
-    mbco = Number(item.mbcoPercent) || 0;
+    mbco = Number(item.mbcoPercent) || 0,
+    residualRisk = Number(item.residualRisk) || 0;
   const timing = rto > 0 && lead > 0 && lead <= rto,
-    capacityOk = capacity >= mbco && mbco > 0;
+    capacityOk = capacity >= mbco && mbco > 0,
+    residualRiskOk = residualRisk >= 1 && residualRisk <= 5,
+    strategyOk =
+      item.selectedStrategies.length > 0 &&
+      Boolean(item.strategyRationale && item.solutionDescription),
+    evidenceOk = Boolean(String(item.evidence || "").trim()),
+    riskRationaleOk =
+      residualRisk <= 3 || Boolean(String(item.risks || "").trim());
   return {
     timing,
     capacityOk,
+    residualRiskOk,
+    strategyOk,
+    evidenceOk,
+    riskRationaleOk,
     feasible:
       timing &&
       capacityOk &&
-      item.selectedStrategies.length > 0 &&
-      Boolean(item.strategyRationale && item.solutionDescription),
+      residualRiskOk &&
+      strategyOk &&
+      evidenceOk &&
+      riskRationaleOk,
   };
 }
 function Field({
@@ -345,7 +362,7 @@ export default function BCPStrategiesSolutions({
       resources.filter((x) => x.requirement).every((x) => x.ownerPersonId),
     activities.length > 0 &&
       activities.every(
-        (x) => analyse(x).feasible && Number(x.residualRisk) > 0,
+        (x) => analyse(x).feasible,
       ),
     actions.length > 0 &&
       actions.every((x) => x.action && x.ownerPersonId && x.dueDate),
@@ -832,10 +849,14 @@ export default function BCPStrategiesSolutions({
                       <span className={a.capacityOk ? "pass" : "fail"}>
                         {a.capacityOk ? "✓" : "!"} MBCO capacity
                       </span>
-                      <span
-                        className={item.residualRisk <= 3 ? "pass" : "fail"}
-                      >
-                        Residual risk: {riskLabels[item.residualRisk]}
+                      <span className={a.strategyOk ? "pass" : "fail"}>
+                        {a.strategyOk ? "✓" : "!"} Strategy defined
+                      </span>
+                      <span className={a.evidenceOk ? "pass" : "fail"}>
+                        {a.evidenceOk ? "✓" : "!"} Objective evidence
+                      </span>
+                      <span className={a.riskRationaleOk ? "pass" : "fail"}>
+                        {a.riskRationaleOk ? "✓" : "!"} Residual-risk rationale
                       </span>
                     </div>
                   </article>
