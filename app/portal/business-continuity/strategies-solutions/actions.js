@@ -41,9 +41,11 @@ export async function saveStrategiesSolutions(_state, fd) {
   const applicableResources = resources.filter((x)=>clean(x.requirement));
   const capitalCost = resources.reduce((n,x)=>n+(Number(x.quantity)||1)*(Number(x.unitCost)||0),0), recurringCost=resources.reduce((n,x)=>n+(Number(x.recurringCost)||0),0);
   const checks=[assessments.length>0,assessments.every((x)=>Array.isArray(x.selectedStrategies)&&x.selectedStrategies.length&&clean(x.strategyRationale)),applicableResources.length>0&&applicableResources.every((x)=>clean(x.ownerPersonId)&&personById.has(x.ownerPersonId)),feasibility.length>0&&feasibility.every((x)=>x.feasible&&Number(x.residualRisk)>=1&&Number(x.residualRisk)<=5),actions.length>0&&actions.every((x)=>clean(x.action)&&clean(x.ownerPersonId)&&personById.has(x.ownerPersonId)&&clean(x.dueDate)),assessments.length>0&&feasibility.every((x)=>x.feasible)&&Boolean(authorisedBcpLeader)];
+  const checkLabels=["linked BIA activities","strategy rationale","resource ownership","feasibility and residual risk","implementation actions","current authorised BCP Leader"];
+  const failedChecks=checkLabels.filter((_,index)=>!checks[index]);
   const completion=Math.round(checks.filter(Boolean).length/checks.length*100);
   let submissionError = "";
-  if (["review","approve"].includes(intent)&&!checks.every(Boolean)) submissionError="Complete strategy selection, resource ownership, feasibility evidence, implementation actions and authorised BCP Leader assignment before submission.";
+  if (["review","approve"].includes(intent)&&failedChecks.length) submissionError=`Outstanding approval checks: ${failedChecks.join(", ")}.`;
   if (intent==="approve" && [bia,hazard,outsourced].filter(Boolean).some((x)=>x.status!=="approved")) submissionError=submissionError||"Every linked source record must be approved before Module 8 can be approved.";
   const reviewer=personName(approverPersonId)||text("reviewer_name"),comment=text("review_comment");
   if(intent==="approve"&&!approverPersonId)submissionError=submissionError||"Select an authorised BCP Leader as the competent approver.";
