@@ -42,6 +42,7 @@ export default async function OutsourcedProcessesPage({
   let initial = null;
   let approvedSuppliers = [];
   let companyUsers = [];
+  let reviewerUsers = [];
 
   if (organization) {
     const fetchRecords = (table) =>
@@ -116,7 +117,8 @@ export default async function OutsourcedProcessesPage({
     const permittedPeople = new Set(
       (permissionsResult.data || []).map((permission) => permission.person_id),
     );
-    companyUsers = (peopleResult.data || []).filter((person) =>
+    companyUsers = peopleResult.data || [];
+    reviewerUsers = companyUsers.filter((person) =>
       permittedPeople.has(person.id),
     );
   }
@@ -205,6 +207,7 @@ export default async function OutsourcedProcessesPage({
           bias={bias}
           approvedSuppliers={approvedSuppliers}
           people={companyUsers}
+          reviewerPeople={reviewerUsers}
           initial={initial}
           organisationName={organization?.name || ""}
           startStep={params?.step || 0}
