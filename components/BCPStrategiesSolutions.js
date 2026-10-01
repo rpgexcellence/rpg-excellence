@@ -250,7 +250,11 @@ export default function BCPStrategiesSolutions({
   const eligibleOwners = people.filter(
     (x) => x.businessContinuityAccess || x.functions?.includes("bcp_leader"),
   );
-  const bcpLeaders = people.filter((x) => x.functions?.includes("bcp_leader"));
+  const authorisedBcpLeaderIds = new Set(
+    people
+      .filter((x) => x.functions?.includes("bcp_leader"))
+      .map((x) => x.id),
+  );
   const generate = () => {
     const source = arr(bia?.activity_assessments).filter(
       (x) => x.included !== false,
@@ -352,7 +356,7 @@ export default function BCPStrategiesSolutions({
       actions.every((x) => x.action && x.ownerPersonId && x.dueDate),
     activities.length > 0 &&
       feasible === activities.length &&
-      Boolean(approverPersonId),
+      authorisedBcpLeaderIds.has(approverPersonId),
   ];
   const completion = Math.round(
     (checks.filter(Boolean).length / checks.length) * 100,
@@ -1025,17 +1029,28 @@ export default function BCPStrategiesSolutions({
               <PersonSelect
                 label="Competent approver · BCP Leader *"
                 value={approverPersonId}
-                people={bcpLeaders}
+                people={people}
                 onChange={(id) => setApproverPersonId(id)}
-                placeholder="Select authorised BCP Leader"
+                placeholder="Select from Company People"
               />
               <input
                 type="hidden"
                 name="reviewer_name"
                 value={personName(
-                  bcpLeaders.find((x) => x.id === approverPersonId),
+                  people.find((x) => x.id === approverPersonId),
                 )}
               />
+              {approverPersonId &&
+                !authorisedBcpLeaderIds.has(approverPersonId) && (
+                  <div className="bssError wide">
+                    <b>The selected Company User is not an authorised BCP Leader.</b>
+                    <span>
+                      The selection can be retained in a draft, but this person
+                      must receive a current BCP Leader authorisation before the
+                      module can be approved.
+                    </span>
+                  </div>
+                )}
               <label className="wide">
                 Decision, limitations and residual risk
                 <small className="bssFieldGuide">
@@ -1053,7 +1068,7 @@ export default function BCPStrategiesSolutions({
                 />
               </label>
             </div>
-            {!bcpLeaders.length && (
+            {!authorisedBcpLeaderIds.size && (
               <div className="bssError">
                 <b>No authorised BCP Leader is available.</b>
                 <span>
