@@ -380,6 +380,8 @@ function SupplierCard({
 
   approvedSuppliers = [],
 
+  people = [],
+
 }) {
 
   const change = (key, value) =>
@@ -398,6 +400,8 @@ function SupplierCard({
 
     owner: "",
 
+    ownerPersonId: "",
+
     dueDate: "",
 
     status: "open",
@@ -412,7 +416,13 @@ function SupplierCard({
 
     change("actions", [...item.actions, { ...action, id: uid() }]);
 
-    setAction({ description: "", owner: "", dueDate: "", status: "open" });
+    setAction({
+      description: "",
+      owner: "",
+      ownerPersonId: "",
+      dueDate: "",
+      status: "open",
+    });
 
   };
 
@@ -532,15 +542,44 @@ function SupplierCard({
 
           )}
 
-          <Field
-
-            label="Accountable process owner *"
-
-            value={item.processOwner}
-
-            onChange={(v) => change("processOwner", v)}
-
-          />
+          <label>
+            Accountable process owner *
+            <select
+              value={
+                item.processOwnerPersonId ||
+                people.find(
+                  (person) =>
+                    `${person.first_name || ""} ${person.last_name || ""}`.trim() ===
+                    item.processOwner,
+                )?.id ||
+                ""
+              }
+              onChange={(event) => {
+                const person = people.find((entry) => entry.id === event.target.value);
+                setRecords(
+                  records.map((record) =>
+                    record.id === item.id
+                      ? {
+                          ...record,
+                          processOwnerPersonId: event.target.value,
+                          processOwner: person
+                            ? `${person.first_name || ""} ${person.last_name || ""}`.trim()
+                            : "",
+                        }
+                      : record,
+                  ),
+                );
+              }}
+            >
+              <option value="">Select active Company User</option>
+              {people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.first_name} {person.last_name}
+                  {person.position ? ` · ${person.position}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <Field
 
@@ -1164,15 +1203,28 @@ function SupplierCard({
 
           />
 
-          <input
-
-            placeholder="Owner"
-
-            value={action.owner}
-
-            onChange={(x) => setAction({ ...action, owner: x.target.value })}
-
-          />
+          <select
+            aria-label="Action owner"
+            value={action.ownerPersonId}
+            onChange={(event) => {
+              const person = people.find((entry) => entry.id === event.target.value);
+              setAction({
+                ...action,
+                ownerPersonId: event.target.value,
+                owner: person
+                  ? `${person.first_name || ""} ${person.last_name || ""}`.trim()
+                  : "",
+              });
+            }}
+          >
+            <option value="">Select action owner</option>
+            {people.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.first_name} {person.last_name}
+                {person.position ? ` · ${person.position}` : ""}
+              </option>
+            ))}
+          </select>
 
           <input
 
@@ -1219,6 +1271,8 @@ export default function BCPOutsourcedProcessControl({
   approvedSuppliers = [],
 
   people = [],
+
+  reviewerPeople = [],
 
   initial,
 
@@ -1329,7 +1383,7 @@ export default function BCPOutsourcedProcessControl({
   );
   const storedReviewer = initial?.reviewed_by || initial?.approved_by || "";
   const [reviewerPersonId, setReviewerPersonId] = useState(
-    people.find(
+    reviewerPeople.find(
       (person) =>
         person.id === storedReviewer ||
         `${person.first_name || ""} ${person.last_name || ""}`.trim() ===
@@ -1909,6 +1963,8 @@ export default function BCPOutsourcedProcessControl({
 
                   approvedSuppliers={approvedSuppliers}
 
+                  people={people}
+
                 />
 
               ))}
@@ -2034,6 +2090,8 @@ export default function BCPOutsourcedProcessControl({
                   setRecords={setRecords}
 
                   mode="performance"
+
+                  people={people}
 
                 />
 
@@ -2207,7 +2265,7 @@ export default function BCPOutsourcedProcessControl({
                   onChange={(event) => setReviewerPersonId(event.target.value)}
                 >
                   <option value="">Select active Company User</option>
-                  {people.map((person) => (
+                  {reviewerPeople.map((person) => (
                     <option key={person.id} value={person.id}>
                       {person.first_name} {person.last_name}
                       {person.position ? ` · ${person.position}` : ""}
