@@ -84,6 +84,9 @@ function PortalSidebar() {
             <Link href="/portal/business-continuity/strategies-solutions">
               Strategies &amp; Solutions
             </Link>
+            <Link href="/portal/business-continuity/incident-management">
+              Incident Management
+            </Link>
             <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
               ISO 22301 Assessment
             </Link>
@@ -168,7 +171,8 @@ export default async function BCPHub() {
     hazards = [],
     bias = [],
     outsourced = [],
-    strategies = [];
+    strategies = [],
+    incidents = [];
   if (org) {
     ({ data: profiles = [] } = await s
       .from("bcp_site_profiles")
@@ -231,6 +235,15 @@ export default async function BCPHub() {
       .neq("status", "archived")
       .order("updated_at", { ascending: false });
     strategies = strategiesResult.data || [];
+    const incidentsResult = await s
+      .from("bcp_incident_management_assessments")
+      .select(
+        "id,assessment_reference,assessment_title,status,version,completion_percent,next_review_date,updated_at,assurance_summary",
+      )
+      .eq("organization_id", org.id)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false });
+    incidents = incidentsResult.data || [];
   }
   const done = training?.filter((x) => x.status === "complete").length || 0;
   const liveRisks = hazards.flatMap((x) =>
@@ -458,6 +471,27 @@ export default async function BCPHub() {
               {strategies?.length
                 ? "Continue latest strategy assessment →"
                 : "Start strategies and solutions →"}
+            </strong>
+          </Link>
+          <Link
+            href={
+              incidents?.[0]?.id
+                ? `/portal/business-continuity/incident-management?id=${incidents[0].id}`
+                : "/portal/business-continuity/incident-management?new=1"
+            }
+          >
+            <ProgressStatus record={incidents?.[0]} />
+            <small>MODULE 9 · CLAUSE 8.4</small>
+            <h2>Incident Management, Response &amp; Recovery</h2>
+            <p>
+              Connect response teams, scenario activation thresholds, warning
+              and communication, Incident Action Plans, recovery, authority
+              handback and formal stand-down.
+            </p>
+            <strong>
+              {incidents?.length
+                ? "Continue latest incident-management assessment →"
+                : "Start incident-management assessment →"}
             </strong>
           </Link>
           <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
