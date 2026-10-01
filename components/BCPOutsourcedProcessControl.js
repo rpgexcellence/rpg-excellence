@@ -1476,6 +1476,18 @@ export default function BCPOutsourcedProcessControl({
 
   };
 
+  const completionChecks = [
+    Boolean(profileIds.length),
+    Boolean(biaIds.length),
+    Boolean(records.length),
+    Boolean(records.length && records.every((x) => x.controlMethod)),
+    Boolean(
+      records.length &&
+        records.every((x) => x.bcpAvailable && x.performanceAcceptable),
+    ),
+    Boolean(records.length && records.every((x) => engine(x).valid)),
+  ];
+
   const derived = records
 
       .map((item) => ({ item, ...engine(item) }))
@@ -1598,7 +1610,7 @@ export default function BCPOutsourcedProcessControl({
 
             >
 
-              <b>{i + 1}</b>
+              <b>{completionChecks[i] ? "✓" : i + 1}</b>
 
               <span>{name}</span>
 
