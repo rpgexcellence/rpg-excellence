@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "020",
+      title: "Business Continuity Decisions Begin with Context",
+      description: "How RPG Excellence converts ISO 22301 Clause 4 context, interested parties, obligations, scope and priorities into connected and auditable registers.",
+      href: "business-continuity-context-interested-parties",
+    },
+    {
       number: "019",
       title: "Supplier Assurance from Approval to Evidence-Based Review",
       description: "How RPG Excellence connects supplier risk, due diligence, approval, performance, audits, NC/CAPA and controlled quarterly business reviews in one assurance position.",
