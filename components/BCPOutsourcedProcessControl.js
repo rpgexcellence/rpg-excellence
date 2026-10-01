@@ -380,6 +380,8 @@ function SupplierCard({
 
   approvedSuppliers = [],
 
+  people = [],
+
 }) {
 
   const change = (key, value) =>
@@ -1325,6 +1327,15 @@ export default function BCPOutsourcedProcessControl({
     arr(initial?.supplier_controls).map(normalise),
 
   );
+  const storedReviewer = initial?.reviewed_by || initial?.approved_by || "";
+  const [reviewerPersonId, setReviewerPersonId] = useState(
+    people.find(
+      (person) =>
+        person.id === storedReviewer ||
+        `${person.first_name || ""} ${person.last_name || ""}`.trim() ===
+          storedReviewer,
+    )?.id || "",
+  );
 
   const selectedProfiles = profiles.filter((x) => profileIds.includes(x.id)),
 
@@ -2190,17 +2201,22 @@ export default function BCPOutsourcedProcessControl({
 
                 Competent reviewer / approver
 
-                <input
-
-                  name="reviewer_name"
-
-                  defaultValue={
-
-                    initial?.reviewed_by || initial?.approved_by || ""
-
-                  }
-
-                />
+                <select
+                  name="reviewer_person_id"
+                  value={reviewerPersonId}
+                  onChange={(event) => setReviewerPersonId(event.target.value)}
+                >
+                  <option value="">Select active Company User</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.first_name} {person.last_name}
+                      {person.position ? ` · ${person.position}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <small>
+                  Only active Company Users with Business Continuity access are available.
+                </small>
 
               </label>
 
