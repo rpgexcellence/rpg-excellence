@@ -62,6 +62,13 @@ const resourceTypes = [
 const arr = (v) => (Array.isArray(v) ? v : []);
 const uid = () => crypto.randomUUID();
 const money = (v) => Number(v || 0);
+const sourceRto = (source) =>
+  Number(source?.rtoHours) || Number(source?.calculated?.rtoHours) || 0;
+const sourceMtpd = (source) =>
+  Number(source?.mtpdHours) ||
+  Number(source?.calculated?.mtpdHours) ||
+  Number(source?.calculated?.detectedMtpdHours) ||
+  0;
 
 function recommend(activity) {
   const values = [];
@@ -91,8 +98,8 @@ function makeActivity(source = {}) {
     ownerPersonId: source.ownerPersonId || "",
     owner: source.owner || "",
     products: arr(source.products),
-    rtoHours: Number(source.rtoHours) || 0,
-    mtpdHours: Number(source.mtpdHours) || 0,
+    rtoHours: sourceRto(source),
+    mtpdHours: sourceMtpd(source),
     troHours: Number(source.troHours) || 0,
     rpoHours: Number(source.rpoHours) || 0,
     mbcoPercent: Number(source.mbcoPercent) || 0,
@@ -253,7 +260,18 @@ export default function BCPStrategiesSolutions({
         const old = activities.find(
           (a) => a.sourceId === x.id || a.name === x.name,
         );
-        if (old) return old;
+        if (old)
+          return {
+            ...old,
+            ownerPersonId: old.ownerPersonId || x.ownerPersonId || "",
+            owner: old.owner || x.owner || "",
+            products: old.products.length ? old.products : arr(x.products),
+            rtoHours: sourceRto(x),
+            mtpdHours: sourceMtpd(x),
+            troHours: Number(x.troHours) || Number(x.calculated?.troHours) || old.troHours || 0,
+            rpoHours: Number(x.rpoHours) || old.rpoHours || 0,
+            mbcoPercent: Number(x.mbcoPercent) || old.mbcoPercent || 0,
+          };
         const next = makeActivity(x);
         const linked = arr(hazard?.scenario_assessments).filter((risk) =>
           arr(x.hazards).includes(risk.name),
@@ -276,7 +294,7 @@ export default function BCPStrategiesSolutions({
           ? Math.min(5, Math.max(1, Math.ceil(maxResidual / 5)))
           : 1;
         next.selectedStrategies = recommend(x);
-        next.recoveryLeadHours = Number(x.rtoHours) || 0;
+        next.recoveryLeadHours = sourceRto(x);
         next.expectedCapacity = Number(x.mbcoPercent) || 0;
         return next;
       }),
@@ -285,7 +303,6 @@ export default function BCPStrategiesSolutions({
   useEffect(() => {
     if (
       bia &&
-      !activities.length &&
       arr(bia.activity_assessments).some((x) => x.included !== false)
     )
       generate();
