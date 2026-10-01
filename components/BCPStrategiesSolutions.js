@@ -250,11 +250,6 @@ export default function BCPStrategiesSolutions({
   const eligibleOwners = people.filter(
     (x) => x.businessContinuityAccess || x.functions?.includes("bcp_leader"),
   );
-  const authorisedBcpLeaderIds = new Set(
-    people
-      .filter((x) => x.functions?.includes("bcp_leader"))
-      .map((x) => x.id),
-  );
   const generate = () => {
     const source = arr(bia?.activity_assessments).filter(
       (x) => x.included !== false,
@@ -356,7 +351,7 @@ export default function BCPStrategiesSolutions({
       actions.every((x) => x.action && x.ownerPersonId && x.dueDate),
     activities.length > 0 &&
       feasible === activities.length &&
-      authorisedBcpLeaderIds.has(approverPersonId),
+      Boolean(approverPersonId),
   ];
   const completion = Math.round(
     (checks.filter(Boolean).length / checks.length) * 100,
@@ -955,8 +950,8 @@ export default function BCPStrategiesSolutions({
           <section className="bssPanel">
             <Intro title="Approve the controlled strategy and solutions register.">
               Confirm traceability, feasibility, investment, ownership and
-              implementation status. Approval is restricted to an authorised BCP
-              Leader selected in Company People.
+              implementation status. Select the competent approver from the
+              active Company User list.
             </Intro>
             <div className="bssStats">
               <article>
@@ -1027,7 +1022,7 @@ export default function BCPStrategiesSolutions({
                 />
               </label>
               <PersonSelect
-                label="Competent approver · BCP Leader *"
+                label="Competent approver · Company User *"
                 value={approverPersonId}
                 people={people}
                 onChange={(id) => setApproverPersonId(id)}
@@ -1040,17 +1035,6 @@ export default function BCPStrategiesSolutions({
                   people.find((x) => x.id === approverPersonId),
                 )}
               />
-              {approverPersonId &&
-                !authorisedBcpLeaderIds.has(approverPersonId) && (
-                  <div className="bssError wide">
-                    <b>The selected Company User is not an authorised BCP Leader.</b>
-                    <span>
-                      The selection can be retained in a draft, but this person
-                      must receive a current BCP Leader authorisation before the
-                      module can be approved.
-                    </span>
-                  </div>
-                )}
               <label className="wide">
                 Decision, limitations and residual risk
                 <small className="bssFieldGuide">
@@ -1068,11 +1052,11 @@ export default function BCPStrategiesSolutions({
                 />
               </label>
             </div>
-            {!authorisedBcpLeaderIds.size && (
+            {!people.length && (
               <div className="bssError">
-                <b>No authorised BCP Leader is available.</b>
+                <b>No active Company User is available.</b>
                 <span>
-                  Assign the BCP Leader professional function in Company People,
+                  Add or activate the competent approver in Company People,
                   then return to this assessment.
                 </span>
               </div>
