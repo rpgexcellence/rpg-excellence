@@ -437,7 +437,7 @@ const iconKey = (name) => {
   if (/sabotage/.test(n)) return "sabotage";
   return "custom";
 };
-function HazardIcon({ name, tone = "neutral", small = false }) {
+export function HazardIcon({ name, tone = "neutral", small = false }) {
   const type = iconKey(name),
     common = {
       fill: "none",
