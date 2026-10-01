@@ -66,6 +66,18 @@ export async function saveOutsourcedProcesses(_state, fd) {
 
   const controls=parseArray(fd,"supplier_controls").map((x)=>({...x,calculated:calculate(x)}));
 
+  const linkedPersonIds=[...new Set(controls.flatMap((control)=>[clean(control.processOwnerPersonId),...(control.actions||[]).map((action)=>clean(action.ownerPersonId))]).filter(Boolean))];
+  if(linkedPersonIds.length){
+    const{data:activePeople,error:peopleError}=await s.from("organization_people").select("id,first_name,last_name").eq("organization_id",org.id).eq("account_status","active").in("id",linkedPersonIds);
+    if(peopleError)return{error:peopleError.message};
+    if((activePeople||[]).length!==linkedPersonIds.length)return{error:"A selected process or action owner is no longer an active Company User. Select an active owner again."};
+    const peopleById=new Map(activePeople.map((person)=>[person.id,`${person.first_name||""} ${person.last_name||""}`.trim()]));
+    for(const control of controls){
+      if(control.processOwnerPersonId)control.processOwner=peopleById.get(control.processOwnerPersonId)||control.processOwner;
+      for(const action of control.actions||[])if(action.ownerPersonId)action.owner=peopleById.get(action.ownerPersonId)||action.owner;
+    }
+  }
+
   const linkedSupplierIds=[...new Set(controls.map((x)=>clean(x.supplierId)).filter(Boolean))];
 
   if(linkedSupplierIds.length){
