@@ -380,8 +380,6 @@ function SupplierCard({
 
   approvedSuppliers = [],
 
-  people = [],
-
 }) {
 
   const change = (key, value) =>
@@ -1219,6 +1217,8 @@ export default function BCPOutsourcedProcessControl({
   bias = [],
 
   approvedSuppliers = [],
+
+  people = [],
 
   initial,
 
