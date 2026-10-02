@@ -262,6 +262,8 @@ const emptyRisk = (name = "") => {
     targetImpact: 1,
     reviewFrequency: "Semi-annually",
     decisionRationale: "",
+    includeInIncidentPlan: true,
+    incidentPlanExclusionRationale: "",
     revisionHistory: [],
   };
 };
@@ -287,6 +289,8 @@ const normalise = (r) => {
     affectedDependencies: arr(r?.affectedDependencies),
     existingControls: arr(r?.existingControls),
     plannedControls: arr(r?.plannedControls),
+    includeInIncidentPlan: r?.includeInIncidentPlan !== false,
+    incidentPlanExclusionRationale: r?.incidentPlanExclusionRationale || "",
     actions: arr(r?.actions),
     revisionHistory: arr(r?.revisionHistory),
   };
@@ -342,32 +346,80 @@ const scenarioGuidance = (name = "") => {
   const value = name.toLowerCase();
   if (/shooter|violence|terror|sabotage/.test(value))
     return {
-      causes: ["Unauthorised access", "Threat escalation", "Security intelligence not acted upon"],
-      warnings: ["Threatening behaviour or communication", "Access-control alert", "Change in official threat level"],
+      causes: [
+        "Unauthorised access",
+        "Threat escalation",
+        "Security intelligence not acted upon",
+      ],
+      warnings: [
+        "Threatening behaviour or communication",
+        "Access-control alert",
+        "Change in official threat level",
+      ],
     };
   if (/cyber|it-related|identity|software/.test(value))
     return {
-      causes: ["Unpatched vulnerability", "Credential compromise", "Third-party service failure"],
-      warnings: ["Repeated failed sign-ins", "Security monitoring alert", "Unexpected system degradation"],
+      causes: [
+        "Unpatched vulnerability",
+        "Credential compromise",
+        "Third-party service failure",
+      ],
+      warnings: [
+        "Repeated failed sign-ins",
+        "Security monitoring alert",
+        "Unexpected system degradation",
+      ],
     };
   if (/fire|explosion|spill|radiation/.test(value))
     return {
-      causes: ["Equipment or containment failure", "Unsafe condition or activity", "Inspection defect not corrected"],
-      warnings: ["Alarm or detector activation", "Abnormal heat, pressure, odour or reading", "Inspection or maintenance exception"],
+      causes: [
+        "Equipment or containment failure",
+        "Unsafe condition or activity",
+        "Inspection defect not corrected",
+      ],
+      warnings: [
+        "Alarm or detector activation",
+        "Abnormal heat, pressure, odour or reading",
+        "Inspection or maintenance exception",
+      ],
     };
   if (/flood|storm|weather|earthquake|landslide|tsunami|volcano/.test(value))
     return {
-      causes: ["Severe-weather or natural-hazard event", "Site exposure or drainage weakness", "Critical utility disruption"],
-      warnings: ["Official weather or hazard warning", "Rising water or abnormal site condition", "Utility-provider alert"],
+      causes: [
+        "Severe-weather or natural-hazard event",
+        "Site exposure or drainage weakness",
+        "Critical utility disruption",
+      ],
+      warnings: [
+        "Official weather or hazard warning",
+        "Rising water or abnormal site condition",
+        "Utility-provider alert",
+      ],
     };
   if (/supplier|transport|customs|export|import/.test(value))
     return {
-      causes: ["Single-source dependency", "Supplier capacity or financial failure", "Route, border or logistics disruption"],
-      warnings: ["Late or missed delivery", "Supplier performance deterioration", "Carrier, customs or border alert"],
+      causes: [
+        "Single-source dependency",
+        "Supplier capacity or financial failure",
+        "Route, border or logistics disruption",
+      ],
+      warnings: [
+        "Late or missed delivery",
+        "Supplier performance deterioration",
+        "Carrier, customs or border alert",
+      ],
     };
   return {
-    causes: ["Equipment, people or process failure", "External dependency disruption", "Control not implemented or ineffective"],
-    warnings: ["Performance outside agreed limits", "Repeated incident or near miss", "Supplier, system or regulatory alert"],
+    causes: [
+      "Equipment, people or process failure",
+      "External dependency disruption",
+      "Control not implemented or ineffective",
+    ],
+    warnings: [
+      "Performance outside agreed limits",
+      "Repeated incident or near miss",
+      "Supplier, system or regulatory alert",
+    ],
   };
 };
 const treatmentGuidance = (name = "") => {
@@ -681,7 +733,8 @@ export default function BCPHazardScenarioAssessment({
         Boolean(
           get(
             "operational_description",
-            initial?.operational_description || profile?.operational_description,
+            initial?.operational_description ||
+              profile?.operational_description,
           ),
         ),
         Boolean(get("next_review_date", initial?.next_review_date)),
@@ -706,6 +759,12 @@ export default function BCPHazardScenarioAssessment({
           (risk) =>
             metrics(risk).residualBand === "Low" || risk.actions.length > 0,
         ),
+        risks.every(
+          (risk) =>
+            risk.includeInIncidentPlan !== false ||
+            !["High", "Critical"].includes(metrics(risk).residualBand) ||
+            risk.incidentPlanExclusionRationale.trim(),
+        ),
         Boolean(get("reviewer_name", initial?.reviewed_by)),
       ],
       [
@@ -718,7 +777,10 @@ export default function BCPHazardScenarioAssessment({
             risk.owner &&
             risk.treatment &&
             risk.decisionRationale &&
-            (metrics(risk).residualBand === "Low" || risk.actions.length),
+            (metrics(risk).residualBand === "Low" || risk.actions.length) &&
+            (risk.includeInIncidentPlan !== false ||
+              !["High", "Critical"].includes(metrics(risk).residualBand) ||
+              risk.incidentPlanExclusionRationale.trim()),
         ),
       ],
     ];
@@ -743,30 +805,64 @@ export default function BCPHazardScenarioAssessment({
       [
         !risks.length && "Select at least one credible hazard scenario",
         countMissing((risk) => risk.description.trim()) > 0 &&
-          `${plural(countMissing((risk) => risk.description.trim()), "scenario")} need a detailed risk / hazard description`,
+          `${plural(
+            countMissing((risk) => risk.description.trim()),
+            "scenario",
+          )} need a detailed risk / hazard description`,
         countMissing((risk) => risk.affectedProcesses.length > 0) > 0 &&
-          `${plural(countMissing((risk) => risk.affectedProcesses.length > 0), "scenario")} need at least one affected process`,
+          `${plural(
+            countMissing((risk) => risk.affectedProcesses.length > 0),
+            "scenario",
+          )} need at least one affected process`,
         countMissing((risk) => risk.applicableSystems.length > 0) > 0 &&
-          `${plural(countMissing((risk) => risk.applicableSystems.length > 0), "scenario")} need management-system applicability`,
+          `${plural(
+            countMissing((risk) => risk.applicableSystems.length > 0),
+            "scenario",
+          )} need management-system applicability`,
       ],
       [
         !risks.length && "Select at least one credible hazard scenario",
         countMissing((risk) => risk.existingControls.length > 0) > 0 &&
-          `${plural(countMissing((risk) => risk.existingControls.length > 0), "scenario")} need an existing control`,
+          `${plural(
+            countMissing((risk) => risk.existingControls.length > 0),
+            "scenario",
+          )} need an existing control`,
         countMissing((risk) => risk.owner) > 0 &&
-          `${plural(countMissing((risk) => risk.owner), "scenario")} need a risk owner`,
+          `${plural(
+            countMissing((risk) => risk.owner),
+            "scenario",
+          )} need a risk owner`,
       ],
       [
         !risks.length && "Select at least one credible hazard scenario",
         countMissing((risk) => risk.treatment) > 0 &&
-          `${plural(countMissing((risk) => risk.treatment), "scenario")} need a treatment decision`,
+          `${plural(
+            countMissing((risk) => risk.treatment),
+            "scenario",
+          )} need a treatment decision`,
         countMissing((risk) => risk.decisionRationale.trim()) > 0 &&
-          `${plural(countMissing((risk) => risk.decisionRationale.trim()), "scenario")} need a decision and tolerability rationale`,
+          `${plural(
+            countMissing((risk) => risk.decisionRationale.trim()),
+            "scenario",
+          )} need a decision and tolerability rationale`,
         countMissing(
           (risk) =>
             metrics(risk).residualBand === "Low" || risk.actions.length > 0,
         ) > 0 &&
-          `${plural(countMissing((risk) => metrics(risk).residualBand === "Low" || risk.actions.length > 0), "elevated scenario")} need a treatment action`,
+          `${plural(
+            countMissing(
+              (risk) =>
+                metrics(risk).residualBand === "Low" || risk.actions.length > 0,
+            ),
+            "elevated scenario",
+          )} need a treatment action`,
+        countMissing(
+          (risk) =>
+            risk.includeInIncidentPlan !== false ||
+            !["High", "Critical"].includes(metrics(risk).residualBand) ||
+            risk.incidentPlanExclusionRationale.trim(),
+        ) > 0 &&
+          "High or Critical scenarios excluded from Module 9 require a rationale",
         !get("reviewer_name", initial?.reviewed_by) &&
           "Select a reviewer or approver from Company Users",
       ],
@@ -790,7 +886,11 @@ export default function BCPHazardScenarioAssessment({
   }, [formTick, profile, participants, risks, initial]);
   useEffect(() => {
     const failedStep = Number(formState?.validation?.step);
-    if (Number.isInteger(failedStep) && failedStep >= 0 && failedStep < steps.length)
+    if (
+      Number.isInteger(failedStep) &&
+      failedStep >= 0 &&
+      failedStep < steps.length
+    )
       setStep(failedStep);
   }, [formState?.validation?.step]);
   const update = (id, changes) =>
@@ -819,11 +919,7 @@ export default function BCPHazardScenarioAssessment({
       })),
     );
   return (
-    <form
-      ref={formRef}
-      action={formAction}
-      className="hz"
-    >
+    <form ref={formRef} action={formAction} className="hz">
       <style>{css}</style>
       <style>{iconCss}</style>
       <style>{heatCss}</style>
@@ -1319,9 +1415,14 @@ function Multi({ title, values, options, onChange }) {
   return (
     <div className="multi">
       <b>{title}</b>
-      <small>Select active Company Users with Business Continuity access.</small>
+      <small>
+        Select active Company Users with Business Continuity access.
+      </small>
       <span>
-        <select value={selected} onChange={(event) => setSelected(event.target.value)}>
+        <select
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+        >
           <option value="">
             {available.length
               ? "Select participant from Company Users"
@@ -1329,7 +1430,8 @@ function Multi({ title, values, options, onChange }) {
           </option>
           {available.map((person) => (
             <option key={`${person.name}-${person.email}`} value={person.name}>
-              {person.name}{person.position ? ` — ${person.position}` : ""}
+              {person.name}
+              {person.position ? ` — ${person.position}` : ""}
             </option>
           ))}
         </select>
@@ -1349,12 +1451,19 @@ function Multi({ title, values, options, onChange }) {
         {values.map((value) => (
           <button
             type="button"
-            className={legacyValues.includes(value) ? "chip legacy" : "selected"}
+            className={
+              legacyValues.includes(value) ? "chip legacy" : "selected"
+            }
             onClick={() => onChange(values.filter((item) => item !== value))}
             key={value}
-            title={legacyValues.includes(value) ? "Invalid legacy entry — click to remove" : "Click to remove"}
+            title={
+              legacyValues.includes(value)
+                ? "Invalid legacy entry — click to remove"
+                : "Click to remove"
+            }
           >
-            {legacyValues.includes(value) ? "⚠ " : "✓ "}{value} ×
+            {legacyValues.includes(value) ? "⚠ " : "✓ "}
+            {value} ×
           </button>
         ))}
       </div>
@@ -1362,7 +1471,9 @@ function Multi({ title, values, options, onChange }) {
         <em>Remove the highlighted legacy entry before saving.</em>
       )}
       {!options.length && (
-        <em>No active Company Users with Business Continuity access are available.</em>
+        <em>
+          No active Company Users with Business Continuity access are available.
+        </em>
       )}
     </div>
   );
@@ -1572,7 +1683,8 @@ function RiskCard({
                 }
               />
               <small>
-                0 None · 20 Weak · 40 Partial · 60 Substantial · 80 Strong and evidenced
+                0 None · 20 Weak · 40 Partial · 60 Substantial · 80 Strong and
+                evidenced
               </small>
             </label>
             <label>
@@ -1592,7 +1704,9 @@ function RiskCard({
                   </option>
                 ))}
               </select>
-              <small>Select an active Company User with Business Continuity access.</small>
+              <small>
+                Select an active Company User with Business Continuity access.
+              </small>
             </label>
             <ListEditor
               label="Causes and contributing factors"
@@ -1690,6 +1804,40 @@ function RiskCard({
                 <option>After trigger or change</option>
               </select>
             </label>
+            <label>
+              Include in Incident Management Plan
+              <select
+                value={r.includeInIncidentPlan === false ? "no" : "yes"}
+                onChange={(e) =>
+                  update(r.id, {
+                    includeInIncidentPlan: e.target.value === "yes",
+                  })
+                }
+              >
+                <option value="yes">
+                  Yes — create activation and recovery controls
+                </option>
+                <option value="no">No — retain in risk register only</option>
+              </select>
+              <small>
+                Only included scenarios flow into BCP Module 9. High and
+                Critical exclusions should be justified below.
+              </small>
+            </label>
+            {r.includeInIncidentPlan === false && (
+              <label>
+                Incident-plan exclusion rationale
+                <input
+                  value={r.incidentPlanExclusionRationale}
+                  onChange={(e) =>
+                    update(r.id, {
+                      incidentPlanExclusionRationale: e.target.value,
+                    })
+                  }
+                  placeholder="Why this assessed scenario does not require an incident response plan"
+                />
+              </label>
+            )}
           </div>
           <div className="treatmentSupportGrid">
             <ListEditor
@@ -1717,9 +1865,9 @@ function RiskCard({
               placeholder={`Explain why ${r.treatment.toLowerCase()} is appropriate, whether residual risk ${metrics(r).residual}/${metrics(r).residualBand} is tolerable, and who authorised the decision.`}
             />
             <small>
-              State the decision basis, expected risk reduction, remaining exposure,
-              dependencies, approval authority and review trigger. Do not enter only
-              “acceptable” or “reviewed”.
+              State the decision basis, expected risk reduction, remaining
+              exposure, dependencies, approval authority and review trigger. Do
+              not enter only “acceptable” or “reviewed”.
             </small>
           </label>
         </>
