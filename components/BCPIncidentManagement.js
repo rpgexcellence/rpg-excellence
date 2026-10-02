@@ -494,6 +494,7 @@ export default function BCPIncidentManagement({
     arr(initial?.activation_thresholds).map(alignThreshold),
   );
   const [activeThresholdIndex, setActiveThresholdIndex] = useState(0);
+  const [expandedThresholdId, setExpandedThresholdId] = useState("");
   const [communications, setCommunications] = useState(
     arr(initial?.warning_communications),
   );
@@ -632,6 +633,7 @@ export default function BCPIncidentManagement({
       }),
     );
     setActiveThresholdIndex(0);
+    setExpandedThresholdId("");
 
     const parties = arr(source.context?.interested_parties);
     const generatedCommunications = parties.length
@@ -795,6 +797,7 @@ export default function BCPIncidentManagement({
     <form action={formAction} className="imShell">
       <style>{styles}</style>
       <style>{`.imGrid>.wide{grid-column:1/-1}.imControlChoices{grid-column:1/-1;margin:0;padding:13px;border:1px solid #c7d7e6;border-radius:10px;background:#f8fbfe}.imControlChoices legend{padding:0 6px;color:#0a2342;font-size:11px;font-weight:900}.imControlChoices>div{display:flex;flex-wrap:wrap;gap:7px}.imControlChoices button{padding:8px 10px;border:1px solid #c2d2e2;border-radius:8px;background:#fff;color:#31516f;font-size:10px;font-weight:800;text-align:left}.imControlChoices button.selected{border-color:#315fe6;background:#e8efff;color:#234fb9}.imTeamDetail .imGrid{gap:22px 14px}.imTeamDetail .imGrid>.wide textarea{min-height:230px;padding:16px;border:2px solid #90aeea;border-left:6px solid #315fe6;background:#f7faff;font-size:13px;line-height:1.65}.imControlChoices{padding:18px 16px}.imControlChoices legend{font-size:12px}.imControlChoices button{padding:10px 12px;line-height:1.35}.imControlChoices.authority{border-color:#c9c0f2;background:#f6f4ff}.imControlChoices.authority legend{color:#5740bf}.imControlChoices.authority button{border-color:#c9c0f2;color:#4b399f}.imControlChoices.authority button.selected{border-color:#6047d7;background:#6047d7;color:#fff}.imControlChoices.responsibility{border-color:#9edbd0;background:#f0fbf8}.imControlChoices.responsibility legend{color:#087568}.imControlChoices.responsibility button{border-color:#a6dcd2;color:#096757}.imControlChoices.responsibility button.selected{border-color:#0b8f78;background:#0b8f78;color:#fff}.imControlChoices.procedure{border-color:#ebcb7b;background:#fff9e9}.imControlChoices.procedure legend{color:#8a5b00}.imControlChoices.procedure button{border-color:#e6c66f;color:#795400}.imControlChoices.procedure button.selected{border-color:#d7970b;background:#d7970b;color:#fff}.imTeamSelectors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}.imTeamSelectors button{display:grid;grid-template-columns:48px 1fr;grid-template-rows:auto auto;gap:3px 10px;align-items:center;padding:13px;border:1px solid #c7d6e5;border-radius:11px;background:#f8fbfe;color:#173b60;text-align:left}.imTeamSelectors button>b{grid-row:1/3;display:grid;place-items:center;width:48px;height:48px;border-radius:10px;background:#e6edff;color:#315fe6;font-size:15px}.imTeamSelectors button>span{font-weight:900;line-height:1.2}.imTeamSelectors button>small{color:#6a7f94;font-size:9px}.imTeamSelectors button.active{border:2px solid #315fe6;background:#eef3ff;box-shadow:0 6px 16px #315fe620}.imTeamSelectors button.active>b{background:#315fe6;color:#fff}.imFixedTeam{padding:6px 9px;border-radius:999px;background:#e8f6f3;color:#087568;font-size:9px;font-weight:850}.imTeamDetail{margin-top:0}.imTeamDetail input[readonly]{background:#edf3f8;color:#536b82}@media(max-width:1050px){.imTeamSelectors{grid-template-columns:1fr 1fr}}@media(max-width:650px){.imTeamSelectors{grid-template-columns:1fr}}.imTeamGuidance{display:grid;gap:5px;margin-top:13px;padding:13px 15px;border-left:4px solid #20a79a;border-radius:8px;background:#eaf8f6;color:#173b60}.imTeamGuidance b{color:#087568}.imTeamGuidance.imt{border-left-color:#315fe6;background:#eef3ff}.imTeamGuidance.imt b{color:#244fbd}.imTeamGuidance.ercc{border-left-color:#20a79a;background:#eaf8f6}.imTeamGuidance.ercc b{color:#087568}.imTeamGuidance.cct{border-left-color:#7656d8;background:#f4f1ff}.imTeamGuidance.cct b{color:#5b3fc0}.imTeamGuidance.brt{border-left-color:#d7970b;background:#fff8e4}.imTeamGuidance.brt b{color:#855a00}.imTeamGuidance span{font-size:12px;line-height:1.5}.imSource{display:block;margin-top:5px;color:#168068;font-size:10px;font-weight:800}.imScenarioTitle{display:flex;align-items:center;gap:10px}.imCardTools{display:flex;gap:8px;align-items:center}.imRecommendation{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding:10px 12px;border-radius:8px;background:#eef4ff;color:#244c99;font-size:10px;font-weight:850}.imRecommendation button{padding:8px 10px;border:1px solid #9eb8ee;border-radius:7px;background:#fff;color:#244c99;font-weight:850}.imScenarioTitle .hazardIcon{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;border-radius:11px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6}.imScenarioTitle .hazardIcon svg{width:29px;height:29px}.imScenarioTitle .hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.imScenarioTitle .hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.imScenarioTitle .hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.imScenarioTitle .hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.imScenarioSelectors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:4px 0 18px}.imScenarioSelectors>button{position:relative;display:grid;grid-template-columns:48px 1fr;grid-template-rows:auto auto auto;gap:3px 10px;min-height:132px;padding:14px;border:2px solid #cfdae6;border-radius:13px;background:#f8fbfe;color:#173b60;text-align:left;cursor:pointer}.imScenarioSelectors .hazardIcon{grid-row:1/4;width:48px;height:48px;display:grid;place-items:center;border-radius:11px;background:#e8efff;color:#315fe6}.imScenarioSelectors .hazardIcon svg{width:31px;height:31px}.imScenarioSelectors span{font-weight:950;line-height:1.2}.imScenarioSelectors small{color:#168068;font-size:9px;font-weight:900}.imScenarioSelectors em{position:absolute;right:10px;top:10px;padding:4px 7px;border-radius:999px;background:#e8efff;color:#315fe6;font-size:8px;font-style:normal;font-weight:900}.imScenarioSelectors b,.imScenarioSelectors i{grid-column:1/-1;font-size:9px;font-style:normal}.imScenarioSelectors b{margin-top:7px;color:#365a7d}.imScenarioSelectors i{color:#6c8094;font-weight:700}.imScenarioSelectors>button.active{border-color:#315fe6;background:#eef3ff;box-shadow:0 7px 18px #315fe626;transform:translateY(-2px)}.imScenarioSelectors>button.tone-Low{border-top-color:#15915f}.imScenarioSelectors>button.tone-Moderate{border-top-color:#d6a800}.imScenarioSelectors>button.tone-High{border-top-color:#df7b11}.imScenarioSelectors>button.tone-Critical{border-top-color:#c83333}.imScenarioSelectors>button.tone-Low em{background:#dff5e9;color:#087242}.imScenarioSelectors>button.tone-Moderate em{background:#fff2bf;color:#805d00}.imScenarioSelectors>button.tone-High em{background:#ffe1b8;color:#944f00}.imScenarioSelectors>button.tone-Critical em{background:#ffd4d4;color:#a61f1f}@media(max-width:1050px){.imScenarioSelectors{grid-template-columns:1fr 1fr}}@media(max-width:650px){.imScenarioSelectors{grid-template-columns:1fr}}`}</style>
+      <style>{`.imScenarioSelectors strong{grid-column:1/-1;margin-top:4px;padding-top:7px;border-top:1px solid #d5e0eb;color:#315fe6;font-size:9px;font-weight:950}.imScenarioSelectors>button.active strong{color:#244fbd}`}</style>
       {[
         ["assessment_id", state?.savedId || initial?.id || ""],
         ["site_profile_id", sourceIds.site],
@@ -1155,9 +1158,10 @@ export default function BCPIncidentManagement({
         {step === 2 && (
           <section className="imPanel">
             <Intro title="Set scenario-specific activation, ERCC and escalation thresholds.">
-              Thresholds are generated from Module 5. RPG recommends the
-              immediate controls, responder route and escalation trigger for
-              each scenario; the plan owner can edit them before approval.
+              Scenario cards are connected directly to the selected Module 5
+              Hazard Scenario assessment. Select a card only when you want to
+              expand and configure its activation controls. You can also add a
+              separate manual scenario.
             </Intro>
             <button
               type="button"
@@ -1178,6 +1182,7 @@ export default function BCPIncidentManagement({
                 };
                 setThresholds([...thresholds, manualThreshold]);
                 setActiveThresholdIndex(thresholds.length);
+                setExpandedThresholdId(manualThreshold.id);
               }}
             >
               + Add manual scenario
@@ -1205,7 +1210,12 @@ export default function BCPIncidentManagement({
                     aria-selected={activeThresholdIndex === index}
                     className={`tone-${tone} ${activeThresholdIndex === index ? "active" : ""}`}
                     key={item.id}
-                    onClick={() => setActiveThresholdIndex(index)}
+                    onClick={() => {
+                      setActiveThresholdIndex(index);
+                      setExpandedThresholdId((current) =>
+                        current === item.id ? "" : item.id,
+                      );
+                    }}
                   >
                     <HazardIcon
                       name={item.scenario || "Custom disruption scenario"}
@@ -1220,13 +1230,22 @@ export default function BCPIncidentManagement({
                     </em>
                     <b>{item.responseLevel || "Response level pending"}</b>
                     <i>{item.externalResponder || guidance.responder}</i>
+                    <strong>
+                      {expandedThresholdId === item.id
+                        ? "▲ Collapse controls"
+                        : "▼ Expand & configure"}
+                    </strong>
                   </button>
                 );
               })}
             </div>
             <div className="imList">
               {thresholds
-                .filter((_, index) => index === activeThresholdIndex)
+                .filter(
+                  (item, index) =>
+                    index === activeThresholdIndex &&
+                    item.id === expandedThresholdId,
+                )
                 .map((item) => {
                   const index = thresholds.findIndex(
                     (threshold) => threshold.id === item.id,
@@ -1296,6 +1315,7 @@ export default function BCPIncidentManagement({
                                   ),
                                 );
                                 setActiveThresholdIndex(0);
+                                setExpandedThresholdId("");
                               }}
                             >
                               Remove
