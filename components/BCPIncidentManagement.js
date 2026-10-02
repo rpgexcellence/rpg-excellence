@@ -1,2292 +1,1392 @@
 "use client";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
-import { useActionState, useMemo, useState } from "react";
-import { HazardIcon } from "./BCPHazardScenarioAssessment";
-
-const arr = (value) => (Array.isArray(value) ? value : []);
-const uid = () => crypto.randomUUID();
+const catalogue = {
+  "People & security": [
+    "Active shooter",
+    "Contagious illness",
+    "Pandemic",
+    "Terrorism",
+    "Workplace violence",
+    "Sabotage",
+  ],
+  "Technology & infrastructure": [
+    "Cyber attack",
+    "IT-related failure",
+    "Mechanical breakdown",
+    "Utility outage",
+    "Electric power supply failure",
+    "Facility / physical security failure",
+  ],
+  "Supply chain & transport": [
+    "Customs / border crossing issue",
+    "Import or export issue",
+    "Supplier failure",
+    "Transportation failure / vehicle collision",
+    "Plane crash",
+  ],
+  "Natural & environmental": [
+    "Earthquake",
+    "Explosion",
+    "Fire",
+    "Flooding / dam or levee failure",
+    "Foodborne illness",
+    "Hazardous-material spill or release",
+    "Hurricane",
+    "Landslide",
+    "Radiation / electromagnetic pulse",
+    "Radiation / thermal",
+    "Subsidence / sinkhole",
+    "Severe thunderstorm",
+    "Tornado",
+    "Tropical storm",
+    "Tsunami",
+    "Volcano",
+    "Windstorm",
+    "Winter storm",
+  ],
+  "Integrity & compliance": ["Bribery and corruption", "Insider trading"],
+};
 const steps = [
-  "Controlled sources",
-  "Response structure",
-  "Activation thresholds",
-  "Warning & communication",
-  "Incident Action Plan",
-  "Recovery & approval",
+  "Linked scope",
+  "Hazard screening",
+  "Risk analysis",
+  "Controls",
+  "Treatment & approval",
+  "Risk register",
 ];
-const personName = (person) =>
-  person ? `${person.first_name} ${person.last_name}` : "";
-const controlCentreName = "Emergency Response Control Centre";
-const defaultTeamNames = [
-  "Incident Management Team",
-  controlCentreName,
-  "Crisis Communications Team",
-  "Business Recovery Team",
-];
-const alignControlCentreTerms = (value) =>
-  String(value || "")
-    .replace(/Emergency Operations Cent(?:re|er)/gi, controlCentreName)
-    .replace(/\bEOC\b/g, "ERCC");
-const alignTeam = (team) => ({
-  ...team,
-  name: alignControlCentreTerms(team?.name),
-  responsibilities: alignControlCentreTerms(team?.responsibilities),
-  procedure: alignControlCentreTerms(team?.procedure),
-  authority: alignControlCentreTerms(team?.authority),
-});
-const alignThreshold = (threshold) => ({
-  ...threshold,
-  eocThreshold: alignControlCentreTerms(threshold?.eocThreshold),
-});
-const teamAcronyms = {
-  "Incident Management Team": "IMT",
-  [controlCentreName]: "ERCC",
-  "Crisis Communications Team": "CCT",
-  "Business Recovery Team": "BRT",
-};
-const teamGuidance = {
-  IMT: {
-    title: "Incident Management Team (IMT)",
-    text: "The IMT provides tactical control at the affected site or service. It protects life and welfare, assesses and stabilises the incident, accounts for people, coordinates emergency responders, maintains the incident log and escalates verified situation reports to the ERCC.",
-  },
-  ERCC: {
-    title: "Emergency Response Control Centre (ERCC)",
-    text: "Establish a physical, virtual or hybrid control point for strategic coordination. The ERCC brings together authorised site leadership, incident management, QHSE/business continuity, affected business functions and communications. It records activation, situation reports, decisions, resource priorities and formal handback.",
-  },
-  CCT: {
-    title: "Crisis Communications Team (CCT)",
-    text: "The CCT provides one verified and authorised voice during disruption. It coordinates employee, customer, authority, supplier, community and media communications; protects confidential information; monitors misinformation; and retains the message, approval and release record.",
-  },
-  BRT: {
-    title: "Business Recovery Team (BRT)",
-    text: "The BRT activates approved continuity solutions and restores priority activities within agreed recovery objectives. It coordinates people, premises, technology, information and suppliers, tracks dependencies and constraints, validates restored services and manages controlled handback to business owners.",
-  },
-};
-const teamControlOptions = {
-  IMT: {
-    authority: [
-      "Activate the local incident response",
-      "Protect life and order evacuation or lockdown",
-      "Suspend unsafe or affected operations",
-      "Deploy available site resources",
-      "Request emergency-service assistance",
-      "Escalate activation of the ERCC",
-    ],
-    responsibilities: [
-      "Assess and classify the incident",
-      "Protect life, welfare and the environment",
-      "Stabilise and contain the incident",
-      "Account for affected people",
-      "Maintain the incident and decision log",
-      "Provide verified situation reports to the ERCC",
-    ],
-    procedure: [
-      "Receive and verify the alert",
-      "Appoint the Incident Controller",
-      "Establish an incident control point",
-      "Complete the initial impact assessment",
-      "Set immediate objectives and allocate actions",
-      "Issue scheduled situation reports",
-      "Escalate, hand over or stand down formally",
-    ],
-  },
-  ERCC: {
-    authority: [
-      "Declare a major incident or crisis",
-      "Approve strategic response priorities",
-      "Allocate cross-functional resources",
-      "Approve continuity-strategy activation",
-      "Authorise executive and external escalation",
-      "Approve recovery handback and stand-down",
-    ],
-    responsibilities: [
-      "Maintain strategic command and oversight",
-      "Set organisation-wide priorities",
-      "Resolve resource and policy conflicts",
-      "Assess legal, regulatory and stakeholder impacts",
-      "Coordinate executive decisions and governance",
-      "Maintain the strategic decision record",
-    ],
-    procedure: [
-      "Activate the physical, virtual or hybrid ERCC",
-      "Confirm command roles and meeting rhythm",
-      "Review IMT situation reports and assumptions",
-      "Approve strategic objectives and resources",
-      "Coordinate continuity, communications and assurance",
-      "Record decisions, owners and review times",
-      "Authorise transition to recovery and closure",
-    ],
-  },
-  CCT: {
-    authority: [
-      "Control incident-related communications",
-      "Approve holding statements and updates",
-      "Select authorised communication channels",
-      "Correct inaccurate or harmful information",
-      "Escalate media and reputation risks",
-      "Suspend unauthorised communications",
-    ],
-    responsibilities: [
-      "Verify information before release",
-      "Coordinate employee and stakeholder messages",
-      "Maintain media and social-media monitoring",
-      "Protect confidential and personal information",
-      "Keep a communication and approval log",
-      "Align messages with the IMT and ERCC",
-    ],
-    procedure: [
-      "Receive verified facts from the IMT or ERCC",
-      "Identify audiences and communication priorities",
-      "Draft and approve the holding statement",
-      "Release through primary and fallback channels",
-      "Monitor response, media and misinformation",
-      "Issue timed updates and record approvals",
-      "Publish closure and recovery communications",
-    ],
-  },
-  BRT: {
-    authority: [
-      "Activate approved continuity solutions",
-      "Prioritise recovery of critical activities",
-      "Deploy alternate sites, systems or suppliers",
-      "Approve temporary recovery workarounds",
-      "Request additional recovery resources",
-      "Recommend restoration and operational handback",
-    ],
-    responsibilities: [
-      "Recover activities within approved RTOs",
-      "Coordinate people, technology, facilities and suppliers",
-      "Track recovery dependencies and constraints",
-      "Validate restored services and data",
-      "Report residual exposure and overdue recovery",
-      "Manage controlled handback to business owners",
-    ],
-    procedure: [
-      "Receive activation and recovery priorities",
-      "Confirm RTOs, dependencies and minimum resources",
-      "Activate selected continuity solutions",
-      "Assign recovery actions and target times",
-      "Validate service, safety, quality and information integrity",
-      "Report recovery status to the ERCC",
-      "Complete controlled handback and retain lessons",
-    ],
-  },
-};
-const selectedList = (team, key) => arr(team?.[key]);
-function buildTeamProcedure(team) {
-  const authorities = selectedList(team, "selectedAuthorities");
-  const responsibilities = selectedList(team, "selectedResponsibilities");
-  const controls = selectedList(team, "selectedProcedureControls");
-  if (!authorities.length && !responsibilities.length && !controls.length)
-    return team?.procedure || "";
-  const lead = team?.leadPersonId
-    ? "The appointed Team Lead"
-    : "The authorised Team Lead";
-  const parts = [];
-  if (authorities.length)
-    parts.push(
-      `${lead} may ${authorities.map((value) => value.toLowerCase()).join("; ")}.`,
-    );
-  if (responsibilities.length)
-    parts.push(
-      `The ${team.name} shall ${responsibilities.map((value) => value.toLowerCase()).join("; ")}.`,
-    );
-  if (controls.length)
-    parts.push(
-      `On activation, the controlled procedure requires the team to ${controls.map((value) => value.toLowerCase()).join("; ")}.`,
-    );
-  parts.push(
-    "Decisions, actions, owners, times and changes in status shall be recorded in the controlled incident log.",
-  );
-  return parts.join(" ");
-}
-const blankResponseTeam = (name) => ({
-  id: `core-${teamAcronyms[name] || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-  name,
-  leadPersonId: "",
-  alternatePersonId: "",
-  authority: "",
-  responsibilities: "",
-  procedure: "",
-  competenceEvidence: "",
-  availability: "",
-});
-const ensureCoreTeams = (items) =>
-  defaultTeamNames.map((name) => {
-    const existing = arr(items)
-      .map(alignTeam)
-      .find((team) => team.name === name);
-    return existing || blankResponseTeam(name);
-  });
-const sourceLabel = (row, fallback) =>
-  row
-    ? `${row.assessment_title || row.location_name || fallback} · v${row.version || 1} · ${String(row.status || "draft").replaceAll("_", " ")}`
-    : fallback;
-
-function PersonSelect({ label, value, people, onChange, exclude = "" }) {
-  return (
-    <label>
-      <span>{label}</span>
-      <select
-        value={value || ""}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">Select Company User</option>
-        {people
-          .filter((person) => person.id !== exclude)
-          .map((person) => (
-            <option key={person.id} value={person.id}>
-              {personName(person)}
-              {person.position ? ` · ${person.position}` : ""}
-            </option>
-          ))}
-      </select>
-    </label>
-  );
-}
-function Field({
-  label,
-  value,
-  onChange,
-  area = false,
-  wide = false,
-  ...props
-}) {
-  const Tag = area ? "textarea" : "input";
-  return (
-    <label className={wide ? "wide" : ""}>
-      <span>{label}</span>
-      <Tag
-        value={value ?? ""}
-        onChange={(event) => onChange(event.target.value)}
-        {...props}
-      />
-    </label>
-  );
-}
-function Intro({ title, children }) {
-  return (
-    <div className="imIntro">
-      <b>{title}</b>
-      <p>{children}</p>
-    </div>
-  );
-}
-function ControlChoices({
-  label,
-  options,
-  selected,
-  onToggle,
-  tone = "authority",
-}) {
-  return (
-    <fieldset className={`imControlChoices ${tone}`}>
-      <legend>{label}</legend>
-      <div>
-        {options.map((option) => {
-          const active = selected.includes(option);
-          return (
-            <button
-              type="button"
-              key={option}
-              className={active ? "selected" : ""}
-              aria-pressed={active}
-              onClick={() => onToggle(option)}
-            >
-              {active ? "✓ " : "+ "}
-              {option}
-            </button>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
-}
-function sourceVersion(row) {
-  return row ? Number(row.version) || 1 : 0;
-}
-
-function scenarioGuidance(value = "") {
-  const name = String(value).toLowerCase();
-  if (/active shooter|armed intruder|weapon|terror|hostile/.test(name))
-    return {
-      responder: "Police / emergency services",
-      controls:
-        "Protect life: escape if safe, otherwise secure and conceal. Call emergency services when safe, prevent entry to the affected area, account for people and preserve evidence. Do not confront the attacker.",
-      eoc: "Activate the ERCC when police confirm a continuing threat, the site is evacuated or locked down, casualties are reported, or executive and cross-functional coordination is required.",
-      authority: "Incident Controller",
-    };
-  if (/fire|explosion|smoke/.test(name))
-    return {
-      responder: "Fire and Rescue Service",
-      controls:
-        "Raise the alarm, evacuate by the approved route, call the fire service, account for people at assembly points and isolate energy only where trained and safe.",
-      eoc: "Activate the ERCC for confirmed fire, loss of site access, casualties, prolonged evacuation or disruption beyond the approved activity tolerance.",
-      authority: "Incident Controller / Fire Marshal",
-    };
-  if (/flood|storm|weather|water/.test(name))
-    return {
-      responder: "Emergency services / Environment Agency / utility provider",
-      controls:
-        "Protect life, move people away from affected areas, isolate electricity where safe, prevent access, protect critical assets and monitor official warnings.",
-      eoc: "Activate the ERCC when evacuation, loss of utilities, multi-area impact or continuity strategy activation is required.",
-      authority: "Incident Controller",
-    };
-  if (/cyber|ransom|data|information security|system outage/.test(name))
-    return {
-      responder:
-        "IT incident response / cyber insurer / regulatory authority as applicable",
-      controls:
-        "Isolate affected systems without destroying evidence, activate the cyber response process, preserve logs, restrict communications to approved channels and assess reporting duties.",
-      eoc: "Activate the ERCC when priority services, regulated data, multiple systems or external reporting obligations are affected.",
-      authority: "Incident Controller / Information Security Lead",
-    };
-  if (/pandemic|epidemic|infectious|health/.test(name))
-    return {
-      responder: "Public health authority / emergency medical services",
-      controls:
-        "Protect affected people, obtain medical advice, isolate exposure where appropriate, record affected contacts and apply approved workforce and hygiene controls.",
-      eoc: "Activate the ERCC when staffing, site operation, public-health direction or several priority activities are affected.",
-      authority: "Incident Controller / Health and Safety Lead",
-    };
-  if (/power|utility|electric|gas|telecom/.test(name))
-    return {
-      responder: "Relevant utility provider / emergency services",
-      controls:
-        "Protect people from unsafe equipment, confirm the extent of loss, isolate affected systems where safe and activate approved backup arrangements.",
-      eoc: "Activate the ERCC when the outage exceeds local backup capacity, affects a priority activity or requires relocation or continuity solutions.",
-      authority: "Incident Controller / Facilities Lead",
-    };
-  return {
-    responder:
-      "Emergency services or competent external authority, as applicable",
-    controls:
-      "Protect life safety, contain the event, assess impact, account for affected people, preserve evidence and activate the relevant emergency procedure.",
-    eoc: "Activate the ERCC when cross-functional coordination, executive decisions, external reporting or continuity strategy activation is required.",
-    authority: "Incident Controller",
-  };
-}
-
-function recoveryCriteriaForScenario(value = "") {
-  const name = String(value).toLowerCase();
-  const common = [
-    "Life-safety hazards are controlled and affected people are accounted for",
-    "Critical Incident Action Plan actions are closed or transferred with an owner",
-    "Residual risks and temporary operating restrictions are documented and accepted",
-  ];
-  if (/fire|explosion|smoke|earthquake|landslide|facility|physical/.test(name))
-    return [
-      "Emergency responders or the competent authority have released the affected area",
-      "A competent structural, fire or facility safety inspection confirms controlled occupancy",
-      "Utilities, alarms, access controls and essential equipment have been function-tested",
-      ...common,
-    ];
-  if (/pandemic|contagious|foodborne|health|illness/.test(name))
-    return [
-      "Applicable public-health or occupational-health restrictions have been satisfied",
-      "Minimum safe staffing and competent cover are available for priority activities",
-      "Hygiene, welfare and employee-support controls are operating effectively",
-      ...common,
-    ];
-  if (/cyber|system|information|data|technology/.test(name))
-    return [
-      "Affected systems are contained, recovered and independently function-tested",
-      "Required backups, logs and evidence have been preserved",
-      "Information-security and regulatory reporting decisions are recorded",
-      ...common,
-    ];
-  if (/utility|power|electric|gas|water|telecom/.test(name))
-    return [
-      "The utility provider confirms stable restoration or an approved alternative supply is operating",
-      "Safety systems and priority equipment have been tested following restoration",
-      "Capacity is sufficient for the planned level of operation",
-      ...common,
-    ];
-  if (/supplier|transport|customs|border|logistics/.test(name))
-    return [
-      "The critical supply or approved alternative route has been confirmed",
-      "Inventory and delivery capacity support the planned operating level",
-      "Customer, quality and regulatory implications have been reviewed",
-      ...common,
-    ];
-  if (/shooter|violence|terror|hostile|security/.test(name))
-    return [
-      "Police or the competent authority have formally returned control of the affected area",
-      "Security, access and employee welfare arrangements have been reassessed",
-      "Evidence-preservation and communication restrictions are understood",
-      ...common,
-    ];
-  return [
-    "The competent responder, authority or responsible technical function confirms the event is controlled",
-    "People, premises, technology, information and supply dependencies have been checked",
-    "The priority activity can operate within its approved recovery objective",
-    ...common,
-  ];
-}
-
-function buildRecoveryScenario(threshold, existing) {
-  const recommendations = recoveryCriteriaForScenario(threshold.scenario);
-  const prior = arr(existing?.criteria);
-  return {
-    id: existing?.id || uid(),
-    thresholdId: threshold.id,
-    sourceId: threshold.sourceId || "",
-    scenario: threshold.scenario,
-    ownerPersonId: existing?.ownerPersonId || "",
-    targetRecovery: existing?.targetRecovery || "",
-    responderReleaseReference: existing?.responderReleaseReference || "",
-    limitations: existing?.limitations || "",
-    criteria: recommendations.map((label, index) => {
-      const saved = prior.find((item) => item.label === label) || prior[index];
-      return {
-        id: saved?.id || uid(),
-        label,
-        complete: Boolean(saved?.complete),
-        evidence: saved?.evidence || "",
-      };
-    }),
-  };
-}
-
-const scoreBand = (score) =>
-  Number(score) >= 20
+const uid = () => crypto.randomUUID();
+const arr = (value) => (Array.isArray(value) ? value : []);
+const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n) || min));
+const band = (score) =>
+  score >= 20
     ? "Critical"
-    : Number(score) >= 12
+    : score >= 12
       ? "High"
-      : Number(score) >= 6
+      : score >= 6
         ? "Moderate"
         : "Low";
-function liveHazardTone(item, hazardAssessment) {
-  if (item?.hazardTone && item.hazardTone !== "neutral") return item.hazardTone;
-  const linked = arr(hazardAssessment?.scenario_assessments).find(
-    (risk) =>
-      (item?.sourceId && risk.id === item.sourceId) ||
-      String(risk.name || risk.scenario || "").toLowerCase() ===
-        String(item?.scenario || "").toLowerCase(),
-  );
-  if (!linked) return "neutral";
-  if (linked.residualBand || linked.riskBand)
-    return linked.residualBand || linked.riskBand;
-  const recordedScore = Number(
-    linked.residualRisk || linked.residualScore || 0,
-  );
-  if (recordedScore > 0) return scoreBand(recordedScore);
-  const impact = Math.max(
-    ...Object.values(linked.impact || {})
-      .map(Number)
-      .filter(Number.isFinite),
-    1,
-  );
-  const likelihood = Math.max(1, Math.min(5, Number(linked.likelihood) || 1));
-  const effectiveness = Math.max(
-    0,
-    Math.min(100, Number(linked.controlEffectiveness) || 0),
-  );
-  const residualLikelihood = Math.max(
-    1,
-    Math.ceil(likelihood * (1 - effectiveness / 100)),
-  );
-  return scoreBand(impact * residualLikelihood);
-}
-
-const siteEmergencyContacts = (site) =>
-  arr(site?.information_continuity?.emergencyContacts);
-const emergencyContactKey = (contact, index = 0) =>
-  contact?.id ||
-  `${contact?.serviceType || "contact"}-${contact?.serviceName || index}`;
-function recommendedEmergencyContact(item, site) {
-  const contacts = siteEmergencyContacts(site);
-  if (!contacts.length) return null;
-  if (item?.responderContactKey) {
-    const selected = contacts.find(
-      (contact, index) =>
-        emergencyContactKey(contact, index) === item.responderContactKey,
-    );
-    if (selected) return selected;
-  }
-  const target =
-    `${item?.externalResponder || ""} ${item?.scenario || ""}`.toLowerCase();
-  const patterns = [
-    [/police|shooter|violence|terror|security/, /police/],
-    [/fire|explosion|smoke/, /fire/],
-    [
-      /ambulance|medical|hospital|health|pandemic|illness/,
-      /ambulance|medical|hospital|emergency department/,
+const impactLabels = [
+  "",
+  "Insignificant",
+  "Minor",
+  "Moderate",
+  "Major",
+  "Severe",
+];
+const likelihoodLabels = [
+  "",
+  "Rare",
+  "Unlikely",
+  "Possible",
+  "Likely",
+  "Almost certain",
+];
+const systems = {
+  Q: "Quality · ISO 9001",
+  E: "Environment · ISO 14001",
+  S: "OH&S · ISO 45001",
+  B: "Business continuity · ISO 22301",
+  IS: "Information security · ISO 27001",
+};
+const hazardCategories = [
+  "Work organisation and social factors",
+  "Infrastructure, equipment, materials and workplace conditions",
+  "Design, production, delivery, maintenance and disposal",
+  "Human factors",
+  "How work is performed",
+  "Past incidents, emergencies and their causes",
+  "Potential emergency situations",
+  "Employees, contractors, visitors and others",
+  "People in the vicinity who may be affected",
+  "People working at locations outside direct control",
+  "Design or adaptation of the work environment",
+  "Nearby situations caused by controlled activities",
+  "External nearby situations outside organisational control",
+  "Actual or proposed organisational, operational or process change",
+  "Changes in hazard knowledge or information",
+];
+const impactKeys = {
+  injury: "Injury / people",
+  collision: "Collision",
+  environment: "Environment · soil, water or air",
+  energy: "Environment · energy use",
+  assets: "Organisation assets",
+  customerAssets: "Customer assets",
+  reputation: "Reputation",
+  legal: "Legal / contractual",
+};
+const starter = {
+  Fire: {
+    systems: ["E", "S", "B"],
+    hazards: [1, 2, 3, 5, 6, 7, 13],
+    controls: [
+      "Fire-risk assessment is current and approved",
+      "Detection, alarm and suppression systems are inspected",
+      "Extinguishers and evacuation routes are maintained",
+      "Fire wardens and periodic evacuation drills are recorded",
+      "Flammable materials and batteries are safely controlled",
     ],
+  },
+  Pandemic: {
+    systems: ["Q", "S", "B"],
+    hazards: [0, 3, 6, 7, 8, 9, 13],
+    controls: [
+      "Remote-working and workforce-separation arrangements are tested",
+      "Critical-role succession and cross-training are maintained",
+      "Health guidance, absence monitoring and escalation triggers are defined",
+    ],
+  },
+  "Cyber attack": {
+    systems: ["Q", "B", "IS"],
+    hazards: [1, 3, 5, 6, 13, 14],
+    controls: [
+      "Phishing-resistant access controls and privileged-account reviews operate",
+      "Backups are isolated and recovery is tested",
+      "Security monitoring, incident response and supplier escalation are exercised",
+    ],
+  },
+  "IT-related failure": {
+    systems: ["Q", "B", "IS"],
+    hazards: [1, 2, 3, 5, 6, 13],
+    controls: [
+      "Resilient infrastructure and monitored failover are maintained",
+      "Backup and restoration tests are evidenced",
+      "Incident escalation and manual workarounds are documented",
+    ],
+  },
+  "Mechanical breakdown": {
+    systems: ["Q", "E", "S", "B"],
+    hazards: [1, 2, 3, 5, 6, 13],
+    controls: [
+      "Preventive maintenance and statutory inspections are current",
+      "Critical spares and competent maintenance cover are available",
+      "Isolation, shutdown and recovery procedures are tested",
+    ],
+  },
+  "Utility outage": {
+    systems: ["Q", "E", "S", "B", "IS"],
+    hazards: [1, 3, 5, 6, 13],
+    controls: [
+      "Critical utilities and single points of failure are documented",
+      "Backup power and safe shutdown arrangements are tested",
+      "Utility-provider escalation and recovery priorities are agreed",
+    ],
+  },
+  "Supplier failure": {
+    systems: ["Q", "E", "S", "B", "IS"],
+    hazards: [2, 5, 6, 7, 13],
+    controls: [
+      "Critical suppliers are tiered and reviewed",
+      "Alternative sources and minimum stock levels are defined",
+      "Contractual notification and continuity requirements are monitored",
+    ],
+  },
+  Sabotage: {
+    systems: ["Q", "S", "B", "IS"],
+    hazards: [3, 5, 6, 7, 8, 13],
+    controls: [
+      "Physical and logical access is role-controlled",
+      "Security incidents and suspicious activity are escalated",
+      "Critical areas, assets and changes are monitored",
+    ],
+  },
+  Terrorism: {
+    systems: ["S", "B"],
+    hazards: [5, 6, 7, 8, 9, 11, 12],
+    controls: [
+      "Threat levels and official guidance are monitored",
+      "Lockdown, evacuation and communications plans are exercised",
+      "Critical staff and alternate operating locations are identified",
+    ],
+  },
+  "Transportation failure / vehicle collision": {
+    systems: ["Q", "E", "S", "B"],
+    hazards: [1, 2, 3, 5, 6, 8, 13],
+    controls: [
+      "Journey, driver and vehicle controls are defined",
+      "Alternative carriers and routes are available",
+      "Incident notification and cargo recovery arrangements are tested",
+    ],
+  },
+  "Hazardous-material spill or release": {
+    systems: ["E", "S", "B"],
+    hazards: [1, 2, 3, 5, 6, 7, 8, 11],
+    controls: [
+      "Substance inventories and safety data are current",
+      "Secondary containment and spill response equipment are inspected",
+      "Trained responders, isolation and notification arrangements are tested",
+    ],
+  },
+  "Insider trading": {
+    systems: ["Q", "IS"],
+    hazards: [0, 3, 5, 7, 13],
+    controls: [
+      "Restricted information and dealing windows are controlled",
+      "Conflicts, attestations and surveillance are reviewed",
+      "Suspected breaches are independently investigated",
+    ],
+  },
+};
+const emptyImpact = () =>
+  Object.fromEntries(Object.keys(impactKeys).map((k) => [k, 0]));
+const emptyRisk = (name = "") => {
+  const preset = starter[name] || {};
+  return {
+    id: uid(),
+    recordNumber: "",
+    assessmentDate: "",
+    name,
+    category:
+      Object.entries(catalogue).find(([, v]) => v.includes(name))?.[0] ||
+      "Site-specific",
+    applicableSystems: preset.systems || ["B"],
+    description: "",
+    opportunityDescription: "",
+    hazardCategories: (preset.hazards || []).map((i) => hazardCategories[i]),
+    causes: [],
+    warningIndicators: [],
+    affectedProcesses: [],
+    affectedDependencies: [],
+    impact: emptyImpact(),
+    likelihood: 1,
+    existingControls: preset.controls || [],
+    plannedControls: [],
+    controlEffectiveness: 0,
+    owner: "",
+    treatment: "Reduce",
+    actions: [],
+    correctiveActionReference: "",
+    targetDate: "",
+    targetLikelihood: 1,
+    targetImpact: 1,
+    reviewFrequency: "Semi-annually",
+    decisionRationale: "",
+    includeInIncidentPlan: true,
+    incidentPlanExclusionRationale: "",
+    revisionHistory: [],
+  };
+};
+const normalise = (r) => {
+  const legacy = r?.impact || {},
+    mapped = { ...emptyImpact(), ...legacy };
+  if (mapped.injury === 0 && legacy.people) mapped.injury = legacy.people;
+  if (mapped.assets === 0 && legacy.operations)
+    mapped.assets = legacy.operations;
+  if (mapped.customerAssets === 0 && legacy.supply)
+    mapped.customerAssets = legacy.supply;
+  return {
+    ...emptyRisk(r?.name),
+    ...r,
+    applicableSystems: arr(r?.applicableSystems).length
+      ? arr(r.applicableSystems)
+      : ["B"],
+    hazardCategories: arr(r?.hazardCategories),
+    impact: mapped,
+    causes: arr(r?.causes),
+    warningIndicators: arr(r?.warningIndicators),
+    affectedProcesses: arr(r?.affectedProcesses),
+    affectedDependencies: arr(r?.affectedDependencies),
+    existingControls: arr(r?.existingControls),
+    plannedControls: arr(r?.plannedControls),
+    includeInIncidentPlan: r?.includeInIncidentPlan !== false,
+    incidentPlanExclusionRationale: r?.incidentPlanExclusionRationale || "",
+    actions: arr(r?.actions),
+    revisionHistory: arr(r?.revisionHistory),
+  };
+};
+const metrics = (r) => {
+  const impact = Math.max(...Object.values(r.impact || {}).map(Number), 1),
+    likelihood = clamp(r.likelihood, 1, 5),
+    inherent = impact * likelihood,
+    residualLikelihood = Math.max(
+      1,
+      Math.ceil(likelihood * (1 - clamp(r.controlEffectiveness, 0, 100) / 100)),
+    ),
+    residual = impact * residualLikelihood,
+    targetLikelihood = clamp(r.targetLikelihood, 1, 5),
+    targetImpact = clamp(r.targetImpact, 1, 5),
+    target = targetLikelihood * targetImpact;
+  return {
+    impact,
+    likelihood,
+    inherent,
+    residualLikelihood,
+    residual,
+    targetLikelihood,
+    targetImpact,
+    target,
+    inherentBand: band(inherent),
+    residualBand: band(residual),
+    targetBand: band(target),
+  };
+};
+const toggle = (list, value) =>
+  list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
+const profileItems = (profile, key) =>
+  arr(profile?.[key])
+    .map((x) =>
+      typeof x === "string"
+        ? x
+        : x?.name || x?.title || x?.role || x?.fullName || "",
+    )
+    .map(String)
+    .filter((x) => x && x !== "[object Object]");
+const personName = (value) =>
+  typeof value === "string"
+    ? value
+    : value?.name ||
+      value?.fullName ||
+      `${value?.first_name || ""} ${value?.last_name || ""}`.trim() ||
+      value?.title ||
+      value?.role ||
+      value?.email ||
+      "";
+const scenarioGuidance = (name = "") => {
+  const value = name.toLowerCase();
+  if (/shooter|violence|terror|sabotage/.test(value))
+    return {
+      causes: [
+        "Unauthorised access",
+        "Threat escalation",
+        "Security intelligence not acted upon",
+      ],
+      warnings: [
+        "Threatening behaviour or communication",
+        "Access-control alert",
+        "Change in official threat level",
+      ],
+    };
+  if (/cyber|it-related|identity|software/.test(value))
+    return {
+      causes: [
+        "Unpatched vulnerability",
+        "Credential compromise",
+        "Third-party service failure",
+      ],
+      warnings: [
+        "Repeated failed sign-ins",
+        "Security monitoring alert",
+        "Unexpected system degradation",
+      ],
+    };
+  if (/fire|explosion|spill|radiation/.test(value))
+    return {
+      causes: [
+        "Equipment or containment failure",
+        "Unsafe condition or activity",
+        "Inspection defect not corrected",
+      ],
+      warnings: [
+        "Alarm or detector activation",
+        "Abnormal heat, pressure, odour or reading",
+        "Inspection or maintenance exception",
+      ],
+    };
+  if (/flood|storm|weather|earthquake|landslide|tsunami|volcano/.test(value))
+    return {
+      causes: [
+        "Severe-weather or natural-hazard event",
+        "Site exposure or drainage weakness",
+        "Critical utility disruption",
+      ],
+      warnings: [
+        "Official weather or hazard warning",
+        "Rising water or abnormal site condition",
+        "Utility-provider alert",
+      ],
+    };
+  if (/supplier|transport|customs|export|import/.test(value))
+    return {
+      causes: [
+        "Single-source dependency",
+        "Supplier capacity or financial failure",
+        "Route, border or logistics disruption",
+      ],
+      warnings: [
+        "Late or missed delivery",
+        "Supplier performance deterioration",
+        "Carrier, customs or border alert",
+      ],
+    };
+  return {
+    causes: [
+      "Equipment, people or process failure",
+      "External dependency disruption",
+      "Control not implemented or ineffective",
+    ],
+    warnings: [
+      "Performance outside agreed limits",
+      "Repeated incident or near miss",
+      "Supplier, system or regulatory alert",
+    ],
+  };
+};
+const treatmentGuidance = (name = "") => {
+  const value = name.toLowerCase();
+  if (/shooter|violence|terror|sabotage/.test(value))
+    return [
+      "Test lockdown, evacuation and emergency communication arrangements",
+      "Review access-control coverage and out-of-hours escalation",
+      "Exercise the incident command team with police liaison assumptions",
+    ];
+  if (/cyber|it-related|identity|software/.test(value))
+    return [
+      "Test recovery from an isolated and verified backup",
+      "Close critical vulnerabilities and verify detection coverage",
+      "Exercise the cyber incident and alternative-access procedure",
+    ];
+  if (/fire|explosion|spill|radiation/.test(value))
+    return [
+      "Close inspection, containment or alarm-system deficiencies",
+      "Exercise isolation, evacuation and emergency response arrangements",
+      "Verify competent responder coverage and emergency equipment",
+    ];
+  if (/flood|storm|weather|earthquake|landslide|tsunami|volcano/.test(value))
+    return [
+      "Protect or relocate continuity-critical equipment and records",
+      "Test site closure, remote-working and alternative-location arrangements",
+      "Verify alert thresholds and severe-weather escalation contacts",
+    ];
+  if (/supplier|transport|customs|export|import/.test(value))
+    return [
+      "Qualify an alternative supplier, carrier or route",
+      "Agree continuity, notification and recovery requirements with the supplier",
+      "Review minimum stock, lead time and single-source exposure",
+    ];
+  return [
+    "Implement and verify an additional preventive control",
+    "Test the response and recovery procedure",
+    "Assign an owner and confirm effectiveness by the target date",
   ];
-  const match = patterns.find(([trigger]) => trigger.test(target));
-  return match
-    ? contacts.find((contact) =>
-        match[1].test(
-          `${contact.serviceType || ""} ${contact.serviceName || ""}`.toLowerCase(),
-        ),
-      ) || null
-    : null;
+};
+const revisionSuggestions = [
+  "Initial assessment completed",
+  "Impact rating reviewed",
+  "Likelihood rating updated",
+  "Controls reviewed or amended",
+  "Residual risk recalculated",
+  "Treatment decision changed",
+];
+const iconKey = (name) => {
+  const n = String(name || "").toLowerCase();
+  if (/active shooter|workplace violence|terrorism/.test(n)) return "security";
+  if (/pandemic|illness|foodborne/.test(n)) return "bio";
+  if (/cyber|it-related/.test(n)) return "cyber";
+  if (/fire|thermal/.test(n)) return "fire";
+  if (/flood|tsunami|dam|levee/.test(n)) return "flood";
+  if (/storm|hurricane|tornado|wind|snow|ice|lightning/.test(n))
+    return "weather";
+  if (/earthquake|landslide|subsidence|sinkhole|volcano/.test(n))
+    return "ground";
+  if (/power|utility/.test(n)) return "power";
+  if (/supplier|import|export|customs|border/.test(n)) return "supply";
+  if (/transport|vehicle|plane/.test(n)) return "transport";
+  if (/mechanical|facility|physical/.test(n)) return "machine";
+  if (/radiation|electromagnetic/.test(n)) return "radiation";
+  if (/hazardous|spill|release|explosion/.test(n)) return "hazmat";
+  if (/bribery|corruption|insider/.test(n)) return "integrity";
+  if (/sabotage/.test(n)) return "sabotage";
+  return "custom";
+};
+export function HazardIcon({ name, tone = "neutral", small = false }) {
+  const type = iconKey(name),
+    common = {
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.8,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+    };
+  return (
+    <span
+      className={`hazardIcon tone-${tone} ${small ? "small" : ""}`}
+      title={name}
+      aria-label={`${name} hazard icon`}
+    >
+      <svg viewBox="0 0 48 48" role="img">
+        {type === "security" && (
+          <>
+            <path
+              {...common}
+              d="M24 5 39 11v11c0 10-6.2 17-15 21-8.8-4-15-11-15-21V11z"
+            />
+            <circle {...common} cx="24" cy="18" r="4" />
+            <path
+              {...common}
+              d="M16 31c1.7-5 4.4-7 8-7s6.3 2 8 7M36 8l5-4M39 12h5"
+            />
+          </>
+        )}
+        {type === "bio" && (
+          <>
+            <circle {...common} cx="24" cy="24" r="10" />
+            <path
+              {...common}
+              d="M24 5v7M24 36v7M5 24h7M36 24h7M10.5 10.5l5 5M32.5 32.5l5 5M37.5 10.5l-5 5M15.5 32.5l-5 5"
+            />
+            <circle cx="20" cy="21" r="2" fill="currentColor" />
+            <circle cx="28" cy="26" r="2" fill="currentColor" />
+          </>
+        )}
+        {type === "cyber" && (
+          <>
+            <rect {...common} x="7" y="8" width="34" height="25" rx="3" />
+            <path {...common} d="M4 39h40M18 39l2-6h8l2 6M24 14v7" />
+            <circle cx="24" cy="26" r="2" fill="currentColor" />
+            <path {...common} d="M18 18a6 6 0 0 1 12 0" />
+          </>
+        )}
+        {type === "fire" && (
+          <>
+            <path
+              {...common}
+              d="M27 5c2 9-5 10-1 17 2-4 5-5 7-8 5 7 7 13 4 20-2.5 6-8 9-14 9-8 0-14-5-14-13 0-7 5-12 11-19 0 7 3 9 7 12 2-6-1-10 0-18z"
+            />
+            <path
+              {...common}
+              d="M25 28c4 4 3 10-2 12-5-2-6-8-2-12 1.5-1.5 2.5-3 3-5 .5 2 0 3 1 5z"
+            />
+          </>
+        )}
+        {type === "flood" && (
+          <>
+            <path
+              {...common}
+              d="M8 24V10h25v14M13 24v-8h7v8M6 30c4-4 8 4 12 0s8 4 12 0 8 4 12 0M6 38c4-4 8 4 12 0s8 4 12 0 8 4 12 0"
+            />
+            <path {...common} d="m31 10 7 6v9" />
+          </>
+        )}
+        {type === "weather" && (
+          <>
+            <path
+              {...common}
+              d="M14 30H10a7 7 0 0 1 0-14c2-7 13-9 18-3 7-2 13 3 13 9 0 5-4 8-9 8"
+            />
+            <path
+              {...common}
+              d="m24 26-5 9h6l-3 8 9-12h-6l3-5M8 37h7M34 37h8"
+            />
+          </>
+        )}
+        {type === "ground" && (
+          <>
+            <path
+              {...common}
+              d="m5 32 10-16 7 9 7-13 14 20M5 39h13l4-7 5 5 4-5h12"
+            />
+            <path {...common} d="m23 5-3 7 5 3-4 7" />
+          </>
+        )}
+        {type === "power" && (
+          <>
+            <path {...common} d="M18 5 8 27h13l-2 16 20-27H26l5-11z" />
+            <path {...common} d="M5 39h9M34 39h9" />
+          </>
+        )}
+        {type === "supply" && (
+          <>
+            <path {...common} d="M6 15h15v13H6zM27 20h9l6 7v8H27zM21 35h6" />
+            <circle {...common} cx="14" cy="36" r="4" />
+            <circle {...common} cx="35" cy="36" r="4" />
+            <path {...common} d="M11 10h17M30 10h8M32 7l-4 3 4 3" />
+          </>
+        )}
+        {type === "transport" && (
+          <>
+            <path
+              {...common}
+              d="M8 29 12 17h24l5 12v9H7v-9zM13 29h22M16 22h16"
+            />
+            <circle {...common} cx="14" cy="38" r="4" />
+            <circle {...common} cx="34" cy="38" r="4" />
+          </>
+        )}
+        {type === "machine" && (
+          <>
+            <path
+              {...common}
+              d="M19 7h10l2 6 6 2 5-3 5 8-5 4v6l5 4-5 8-5-3-6 2-2 6H19l-2-6-6-2-5 3-5-8 5-4v-6l-5-4 5-8 5 3 6-2z"
+              transform="scale(.82) translate(5 5)"
+            />
+            <circle {...common} cx="24" cy="24" r="7" />
+          </>
+        )}
+        {type === "radiation" && (
+          <>
+            <circle {...common} cx="24" cy="24" r="5" />
+            <path
+              {...common}
+              d="M21 17 15 7a20 20 0 0 1 18 0l-6 10M31 25l12 1a20 20 0 0 1-9 15l-5-11M17 25 5 26a20 20 0 0 0 9 15l5-11"
+            />
+          </>
+        )}
+        {type === "hazmat" && (
+          <>
+            <path
+              {...common}
+              d="M17 5h14M20 5v12L8 38c-1 2 1 5 4 5h24c3 0 5-3 4-5L28 17V5"
+            />
+            <path {...common} d="M15 32h18M18 26c4 3 8-3 12 0" />
+            <circle cx="24" cy="36" r="2" fill="currentColor" />
+          </>
+        )}
+        {type === "integrity" && (
+          <>
+            <path
+              {...common}
+              d="M7 20h34M12 20v17M20 20v17M28 20v17M36 20v17M7 38h34M5 43h38M24 5 6 15h36z"
+            />
+            <path {...common} d="m31 8 6 6" />
+          </>
+        )}
+        {type === "sabotage" && (
+          <>
+            <path
+              {...common}
+              d="M18 7h12l2 7 7 3v12l-7 3-2 8H18l-2-8-7-3V17l7-3z"
+            />
+            <path {...common} d="m17 17 14 14M31 17 17 31" />
+          </>
+        )}
+        {type === "custom" && (
+          <>
+            <path {...common} d="M24 5 44 41H4z" />
+            <path {...common} d="M24 17v12" />
+            <circle cx="24" cy="35" r="2" fill="currentColor" />
+          </>
+        )}
+      </svg>
+    </span>
+  );
 }
-const contactValues = (contact) =>
-  contact
-    ? {
-        responderContactKey: emergencyContactKey(contact),
-        responderName: contact.serviceName || contact.serviceType || "",
-        responderAddress: contact.address || "",
-        responderEmergencyNumber: contact.emergencyNumber || "",
-        responderDirectNumber: contact.nonEmergencyNumber || "",
-        responderTravelTime: contact.travelTimeMinutes || "",
-        responderLastVerified: contact.lastVerified || "",
-        responderAccessNotes: contact.accessNotes || "",
-      }
-    : {};
+const iconCss = `.hazardIcon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:14px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6;box-shadow:0 5px 14px #143a6420}.hazardIcon svg{width:38px;height:38px}.hazardIcon.small{width:25px;height:25px;flex-basis:25px;border-radius:7px;box-shadow:none}.hazardIcon.small svg{width:17px;height:17px}.hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.riskIdentity{display:flex;align-items:center;gap:13px}.registerCopy{flex:1;min-width:0}.catalogue button{display:inline-flex;align-items:center;gap:6px}.custom{align-items:center;gap:7px}.register article>.hazardIcon{margin-right:13px}@media(max-width:900px){.hazardIcon{width:48px;height:48px;flex-basis:48px}.hazardIcon svg{width:32px;height:32px}.register article>.hazardIcon{margin:0 0 8px}}`;
+const heatCss = `.appetite{display:flex;justify-content:space-between;gap:20px;align-items:center;background:#eef5ff;border:1px solid #c9daee;border-radius:10px;padding:13px;margin-bottom:14px}.appetite label{min-width:320px}.appetite span{color:#607890}.heatHead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.heatHead h3{margin:4px 0}.heatHead p{margin:0;color:#607890}.heatHead>div:last-child{display:flex;background:#eef3f7;padding:4px;border-radius:9px}.heatHead button{border:0;background:transparent;padding:8px 11px;border-radius:7px;font-weight:800;color:#49637b}.heatHead button.active{background:#fff;color:#0b3155;box-shadow:0 1px 5px #16365220}.heat{max-width:760px}.heat .row,.heat footer{grid-template-columns:70px repeat(5,1fr)}.heat .row>label{align-content:center;text-align:right;padding-right:7px}.heat .row>label small,.heat footer small{display:block}.heat .row>button{height:65px;border:0;display:grid;place-items:center;position:relative;border-radius:7px;cursor:pointer}.heat .row>button.selected{outline:4px solid #112f50;outline-offset:1px}.heat .row i{position:absolute;left:7px;top:5px;font-style:normal;font-size:10px}.heat .row strong{font-size:22px}.heat .row em{position:absolute;right:5px;top:5px;font-size:8px;font-style:normal}@media(max-width:900px){.appetite,.heatHead{display:block}.appetite label{min-width:0}.heat{overflow:auto}}`;
+const riskCoreCss = `.risk>header{display:grid!important;grid-template-columns:minmax(240px,1fr) minmax(220px,280px) auto;align-items:center}.riskCore{display:grid;justify-self:start;padding:8px 13px;border:1px solid #cedce8;border-left:4px solid #2d60e6;border-radius:9px;background:#f1f6fb}.riskCore small{color:#285de4!important;font-size:9px;font-weight:950;letter-spacing:.1em}.riskCore b{font-size:17px;line-height:1.2}.riskCore span{font-size:9px;color:#607890}@media(max-width:1150px){.risk>header{grid-template-columns:1fr auto!important}.riskCore{grid-column:1/-1;width:100%}}@media(max-width:900px){.risk>header{display:flex!important}.riskCore{width:100%}}`;
+const completionCss = `.hz nav button b{flex:0 0 27px;width:27px;height:27px;border-radius:8px}.hz nav button>span{display:grid;gap:2px}.hz nav button>span strong{font-size:13px}.hz nav button>span small{color:#91aac1;font-size:9px;font-weight:600}.hz nav button.complete b{background:#0b8068;color:#fff}.hz nav button.complete>span small{color:#6ee7cf}.stepRequirements{margin:16px 20px 0;padding:14px 18px;border:1px solid #efc66e;border-left:5px solid #e49a16;border-radius:10px;background:#fff8e8;color:#65450b}.stepRequirements>b{display:block;margin-bottom:6px}.stepRequirements ul{margin:0;padding-left:20px}.stepRequirements li{margin:4px 0;font-size:13px}.controlGrid,.treatmentSupportGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;align-items:start}.controlGrid .list,.treatmentSupportGrid .list{margin:0;padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.controlGrid label{padding:13px;border:1px solid #d6e2ec;border-radius:10px;background:#f8fbfd}.treatmentSupportGrid{margin:14px 0}.listGuide{display:block;margin:-3px 0 8px;color:#687e92;font-weight:500;line-height:1.35}.list .listSuggestions{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 9px}.list .listSuggestions button{width:auto;border:1px solid #bcd0e2;border-radius:999px;background:#eef4ff;color:#174da8;padding:6px 8px;font-size:10px;text-align:left}.list .listSuggestions:empty{display:none}.controlScale small{line-height:1.35}@media(max-width:900px){.stepRequirements{margin:10px 10px 0}.controlGrid,.treatmentSupportGrid{grid-template-columns:1fr}}`;
 
-export default function BCPIncidentManagement({
+export default function BCPHazardScenarioAssessment({
   action,
   profiles = [],
   contexts = [],
   roles = [],
-  hazards = [],
-  bias = [],
-  strategies = [],
-  people = [],
+  companyPeople = [],
   initial,
   organisationName = "",
   startStep = 0,
 }) {
-  const [state, formAction, pending] = useActionState(action, {});
-  const [step, setStep] = useState(
-    Math.max(0, Math.min(5, Number(startStep) || 0)),
+  const formRef = useRef(null);
+  const [formTick, setFormTick] = useState(0);
+  const [formState, formAction, isPending] = useActionState(action, {
+      error: "",
+    }),
+    [step, setStep] = useState(clamp(startStep, 0, 5));
+  const [profileId, setProfileId] = useState(initial?.site_profile_id || ""),
+    [contextId, setContextId] = useState(initial?.context_assessment_id || ""),
+    [roleId, setRoleId] = useState(initial?.role_assessment_id || "");
+  const profile = profiles.find((x) => x.id === profileId),
+    context = contexts.find((x) => x.id === contextId),
+    role = roles.find((x) => x.id === roleId);
+  const people = useMemo(
+    () =>
+      companyPeople
+        .map((person) => ({
+          name: personName(person),
+          email: person.email || "",
+          position: person.position || "",
+        }))
+        .filter((person) => person.name),
+    [companyPeople],
   );
-  const [sourceIds, setSourceIds] = useState({
-    site: initial?.site_profile_id || "",
-    context: initial?.context_assessment_id || "",
-    roles: initial?.role_assessment_id || "",
-    hazards: initial?.hazard_assessment_id || "",
-    bia: initial?.bia_assessment_id || "",
-    strategy: initial?.strategy_assessment_id || "",
-  });
-  const source = {
-    site: profiles.find((item) => item.id === sourceIds.site),
-    context: contexts.find((item) => item.id === sourceIds.context),
-    roles: roles.find((item) => item.id === sourceIds.roles),
-    hazards: hazards.find((item) => item.id === sourceIds.hazards),
-    bia: bias.find((item) => item.id === sourceIds.bia),
-    strategy: strategies.find((item) => item.id === sourceIds.strategy),
-  };
-  const [teams, setTeams] = useState(ensureCoreTeams(initial?.response_teams));
-  const [activeTeamIndex, setActiveTeamIndex] = useState(0);
-  const [thresholds, setThresholds] = useState(
-    arr(initial?.activation_thresholds).map(alignThreshold),
-  );
-  const [activeThresholdIndex, setActiveThresholdIndex] = useState(0);
-  const [expandedThresholdId, setExpandedThresholdId] = useState("");
-  const [communications, setCommunications] = useState(
-    arr(initial?.warning_communications),
-  );
-  const [actionPlan, setActionPlan] = useState(
-    arr(initial?.incident_action_plan),
-  );
-  const [recovery, setRecovery] = useState({
-    ...(initial?.recovery_stand_down || {}),
-    eocClosureCriteria: alignControlCentreTerms(
-      initial?.recovery_stand_down?.eocClosureCriteria,
+  const processes = [
+      ...profileItems(profile, "value_chain_processes"),
+      ...profileItems(profile, "support_processes"),
+    ],
+    dependencies = [
+      ...profileItems(profile, "dependency_records"),
+      ...profileItems(profile, "site_dependencies"),
+    ];
+  const [participants, setParticipants] = useState(
+      arr(initial?.participants).length ? arr(initial.participants) : [],
     ),
-  });
-  const [activeRecoveryId, setActiveRecoveryId] = useState("");
-  const [approverPersonId, setApproverPersonId] = useState(
-    initial?.approver_person_id || "",
+    [risks, setRisks] = useState(
+      arr(initial?.scenario_assessments).map(normalise),
+    );
+  const [appetite, setAppetite] = useState(
+    clamp(initial?.methodology?.appetiteScore || 9, 1, 25),
   );
-
-  const changeSource = (key, value) =>
-    setSourceIds((current) => ({ ...current, [key]: value }));
-  const changeItem = (setter) => (id, key, value) =>
-    setter((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, [key]: value } : item,
-      ),
-    );
-  const changeTeam = changeItem(setTeams),
-    changeThreshold = changeItem(setThresholds),
-    changeCommunication = changeItem(setCommunications),
-    changeAction = changeItem(setActionPlan);
-  const changeRecovery = (key, value) =>
-    setRecovery((current) => ({ ...current, [key]: value }));
-  const updateRecoveryScenario = (id, updater) =>
-    setRecovery((current) => ({
-      ...current,
-      scenarioRecovery: arr(current.scenarioRecovery).map((item) =>
-        item.id === id
-          ? typeof updater === "function"
-            ? updater(item)
-            : { ...item, ...updater }
-          : item,
-      ),
-    }));
-  const toggleTeamControl = (id, key, value) =>
-    setTeams((current) =>
-      current.map((team) => {
-        if (team.id !== id) return team;
-        const selected = selectedList(team, key);
-        const next = selected.includes(value)
-          ? selected.filter((item) => item !== value)
-          : [...selected, value];
-        let updated = { ...team, [key]: next };
-        if (key === "selectedAuthorities") updated.authority = next.join("; ");
-        if (key === "selectedResponsibilities")
-          updated.responsibilities = next.join("; ");
-        updated = { ...updated, procedure: buildTeamProcedure(updated) };
-        return updated;
-      }),
-    );
-
-  const generate = () => {
-    const roleRecords = arr(source.roles?.roles);
-    const generatedTeams = defaultTeamNames.map((name, index) => {
-      const old = teams.find(
-        (item) => alignControlCentreTerms(item.name) === name,
-      );
-      const linked = roleRecords.find((role) =>
-        index === 0
-          ? /incident|continuity|crisis/i.test(role.title || "")
-          : index === 1
-            ? /site leader|incident controller|emergency/i.test(
-                role.title || "",
-              )
-            : index === 2
-              ? /communication|media/i.test(role.title || "")
-              : /recovery|business continuity/i.test(role.title || ""),
-      );
-      const options = teamControlOptions[teamAcronyms[name]];
-      const selectedAuthorities = selectedList(old, "selectedAuthorities")
-        .length
-        ? selectedList(old, "selectedAuthorities")
-        : options.authority;
-      const selectedResponsibilities = selectedList(
-        old,
-        "selectedResponsibilities",
-      ).length
-        ? selectedList(old, "selectedResponsibilities")
-        : options.responsibilities;
-      const selectedProcedureControls = selectedList(
-        old,
-        "selectedProcedureControls",
-      ).length
-        ? selectedList(old, "selectedProcedureControls")
-        : options.procedure;
-      const generated = {
-        ...blankResponseTeam(name),
-        ...old,
-        name,
-        leadPersonId: old?.leadPersonId || linked?.primaryHolder || "",
-        alternatePersonId:
-          old?.alternatePersonId || arr(linked?.deputies)[0] || "",
-        availability: old?.availability || "24/7 call-out",
-        selectedAuthorities,
-        selectedResponsibilities,
-        selectedProcedureControls,
-        authority: selectedAuthorities.join("; "),
-        responsibilities: selectedResponsibilities.join("; "),
-      };
-      return { ...generated, procedure: buildTeamProcedure(generated) };
-    });
-    setTeams(generatedTeams);
-
-    const generatedThresholds = arr(source.hazards?.scenario_assessments).map(
-      (risk) => {
-        const old = thresholds.find(
-          (item) => item.sourceId === risk.id || item.scenario === risk.name,
-        );
-        const scenario = risk.name || risk.scenario || "Disruption scenario";
-        const guidance = scenarioGuidance(scenario);
-        const base = {
-          id: uid(),
-          sourceId: risk.id || "",
-          sourceModule: "Module 5 · Hazard Scenarios",
-          scenario,
-          hazardTone: risk.residualBand || risk.riskBand || "neutral",
-          activationCriteria: `Activate when ${scenario} threatens life safety, regulatory compliance or a priority activity beyond its approved tolerance.`,
-          responseLevel:
-            Number(risk.residualRisk || risk.riskScore || 0) >= 15
-              ? "Crisis / executive"
-              : "Incident management",
-          initialControls: arr(risk.controls).join("; ") || guidance.controls,
-          externalResponder: guidance.responder,
-          eocThreshold: guidance.eoc,
-          authorityToActivate: guidance.authority,
-          status: "ready",
-        };
-        const contact = recommendedEmergencyContact(old || base, source.site);
-        return old
-          ? {
-              ...contactValues(contact),
-              ...old,
-              externalResponder: old.externalResponder || guidance.responder,
-              initialControls: old.initialControls || guidance.controls,
-              eocThreshold: old.eocThreshold || guidance.eoc,
-              authorityToActivate:
-                old.authorityToActivate || guidance.authority,
-            }
-          : { ...base, ...contactValues(contact) };
-      },
-    );
-    setThresholds(generatedThresholds);
-    setRecovery((current) => ({
-      ...current,
-      scenarioRecovery: generatedThresholds.map((threshold) =>
-        buildRecoveryScenario(
-          threshold,
-          arr(current.scenarioRecovery).find(
-            (item) =>
-              item.thresholdId === threshold.id ||
-              item.scenario === threshold.scenario,
-          ),
-        ),
-      ),
-    }));
-    setActiveThresholdIndex(0);
-    setExpandedThresholdId("");
-    setActiveRecoveryId("");
-
-    const parties = arr(source.context?.interested_parties);
-    const generatedCommunications = parties.length
-      ? parties.map((party) => {
-          const audience = party.party || party.name || "Interested party";
-          const old = communications.find((item) => item.audience === audience);
-          return (
-            old || {
-              id: uid(),
-              audience,
-              what:
-                party.expectation ||
-                party.requirement ||
-                "Incident status, impacts, protective action and recovery information",
-              when: "On activation and at agreed intervals",
-              primaryMethod: "Email / telephone / approved alert",
-              fallbackMethod:
-                "Alternate mobile, SMS or nominated contact chain",
-              ownerPersonId: party.ownerPersonId || "",
-              approvalAuthority: "Incident Controller",
-              logMethod: "Incident decision and communication log",
-              emergencyResponder:
-                /emergency|police|fire|ambulance|authority/i.test(audience),
-              media: /media/i.test(audience),
-            }
-          );
-        })
-      : [
-          {
-            id: uid(),
-            audience: "Employees and emergency contacts",
-            what: "Protective action, site status and working arrangements",
-            when: "Immediately on activation and at agreed intervals",
-            primaryMethod: "Mass notification and email",
-            fallbackMethod: "SMS and manager call tree",
-            ownerPersonId: "",
-            approvalAuthority: "Incident Controller",
-            logMethod: "Incident communication log",
-            emergencyResponder: false,
-            media: false,
-          },
-        ];
-    setCommunications(generatedCommunications);
-
-    setActionPlan(
-      arr(source.strategy?.strategy_assessments).map((activity, index) => {
-        const old = actionPlan.find(
-          (item) =>
-            item.sourceId === activity.id || item.objective === activity.name,
-        );
-        return (
-          old || {
-            id: uid(),
-            sourceId: activity.id || "",
-            objective:
-              index === 0
-                ? "Protect life safety and stabilise the incident"
-                : `Continue or recover ${activity.name || "priority activity"}`,
-            action:
-              activity.solutionDescription ||
-              `Activate the selected continuity solution for ${activity.name || "the priority activity"}.`,
-            ownerPersonId: activity.ownerPersonId || "",
-            priority:
-              index === 0 ? "1 - Life safety" : "3 - Business continuity",
-            targetTime: activity.rtoHours
-              ? `${activity.rtoHours} hours`
-              : "As directed",
-            resources: arr(activity.resources).join("; "),
-            decisionReference: "",
-            status: "open",
-          }
-        );
-      }),
-    );
-  };
-
-  const generateRecoveryScenarios = () => {
-    setRecovery((current) => ({
-      ...current,
-      scenarioRecovery: thresholds.map((threshold) =>
-        buildRecoveryScenario(
-          threshold,
-          arr(current.scenarioRecovery).find(
-            (item) =>
-              item.thresholdId === threshold.id ||
-              item.scenario === threshold.scenario,
-          ),
-        ),
-      ),
-    }));
-    setActiveRecoveryId("");
-  };
-  const scenarioRecoveries = arr(recovery.scenarioRecovery);
-
-  const checks = useMemo(
-    () => [
-      Boolean(source.site && source.roles && source.hazards && source.strategy),
-      teams.length > 0 &&
-        teams.every(
-          (item) =>
-            item.name &&
-            item.leadPersonId &&
-            item.alternatePersonId &&
-            item.leadPersonId !== item.alternatePersonId &&
-            item.authority &&
-            item.responsibilities &&
-            item.procedure,
-        ),
-      thresholds.length > 0 &&
-        thresholds.every(
-          (item) =>
-            item.scenario &&
-            item.activationCriteria &&
-            item.initialControls &&
-            item.responseLevel,
-        ),
-      communications.length > 0 &&
-        communications.every(
-          (item) =>
-            item.audience &&
-            item.what &&
-            item.when &&
-            item.primaryMethod &&
-            item.fallbackMethod &&
-            item.ownerPersonId &&
-            item.logMethod,
-        ),
-      actionPlan.length > 0 &&
-        actionPlan.every(
-          (item) =>
-            item.objective &&
-            item.action &&
-            item.ownerPersonId &&
-            item.priority &&
-            item.status,
-        ),
+  const selected = risks.map((x) => x.name);
+  const completion = useMemo(() => {
+    const form = formRef.current;
+    const get = (name, fallback = "") => {
+      const field = form?.elements?.namedItem(name);
+      return field
+        ? String(field.value ?? "").trim()
+        : String(fallback ?? "").trim();
+    };
+    const requirements = [
       [
-        "normalOperationsCriteria",
-        "handbackAuthority",
-        "eocClosureCriteria",
-        "standDownProcess",
-        "employeeSupport",
-        "postIncidentReview",
-        "planAvailability",
-      ].every((key) => recovery[key]) && Boolean(approverPersonId),
-    ],
-    [
-      source.site,
-      source.roles,
-      source.hazards,
-      source.strategy,
-      teams,
-      thresholds,
-      communications,
-      actionPlan,
-      recovery,
-      approverPersonId,
-    ],
-  );
-  const completion = Math.round(
-    (checks.filter(Boolean).length / checks.length) * 100,
-  );
-  const persistedThresholds = thresholds.map((item) => {
-    const guidance = scenarioGuidance(item.scenario);
-    const completed = {
-      ...item,
-      externalResponder: item.externalResponder || guidance.responder,
-      initialControls: item.initialControls || guidance.controls,
-      eocThreshold: item.eocThreshold || guidance.eoc,
-      authorityToActivate: item.authorityToActivate || guidance.authority,
-    };
+        Boolean(profile),
+        participants.length > 0,
+        Boolean(get("assessment_title", initial?.assessment_title)),
+        Boolean(
+          get(
+            "operational_description",
+            initial?.operational_description ||
+              profile?.operational_description,
+          ),
+        ),
+        Boolean(get("next_review_date", initial?.next_review_date)),
+      ],
+      [risks.length > 0, risks.every((risk) => risk.name.trim())],
+      [
+        risks.length > 0,
+        risks.every((risk) => risk.description.trim()),
+        risks.every((risk) => risk.affectedProcesses.length > 0),
+        risks.every((risk) => risk.applicableSystems.length > 0),
+      ],
+      [
+        risks.length > 0,
+        risks.every((risk) => risk.existingControls.length > 0),
+        risks.every((risk) => risk.owner),
+      ],
+      [
+        risks.length > 0,
+        risks.every((risk) => risk.treatment),
+        risks.every((risk) => risk.decisionRationale.trim()),
+        risks.every(
+          (risk) =>
+            metrics(risk).residualBand === "Low" || risk.actions.length > 0,
+        ),
+        risks.every(
+          (risk) =>
+            risk.includeInIncidentPlan !== false ||
+            !["High", "Critical"].includes(metrics(risk).residualBand) ||
+            risk.incidentPlanExclusionRationale.trim(),
+        ),
+        Boolean(get("reviewer_name", initial?.reviewed_by)),
+      ],
+      [
+        risks.length > 0,
+        risks.every(
+          (risk) =>
+            risk.description &&
+            risk.affectedProcesses.length &&
+            risk.existingControls.length &&
+            risk.owner &&
+            risk.treatment &&
+            risk.decisionRationale &&
+            (metrics(risk).residualBand === "Low" || risk.actions.length) &&
+            (risk.includeInIncidentPlan !== false ||
+              !["High", "Critical"].includes(metrics(risk).residualBand) ||
+              risk.incidentPlanExclusionRationale.trim()),
+        ),
+      ],
+    ];
+    const complete = requirements.map((items) => items.every(Boolean));
+    const countMissing = (test) => risks.filter((risk) => !test(risk)).length;
+    const plural = (count, singular, multiple = `${singular}s`) =>
+      `${count} ${count === 1 ? singular : multiple}`;
+    const details = [
+      [
+        !profile && "Select a Module 1 Site Profile",
+        !participants.length && "Select at least one assessment participant",
+        !get("assessment_title", initial?.assessment_title) &&
+          "Enter the assessment title",
+        !get(
+          "operational_description",
+          initial?.operational_description || profile?.operational_description,
+        ) && "Describe the operational activities and local scope",
+        !get("next_review_date", initial?.next_review_date) &&
+          "Select the next review date",
+      ],
+      [!risks.length && "Select at least one credible hazard scenario"],
+      [
+        !risks.length && "Select at least one credible hazard scenario",
+        countMissing((risk) => risk.description.trim()) > 0 &&
+          `${plural(
+            countMissing((risk) => risk.description.trim()),
+            "scenario",
+          )} need a detailed risk / hazard description`,
+        countMissing((risk) => risk.affectedProcesses.length > 0) > 0 &&
+          `${plural(
+            countMissing((risk) => risk.affectedProcesses.length > 0),
+            "scenario",
+          )} need at least one affected process`,
+        countMissing((risk) => risk.applicableSystems.length > 0) > 0 &&
+          `${plural(
+            countMissing((risk) => risk.applicableSystems.length > 0),
+            "scenario",
+          )} need management-system applicability`,
+      ],
+      [
+        !risks.length && "Select at least one credible hazard scenario",
+        countMissing((risk) => risk.existingControls.length > 0) > 0 &&
+          `${plural(
+            countMissing((risk) => risk.existingControls.length > 0),
+            "scenario",
+          )} need an existing control`,
+        countMissing((risk) => risk.owner) > 0 &&
+          `${plural(
+            countMissing((risk) => risk.owner),
+            "scenario",
+          )} need a risk owner`,
+      ],
+      [
+        !risks.length && "Select at least one credible hazard scenario",
+        countMissing((risk) => risk.treatment) > 0 &&
+          `${plural(
+            countMissing((risk) => risk.treatment),
+            "scenario",
+          )} need a treatment decision`,
+        countMissing((risk) => risk.decisionRationale.trim()) > 0 &&
+          `${plural(
+            countMissing((risk) => risk.decisionRationale.trim()),
+            "scenario",
+          )} need a decision and tolerability rationale`,
+        countMissing(
+          (risk) =>
+            metrics(risk).residualBand === "Low" || risk.actions.length > 0,
+        ) > 0 &&
+          `${plural(
+            countMissing(
+              (risk) =>
+                metrics(risk).residualBand === "Low" || risk.actions.length > 0,
+            ),
+            "elevated scenario",
+          )} need a treatment action`,
+        countMissing(
+          (risk) =>
+            risk.includeInIncidentPlan !== false ||
+            !["High", "Critical"].includes(metrics(risk).residualBand) ||
+            risk.incidentPlanExclusionRationale.trim(),
+        ) > 0 &&
+          "High or Critical scenarios excluded from Module 9 require a rationale",
+        !get("reviewer_name", initial?.reviewed_by) &&
+          "Select a reviewer or approver from Company Users",
+      ],
+      [
+        !requirements[5][0] && "Select at least one credible hazard scenario",
+        requirements[5][0] &&
+          !requirements[5][1] &&
+          "Complete the analysis, controls and treatment requirements for every scenario",
+      ],
+    ].map((items) => items.filter(Boolean));
     return {
-      ...contactValues(recommendedEmergencyContact(completed, source.site)),
-      ...completed,
+      complete,
+      details,
+      remaining: requirements.map(
+        (items) => items.filter((item) => !item).length,
+      ),
+      percent: Math.round(
+        (complete.filter(Boolean).length / steps.length) * 100,
+      ),
     };
-  });
-
+  }, [formTick, profile, participants, risks, initial]);
+  useEffect(() => {
+    const failedStep = Number(formState?.validation?.step);
+    if (
+      Number.isInteger(failedStep) &&
+      failedStep >= 0 &&
+      failedStep < steps.length
+    )
+      setStep(failedStep);
+  }, [formState?.validation?.step]);
+  const update = (id, changes) =>
+    setRisks(risks.map((x) => (x.id === id ? { ...x, ...changes } : x)));
+  const choose = (name) =>
+    setRisks(
+      selected.includes(name)
+        ? risks.filter((x) => x.name !== name)
+        : [...risks, emptyRisk(name)],
+    );
+  const addCustom = () =>
+    setRisks([...risks, emptyRisk("Site-specific scenario")]);
+  const generate = () =>
+    setRisks(
+      risks.map((r) => ({
+        ...r,
+        description:
+          r.description ||
+          `${r.name} may disrupt ${processes.slice(0, 3).join(", ") || "priority operations"}, causing loss of service, safety, compliance or recovery capability.`,
+        affectedProcesses: r.affectedProcesses.length
+          ? r.affectedProcesses
+          : processes.slice(0, 3),
+        affectedDependencies: r.affectedDependencies.length
+          ? r.affectedDependencies
+          : dependencies.slice(0, 2),
+      })),
+    );
   return (
-    <form action={formAction} className="imShell">
-      <style>{styles}</style>
-      <style>{`.imGrid>.wide{grid-column:1/-1}.imControlChoices{grid-column:1/-1;margin:0;padding:13px;border:1px solid #c7d7e6;border-radius:10px;background:#f8fbfe}.imControlChoices legend{padding:0 6px;color:#0a2342;font-size:11px;font-weight:900}.imControlChoices>div{display:flex;flex-wrap:wrap;gap:7px}.imControlChoices button{padding:8px 10px;border:1px solid #c2d2e2;border-radius:8px;background:#fff;color:#31516f;font-size:10px;font-weight:800;text-align:left}.imControlChoices button.selected{border-color:#315fe6;background:#e8efff;color:#234fb9}.imTeamDetail .imGrid{gap:22px 14px}.imTeamDetail .imGrid>.wide textarea{min-height:230px;padding:16px;border:2px solid #90aeea;border-left:6px solid #315fe6;background:#f7faff;font-size:13px;line-height:1.65}.imControlChoices{padding:18px 16px}.imControlChoices legend{font-size:12px}.imControlChoices button{padding:10px 12px;line-height:1.35}.imControlChoices.authority{border-color:#c9c0f2;background:#f6f4ff}.imControlChoices.authority legend{color:#5740bf}.imControlChoices.authority button{border-color:#c9c0f2;color:#4b399f}.imControlChoices.authority button.selected{border-color:#6047d7;background:#6047d7;color:#fff}.imControlChoices.responsibility{border-color:#9edbd0;background:#f0fbf8}.imControlChoices.responsibility legend{color:#087568}.imControlChoices.responsibility button{border-color:#a6dcd2;color:#096757}.imControlChoices.responsibility button.selected{border-color:#0b8f78;background:#0b8f78;color:#fff}.imControlChoices.procedure{border-color:#ebcb7b;background:#fff9e9}.imControlChoices.procedure legend{color:#8a5b00}.imControlChoices.procedure button{border-color:#e6c66f;color:#795400}.imControlChoices.procedure button.selected{border-color:#d7970b;background:#d7970b;color:#fff}.imTeamSelectors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}.imTeamSelectors button{display:grid;grid-template-columns:48px 1fr;grid-template-rows:auto auto;gap:3px 10px;align-items:center;padding:13px;border:1px solid #c7d6e5;border-radius:11px;background:#f8fbfe;color:#173b60;text-align:left}.imTeamSelectors button>b{grid-row:1/3;display:grid;place-items:center;width:48px;height:48px;border-radius:10px;background:#e6edff;color:#315fe6;font-size:15px}.imTeamSelectors button>span{font-weight:900;line-height:1.2}.imTeamSelectors button>small{color:#6a7f94;font-size:9px}.imTeamSelectors button.active{border:2px solid #315fe6;background:#eef3ff;box-shadow:0 6px 16px #315fe620}.imTeamSelectors button.active>b{background:#315fe6;color:#fff}.imFixedTeam{padding:6px 9px;border-radius:999px;background:#e8f6f3;color:#087568;font-size:9px;font-weight:850}.imTeamDetail{margin-top:0}.imTeamDetail input[readonly]{background:#edf3f8;color:#536b82}@media(max-width:1050px){.imTeamSelectors{grid-template-columns:1fr 1fr}}@media(max-width:650px){.imTeamSelectors{grid-template-columns:1fr}}.imTeamGuidance{display:grid;gap:5px;margin-top:13px;padding:13px 15px;border-left:4px solid #20a79a;border-radius:8px;background:#eaf8f6;color:#173b60}.imTeamGuidance b{color:#087568}.imTeamGuidance.imt{border-left-color:#315fe6;background:#eef3ff}.imTeamGuidance.imt b{color:#244fbd}.imTeamGuidance.ercc{border-left-color:#20a79a;background:#eaf8f6}.imTeamGuidance.ercc b{color:#087568}.imTeamGuidance.cct{border-left-color:#7656d8;background:#f4f1ff}.imTeamGuidance.cct b{color:#5b3fc0}.imTeamGuidance.brt{border-left-color:#d7970b;background:#fff8e4}.imTeamGuidance.brt b{color:#855a00}.imTeamGuidance span{font-size:12px;line-height:1.5}.imSource{display:block;margin-top:5px;color:#168068;font-size:10px;font-weight:800}.imScenarioTitle{display:flex;align-items:center;gap:10px}.imCardTools{display:flex;gap:8px;align-items:center}.imRecommendation{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding:10px 12px;border-radius:8px;background:#eef4ff;color:#244c99;font-size:10px;font-weight:850}.imRecommendation button{padding:8px 10px;border:1px solid #9eb8ee;border-radius:7px;background:#fff;color:#244c99;font-weight:850}.imScenarioTitle .hazardIcon{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;border-radius:11px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6}.imScenarioTitle .hazardIcon svg{width:29px;height:29px}.imScenarioTitle .hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.imScenarioTitle .hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.imScenarioTitle .hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.imScenarioTitle .hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.imScenarioSelectors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:4px 0 18px}.imScenarioSelectors>button{position:relative;display:grid;grid-template-columns:48px 1fr;grid-template-rows:auto auto auto;gap:3px 10px;min-height:132px;padding:14px;border:2px solid #cfdae6;border-radius:13px;background:#f8fbfe;color:#173b60;text-align:left;cursor:pointer}.imScenarioSelectors .hazardIcon{grid-row:1/4;width:48px;height:48px;display:grid;place-items:center;border-radius:11px;background:#e8efff;color:#315fe6}.imScenarioSelectors .hazardIcon svg{width:31px;height:31px}.imScenarioSelectors span{font-weight:950;line-height:1.2}.imScenarioSelectors small{color:#168068;font-size:9px;font-weight:900}.imScenarioSelectors em{position:absolute;right:10px;top:10px;padding:4px 7px;border-radius:999px;background:#e8efff;color:#315fe6;font-size:8px;font-style:normal;font-weight:900}.imScenarioSelectors b,.imScenarioSelectors i{grid-column:1/-1;font-size:9px;font-style:normal}.imScenarioSelectors b{margin-top:7px;color:#365a7d}.imScenarioSelectors i{color:#6c8094;font-weight:700}.imScenarioSelectors>button.active{border-color:#315fe6;background:#eef3ff;box-shadow:0 7px 18px #315fe626;transform:translateY(-2px)}.imScenarioSelectors>button.tone-Low{border-top-color:#15915f}.imScenarioSelectors>button.tone-Moderate{border-top-color:#d6a800}.imScenarioSelectors>button.tone-High{border-top-color:#df7b11}.imScenarioSelectors>button.tone-Critical{border-top-color:#c83333}.imScenarioSelectors>button.tone-Low em{background:#dff5e9;color:#087242}.imScenarioSelectors>button.tone-Moderate em{background:#fff2bf;color:#805d00}.imScenarioSelectors>button.tone-High em{background:#ffe1b8;color:#944f00}.imScenarioSelectors>button.tone-Critical em{background:#ffd4d4;color:#a61f1f}@media(max-width:1050px){.imScenarioSelectors{grid-template-columns:1fr 1fr}}@media(max-width:650px){.imScenarioSelectors{grid-template-columns:1fr}}`}</style>
-      <style>{`.imScenarioSelectors strong{grid-column:1/-1;margin-top:4px;padding-top:7px;border-top:1px solid #d5e0eb;color:#315fe6;font-size:9px;font-weight:950}.imScenarioSelectors>button.active strong{color:#244fbd}`}</style>
-      <style>{`.imRecoveryHead{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:18px 0 12px;padding:15px 17px;border-radius:11px;background:#eef5fb}.imRecoveryHead>div{display:grid;gap:4px}.imRecoveryHead b{font-size:14px}.imRecoveryHead span{color:#60778e;font-size:11px}.imRecoveryHead button{padding:10px 13px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:900}.imRecoveryCards{display:grid;gap:10px;margin-bottom:20px}.imRecoveryCard{border:1px solid #cfdae6;border-radius:12px;overflow:hidden}.imRecoveryCard.active{border:2px solid #315fe6;box-shadow:0 6px 18px #315fe61b}.imRecoverySummary{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:12px;align-items:center;width:100%;padding:13px 15px;border:0;background:#f8fbfe;color:#173b60;text-align:left}.imRecoverySummary .hazardIcon{display:grid;place-items:center;width:48px;height:48px;border-radius:10px;background:#e8efff;color:#315fe6}.imRecoverySummary .hazardIcon svg{width:30px;height:30px}.imRecoverySummary>span{display:grid;gap:4px}.imRecoverySummary>span>b{font-size:13px}.imRecoverySummary small{color:#168068;font-size:9px;font-weight:850}.imRecoverySummary em{padding:6px 9px;border-radius:999px;font-size:9px;font-style:normal;font-weight:950}.imRecoverySummary em.ready{background:#dff5e9;color:#087242}.imRecoverySummary em.conditional{background:#fff2bf;color:#805d00}.imRecoverySummary em.notReady{background:#ffe2df;color:#9d241a}.imRecoverySummary>strong{color:#315fe6;font-size:10px}.imRecoveryDetail{padding:17px;border-top:1px solid #d9e3ec;background:#fff}.imRecoveryCriteria{display:grid;gap:8px;margin:16px 0}.imRecoveryCriteria>label{display:grid;grid-template-columns:22px minmax(240px,1fr) minmax(220px,.75fr);gap:10px;align-items:center;padding:10px 12px;border:1px solid #d5e0e9;border-radius:9px;background:#fbfdff;font-size:11px;font-weight:800}.imRecoveryCriteria input[type=checkbox]{width:17px;height:17px;accent-color:#15915f}.imRecoveryCriteria input:not([type=checkbox]){width:100%;padding:8px;border:1px solid #c6d5e2;border-radius:7px}@media(max-width:850px){.imRecoverySummary{grid-template-columns:48px 1fr}.imRecoverySummary em,.imRecoverySummary>strong{grid-column:2}.imRecoveryCriteria>label{grid-template-columns:22px 1fr}.imRecoveryCriteria input:not([type=checkbox]){grid-column:2}.imRecoveryHead{align-items:stretch;flex-direction:column}}`}</style>
-      <style>{`.imRecoveryCriteria>label{grid-template-columns:22px minmax(0,1fr);min-height:50px}.imRecoveryLimitations{margin-top:14px}.imRecoveryLimitations textarea{min-height:120px;padding:13px;line-height:1.5}`}</style>
+    <form ref={formRef} action={formAction} className="hz">
+      <style>{css}</style>
+      <style>{iconCss}</style>
+      <style>{heatCss}</style>
+      <style>{riskCoreCss}</style>
+      <style>{completionCss}</style>
       {[
-        ["assessment_id", state?.savedId || initial?.id || ""],
-        ["site_profile_id", sourceIds.site],
-        ["context_assessment_id", sourceIds.context],
-        ["role_assessment_id", sourceIds.roles],
-        ["hazard_assessment_id", sourceIds.hazards],
-        ["bia_assessment_id", sourceIds.bia],
-        ["strategy_assessment_id", sourceIds.strategy],
-        ["approver_person_id", approverPersonId],
-        ["response_teams", JSON.stringify(teams)],
-        ["activation_thresholds", JSON.stringify(persistedThresholds)],
-        ["warning_communications", JSON.stringify(communications)],
-        ["incident_action_plan", JSON.stringify(actionPlan)],
-        ["recovery_stand_down", JSON.stringify(recovery)],
+        ["assessment_id", initial?.id || ""],
+        ["site_profile_id", profileId],
+        ["context_assessment_id", contextId],
+        ["role_assessment_id", roleId],
+        ["participants", JSON.stringify(participants)],
+        ["scenario_assessments", JSON.stringify(risks)],
+        ["risk_appetite_score", appetite],
         ["next_step", Math.min(5, step + 1)],
       ].map(([name, value]) => (
-        <input key={name} type="hidden" name={name} value={value} />
+        <input type="hidden" name={name} value={value} key={name} />
       ))}
-      <aside>
-        <div className="imBrand">
-          <b>RPG</b> Excellence
+      {formState?.error && (
+        <div className="error" role="alert">
+          <b>Cannot save Module 5</b>
+          <span>{formState.error}</span>
+          {formState?.validation?.items?.length > 0 && (
+            <ul>
+              {formState.validation.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
         </div>
-        <small>BCP MODULE 9</small>
+      )}
+      <aside>
+        <div className="brand">
+          RPG <span>Excellence</span>
+        </div>
+        <small>BCP MODULE 5</small>
         <section>
-          <strong>{completion}%</strong>
+          <strong>{completion.percent}%</strong>
           <span>complete</span>
           <i>
-            <b style={{ width: `${completion}%` }} />
+            <b style={{ width: `${completion.percent}%` }} />
           </i>
         </section>
         <nav>
-          {steps.map((name, index) => (
+          {steps.map((x, i) => (
             <button
               type="button"
-              key={name}
-              className={step === index ? "active" : ""}
-              onClick={() => setStep(index)}
+              className={`${step === i ? "active" : ""} ${completion.complete[i] ? "complete" : "incomplete"}`}
+              onClick={() => setStep(i)}
+              key={x}
             >
-              <b>{checks[index] ? "✓" : index + 1}</b>
-              <span>{name}</span>
+              <b>{completion.complete[i] ? "✓" : i + 1}</b>
+              <span>
+                <strong>{x}</strong>
+                <small>
+                  {completion.complete[i]
+                    ? "Complete"
+                    : `${completion.remaining[i]} requirement${completion.remaining[i] === 1 ? "" : "s"} remaining`}
+                </small>
+              </span>
             </button>
           ))}
         </nav>
-        <div className="imLive">
-          <b>DYNAMIC ENGINE</b>
-          <span>{teams.length} response teams</span>
-          <span>{thresholds.length} activation thresholds</span>
-          <span>{communications.length} communication routes</span>
+        <div className="outputs">
+          <b>Live engine</b>
+          <span>{risks.length} scenarios selected</span>
           <span>
-            {actionPlan.filter((item) => item.status !== "closed").length} open
-            IAP actions
+            {
+              risks.filter((x) =>
+                ["High", "Critical"].includes(metrics(x).residualBand),
+              ).length
+            }{" "}
+            elevated residual risks
+          </span>
+          <span>
+            {risks.reduce((n, x) => n + x.actions.length, 0)} treatment actions
           </span>
         </div>
       </aside>
       <main>
-        <header className="imTop">
+        <header>
           <div>
-            <small>STEP {step + 1} OF 6 · ISO 22301 CLAUSE 8.4</small>
+            <small>
+              STEP {step + 1} OF 6 · {completion.percent}% COMPLETE · ISO 22301
+              CLAUSE 8.2.3
+            </small>
             <h1>{steps[step]}</h1>
             <p>
-              {organisationName || "Organisation"} · incident management,
-              response and recovery
+              Identify disruption threats, evaluate controls and maintain a
+              current, evidence-led continuity risk register.
             </p>
           </div>
-          <b>{String(initial?.status || "draft").replaceAll("_", " ")}</b>
+          <b>{initial?.status?.replaceAll("_", " ") || "draft"}</b>
         </header>
-        <div className="imProgress">
-          <i style={{ width: `${((step + 1) / 6) * 100}%` }} />
+        <div className="progress">
+          <i style={{ width: `${completion.percent}%` }} />
         </div>
-        {state?.error && (
-          <div className={state?.savedId ? "imNotice" : "imError"}>
-            <b>
-              {state?.savedId
-                ? "Draft saved - approval needs attention"
-                : "Cannot save Module 9"}
-            </b>
-            <span>{state.error}</span>
-          </div>
+        {!completion.complete[step] && completion.details[step]?.length > 0 && (
+          <section className="stepRequirements" aria-live="polite">
+            <b>To complete {steps[step]}</b>
+            <ul>
+              {completion.details[step].map((requirement) => (
+                <li key={requirement}>{requirement}</li>
+              ))}
+            </ul>
+          </section>
         )}
-
         {step === 0 && (
-          <section className="imPanel">
-            <Intro title="Connect the controlled evidence that drives the incident-management engine.">
-              Module 9 carries forward the operating boundary, response
-              authority, disruption scenarios, recovery objectives and selected
-              continuity solutions. Source versions are frozen on approval.
-            </Intro>
-            <div className="imGrid">
+          <Panel
+            title="Connect the controlled source records"
+            text="Module 5 inherits the operating boundary, processes, dependencies, context and accountable people. Source versions are frozen on approval."
+          >
+            <div className="grid">
               <label>
-                <span>Module 1 Site Profile *</span>
+                Module 1 Site Profile *
                 <select
-                  value={sourceIds.site}
-                  onChange={(e) => changeSource("site", e.target.value)}
+                  value={profileId}
+                  onChange={(e) => setProfileId(e.target.value)}
                 >
-                  <option value="">Select controlled Site Profile</option>
-                  {profiles.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {sourceLabel(item, "Site Profile")}
+                  <option value="">Select profile</option>
+                  {profiles.map((x) => (
+                    <option value={x.id} key={x.id}>
+                      {x.location_name} · v{x.version} · {x.status}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                <span>Module 3 Context & Interested Parties</span>
+                Module 3 Context Assessment
                 <select
-                  value={sourceIds.context}
-                  onChange={(e) => changeSource("context", e.target.value)}
+                  value={contextId}
+                  onChange={(e) => setContextId(e.target.value)}
                 >
-                  <option value="">Optional controlled context</option>
-                  {contexts.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {sourceLabel(item, "Context")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Module 4 Roles & Responsibilities *</span>
-                <select
-                  value={sourceIds.roles}
-                  onChange={(e) => changeSource("roles", e.target.value)}
-                >
-                  <option value="">Select controlled role assessment</option>
-                  {roles.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {sourceLabel(item, "Roles")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Module 5 Hazard Scenarios *</span>
-                <select
-                  value={sourceIds.hazards}
-                  onChange={(e) => changeSource("hazards", e.target.value)}
-                >
-                  <option value="">Select controlled hazard assessment</option>
-                  {hazards.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {sourceLabel(item, "Hazards")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Module 6 Business Impact Analysis</span>
-                <select
-                  value={sourceIds.bia}
-                  onChange={(e) => changeSource("bia", e.target.value)}
-                >
-                  <option value="">Optional controlled BIA</option>
-                  {bias.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {sourceLabel(item, "BIA")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Module 8 Strategies & Solutions *</span>
-                <select
-                  value={sourceIds.strategy}
-                  onChange={(e) => changeSource("strategy", e.target.value)}
-                >
-                  <option value="">
-                    Select controlled strategy assessment
-                  </option>
-                  {strategies.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {sourceLabel(item, "Strategies")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <button
-              className="imGenerate"
-              type="button"
-              onClick={generate}
-              disabled={
-                !source.site ||
-                !source.roles ||
-                !source.hazards ||
-                !source.strategy
-              }
-            >
-              ✦ Generate connected incident-management controls
-            </button>
-            <div className="imTrace">
-              {Object.entries(source).map(([key, row]) => (
-                <span className={row ? "linked" : ""} key={key}>
-                  {row ? "✓" : "○"} {key.toUpperCase()}{" "}
-                  {row ? `v${sourceVersion(row)}` : "not linked"}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {step === 1 && (
-          <section className="imPanel">
-            <Intro title="Define the four response teams, authority and deputies.">
-              Select a team card to maintain its controlled structure. Use the
-              guided selections to define accountable personnel, authority,
-              priorities and the procedural controls that will feed the detailed
-              Response Procedures.
-            </Intro>
-            <div className="imTeamSelectors">
-              {teams.map((team, index) => {
-                const lead = people.find(
-                  (person) => person.id === team.leadPersonId,
-                );
-                const ready = Boolean(
-                  team.leadPersonId &&
-                  team.alternatePersonId &&
-                  team.authority &&
-                  team.responsibilities,
-                );
-                return (
-                  <button
-                    type="button"
-                    key={team.id || team.name}
-                    className={activeTeamIndex === index ? "active" : ""}
-                    onClick={() => setActiveTeamIndex(index)}
-                  >
-                    <b>{teamAcronyms[team.name] || `T${index + 1}`}</b>
-                    <span>{team.name}</span>
-                    <small>
-                      {lead ? personName(lead) : "Lead not assigned"} ·{" "}
-                      {ready ? "Structure ready" : "Needs completion"}
-                    </small>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="imList">
-              {teams
-                .filter((_, index) => index === activeTeamIndex)
-                .map((item) => {
-                  const acronym = teamAcronyms[item.name] || "IMT";
-                  const options = teamControlOptions[acronym] || {
-                    authority: [],
-                    responsibilities: [],
-                    procedure: [],
-                  };
-                  const guidance = teamGuidance[acronym];
-                  return (
-                    <article className="imCard imTeamDetail" key={item.id}>
-                      <header>
-                        <b>
-                          {String(activeTeamIndex + 1).padStart(2, "0")}{" "}
-                          {item.name}
-                        </b>
-                        <span className="imFixedTeam">Core response team</span>
-                      </header>
-                      {guidance && (
-                        <div
-                          className={`imTeamGuidance ${acronym.toLowerCase()}`}
-                        >
-                          <b>{guidance.title}</b>
-                          <span>{guidance.text}</span>
-                        </div>
-                      )}
-                      <div className="imGrid">
-                        <Field
-                          label="Team name *"
-                          value={item.name}
-                          readOnly
-                          onChange={() => {}}
-                        />
-                        <PersonSelect
-                          label="Team lead *"
-                          value={item.leadPersonId}
-                          people={people}
-                          exclude={item.alternatePersonId}
-                          onChange={(value) =>
-                            changeTeam(item.id, "leadPersonId", value)
-                          }
-                        />
-                        <PersonSelect
-                          label="Alternate *"
-                          value={item.alternatePersonId}
-                          people={people}
-                          exclude={item.leadPersonId}
-                          onChange={(value) =>
-                            changeTeam(item.id, "alternatePersonId", value)
-                          }
-                        />
-                        <Field
-                          label="Call-out availability"
-                          value={item.availability}
-                          onChange={(value) =>
-                            changeTeam(item.id, "availability", value)
-                          }
-                        />
-                        <ControlChoices
-                          tone="authority"
-                          label="Decision authority * — select all that apply"
-                          options={options.authority}
-                          selected={selectedList(item, "selectedAuthorities")}
-                          onToggle={(value) =>
-                            toggleTeamControl(
-                              item.id,
-                              "selectedAuthorities",
-                              value,
-                            )
-                          }
-                        />
-                        <ControlChoices
-                          tone="responsibility"
-                          label="Responsibilities and priorities * — select all that apply"
-                          options={options.responsibilities}
-                          selected={selectedList(
-                            item,
-                            "selectedResponsibilities",
-                          )}
-                          onToggle={(value) =>
-                            toggleTeamControl(
-                              item.id,
-                              "selectedResponsibilities",
-                              value,
-                            )
-                          }
-                        />
-                        <ControlChoices
-                          tone="procedure"
-                          label="Procedure controls * — select all that apply"
-                          options={options.procedure}
-                          selected={selectedList(
-                            item,
-                            "selectedProcedureControls",
-                          )}
-                          onToggle={(value) =>
-                            toggleTeamControl(
-                              item.id,
-                              "selectedProcedureControls",
-                              value,
-                            )
-                          }
-                        />
-                        <Field
-                          wide
-                          area
-                          label="Generated procedural control *"
-                          value={item.procedure}
-                          onChange={(value) =>
-                            changeTeam(item.id, "procedure", value)
-                          }
-                        />
-                      </div>
-                    </article>
-                  );
-                })}
-            </div>
-          </section>
-        )}
-
-        {step === 2 && (
-          <section className="imPanel">
-            <Intro title="Set scenario-specific activation, ERCC and escalation thresholds.">
-              Scenario cards are connected directly to the selected Module 5
-              Hazard Scenario assessment. Select a card only when you want to
-              expand and configure its activation controls. You can also add a
-              separate manual scenario.
-            </Intro>
-            <button
-              type="button"
-              className="imGenerate"
-              onClick={() => {
-                const manualThreshold = {
-                  id: uid(),
-                  sourceId: "",
-                  sourceModule: "Manual entry",
-                  scenario: "",
-                  activationCriteria: "",
-                  responseLevel: "Incident management",
-                  initialControls: "",
-                  externalResponder: "",
-                  eocThreshold: "",
-                  authorityToActivate: "Incident Controller",
-                  status: "draft",
-                };
-                setThresholds([...thresholds, manualThreshold]);
-                setActiveThresholdIndex(thresholds.length);
-                setExpandedThresholdId(manualThreshold.id);
-              }}
-            >
-              + Add manual scenario
-            </button>
-            <datalist id="incidentResponders">
-              <option value="Police / emergency services" />
-              <option value="Fire and Rescue Service" />
-              <option value="Emergency medical services" />
-              <option value="Environment Agency / environmental authority" />
-              <option value="Relevant utility provider" />
-              <option value="IT incident response / cyber insurer" />
-            </datalist>
-            <div
-              className="imScenarioSelectors"
-              role="tablist"
-              aria-label="Activation scenarios"
-            >
-              {thresholds.map((item, index) => {
-                const tone = liveHazardTone(item, source.hazards);
-                const guidance = scenarioGuidance(item.scenario);
-                return (
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeThresholdIndex === index}
-                    className={`tone-${tone} ${activeThresholdIndex === index ? "active" : ""}`}
-                    key={item.id}
-                    onClick={() => {
-                      setActiveThresholdIndex(index);
-                      setExpandedThresholdId((current) =>
-                        current === item.id ? "" : item.id,
-                      );
-                    }}
-                  >
-                    <HazardIcon
-                      name={item.scenario || "Custom disruption scenario"}
-                      tone={tone}
-                    />
-                    <span>{item.scenario || "New manual scenario"}</span>
-                    <small>
-                      {item.sourceId ? "Live · Module 5" : "Manual scenario"}
-                    </small>
-                    <em>
-                      {tone !== "neutral" ? `${tone} risk` : "Risk pending"}
-                    </em>
-                    <b>{item.responseLevel || "Response level pending"}</b>
-                    <i>{item.externalResponder || guidance.responder}</i>
-                    <strong>
-                      {expandedThresholdId === item.id
-                        ? "▲ Collapse controls"
-                        : "▼ Expand & configure"}
-                    </strong>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="imList">
-              {thresholds
-                .filter(
-                  (item, index) =>
-                    index === activeThresholdIndex &&
-                    item.id === expandedThresholdId,
-                )
-                .map((item) => {
-                  const index = thresholds.findIndex(
-                    (threshold) => threshold.id === item.id,
-                  );
-                  const recommendation = scenarioGuidance(item.scenario);
-                  const tone = liveHazardTone(item, source.hazards);
-                  const contacts = siteEmergencyContacts(source.site);
-                  const linkedContact = recommendedEmergencyContact(
-                    item,
-                    source.site,
-                  );
-                  const selectedContactKey =
-                    item.responderContactKey ||
-                    (linkedContact
-                      ? emergencyContactKey(
-                          linkedContact,
-                          contacts.indexOf(linkedContact),
-                        )
-                      : "");
-                  return (
-                    <article className="imCard" key={item.id}>
-                      <header>
-                        <div className="imScenarioTitle">
-                          <HazardIcon
-                            name={item.scenario || "Custom disruption scenario"}
-                            tone={tone}
-                          />
-                          <div>
-                            <b>
-                              {String(index + 1).padStart(2, "0")}{" "}
-                              {item.scenario || "New scenario"}
-                            </b>
-                            <small className="imSource">
-                              {item.sourceId
-                                ? "✓ Linked to Module 5"
-                                : "Manual threshold"}{" "}
-                              ·{" "}
-                              {tone !== "neutral"
-                                ? `${tone} residual risk · `
-                                : ""}
-                              {item.status || "draft"}
-                            </small>
-                          </div>
-                        </div>
-                        <div className="imCardTools">
-                          <select
-                            value={item.responseLevel}
-                            onChange={(e) =>
-                              changeThreshold(
-                                item.id,
-                                "responseLevel",
-                                e.target.value,
-                              )
-                            }
-                          >
-                            <option>Local response</option>
-                            <option>Incident management</option>
-                            <option>Crisis / executive</option>
-                          </select>
-                          {!item.sourceId && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setThresholds(
-                                  thresholds.filter(
-                                    (threshold) => threshold.id !== item.id,
-                                  ),
-                                );
-                                setActiveThresholdIndex(0);
-                                setExpandedThresholdId("");
-                              }}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </header>
-                      <div className="imGrid">
-                        <Field
-                          label="Scenario *"
-                          value={item.scenario}
-                          readOnly={Boolean(item.sourceId)}
-                          onChange={(value) =>
-                            changeThreshold(item.id, "scenario", value)
-                          }
-                        />
-                        <Field
-                          label="Authority to activate *"
-                          value={item.authorityToActivate}
-                          onChange={(value) =>
-                            changeThreshold(
-                              item.id,
-                              "authorityToActivate",
-                              value,
-                            )
-                          }
-                        />
-                        <Field
-                          area
-                          label="Activation criteria / measurable impact threshold *"
-                          value={item.activationCriteria}
-                          onChange={(value) =>
-                            changeThreshold(
-                              item.id,
-                              "activationCriteria",
-                              value,
-                            )
-                          }
-                        />
-                        <Field
-                          area
-                          label="Immediate life-safety and containment controls *"
-                          value={item.initialControls}
-                          onChange={(value) =>
-                            changeThreshold(item.id, "initialControls", value)
-                          }
-                        />
-                        <Field
-                          label="External responder / competent authority"
-                          list="incidentResponders"
-                          value={
-                            item.externalResponder || recommendation.responder
-                          }
-                          onChange={(value) =>
-                            changeThreshold(item.id, "externalResponder", value)
-                          }
-                        />
-                        <label>
-                          <span>Verified responder contact · Module 1</span>
-                          <select
-                            value={selectedContactKey}
-                            onChange={(event) => {
-                              const key = event.target.value;
-                              const contact = contacts.find(
-                                (entry, contactIndex) =>
-                                  emergencyContactKey(entry, contactIndex) ===
-                                  key,
-                              );
-                              setThresholds((current) =>
-                                current.map((threshold) =>
-                                  threshold.id === item.id
-                                    ? {
-                                        ...threshold,
-                                        responderContactKey: key,
-                                        responderName: "",
-                                        responderAddress: "",
-                                        responderEmergencyNumber: "",
-                                        responderDirectNumber: "",
-                                        responderTravelTime: "",
-                                        responderLastVerified: "",
-                                        responderAccessNotes: "",
-                                        ...contactValues(contact),
-                                      }
-                                    : threshold,
-                                ),
-                              );
-                            }}
-                          >
-                            <option value="">
-                              Select from Site Profile emergency directory
-                            </option>
-                            {contacts.map((contact, contactIndex) => (
-                              <option
-                                key={emergencyContactKey(contact, contactIndex)}
-                                value={emergencyContactKey(
-                                  contact,
-                                  contactIndex,
-                                )}
-                              >
-                                {contact.serviceName ||
-                                  contact.serviceType ||
-                                  "Emergency contact"}
-                                {contact.emergencyNumber
-                                  ? ` · ${contact.emergencyNumber}`
-                                  : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <Field
-                          area
-                          label="ERCC activation / executive escalation trigger"
-                          value={item.eocThreshold}
-                          onChange={(value) =>
-                            changeThreshold(item.id, "eocThreshold", value)
-                          }
-                        />
-                        <Field
-                          label="Responder / facility name"
-                          value={
-                            item.responderName ||
-                            linkedContact?.serviceName ||
-                            linkedContact?.serviceType ||
-                            ""
-                          }
-                          onChange={(value) =>
-                            changeThreshold(item.id, "responderName", value)
-                          }
-                        />
-                        <Field
-                          area
-                          label="Responder address / location"
-                          value={
-                            item.responderAddress ||
-                            linkedContact?.address ||
-                            ""
-                          }
-                          onChange={(value) =>
-                            changeThreshold(item.id, "responderAddress", value)
-                          }
-                        />
-                        <Field
-                          label="Emergency telephone"
-                          type="tel"
-                          value={
-                            item.responderEmergencyNumber ||
-                            linkedContact?.emergencyNumber ||
-                            ""
-                          }
-                          onChange={(value) =>
-                            changeThreshold(
-                              item.id,
-                              "responderEmergencyNumber",
-                              value,
-                            )
-                          }
-                        />
-                        <Field
-                          label="Direct / non-emergency telephone"
-                          type="tel"
-                          value={
-                            item.responderDirectNumber ||
-                            linkedContact?.nonEmergencyNumber ||
-                            ""
-                          }
-                          onChange={(value) =>
-                            changeThreshold(
-                              item.id,
-                              "responderDirectNumber",
-                              value,
-                            )
-                          }
-                        />
-                        <Field
-                          label="Estimated travel time (minutes)"
-                          type="number"
-                          min="0"
-                          value={
-                            item.responderTravelTime ||
-                            linkedContact?.travelTimeMinutes ||
-                            ""
-                          }
-                          onChange={(value) =>
-                            changeThreshold(
-                              item.id,
-                              "responderTravelTime",
-                              value,
-                            )
-                          }
-                        />
-                        <Field
-                          label="Contact last verified"
-                          type="date"
-                          value={
-                            item.responderLastVerified ||
-                            linkedContact?.lastVerified ||
-                            ""
-                          }
-                          onChange={(value) =>
-                            changeThreshold(
-                              item.id,
-                              "responderLastVerified",
-                              value,
-                            )
-                          }
-                        />
-                        <Field
-                          area
-                          label="Access, arrival and route instructions"
-                          value={
-                            item.responderAccessNotes ||
-                            linkedContact?.accessNotes ||
-                            linkedContact?.directionsReference ||
-                            ""
-                          }
-                          onChange={(value) =>
-                            changeThreshold(
-                              item.id,
-                              "responderAccessNotes",
-                              value,
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="imRecommendation">
-                        <span>RPG scenario recommendation</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setThresholds((current) =>
-                              current.map((threshold) =>
-                                threshold.id === item.id
-                                  ? {
-                                      ...threshold,
-                                      initialControls: recommendation.controls,
-                                      externalResponder:
-                                        recommendation.responder,
-                                      eocThreshold: recommendation.eoc,
-                                      authorityToActivate:
-                                        recommendation.authority,
-                                    }
-                                  : threshold,
-                              ),
-                            )
-                          }
-                        >
-                          Apply recommended controls
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-            </div>
-          </section>
-        )}
-
-        {step === 3 && (
-          <section className="imPanel">
-            <Intro title="Control warning, communication, emergency responder and media routes.">
-              Record what, when, with whom and how to communicate, including
-              fallback channels and the method used to log incoming and outgoing
-              information and decisions.
-            </Intro>
-            <button
-              type="button"
-              className="imGenerate"
-              onClick={() =>
-                setCommunications([
-                  ...communications,
-                  {
-                    id: uid(),
-                    audience: "",
-                    what: "",
-                    when: "",
-                    primaryMethod: "",
-                    fallbackMethod: "",
-                    ownerPersonId: "",
-                    approvalAuthority: "",
-                    logMethod: "",
-                    emergencyResponder: false,
-                    media: false,
-                  },
-                ])
-              }
-            >
-              + Add communication route
-            </button>
-            <div className="imList">
-              {communications.map((item, index) => (
-                <article className="imCard" key={item.id}>
-                  <header>
-                    <b>
-                      {String(index + 1).padStart(2, "0")}{" "}
-                      {item.audience || "New audience"}
-                    </b>
-                    <div className="imFlags">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.emergencyResponder)}
-                          onChange={(e) =>
-                            changeCommunication(
-                              item.id,
-                              "emergencyResponder",
-                              e.target.checked,
-                            )
-                          }
-                        />{" "}
-                        Emergency responder
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.media)}
-                          onChange={(e) =>
-                            changeCommunication(
-                              item.id,
-                              "media",
-                              e.target.checked,
-                            )
-                          }
-                        />{" "}
-                        Media route
-                      </label>
-                    </div>
-                  </header>
-                  <div className="imGrid">
-                    <Field
-                      label="Audience / interested party *"
-                      value={item.audience}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "audience", value)
-                      }
-                    />
-                    <PersonSelect
-                      label="Communication owner *"
-                      value={item.ownerPersonId}
-                      people={people}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "ownerPersonId", value)
-                      }
-                    />
-                    <Field
-                      area
-                      label="What will be communicated *"
-                      value={item.what}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "what", value)
-                      }
-                    />
-                    <Field
-                      area
-                      label="Trigger and frequency *"
-                      value={item.when}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "when", value)
-                      }
-                    />
-                    <Field
-                      label="Primary method *"
-                      value={item.primaryMethod}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "primaryMethod", value)
-                      }
-                    />
-                    <Field
-                      label="Fallback method *"
-                      value={item.fallbackMethod}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "fallbackMethod", value)
-                      }
-                    />
-                    <Field
-                      label="Message approval authority"
-                      value={item.approvalAuthority}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "approvalAuthority", value)
-                      }
-                    />
-                    <Field
-                      label="Communication / decision log *"
-                      value={item.logMethod}
-                      onChange={(value) =>
-                        changeCommunication(item.id, "logMethod", value)
-                      }
-                    />
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {step === 4 && (
-          <section className="imPanel">
-            <Intro title="Create the controlled Incident Action Plan.">
-              Life safety is always the first priority. Add stabilisation,
-              environmental protection, security, continuity and recovery
-              objectives with accountable owners and live status.
-            </Intro>
-            <button
-              type="button"
-              className="imGenerate"
-              onClick={() =>
-                setActionPlan([
-                  ...actionPlan,
-                  {
-                    id: uid(),
-                    objective: "",
-                    action: "",
-                    ownerPersonId: "",
-                    priority: "2 - Stabilisation",
-                    targetTime: "",
-                    resources: "",
-                    decisionReference: "",
-                    status: "open",
-                  },
-                ])
-              }
-            >
-              + Add Incident Action
-            </button>
-            <div className="imActions">
-              <header>
-                <b>Objective</b>
-                <b>Action</b>
-                <b>Owner</b>
-                <b>Priority</b>
-                <b>Target</b>
-                <b>Status</b>
-              </header>
-              {actionPlan.map((item) => (
-                <article key={item.id}>
-                  <input
-                    value={item.objective}
-                    onChange={(e) =>
-                      changeAction(item.id, "objective", e.target.value)
-                    }
-                    placeholder="Incident objective"
-                  />
-                  <textarea
-                    value={item.action}
-                    onChange={(e) =>
-                      changeAction(item.id, "action", e.target.value)
-                    }
-                    placeholder="Action and expected result"
-                  />
-                  <select
-                    value={item.ownerPersonId}
-                    onChange={(e) =>
-                      changeAction(item.id, "ownerPersonId", e.target.value)
-                    }
-                  >
-                    <option value="">Select owner</option>
-                    {people.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {personName(person)}
+                  <option value="">Optional</option>
+                  {contexts
+                    .filter(
+                      (x) => !profileId || x.site_profile_id === profileId,
+                    )
+                    .map((x) => (
+                      <option value={x.id} key={x.id}>
+                        {x.assessment_reference} · v{x.version}
                       </option>
                     ))}
-                  </select>
-                  <select
-                    value={item.priority}
-                    onChange={(e) =>
-                      changeAction(item.id, "priority", e.target.value)
-                    }
-                  >
-                    <option>1 - Life safety</option>
-                    <option>2 - Stabilisation</option>
-                    <option>3 - Business continuity</option>
-                    <option>4 - Recovery</option>
-                  </select>
-                  <input
-                    value={item.targetTime}
-                    onChange={(e) =>
-                      changeAction(item.id, "targetTime", e.target.value)
-                    }
-                    placeholder="e.g. 2 hours"
-                  />
-                  <select
-                    value={item.status}
-                    onChange={(e) =>
-                      changeAction(item.id, "status", e.target.value)
-                    }
-                  >
-                    <option value="open">Open</option>
-                    <option value="in_progress">In progress</option>
-                    <option value="blocked">Blocked</option>
-                    <option value="closed">Closed</option>
-                  </select>
-                  <details>
-                    <summary>Resources and decision record</summary>
-                    <div className="imGrid">
-                      <Field
-                        area
-                        label="Resources / dependencies"
-                        value={item.resources}
-                        onChange={(value) =>
-                          changeAction(item.id, "resources", value)
-                        }
-                      />
-                      <Field
-                        area
-                        label="Decision / evidence reference"
-                        value={item.decisionReference}
-                        onChange={(value) =>
-                          changeAction(item.id, "decisionReference", value)
-                        }
-                      />
-                    </div>
-                  </details>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {step === 5 && (
-          <section className="imPanel">
-            <Intro title="Control recovery, handback, stand-down and approval.">
-              The plan must define how temporary measures end, authority
-              returns, outstanding actions are retained and people receive
-              post-incident support.
-            </Intro>
-            <div className="imStats">
-              <article>
-                <b>{teams.length}</b>
-                <span>response teams</span>
-              </article>
-              <article>
-                <b>{thresholds.length}</b>
-                <span>thresholds</span>
-              </article>
-              <article>
-                <b>{communications.length}</b>
-                <span>communication routes</span>
-              </article>
-              <article>
-                <b>
-                  {actionPlan.filter((item) => item.status !== "closed").length}
-                </b>
-                <span>open actions</span>
-              </article>
-            </div>
-            <div className="imRecoveryHead">
-              <div>
-                <b>Scenario recovery and return-to-operation criteria</b>
-                <span>
-                  Generated from the live Module 5 scenarios carried into the
-                  activation engine.
-                </span>
-              </div>
-              <button type="button" onClick={generateRecoveryScenarios}>
-                {scenarioRecoveries.length
-                  ? "Refresh linked recovery cards"
-                  : "Generate recovery cards"}
-              </button>
-            </div>
-            {scenarioRecoveries.length > 0 && (
-              <div className="imRecoveryCards">
-                {scenarioRecoveries.map((item) => {
-                  const threshold = thresholds.find(
-                    (entry) =>
-                      entry.id === item.thresholdId ||
-                      entry.scenario === item.scenario,
-                  );
-                  const complete = arr(item.criteria).filter(
-                    (criterion) => criterion.complete,
-                  ).length;
-                  const total = arr(item.criteria).length;
-                  const ready = total > 0 && complete === total;
-                  const partial = complete > 0 && !ready;
-                  return (
-                    <article
-                      key={item.id}
-                      className={`imRecoveryCard ${activeRecoveryId === item.id ? "active" : ""}`}
-                    >
-                      <button
-                        type="button"
-                        className="imRecoverySummary"
-                        onClick={() =>
-                          setActiveRecoveryId((current) =>
-                            current === item.id ? "" : item.id,
-                          )
-                        }
-                      >
-                        <HazardIcon
-                          name={item.scenario}
-                          tone={liveHazardTone(threshold, source.hazards)}
-                        />
-                        <span>
-                          <b>{item.scenario}</b>
-                          <small>
-                            Live link · Module 5 and Activation Thresholds
-                          </small>
-                        </span>
-                        <em
-                          className={
-                            ready
-                              ? "ready"
-                              : partial
-                                ? "conditional"
-                                : "notReady"
-                          }
-                        >
-                          {ready
-                            ? "Ready for handback"
-                            : partial
-                              ? "Conditionally ready"
-                              : "Not ready"}
-                        </em>
-                        <strong>
-                          {complete}/{total} criteria
-                        </strong>
-                      </button>
-                      {activeRecoveryId === item.id && (
-                        <div className="imRecoveryDetail">
-                          <div className="imGrid">
-                            <PersonSelect
-                              label="Recovery owner · Company User *"
-                              value={item.ownerPersonId}
-                              people={people}
-                              onChange={(value) =>
-                                updateRecoveryScenario(item.id, {
-                                  ownerPersonId: value,
-                                })
-                              }
-                            />
-                            <Field
-                              label="Target recovery / handback time"
-                              value={item.targetRecovery}
-                              onChange={(value) =>
-                                updateRecoveryScenario(item.id, {
-                                  targetRecovery: value,
-                                })
-                              }
-                              placeholder="e.g. Within 4 hours or before restart"
-                            />
-                            <Field
-                              wide
-                              label="Responder or competent-authority release reference (if applicable)"
-                              value={item.responderReleaseReference}
-                              onChange={(value) =>
-                                updateRecoveryScenario(item.id, {
-                                  responderReleaseReference: value,
-                                })
-                              }
-                              placeholder="Optional reference, date/time and person confirming release"
-                            />
-                          </div>
-                          <div className="imRecoveryCriteria">
-                            {arr(item.criteria).map((criterion) => (
-                              <label key={criterion.id}>
-                                <input
-                                  type="checkbox"
-                                  checked={criterion.complete}
-                                  onChange={(event) =>
-                                    updateRecoveryScenario(
-                                      item.id,
-                                      (record) => ({
-                                        ...record,
-                                        criteria: arr(record.criteria).map(
-                                          (entry) =>
-                                            entry.id === criterion.id
-                                              ? {
-                                                  ...entry,
-                                                  complete:
-                                                    event.target.checked,
-                                                }
-                                              : entry,
-                                        ),
-                                      }),
-                                    )
-                                  }
-                                />
-                                <span>{criterion.label}</span>
-                              </label>
-                            ))}
-                          </div>
-                          <div className="imGrid imRecoveryLimitations">
-                            <Field
-                              wide
-                              area
-                              label="Temporary restrictions, limitations and accepted residual exposure"
-                              value={item.limitations}
-                              onChange={(value) =>
-                                updateRecoveryScenario(item.id, {
-                                  limitations: value,
-                                })
-                              }
-                              placeholder="Record only material restrictions or residual exposure requiring handback approval"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-            <div className="imGrid">
-              <Field
-                area
-                label="Overall controlled return-to-operation criteria *"
-                value={recovery.normalOperationsCriteria || ""}
-                onChange={(value) =>
-                  changeRecovery("normalOperationsCriteria", value)
-                }
-              />
-              <Field
-                area
-                label="Authority handback process *"
-                value={recovery.handbackAuthority || ""}
-                onChange={(value) => changeRecovery("handbackAuthority", value)}
-              />
-              <Field
-                area
-                label="ERCC deactivation and closure criteria *"
-                value={recovery.eocClosureCriteria || ""}
-                onChange={(value) =>
-                  changeRecovery("eocClosureCriteria", value)
-                }
-              />
-              <Field
-                area
-                label="Formal stand-down process *"
-                value={recovery.standDownProcess || ""}
-                onChange={(value) => changeRecovery("standDownProcess", value)}
-              />
-              <Field
-                area
-                label="Post-incident employee assistance *"
-                value={recovery.employeeSupport || ""}
-                onChange={(value) => changeRecovery("employeeSupport", value)}
-              />
-              <Field
-                area
-                label="Post-incident review, actions and lessons *"
-                value={recovery.postIncidentReview || ""}
-                onChange={(value) =>
-                  changeRecovery("postIncidentReview", value)
-                }
-              />
-              <Field
-                area
-                label="Plan availability during disruption *"
-                value={recovery.planAvailability || ""}
-                onChange={(value) => changeRecovery("planAvailability", value)}
-                placeholder="Offline copy, emergency pack, alternate site, controlled mobile copy"
-              />
-              <Field
-                area
-                label="Security during and after the incident"
-                value={recovery.securityControls || ""}
-                onChange={(value) => changeRecovery("securityControls", value)}
-              />
-              <label>
-                <span>Review frequency</span>
-                <select
-                  name="review_frequency"
-                  defaultValue={initial?.review_frequency || "Every 12 months"}
-                >
-                  <option>Every 6 months</option>
-                  <option>Every 12 months</option>
-                  <option>After every exercise</option>
-                  <option>After every activation</option>
-                  <option>After material change</option>
                 </select>
               </label>
               <label>
-                <span>Next review date</span>
+                Module 4 Roles Assessment
+                <select
+                  value={roleId}
+                  onChange={(e) => setRoleId(e.target.value)}
+                >
+                  <option value="">Optional</option>
+                  {roles
+                    .filter(
+                      (x) => !profileId || x.site_profile_id === profileId,
+                    )
+                    .map((x) => (
+                      <option value={x.id} key={x.id}>
+                        {x.assessment_reference} · v{x.version}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Assessment title
+                <input
+                  name="assessment_title"
+                  onInput={() => setFormTick((value) => value + 1)}
+                  defaultValue={
+                    initial?.assessment_title ||
+                    `${organisationName || "Organisation"} disruption hazard assessment`
+                  }
+                />
+              </label>
+              <label>
+                Review frequency
+                <select
+                  name="review_frequency"
+                  defaultValue={initial?.review_frequency || "Semi-annually"}
+                >
+                  <option>Quarterly</option>
+                  <option>Semi-annually</option>
+                  <option>Annually</option>
+                  <option>After material change or incident</option>
+                </select>
+              </label>
+              <label>
+                Next review date
                 <input
                   type="date"
                   name="next_review_date"
+                  onInput={() => setFormTick((value) => value + 1)}
                   defaultValue={initial?.next_review_date || ""}
                 />
               </label>
-              <PersonSelect
-                label="Competent approver · Company User *"
-                value={approverPersonId}
-                people={people}
-                onChange={setApproverPersonId}
+            </div>
+            <label className="wide">
+              Operational activities and local scope
+              <textarea
+                name="operational_description"
+                onInput={() => setFormTick((value) => value + 1)}
+                rows="5"
+                defaultValue={
+                  initial?.operational_description ||
+                  profile?.operational_description ||
+                  ""
+                }
               />
+            </label>
+            <Multi
+              title="Assessment participants"
+              values={participants}
+              options={people}
+              onChange={setParticipants}
+            />
+            {profile && (
+              <div className="source">
+                <article>
+                  <small>Location</small>
+                  <b>{profile.location_name}</b>
+                  <span>{profile.country}</span>
+                </article>
+                <article>
+                  <small>Processes</small>
+                  <b>{processes.length}</b>
+                  <span>from Module 1</span>
+                </article>
+                <article>
+                  <small>Dependencies</small>
+                  <b>{dependencies.length}</b>
+                  <span>available to link</span>
+                </article>
+                <article>
+                  <small>Context risks</small>
+                  <b>{arr(context?.risks_opportunities).length}</b>
+                  <span>from Module 3</span>
+                </article>
+              </div>
+            )}
+          </Panel>
+        )}
+        {step === 1 && (
+          <Panel
+            title="Screen credible disruption scenarios"
+            text="Select every scenario that could interrupt this location. Add local threats where the catalogue is not sufficient."
+          >
+            <div className="catalogue">
+              {Object.entries(catalogue).map(([category, items]) => (
+                <fieldset key={category}>
+                  <legend>{category}</legend>
+                  {items.map((name) => (
+                    <button
+                      type="button"
+                      className={selected.includes(name) ? "selected" : ""}
+                      onClick={() => choose(name)}
+                      key={name}
+                    >
+                      <HazardIcon name={name} small />
+                      {selected.includes(name) ? "✓" : "+"} {name}
+                    </button>
+                  ))}
+                </fieldset>
+              ))}
+            </div>
+            <button type="button" className="add" onClick={addCustom}>
+              + Add site-specific scenario
+            </button>
+            {risks
+              .filter((x) => x.category === "Site-specific")
+              .map((r) => (
+                <div className="custom" key={r.id}>
+                  <HazardIcon name={r.name} small />
+                  <input
+                    value={r.name}
+                    onChange={(e) => update(r.id, { name: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRisks(risks.filter((x) => x.id !== r.id))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+          </Panel>
+        )}
+        {step === 2 && (
+          <Panel
+            title="Assess inherent risk before controls"
+            text="Describe the activity, hazard, opportunity and credible cause-event-consequence pathway. N/A is available for impact dimensions that do not apply."
+          >
+            <div className="appetite">
               <label>
-                <span>Decision, limitations and residual exposure</span>
+                Risk appetite threshold <b>{appetite}/25</b>
+                <input
+                  type="range"
+                  min="1"
+                  max="25"
+                  value={appetite}
+                  onChange={(e) => setAppetite(+e.target.value)}
+                />
+              </label>
+              <span>
+                Scores above this threshold require treatment or authorised
+                acceptance.
+              </span>
+            </div>
+            <button type="button" className="generate" onClick={generate}>
+              Generate linked starting points
+            </button>
+            {risks.map((r) => (
+              <RiskCard
+                r={r}
+                key={r.id}
+                processes={processes}
+                dependencies={dependencies}
+                update={update}
+                stage="analysis"
+              />
+            ))}
+          </Panel>
+        )}
+        {step === 3 && (
+          <Panel
+            title="Evaluate prevention, detection and response controls"
+            text="Record the controls that genuinely operate today. Control effectiveness adjusts residual likelihood; it never hides the inherent consequence."
+          >
+            {risks.map((r) => (
+              <RiskCard
+                r={r}
+                key={r.id}
+                people={people}
+                update={update}
+                stage="controls"
+              />
+            ))}
+          </Panel>
+        )}
+        {step === 4 && (
+          <Panel
+            title="Choose treatment and secure accountable approval"
+            text="Treat elevated residual risks, assign actions and record why the selected decision is tolerable."
+          >
+            {risks.map((r) => (
+              <RiskCard
+                r={r}
+                key={r.id}
+                people={people}
+                update={update}
+                stage="treatment"
+              />
+            ))}
+            <div className="approval">
+              <label>
+                Reviewer / approver
+                <select
+                  name="reviewer_name"
+                  onChange={() => setFormTick((value) => value + 1)}
+                  defaultValue={initial?.reviewed_by || ""}
+                >
+                  <option value="">Select reviewer from Company Users</option>
+                  {people.map((person) => (
+                    <option
+                      key={`${person.name}-${person.email}`}
+                      value={person.name}
+                    >
+                      {person.name}
+                      {person.position ? ` — ${person.position}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="wide">
+                Review comment / approval rationale
                 <textarea
                   name="review_comment"
                   defaultValue={initial?.review_comment || ""}
                 />
               </label>
             </div>
-          </section>
+          </Panel>
         )}
-
+        {step === 5 && (
+          <Panel
+            title="Current hazard-scenario risk register"
+            text="Switch between inherent, residual and target positions. Select a cell to filter the controlled register."
+          >
+            <Heat risks={risks} appetite={appetite} />
+            <div className="register">
+              {risks.map((r) => {
+                const m = metrics(r);
+                return (
+                  <article key={r.id}>
+                    <HazardIcon name={r.name} tone={m.residualBand} />
+                    <div className="registerCopy">
+                      <small>
+                        {r.recordNumber || "Record pending"} · {r.category} ·{" "}
+                        {r.applicableSystems.join(", ")}
+                      </small>
+                      <h3>{r.name}</h3>
+                      <p>{r.description}</p>
+                      <span>
+                        {r.owner || "Owner not assigned"}
+                        {r.correctiveActionReference
+                          ? ` · ${r.correctiveActionReference}`
+                          : ""}
+                      </span>
+                    </div>
+                    <div>
+                      <em className={m.inherentBand}>I {m.inherent}</em>
+                      <b>→</b>
+                      <em className={m.residualBand}>R {m.residual}</em>
+                      <b>→</b>
+                      <em className={m.targetBand}>T {m.target}</em>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </Panel>
+        )}
         <footer>
           <button
             type="button"
-            disabled={!step || pending}
+            disabled={!step || isPending}
             onClick={() => setStep(step - 1)}
           >
             ← Previous
           </button>
           {initial?.id && (
             <button
-              className="danger"
               name="intent"
               value="archive"
-              disabled={pending}
+              className="danger"
+              disabled={isPending}
             >
               Archive
             </button>
           )}
           <span>
-            {pending
-              ? "Saving..."
+            {isPending
+              ? "Saving…"
               : "Controlled progress saves to your account"}
           </span>
-          {state?.error && (
-            <strong className="imFooterNotice">{state.error}</strong>
-          )}
           {step < 5 ? (
             <button
-              className="primary"
               name="intent"
               value="continue"
-              disabled={pending || !source.site}
+              className="primary"
+              disabled={isPending}
             >
-              Save & continue →
+              Save &amp; continue →
             </button>
           ) : (
             <>
-              <button name="intent" value="draft" disabled={pending}>
+              <button name="intent" value="draft" disabled={isPending}>
                 Save draft
               </button>
-              <button name="intent" value="review" disabled={pending}>
+              <button name="intent" value="review" disabled={isPending}>
                 Submit for review
               </button>
               <button
-                className="primary"
                 name="intent"
                 value="approve"
-                disabled={pending}
+                className="primary"
+                disabled={isPending}
               >
-                Approve Module 9 →
+                Approve controlled version →
               </button>
             </>
           )}
@@ -2296,4 +1396,629 @@ export default function BCPIncidentManagement({
   );
 }
 
-const styles = `*{box-sizing:border-box}.imShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342;font-family:Arial,sans-serif}.imShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.imBrand{font-size:21px}.imBrand b{font-weight:950}.imShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.imShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.imShell>aside>section strong{font-size:28px}.imShell>aside>section span{float:right;margin-top:10px;font-size:10px}.imShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.imShell>aside>section i b{display:block;height:100%;background:#55e1d4}.imShell nav{display:grid;gap:6px;margin-top:18px}.imShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.imShell nav button.active{background:#245d97}.imShell nav button>b{display:grid;place-items:center;width:27px;height:27px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.imLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.imLive b{color:#55e1d4}.imShell main{min-width:0}.imTop{display:flex;justify-content:space-between;gap:20px;align-items:end}.imTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.imTop h1{margin:7px 0 4px;font-size:37px}.imTop p{margin:0;color:#607890}.imTop>b{text-transform:capitalize;color:#087c61}.imProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.imProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.imPanel{padding:24px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.imIntro{padding:19px;border-radius:12px;background:#eff5fa}.imIntro b{font-size:17px}.imIntro p{margin:7px 0 0;color:#60778e;line-height:1.5}.imGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:15px}.imGrid label{font-size:11px;font-weight:850}.imGrid label>span{display:block}.imGrid input,.imGrid select,.imGrid textarea,.imActions input,.imActions select,.imActions textarea,.imCard header select{width:100%;margin-top:6px;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.imGrid textarea{min-height:92px}.imGenerate{margin:16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.imGenerate:disabled{opacity:.45}.imTrace{display:flex;flex-wrap:wrap;gap:8px}.imTrace span{padding:8px 10px;border-radius:999px;background:#f0f3f6;color:#718396;font-size:10px;font-weight:850}.imTrace span.linked{background:#e5f7f1;color:#08745d}.imList{display:grid;gap:13px}.imCard{padding:17px;border:1px solid #cfdae6;border-left:5px solid #315fe6;border-radius:12px}.imCard>header{display:flex;justify-content:space-between;gap:12px;align-items:center}.imCard>header button{padding:8px;border:0;border-radius:7px;background:#fff0ed;color:#ae2a1c;font-weight:800}.imFlags{display:flex;gap:10px;font-size:10px}.imFlags input{accent-color:#315fe6}.imActions{margin-top:16px;border:1px solid #d0dce7;border-radius:11px;overflow:auto}.imActions>header,.imActions>article{min-width:1100px;display:grid;grid-template-columns:1.2fr 1.7fr 1fr .9fr .7fr .7fr;gap:8px;padding:11px}.imActions>header{background:#0b2d56;color:#fff;font-size:10px}.imActions>article{border-top:1px solid #e0e8ef}.imActions textarea{min-height:48px}.imActions details{grid-column:1/-1}.imStats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:15px}.imStats article{padding:14px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.imStats b{display:block;color:#315fe6;font-size:25px}.imStats span{color:#60778e;font-size:10px}.imError,.imNotice{display:grid;gap:4px;margin-bottom:13px;padding:13px;border-radius:10px}.imError{border:1px solid #f0b5ad;background:#fff1ef;color:#9c241a}.imNotice{border:1px solid #e4c65c;background:#fff8dc;color:#725800}.imShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.imShell footer>span{margin-left:auto;color:#6f8396;font-size:11px}.imShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.imShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.imShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}.imFooterNotice{max-width:420px;padding:7px;background:#fff7d7;color:#765b00;font-size:9px}@media(max-width:1100px){.imShell{grid-template-columns:80px 1fr}.imBrand,.imShell>aside>small,.imShell nav span,.imLive{display:none}.imShell nav button{justify-content:center}.imGrid{grid-template-columns:1fr}}@media(max-width:720px){.imShell{display:block}.imShell>aside{position:static;height:auto;margin-bottom:15px;padding:15px}.imShell nav{display:flex;overflow:auto}.imStats{grid-template-columns:1fr 1fr}.imTop h1{font-size:29px}.imShell footer{flex-wrap:wrap}.imShell footer>span{display:none}}`;
+function Panel({ title, text, children }) {
+  return (
+    <section className="panel">
+      <div className="intro">
+        <h2>{title}</h2>
+        <p>{text}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+function Multi({ title, values, options, onChange }) {
+  const [selected, setSelected] = useState("");
+  const available = options.filter((person) => !values.includes(person.name));
+  const validNames = new Set(options.map((person) => person.name));
+  const legacyValues = values.filter((value) => !validNames.has(value));
+  return (
+    <div className="multi">
+      <b>{title}</b>
+      <small>
+        Select active Company Users with Business Continuity access.
+      </small>
+      <span>
+        <select
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+        >
+          <option value="">
+            {available.length
+              ? "Select participant from Company Users"
+              : "No additional Company Users available"}
+          </option>
+          {available.map((person) => (
+            <option key={`${person.name}-${person.email}`} value={person.name}>
+              {person.name}
+              {person.position ? ` — ${person.position}` : ""}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => {
+            if (selected && !values.includes(selected))
+              onChange([...values, selected]);
+            setSelected("");
+          }}
+          disabled={!selected}
+        >
+          Add participant
+        </button>
+      </span>
+      <div>
+        {values.map((value) => (
+          <button
+            type="button"
+            className={
+              legacyValues.includes(value) ? "chip legacy" : "selected"
+            }
+            onClick={() => onChange(values.filter((item) => item !== value))}
+            key={value}
+            title={
+              legacyValues.includes(value)
+                ? "Invalid legacy entry — click to remove"
+                : "Click to remove"
+            }
+          >
+            {legacyValues.includes(value) ? "⚠ " : "✓ "}
+            {value} ×
+          </button>
+        ))}
+      </div>
+      {legacyValues.length > 0 && (
+        <em>Remove the highlighted legacy entry before saving.</em>
+      )}
+      {!options.length && (
+        <em>
+          No active Company Users with Business Continuity access are available.
+        </em>
+      )}
+    </div>
+  );
+}
+function Choices({ label, values, options, onChange, display = {} }) {
+  return (
+    <div className="choices">
+      <b>{label}</b>
+      <div>
+        {options.map((x) => (
+          <button
+            type="button"
+            className={values.includes(x) ? "selected" : ""}
+            onClick={() => onChange(toggle(values, x))}
+            key={x}
+          >
+            {values.includes(x) ? "✓ " : "+ "}
+            {display[x] || x}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+function RiskCard({
+  r,
+  processes = [],
+  dependencies = [],
+  people = [],
+  update,
+  stage,
+}) {
+  const m = metrics(r);
+  return (
+    <article className="risk">
+      <header>
+        <div className="riskIdentity">
+          <HazardIcon name={r.name} tone={m.residualBand} />
+          <div>
+            <small>{r.category}</small>
+            <h3>{r.name}</h3>
+          </div>
+        </div>
+        <div className="riskCore" aria-label="Risk score calculation">
+          <small>RISK SCORE</small>
+          <b>
+            {m.impact} × {m.likelihood} = {m.inherent}
+          </b>
+          <span>Impact × likelihood · heat-map position</span>
+        </div>
+        <div>
+          <em className={m.inherentBand}>Inherent {m.inherent}</em>
+          <span>→</span>
+          <em className={m.residualBand}>Residual {m.residual}</em>
+          <span>→</span>
+          <em className={m.targetBand}>Target {m.target}</em>
+        </div>
+      </header>
+      {stage === "analysis" && (
+        <>
+          <div className="grid">
+            <label>
+              Record number
+              <input
+                value={r.recordNumber}
+                onChange={(e) => update(r.id, { recordNumber: e.target.value })}
+                placeholder="Controlled reference"
+              />
+            </label>
+            <label>
+              Assessment date
+              <input
+                type="date"
+                value={r.assessmentDate}
+                onChange={(e) =>
+                  update(r.id, { assessmentDate: e.target.value })
+                }
+              />
+            </label>
+          </div>
+          <Choices
+            label="Management-system applicability"
+            values={r.applicableSystems}
+            options={Object.keys(systems)}
+            display={systems}
+            onChange={(v) => update(r.id, { applicableSystems: v })}
+          />
+          <label>
+            Activity, aspect or scenario under analysis *
+            <input
+              value={r.name}
+              onChange={(e) => update(r.id, { name: e.target.value })}
+            />
+          </label>
+          <label>
+            Detailed risk / hazard description *
+            <textarea
+              value={r.description}
+              onChange={(e) => update(r.id, { description: e.target.value })}
+              placeholder={`Because of a credible cause, ${r.name.toLowerCase()} may occur, resulting in disruption to priority activities.`}
+            />
+          </label>
+          <label>
+            Opportunity created by stronger controls
+            <textarea
+              value={r.opportunityDescription}
+              onChange={(e) =>
+                update(r.id, { opportunityDescription: e.target.value })
+              }
+              placeholder="Resilience, safer work, improved service, compliance or efficiency opportunity"
+            />
+          </label>
+          <Choices
+            label="OH&S hazard-identification categories"
+            values={r.hazardCategories}
+            options={hazardCategories}
+            onChange={(v) => update(r.id, { hazardCategories: v })}
+          />
+          <Choices
+            label="Affected processes *"
+            values={r.affectedProcesses}
+            options={processes}
+            onChange={(v) => update(r.id, { affectedProcesses: v })}
+          />
+          <Choices
+            label="Affected dependencies"
+            values={r.affectedDependencies}
+            options={dependencies}
+            onChange={(v) => update(r.id, { affectedDependencies: v })}
+          />
+          <div className="impact">
+            {Object.entries(impactKeys).map(([k, label]) => (
+              <label key={k}>
+                <span>
+                  {label}
+                  <b>
+                    {r.impact[k] === 0
+                      ? "N/A"
+                      : `${r.impact[k]} · ${impactLabels[r.impact[k]]}`}
+                  </b>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="5"
+                  value={r.impact[k] || 0}
+                  onChange={(e) =>
+                    update(r.id, {
+                      impact: { ...r.impact, [k]: +e.target.value },
+                    })
+                  }
+                />
+                <small>
+                  0 N/A · 1 Insignificant · 2 Minor · 3 Moderate · 4 Major · 5
+                  Severe
+                </small>
+              </label>
+            ))}
+          </div>
+          <label>
+            Likelihood / exposure before controls{" "}
+            <b>
+              {r.likelihood} · {likelihoodLabels[r.likelihood]}
+            </b>
+            <input
+              type="range"
+              min="1"
+              max="5"
+              value={r.likelihood}
+              onChange={(e) => update(r.id, { likelihood: +e.target.value })}
+            />
+            <small>
+              1 Rare · 2 Unlikely · 3 Possible · 4 Likely · 5 Almost certain
+            </small>
+          </label>
+        </>
+      )}
+      {stage === "controls" && (
+        <>
+          <div className="controlGrid">
+            <ListEditor
+              label="Controls already implemented *"
+              guide="Select only controls that currently operate and can be evidenced."
+              suggestions={starter[r.name]?.controls || []}
+              items={r.existingControls}
+              onChange={(v) => update(r.id, { existingControls: v })}
+            />
+            <ListEditor
+              label="Controls to be implemented"
+              guide="Record additional prevention, detection or response controls required."
+              suggestions={(starter[r.name]?.controls || []).filter(
+                (item) => !r.existingControls.includes(item),
+              )}
+              items={r.plannedControls}
+              onChange={(v) => update(r.id, { plannedControls: v })}
+            />
+            <label className="controlScale">
+              Control effectiveness <b>{r.controlEffectiveness}%</b>
+              <input
+                type="range"
+                min="0"
+                max="80"
+                step="10"
+                value={r.controlEffectiveness}
+                onChange={(e) =>
+                  update(r.id, { controlEffectiveness: +e.target.value })
+                }
+              />
+              <small>
+                0 None · 20 Weak · 40 Partial · 60 Substantial · 80 Strong and
+                evidenced
+              </small>
+            </label>
+            <label>
+              Risk owner *
+              <select
+                value={r.owner}
+                onChange={(e) => update(r.id, { owner: e.target.value })}
+              >
+                <option value="">Select accountable owner</option>
+                {people.map((person) => (
+                  <option
+                    key={`${person.name}-${person.email}`}
+                    value={person.name}
+                  >
+                    {person.name}
+                    {person.position ? ` — ${person.position}` : ""}
+                  </option>
+                ))}
+              </select>
+              <small>
+                Select an active Company User with Business Continuity access.
+              </small>
+            </label>
+            <ListEditor
+              label="Causes and contributing factors"
+              guide="Choose credible initiating causes, then add any site-specific cause."
+              suggestions={scenarioGuidance(r.name).causes}
+              items={r.causes}
+              onChange={(v) => update(r.id, { causes: v })}
+            />
+            <ListEditor
+              label="Early-warning indicators"
+              guide="Choose observable signals that would trigger escalation or preparation."
+              suggestions={scenarioGuidance(r.name).warnings}
+              items={r.warningIndicators}
+              onChange={(v) => update(r.id, { warningIndicators: v })}
+            />
+          </div>
+        </>
+      )}
+      {stage === "treatment" && (
+        <>
+          <div className="grid">
+            <label>
+              Treatment decision
+              <select
+                value={r.treatment}
+                onChange={(e) => update(r.id, { treatment: e.target.value })}
+              >
+                <option>Reduce</option>
+                <option>Avoid</option>
+                <option>Transfer / share</option>
+                <option>Accept</option>
+                <option>Prepare and monitor</option>
+              </select>
+            </label>
+            <label>
+              Target completion
+              <input
+                type="date"
+                value={r.targetDate}
+                onChange={(e) => update(r.id, { targetDate: e.target.value })}
+              />
+            </label>
+            <label>
+              Target likelihood
+              <select
+                value={r.targetLikelihood}
+                onChange={(e) =>
+                  update(r.id, { targetLikelihood: +e.target.value })
+                }
+              >
+                {likelihoodLabels.slice(1).map((x, i) => (
+                  <option value={i + 1} key={x}>
+                    {i + 1} · {x}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Target impact
+              <select
+                value={r.targetImpact}
+                onChange={(e) =>
+                  update(r.id, { targetImpact: +e.target.value })
+                }
+              >
+                {impactLabels.slice(1).map((x, i) => (
+                  <option value={i + 1} key={x}>
+                    {i + 1} · {x}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Corrective-action reference
+              <input
+                value={r.correctiveActionReference}
+                onChange={(e) =>
+                  update(r.id, { correctiveActionReference: e.target.value })
+                }
+                placeholder="PRIR / CI / CAPA / local action reference"
+              />
+            </label>
+            <label>
+              Review frequency
+              <select
+                value={r.reviewFrequency}
+                onChange={(e) =>
+                  update(r.id, { reviewFrequency: e.target.value })
+                }
+              >
+                <option>Monthly</option>
+                <option>Quarterly</option>
+                <option>Semi-annually</option>
+                <option>Annually</option>
+                <option>After trigger or change</option>
+              </select>
+            </label>
+            <label>
+              Include in Incident Management Plan
+              <select
+                value={r.includeInIncidentPlan === false ? "no" : "yes"}
+                onChange={(e) =>
+                  update(r.id, {
+                    includeInIncidentPlan: e.target.value === "yes",
+                  })
+                }
+              >
+                <option value="yes">
+                  Yes — create activation and recovery controls
+                </option>
+                <option value="no">No — retain in risk register only</option>
+              </select>
+              <small>
+                Only included scenarios flow into BCP Module 9. High and
+                Critical exclusions should be justified below.
+              </small>
+            </label>
+            {r.includeInIncidentPlan === false && (
+              <label>
+                Incident-plan exclusion rationale
+                <input
+                  value={r.incidentPlanExclusionRationale}
+                  onChange={(e) =>
+                    update(r.id, {
+                      incidentPlanExclusionRationale: e.target.value,
+                    })
+                  }
+                  placeholder="Why this assessed scenario does not require an incident response plan"
+                />
+              </label>
+            )}
+          </div>
+          <div className="treatmentSupportGrid">
+            <ListEditor
+              label="Risk-treatment actions"
+              guide="Select one or more proportionate actions, then add any site-specific action. Each action should later have an owner, evidence and target date."
+              suggestions={treatmentGuidance(r.name)}
+              items={r.actions}
+              onChange={(v) => update(r.id, { actions: v })}
+            />
+            <ListEditor
+              label="Revision history / changes to impacts, rating or controls"
+              guide="Record what changed and why so the controlled risk decision remains traceable."
+              suggestions={revisionSuggestions}
+              items={r.revisionHistory}
+              onChange={(v) => update(r.id, { revisionHistory: v })}
+            />
+          </div>
+          <label>
+            Decision and tolerability rationale *
+            <textarea
+              value={r.decisionRationale}
+              onChange={(e) =>
+                update(r.id, { decisionRationale: e.target.value })
+              }
+              placeholder={`Explain why ${r.treatment.toLowerCase()} is appropriate, whether residual risk ${metrics(r).residual}/${metrics(r).residualBand} is tolerable, and who authorised the decision.`}
+            />
+            <small>
+              State the decision basis, expected risk reduction, remaining
+              exposure, dependencies, approval authority and review trigger. Do
+              not enter only “acceptable” or “reviewed”.
+            </small>
+          </label>
+        </>
+      )}
+    </article>
+  );
+}
+function ListEditor({ label, guide = "", suggestions = [], items, onChange }) {
+  const [value, setValue] = useState("");
+  return (
+    <div className="list">
+      <b>{label}</b>
+      {guide && <small className="listGuide">{guide}</small>}
+      {suggestions.length > 0 && (
+        <div className="listSuggestions">
+          {suggestions
+            .filter((suggestion) => !items.includes(suggestion))
+            .map((suggestion) => (
+              <button
+                type="button"
+                key={suggestion}
+                onClick={() => onChange([...items, suggestion])}
+              >
+                + {suggestion}
+              </button>
+            ))}
+        </div>
+      )}
+      {items.map((x, i) => (
+        <span key={`${x}-${i}`}>
+          {x}
+          <button
+            type="button"
+            onClick={() => onChange(items.filter((_, n) => n !== i))}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <div>
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Add a specific, verifiable item"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (value.trim()) onChange([...items, value.trim()]);
+            setValue("");
+          }}
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+function Heat({ risks, appetite }) {
+  const [mode, setMode] = useState("residual"),
+    [selected, setSelected] = useState("");
+  const position = (r) => {
+    const m = metrics(r);
+    return mode === "inherent"
+      ? [m.likelihood, m.impact]
+      : mode === "target"
+        ? [m.targetLikelihood, m.targetImpact]
+        : [m.residualLikelihood, m.impact];
+  };
+  const visible = selected
+    ? risks.filter((r) => position(r).join("-") === selected)
+    : risks;
+  return (
+    <>
+      <div className="heatHead">
+        <div>
+          <small>INTERACTIVE RISK POSITION</small>
+          <h3>Risk heat map</h3>
+          <p>
+            {visible.length} of {risks.length} scenarios · appetite {appetite}
+            /25
+          </p>
+        </div>
+        <div>
+          {["inherent", "residual", "target"].map((x) => (
+            <button
+              type="button"
+              className={mode === x ? "active" : ""}
+              onClick={() => {
+                setMode(x);
+                setSelected("");
+              }}
+              key={x}
+            >
+              {x[0].toUpperCase() + x.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="heat">
+        <div className="axis">IMPACT ↑</div>
+        {[5, 4, 3, 2, 1].map((i) => (
+          <div className="row" key={i}>
+            <label>
+              <b>{i}</b>
+              <small>{impactLabels[i]}</small>
+            </label>
+            {[1, 2, 3, 4, 5].map((l) => {
+              const here = risks.filter((r) => {
+                  const p = position(r);
+                  return p[0] === l && p[1] === i;
+                }),
+                score = i * l,
+                key = `${l}-${i}`;
+              return (
+                <button
+                  type="button"
+                  className={`${band(score)} ${selected === key ? "selected" : ""}`}
+                  key={key}
+                  onClick={() => setSelected(selected === key ? "" : key)}
+                >
+                  <i>{score}</i>
+                  <strong>{here.length}</strong>
+                  <small>{band(score)}</small>
+                  {score > appetite && <em>Above appetite</em>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+        <footer>
+          <span />
+          <b>
+            1<small>Rare</small>
+          </b>
+          <b>
+            2<small>Unlikely</small>
+          </b>
+          <b>
+            3<small>Possible</small>
+          </b>
+          <b>
+            4<small>Likely</small>
+          </b>
+          <b>
+            5<small>Almost certain</small>
+          </b>
+        </footer>
+        <strong>LIKELIHOOD →</strong>
+      </div>
+    </>
+  );
+}
+const css = `*{box-sizing:border-box}.hz{display:grid;grid-template-columns:265px minmax(0,1fr);max-width:1780px;margin:auto;background:#eef4fa;color:#0a2342;border:1px solid #ccdae7;border-radius:16px;overflow:hidden;min-height:850px}.hz>aside{background:#09264b;color:#fff;padding:26px 20px}.brand{font-size:22px;font-weight:950}.brand span{font-weight:400}.hz>aside>small{display:block;color:#55ddd0;font-weight:900;letter-spacing:.13em;margin:22px 0}.hz>aside section{background:#143860;border:1px solid #33577c;border-radius:12px;padding:16px}.hz>aside section strong{font-size:30px}.hz>aside section span{display:block;font-size:12px}.hz>aside section i,.progress{display:block;height:7px;background:#d9e4ef;border-radius:9px;overflow:hidden;margin-top:10px}.hz>aside section i b,.progress i{display:block;height:100%;background:linear-gradient(90deg,#2e64ef,#23b8a8)}.hz nav{display:grid;gap:5px;margin:20px -8px}.hz nav button{display:flex;gap:10px;align-items:center;text-align:left;background:transparent;color:#cbd9e8;border:0;padding:11px;border-radius:8px;font-weight:800}.hz nav button b{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#254a72}.hz nav button.active{background:#1d518b;color:#fff}.outputs{border-top:1px solid #315071;padding-top:17px;display:grid;gap:8px;font-size:12px}.outputs b{color:#55ddd0;text-transform:uppercase}.hz>main{min-width:0}.hz>main>header{display:flex;justify-content:space-between;gap:20px;padding:26px 30px 20px;background:#fff}.hz>main>header small,.intro small{color:#285de4;font-weight:900;letter-spacing:.1em}.hz h1{margin:5px 0;font-size:36px}.hz>main>header p{margin:0;color:#607890}.hz>main>header>b{height:max-content;background:#eaf0ff;color:#214fcf;padding:7px 11px;border-radius:20px}.progress{margin:0;height:5px}.panel{margin:20px;padding:0 22px 24px;background:#fff;border:1px solid #d1dfec;border-radius:13px}.intro{margin:0 -22px 20px;padding:20px 22px;border-bottom:1px solid #dce6ef}.intro h2{margin:0 0 5px}.intro p{margin:0;color:#607890}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.hz label{display:grid;gap:6px;font-size:13px;font-weight:850}.hz input,.hz select,.hz textarea{width:100%;border:1px solid #bfd0df;border-radius:8px;padding:11px;background:#fff;color:#102d4d;font:inherit}.wide{display:grid!important;margin-top:15px}.source{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.source article{background:#f2f6fa;border-left:4px solid #2e64ef;padding:13px;border-radius:8px;display:grid}.source small{color:#6a7f94}.source b{font-size:20px}.multi,.choices{margin-top:18px}.multi>b,.choices>b,.list>b{display:block;margin-bottom:9px}.multi>div,.choices>div{display:flex;gap:7px;flex-wrap:wrap}.multi button,.choices button,.catalogue button,.add,.custom button{border:1px solid #bfd0df;background:#f7fafc;color:#153c62;padding:8px 10px;border-radius:20px;font-weight:750}.multi button.selected,.choices button.selected,.catalogue button.selected{background:#e1f8f3;border-color:#1da791;color:#066456}.multi>span,.list>div{display:flex;margin-top:9px}.multi>span input,.list>div input{border-radius:8px 0 0 8px}.multi>span button,.list>div button{border-radius:0 8px 8px 0;background:#2d60e6;color:#fff}.multi .chip{margin-top:8px;background:#eaf0ff;color:#214fcf}.catalogue{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.catalogue fieldset{border:1px solid #d0dfec;border-radius:10px;padding:12px;display:flex;gap:7px;flex-wrap:wrap}.catalogue legend{font-weight:900;padding:0 7px}.add{margin:15px 0;background:#2d60e6;color:#fff;border-radius:8px}.custom{display:flex;margin:8px 0}.custom input{border-radius:8px 0 0 8px}.custom button{border-radius:0 8px 8px 0}.generate{border:0;background:#2d60e6;color:#fff;border-radius:8px;padding:11px 14px;font-weight:900;margin-bottom:15px}.risk{border:1px solid #ccdae7;border-radius:12px;margin:0 0 17px;padding:16px;background:#fbfdff}.risk>header{display:flex;justify-content:space-between;gap:15px;margin-bottom:14px}.risk h3{margin:3px 0}.risk small{color:#667e94}.risk>header>div:last-child{display:flex;align-items:center;gap:8px}.risk em,.register em{font-style:normal;padding:6px 9px;border-radius:18px;font-size:12px;font-weight:900}.Low{background:#dff5e9!important;color:#087242}.Moderate{background:#fff2bf!important;color:#805d00}.High{background:#ffe1b8!important;color:#944f00}.Critical{background:#ffd4d4!important;color:#a61f1f}.impact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:15px 0}.impact label{background:#f0f5f9;padding:10px;border-radius:8px}.impact label span{display:flex;justify-content:space-between}.impact input,.risk input[type=range]{padding:0;accent-color:#2d60e6}.list{margin:13px 0}.list>span{display:flex;justify-content:space-between;background:#edf3f8;padding:8px 10px;margin:5px 0;border-radius:6px}.list>span button{border:0;background:transparent;color:#b22727;font-weight:950}.approval{display:grid;grid-template-columns:1fr 2fr;gap:12px;background:#edf4ff;padding:15px;border-radius:10px}.heat{max-width:640px;margin:10px auto 25px;position:relative}.heat .row,.heat footer{display:grid;grid-template-columns:35px repeat(5,1fr);gap:4px;margin-bottom:4px}.heat .row>div{height:50px;display:grid;place-items:center;position:relative;border-radius:5px}.heat .row span{position:absolute;right:5px;top:5px;background:#09264b;color:#fff;border-radius:50%;width:19px;height:19px;display:grid;place-items:center;font-size:10px}.heat footer{text-align:center}.heat>strong{display:block;text-align:center;font-size:11px}.axis{font-size:11px;font-weight:900}.register{display:grid;gap:9px}.register article{display:flex;justify-content:space-between;align-items:center;border:1px solid #d1deea;border-radius:9px;padding:13px}.register h3{margin:3px 0}.register p{margin:4px 0;color:#617990}.register article>div:last-child{display:flex;align-items:center;gap:8px}.hz>main>footer{position:sticky;bottom:0;display:flex;gap:8px;align-items:center;padding:14px 20px;background:#fff;border-top:1px solid #cbd9e5;z-index:3}.hz>main>footer span{margin-right:auto;color:#607890}.hz>main>footer button{padding:10px 13px;border:1px solid #bfd0df;border-radius:7px;background:#fff;font-weight:850}.hz>main>footer .primary{background:#2d60e6;color:#fff;border-color:#2d60e6}.hz>main>footer .danger{color:#aa2424}.error{position:fixed;z-index:20;left:50%;top:20px;transform:translateX(-50%);background:#fff0f0;border:1px solid #efaaaa;color:#9c1d1d;padding:12px 18px;border-radius:8px;display:grid}@media(max-width:900px){.hz{display:block;border-radius:0}.hz>aside{padding:16px}.hz nav{grid-template-columns:repeat(3,1fr)}.hz nav button{display:grid}.outputs{display:none}.grid,.catalogue,.impact,.source,.approval{grid-template-columns:1fr}.panel{margin:10px;padding:0 14px 20px}.intro{margin:0 -14px 16px}.hz>main>header{padding:18px}.hz h1{font-size:28px}.hz>main>footer{flex-wrap:wrap}.hz>main>footer span{width:100%;order:-1}.risk>header,.register article{align-items:flex-start;flex-direction:column}}`;
