@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 
-import { incidentScenarios, reconcileScenarioLinks } from "../../../../lib/bcpIncidentScenarioLinks";
+import { incidentScenarios, synchroniseIncidentScenarios } from "../../../../lib/bcpIncidentScenarioLinks";
 
 import { buildIncidentTeam } from "../../../../lib/bcpIncidentTeamEngine";
 
@@ -69,7 +69,7 @@ export async function saveIncidentManagement(_state, fd) {
 
   const teams = parse(fd, "response_teams", []);
   const rawThresholds = parse(fd, "activation_thresholds", []);
-  const thresholds = reconcileScenarioLinks(rawThresholds, incidentScenarios(sources.hazards));
+  const thresholds = synchroniseIncidentScenarios(rawThresholds, incidentScenarios(sources.hazards));
   const communications = parse(fd, "warning_communications", []);
   const actionPlan = parse(fd, "incident_action_plan", []);
   const recovery = parse(fd, "recovery_stand_down", {});
