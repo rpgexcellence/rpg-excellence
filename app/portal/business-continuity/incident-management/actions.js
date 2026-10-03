@@ -88,6 +88,7 @@ export async function saveIncidentManagement(_state, fd) {
   });
   const sourceScenarios = new Map((sources.hazards.scenario_assessments || []).filter((item) => item.includeInIncidentPlan !== false).map((item) => [item.id, item]));
   const availableScenarios = new Set(sourceScenarios.keys());
+  const invalidActionScenarioLinks = actionPlan.filter((item) => item.scenarioScope === "specific" && (item.hazardAssessmentId !== sources.hazards.id || !Array.isArray(item.scenarioIds) || item.scenarioIds.length === 0 || item.scenarioIds.some((id) => !availableScenarios.has(id))));
   const unresolvedScenarios = thresholds.filter((item) => !availableScenarios.has(item.scenarioId));
   thresholds.forEach((item) => { const source = sourceScenarios.get(item.scenarioId); if (source) item.scenario = source.name; });
   const approverPersonId = text("approver_person_id", 80);
@@ -119,10 +120,10 @@ export async function saveIncidentManagement(_state, fd) {
     teams.length > 0 && teams.every((item) => clean(item.name) && clean(item.leadPersonId) && clean(item.alternatePersonId) && item.leadPersonId !== item.alternatePersonId && clean(item.authority) && clean(item.responsibilities) && clean(item.procedure) && (item.procedureMode !== "automatic" || (Array.isArray(item.procedureSelections) && item.procedureSelections.length > 0))),
     thresholds.length > 0 && unresolvedScenarios.length === 0 && thresholds.every((item) => clean(item.scenario) && clean(item.activationCriteria) && clean(item.initialControls) && clean(item.responseLevel)),
     communications.length > 0 && invalidEmergencyLinks.length === 0 && invalidInterestedPartyLinks.length === 0 && communications.every((item) => clean(item.audience) && clean(item.what) && clean(item.when) && clean(item.primaryMethod) && clean(item.fallbackMethod) && clean(item.ownerPersonId) && clean(item.logMethod)),
-    actionPlan.length > 0 && actionPlan.every((item) => clean(item.objective) && clean(item.action) && clean(item.ownerPersonId) && clean(item.priority) && clean(item.status)),
+    actionPlan.length > 0 && invalidActionScenarioLinks.length === 0 && actionPlan.every((item) => clean(item.objective) && clean(item.action) && clean(item.ownerPersonId) && clean(item.priority) && clean(item.status)),
     ["normalOperationsCriteria", "handbackAuthority", "eocClosureCriteria", "standDownProcess", "employeeSupport", "postIncidentReview", "planAvailability"].every((key) => clean(recovery[key])) && Boolean(approverPersonId),
   ];
-  const labels = ["controlled source links", "response teams, deputies and authority", "activation thresholds", "warning and communication controls (including interested-party and emergency-service source links)", "Incident Action Plan", "recovery, stand-down and competent approver"];
+  const labels = ["controlled source links", "response teams, deputies and authority", "activation thresholds", "warning and communication controls (including interested-party and emergency-service source links)", "Incident Action Plan (including scenario links)", "recovery, stand-down and competent approver"];
   const failed = labels.filter((_, index) => !checks[index]);
   const completion = Math.round(checks.filter(Boolean).length / checks.length * 100);
   let submissionError = "";
