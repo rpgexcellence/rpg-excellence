@@ -321,6 +321,7 @@ const metrics = (r) => {
     targetBand: band(target),
   };
 };
+const scenarioNameKey = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 const toggle = (list, value) =>
   list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
 const profileItems = (profile, key) =>
@@ -716,7 +717,13 @@ export default function BCPHazardScenarioAssessment({
   const [appetite, setAppetite] = useState(
     clamp(initial?.methodology?.appetiteScore || 9, 1, 25),
   );
-  const selected = risks.map((x) => x.name);
+  const [removedScenarios, setRemovedScenarios] = useState([]);
+  const selected = risks.map((x) => scenarioNameKey(x.name));
+  const nameCounts = risks.reduce((counts, risk) => { const key = scenarioNameKey(risk.name); if (key) counts.set(key, (counts.get(key) || 0) + 1); return counts; }, new Map());
+  const duplicateRows = risks.map((risk, index) => ({ risk, index })).filter(({ risk }) => nameCounts.get(scenarioNameKey(risk.name)) > 1);
+  const removeDuplicate = (index) => { setRemovedScenarios([...removedScenarios, { risk: risks[index], index }]); setRisks(risks.filter((_, i) => i !== index)); };
+  const undoDuplicateRemoval = () => { const removed = removedScenarios[removedScenarios.length - 1]; if (!removed) return; const restored = [...risks]; restored.splice(Math.min(removed.index, restored.length), 0, removed.risk); setRisks(restored); setRemovedScenarios(removedScenarios.slice(0, -1)); };
+
   const completion = useMemo(() => {
     const form = formRef.current;
     const get = (name, fallback = "") => {
@@ -897,12 +904,11 @@ export default function BCPHazardScenarioAssessment({
     setRisks(risks.map((x) => (x.id === id ? { ...x, ...changes } : x)));
   const choose = (name) =>
     setRisks(
-      selected.includes(name)
-        ? risks.filter((x) => x.name !== name)
+      selected.includes(scenarioNameKey(name))
+        ? risks.filter((x) => scenarioNameKey(x.name) !== scenarioNameKey(name))
         : [...risks, emptyRisk(name)],
     );
-  const addCustom = () =>
-    setRisks([...risks, emptyRisk("Site-specific scenario")]);
+  const addCustom = () => { let title = "Site-specific scenario", number = 2; while (selected.includes(scenarioNameKey(title))) title = `Site-specific scenario ${number++}`; setRisks([...risks, emptyRisk(title)]); };
   const generate = () =>
     setRisks(
       risks.map((r) => ({
@@ -925,6 +931,7 @@ export default function BCPHazardScenarioAssessment({
       <style>{heatCss}</style>
       <style>{riskCoreCss}</style>
       <style>{completionCss}</style>
+      <style>{`.hz .duplicateReview{margin:20px;padding:20px;background:#fff7e7;border:1px solid #eac67c;border-radius:12px}.hz .duplicateReview h2{margin:0;font-size:20px}.hz .duplicateReview>p{font-size:14px;color:#73551a;line-height:1.5}.hz .duplicateReview article{display:flex;gap:18px;align-items:flex-start;margin-top:14px;padding:16px;border:1px solid #dfd3bb;border-radius:10px;background:#fff}.hz .duplicateReview article>div{flex:1;min-width:0}.hz .duplicateReview small{display:block;margin:8px 0;color:#617990}.hz .duplicateReview article p{font-size:14px;white-space:pre-wrap}.hz .duplicateReview button{border:1px solid #e2b4ad;border-radius:8px;padding:10px;color:#a62418;background:#fff0ed;font-weight:750;cursor:pointer}.hz .duplicateReview input{width:100%;min-height:44px;padding:10px;margin-top:6px;border:1px solid #bfd0df;border-radius:8px;font:inherit}.hz .duplicateReview label{display:block;margin-top:12px;font-size:13px;font-weight:750}.hz .duplicateReview pre{max-height:300px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#f5f8fc;padding:12px}.hz .duplicateReview summary{cursor:pointer;margin:10px 0;font-size:13px;color:#2459d6}.hz .duplicateUndo{display:flex;gap:15px;align-items:center;margin-top:16px;font-size:14px}@media(max-width:700px){.hz .duplicateReview{margin:10px;padding:14px}.hz .duplicateReview article{flex-direction:column}.hz .duplicateReview article>div{width:100%}}`}</style>
       {[
         ["assessment_id", initial?.id || ""],
         ["site_profile_id", profileId],
@@ -1013,6 +1020,11 @@ export default function BCPHazardScenarioAssessment({
           </div>
           <b>{initial?.status?.replaceAll("_", " ") || "draft"}</b>
         </header>
+        {(step === 1 || step === 2) && (duplicateRows.length > 0 || removedScenarios.length > 0) && <section className="duplicateReview" aria-label="Review duplicate hazard scenarios"><h2>Review repeated scenario names</h2><p>These records share a name. Compare their details before removing one. If they describe different situations, give each a distinct name. Changes apply when you save.</p>
+          {duplicateRows.map(({ risk, index }) => <article key={`${risk.id}-${index}`}><div><strong>Source item {index + 1} · {risk.name}</strong><small>Record: {risk.recordNumber || "Not set"} · Inherent risk {metrics(risk).inherent} · {risk.includeInIncidentPlan !== false ? "Included in incident plan" : "Excluded from incident plan"}</small><p>{risk.description || "No description recorded"}</p><small>Existing controls: {risk.existingControls.join("; ") || "None recorded"}</small><details><summary>Compare assessment details</summary>{[["Assessment date", risk.assessmentDate], ["Causes", risk.causes.join("; ")], ["Warning indicators", risk.warningIndicators.join("; ")], ["Affected processes", risk.affectedProcesses.join("; ")], ["Affected dependencies", risk.affectedDependencies.join("; ")], ["Planned controls", risk.plannedControls.join("; ")], ["Owner", risk.owner], ["Treatment", risk.treatment], ["Decision rationale", risk.decisionRationale], ["Target date", risk.targetDate], ["Residual risk", metrics(risk).residual]].map(([label, value]) => <p key={label}><strong>{label}:</strong> {String(value || "Not recorded")}</p>)}</details><label>Distinct scenario name<input value={risk.name} onChange={(e) => update(risk.id, { name: e.target.value })} /></label></div><button type="button" onClick={() => removeDuplicate(index)}>Remove this duplicate</button></article>)}
+          {removedScenarios.length > 0 && <div className="duplicateUndo"><span>{removedScenarios.length} record(s) removed in this session.</span><button type="button" onClick={undoDuplicateRemoval}>Undo last removal</button></div>}
+        </section>}
+
         <div className="progress">
           <i style={{ width: `${completion.percent}%` }} />
         </div>
@@ -1172,12 +1184,12 @@ export default function BCPHazardScenarioAssessment({
                   {items.map((name) => (
                     <button
                       type="button"
-                      className={selected.includes(name) ? "selected" : ""}
+                      className={selected.includes(scenarioNameKey(name)) ? "selected" : ""}
                       onClick={() => choose(name)}
                       key={name}
                     >
                       <HazardIcon name={name} small />
-                      {selected.includes(name) ? "✓" : "+"} {name}
+                      {selected.includes(scenarioNameKey(name)) ? "✓" : "+"} {name}
                     </button>
                   ))}
                 </fieldset>
