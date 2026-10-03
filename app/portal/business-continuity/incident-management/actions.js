@@ -4,6 +4,8 @@ import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 
+import { incidentScenarios, reconcileScenarioLinks } from "../../../../lib/bcpIncidentScenarioLinks";
+
 const clean = (value, max = 4000) => String(value ?? "").trim().slice(0, max);
 const parse = (fd, name, fallback) => {
   try {
@@ -64,15 +66,16 @@ export async function saveIncidentManagement(_state, fd) {
   }
 
   const teams = parse(fd, "response_teams", []);
-  const thresholds = parse(fd, "activation_thresholds", []);
+  const rawThresholds = parse(fd, "activation_thresholds", []);
+  const thresholds = reconcileScenarioLinks(rawThresholds, incidentScenarios(sources.hazards));
   const communications = parse(fd, "warning_communications", []);
   const actionPlan = parse(fd, "incident_action_plan", []);
   const recovery = parse(fd, "recovery_stand_down", {});
-  if (![teams, thresholds, communications, actionPlan].every(Array.isArray) || !recovery || typeof recovery !== "object" || Array.isArray(recovery)) return { error: "Invalid Module 9 form data." };
+  if (![teams, rawThresholds, communications, actionPlan].every(Array.isArray) || !recovery || typeof recovery !== "object" || Array.isArray(recovery)) return { error: "Invalid Module 9 form data." };
   const sourceScenarios = new Map((sources.hazards.scenario_assessments || []).filter((item) => item.includeInIncidentPlan !== false).map((item) => [item.id, item]));
   const availableScenarios = new Set(sourceScenarios.keys());
-  if (thresholds.some((item) => !availableScenarios.has(item.scenarioId))) return { error: "Activation scenarios must come from the selected Module 5 assessment and be included in its incident plan." };
-  thresholds.forEach((item) => { item.scenario = sourceScenarios.get(item.scenarioId).name; });
+  const unresolvedScenarios = thresholds.filter((item) => !availableScenarios.has(item.scenarioId));
+  thresholds.forEach((item) => { const source = sourceScenarios.get(item.scenarioId); if (source) item.scenario = source.name; });
   const approverPersonId = text("approver_person_id", 80);
   const personIds = [...new Set([
     ...teams.flatMap((item) => [item.leadPersonId, item.alternatePersonId]),
@@ -99,7 +102,7 @@ export async function saveIncidentManagement(_state, fd) {
   const checks = [
     Boolean(sources.site && sources.roles && sources.hazards && sources.strategy),
     teams.length > 0 && teams.every((item) => clean(item.name) && clean(item.leadPersonId) && clean(item.alternatePersonId) && item.leadPersonId !== item.alternatePersonId && clean(item.authority) && clean(item.responsibilities) && clean(item.procedure)),
-    thresholds.length > 0 && thresholds.every((item) => clean(item.scenario) && clean(item.activationCriteria) && clean(item.initialControls) && clean(item.responseLevel)),
+    thresholds.length > 0 && unresolvedScenarios.length === 0 && thresholds.every((item) => clean(item.scenario) && clean(item.activationCriteria) && clean(item.initialControls) && clean(item.responseLevel)),
     communications.length > 0 && communications.every((item) => clean(item.audience) && clean(item.what) && clean(item.when) && clean(item.primaryMethod) && clean(item.fallbackMethod) && clean(item.ownerPersonId) && clean(item.logMethod)),
     actionPlan.length > 0 && actionPlan.every((item) => clean(item.objective) && clean(item.action) && clean(item.ownerPersonId) && clean(item.priority) && clean(item.status)),
     ["normalOperationsCriteria", "handbackAuthority", "eocClosureCriteria", "standDownProcess", "employeeSupport", "postIncidentReview", "planAvailability"].every((key) => clean(recovery[key])) && Boolean(approverPersonId),
@@ -135,7 +138,7 @@ export async function saveIncidentManagement(_state, fd) {
     warning_communications: communications,
     incident_action_plan: actionPlan,
     recovery_stand_down: recovery,
-    assurance_summary: { checks, failed, teams: teams.length, thresholds: thresholds.length, communications: communications.length, openActions: actionPlan.filter((item) => item.status !== "closed").length },
+    assurance_summary: { checks, failed, unresolvedScenarios: unresolvedScenarios.map((item) => item.scenario || "Unnamed scenario"), teams: teams.length, thresholds: thresholds.length, communications: communications.length, openActions: actionPlan.filter((item) => item.status !== "closed").length },
     review_frequency: text("review_frequency", 80) || "Every 12 months",
     next_review_date: text("next_review_date", 30) || null,
     completion_percent: completion,
