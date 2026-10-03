@@ -46,7 +46,7 @@ export default async function ExtraDefenderCaseStudy({ params }) {
     <PageShell locale={locale}>
       <JsonLd data={schema} />
       <main className="simplePage">
-        <div className="simpleInner" style={{ maxWidth: "900px" }}>
+        <div className="simpleInner" style={{ maxWidth: "1280px" }}>
           <Link href={`/${locale}/insights`} className="caseBack">
             ← Back to RPG Insights
           </Link>
@@ -61,8 +61,8 @@ export default async function ExtraDefenderCaseStudy({ params }) {
             <img
               src={image}
               alt="Diagram showing a pass from the right into a crowded penalty area, with the headline Stop the Pass"
-              width="1254"
-              height="1254"
+              width="1280"
+              height="1280"
             />
             <figcaption>
               A conceptual illustration of the passing route. The match and
@@ -212,12 +212,13 @@ export default async function ExtraDefenderCaseStudy({ params }) {
         </div>
       </main>
       <style>{`
-        .caseBack{display:inline-block;margin-bottom:28px;color:#1459d9;text-decoration:none;font-weight:700}
+        .caseBack{display:block;width:fit-content;margin-bottom:28px;color:#1459d9;text-decoration:none;font-weight:700}
+        .simpleInner>.kicker{display:block}
         .caseLead{max-width:780px;color:#50647d;font-size:21px;line-height:1.65;margin:20px 0 28px}
-        .caseFigure{max-width:720px;margin:0 auto 38px}
+        .caseFigure{width:100%;max-width:1280px;margin:0 auto 38px}
         .caseFigure img{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 18px 42px #071a3d24}
         .caseFigure figcaption{color:#617087;font-size:13px;line-height:1.5;margin-top:10px;text-align:center}
-        .caseBody{padding:clamp(22px,4vw,42px);font-size:17px;line-height:1.8;color:#334c68}
+        .caseBody{max-width:900px;margin:0 auto;padding:clamp(22px,4vw,42px);font-size:17px;line-height:1.8;color:#334c68}
         .caseBody h2{color:#09254b;font-size:clamp(24px,3vw,31px);line-height:1.2;margin:38px 0 14px}
         .caseBody h2:first-child{margin-top:0}
         .caseBody p{margin:0 0 18px}
