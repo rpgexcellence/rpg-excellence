@@ -216,7 +216,7 @@ async function saveHazards(_previousState, fd) {
     (person) => permittedIds.has(person.id) || authorisedIds.has(person.id),
   );
   const controlledPeople = new Set(
-    (eligiblePeople.length ? eligiblePeople : peopleResult.data || [])
+    eligiblePeople
       .map((person) =>
         `${person.first_name || ""} ${person.last_name || ""}`.trim(),
       )
@@ -294,7 +294,7 @@ async function saveHazards(_previousState, fd) {
     };
   const now = new Date().toISOString(),
     currentVersion = Number(existing?.version) || 1,
-    editingApproved = existing?.status === "approved" && intent !== "approve",
+    editingApproved = existing?.status === "approved",
     version = editingApproved ? currentVersion + 1 : currentVersion,
     status =
       intent === "approve"
@@ -340,15 +340,15 @@ async function saveHazards(_previousState, fd) {
     version,
     prepared_by: existing?.prepared_by || user.email || "Account owner",
     reviewed_by: reviewer || null,
-    reviewed_at: intent === "approve" ? now : existing?.reviewed_at || null,
+    reviewed_at: intent === "approve" ? now : null,
     review_comment: comment || null,
     approved_by:
-      intent === "approve" ? reviewer : existing?.approved_by || null,
-    approved_at: intent === "approve" ? now : existing?.approved_at || null,
+      intent === "approve" ? reviewer : null,
+    approved_at: intent === "approve" ? now : null,
     updated_at: now,
   };
   if (editingApproved) {
-    const { error } = await s.from("bcp_hazard_assessment_versions").insert({
+    const { error } = await s.from("bcp_hazard_assessment_versions").upsert({
       assessment_id: existing.id,
       organization_id: org.id,
       owner_id: user.id,
@@ -356,7 +356,7 @@ async function saveHazards(_previousState, fd) {
       status: existing.status,
       snapshot: existing,
       change_reason: "Approved version superseded",
-    });
+    }, { onConflict: "assessment_id,version", ignoreDuplicates: true });
     if (error) return { error: error.message };
   }
   let savedId = existing?.id,
@@ -366,7 +366,10 @@ async function saveHazards(_previousState, fd) {
       .from("bcp_hazard_assessments")
       .update(data)
       .eq("id", existing.id)
-      .eq("owner_id", user.id));
+      .eq("owner_id", user.id)
+      .eq("updated_at", existing.updated_at)
+      .select("id")
+      .single());
   else {
     const result = await s
       .from("bcp_hazard_assessments")
@@ -393,7 +396,7 @@ async function saveHazards(_previousState, fd) {
           snapshot: { ...data, id: savedId },
           change_reason: comment || "Controlled approval",
         },
-        { onConflict: "assessment_id,version" },
+        { onConflict: "assessment_id,version", ignoreDuplicates: true },
       );
     if (versionError) return { error: versionError.message };
   }
@@ -489,9 +492,7 @@ export default async function HazardScenarioPage({ searchParams }) {
     const eligiblePeople = (peopleResult.data || []).filter(
       (person) => permittedIds.has(person.id) || authorisedIds.has(person.id),
     );
-    companyPeople = eligiblePeople.length
-      ? eligiblePeople
-      : peopleResult.data || [];
+    companyPeople = eligiblePeople;
     if (params?.new !== "1") {
       let query = s
         .from("bcp_hazard_assessments")
