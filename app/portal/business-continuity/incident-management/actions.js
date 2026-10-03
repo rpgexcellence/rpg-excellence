@@ -69,7 +69,7 @@ export async function saveIncidentManagement(_state, fd) {
 
   const teams = parse(fd, "response_teams", []);
   const rawThresholds = parse(fd, "activation_thresholds", []);
-  const thresholds = synchroniseIncidentScenarios(rawThresholds, incidentScenarios(sources.hazards));
+  const thresholds = synchroniseIncidentScenarios(rawThresholds, incidentScenarios(sources.hazards), { allScenarios: sources.hazards.scenario_assessments || [] });
   const communications = parse(fd, "warning_communications", []);
   const actionPlan = parse(fd, "incident_action_plan", []);
   const recovery = parse(fd, "recovery_stand_down", {});
