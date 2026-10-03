@@ -6,6 +6,8 @@ import { createClient } from "../../../../lib/supabase/server";
 
 import { incidentScenarios, reconcileScenarioLinks } from "../../../../lib/bcpIncidentScenarioLinks";
 
+import { buildIncidentTeam } from "../../../../lib/bcpIncidentTeamEngine";
+
 const clean = (value, max = 4000) => String(value ?? "").trim().slice(0, max);
 const parse = (fd, name, fallback) => {
   try {
@@ -96,12 +98,13 @@ export async function saveIncidentManagement(_state, fd) {
     return person ? `${person.first_name} ${person.last_name}` : "";
   };
   teams.forEach((item) => { item.lead = personName(item.leadPersonId); item.alternate = personName(item.alternatePersonId); });
+  teams.forEach((item, index) => { teams[index] = buildIncidentTeam(item, { people, siteName: sources.site.location_name || "", scenarios: thresholds.filter((row) => availableScenarios.has(row.scenarioId)) }); });
   communications.forEach((item) => { item.owner = personName(item.ownerPersonId); });
   actionPlan.forEach((item) => { item.owner = personName(item.ownerPersonId); });
 
   const checks = [
     Boolean(sources.site && sources.roles && sources.hazards && sources.strategy),
-    teams.length > 0 && teams.every((item) => clean(item.name) && clean(item.leadPersonId) && clean(item.alternatePersonId) && item.leadPersonId !== item.alternatePersonId && clean(item.authority) && clean(item.responsibilities) && clean(item.procedure)),
+    teams.length > 0 && teams.every((item) => clean(item.name) && clean(item.leadPersonId) && clean(item.alternatePersonId) && item.leadPersonId !== item.alternatePersonId && clean(item.authority) && clean(item.responsibilities) && clean(item.procedure) && (item.procedureMode !== "automatic" || (Array.isArray(item.procedureSelections) && item.procedureSelections.length > 0))),
     thresholds.length > 0 && unresolvedScenarios.length === 0 && thresholds.every((item) => clean(item.scenario) && clean(item.activationCriteria) && clean(item.initialControls) && clean(item.responseLevel)),
     communications.length > 0 && communications.every((item) => clean(item.audience) && clean(item.what) && clean(item.when) && clean(item.primaryMethod) && clean(item.fallbackMethod) && clean(item.ownerPersonId) && clean(item.logMethod)),
     actionPlan.length > 0 && actionPlan.every((item) => clean(item.objective) && clean(item.action) && clean(item.ownerPersonId) && clean(item.priority) && clean(item.status)),
