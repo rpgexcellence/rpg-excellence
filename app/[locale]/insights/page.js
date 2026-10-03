@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "021",
+      title: "The Extra Defender: A Root Cause Analysis Case Study",
+      description: "A hypothetical football scenario shows how containment, evidence-led causal analysis, corrective action and effectiveness checks work together.",
+      href: "the-extra-defender-rca-case-study",
+    },
+    {
       number: "020",
       title: "Business Continuity Decisions Begin with Context",
       description: "How RPG Excellence converts ISO 22301 Clause 4 context, interested parties, obligations, scope and priorities into connected and auditable registers.",
