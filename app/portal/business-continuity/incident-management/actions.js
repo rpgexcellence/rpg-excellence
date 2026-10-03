@@ -74,6 +74,14 @@ export async function saveIncidentManagement(_state, fd) {
   const actionPlan = parse(fd, "incident_action_plan", []);
   const recovery = parse(fd, "recovery_stand_down", {});
   if (![teams, rawThresholds, communications, actionPlan].every(Array.isArray) || !recovery || typeof recovery !== "object" || Array.isArray(recovery)) return { error: "Invalid Module 9 form data." };
+  const contextParties = new Map((Array.isArray(sources.context?.interested_parties) ? sources.context.interested_parties : []).map((party) => [party.id, party]));
+  const invalidInterestedPartyLinks = communications.filter((item) => item.interestedPartyId && (item.interestedPartyContextId !== sources.context?.id || !contextParties.has(item.interestedPartyId)));
+  communications.forEach((item) => {
+    if (item.interestedPartyId && item.interestedPartyContextId === sources.context?.id) {
+      const party = contextParties.get(item.interestedPartyId);
+      if (party) item.audience = clean(party.name, 250);
+    }
+  });
   const sourceScenarios = new Map((sources.hazards.scenario_assessments || []).filter((item) => item.includeInIncidentPlan !== false).map((item) => [item.id, item]));
   const availableScenarios = new Set(sourceScenarios.keys());
   const unresolvedScenarios = thresholds.filter((item) => !availableScenarios.has(item.scenarioId));
@@ -106,11 +114,11 @@ export async function saveIncidentManagement(_state, fd) {
     Boolean(sources.site && sources.roles && sources.hazards && sources.strategy),
     teams.length > 0 && teams.every((item) => clean(item.name) && clean(item.leadPersonId) && clean(item.alternatePersonId) && item.leadPersonId !== item.alternatePersonId && clean(item.authority) && clean(item.responsibilities) && clean(item.procedure) && (item.procedureMode !== "automatic" || (Array.isArray(item.procedureSelections) && item.procedureSelections.length > 0))),
     thresholds.length > 0 && unresolvedScenarios.length === 0 && thresholds.every((item) => clean(item.scenario) && clean(item.activationCriteria) && clean(item.initialControls) && clean(item.responseLevel)),
-    communications.length > 0 && communications.every((item) => clean(item.audience) && clean(item.what) && clean(item.when) && clean(item.primaryMethod) && clean(item.fallbackMethod) && clean(item.ownerPersonId) && clean(item.logMethod)),
+    communications.length > 0 && invalidInterestedPartyLinks.length === 0 && communications.every((item) => clean(item.audience) && clean(item.what) && clean(item.when) && clean(item.primaryMethod) && clean(item.fallbackMethod) && clean(item.ownerPersonId) && clean(item.logMethod)),
     actionPlan.length > 0 && actionPlan.every((item) => clean(item.objective) && clean(item.action) && clean(item.ownerPersonId) && clean(item.priority) && clean(item.status)),
     ["normalOperationsCriteria", "handbackAuthority", "eocClosureCriteria", "standDownProcess", "employeeSupport", "postIncidentReview", "planAvailability"].every((key) => clean(recovery[key])) && Boolean(approverPersonId),
   ];
-  const labels = ["controlled source links", "response teams, deputies and authority", "activation thresholds", "warning and communication controls", "Incident Action Plan", "recovery, stand-down and competent approver"];
+  const labels = ["controlled source links", "response teams, deputies and authority", "activation thresholds", "warning and communication controls (including interested-party source links)", "Incident Action Plan", "recovery, stand-down and competent approver"];
   const failed = labels.filter((_, index) => !checks[index]);
   const completion = Math.round(checks.filter(Boolean).length / checks.length * 100);
   let submissionError = "";
