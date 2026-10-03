@@ -68,6 +68,11 @@ export async function saveIncidentManagement(_state, fd) {
   const communications = parse(fd, "warning_communications", []);
   const actionPlan = parse(fd, "incident_action_plan", []);
   const recovery = parse(fd, "recovery_stand_down", {});
+  if (![teams, thresholds, communications, actionPlan].every(Array.isArray) || !recovery || typeof recovery !== "object" || Array.isArray(recovery)) return { error: "Invalid Module 9 form data." };
+  const sourceScenarios = new Map((sources.hazards.scenario_assessments || []).filter((item) => item.includeInIncidentPlan !== false).map((item) => [item.id, item]));
+  const availableScenarios = new Set(sourceScenarios.keys());
+  if (thresholds.some((item) => !availableScenarios.has(item.scenarioId))) return { error: "Activation scenarios must come from the selected Module 5 assessment and be included in its incident plan." };
+  thresholds.forEach((item) => { item.scenario = sourceScenarios.get(item.scenarioId).name; });
   const approverPersonId = text("approver_person_id", 80);
   const personIds = [...new Set([
     ...teams.flatMap((item) => [item.leadPersonId, item.alternatePersonId]),
@@ -108,7 +113,7 @@ export async function saveIncidentManagement(_state, fd) {
   const effectiveIntent = submissionError ? "draft" : intent;
   const now = new Date().toISOString();
   const currentVersion = Number(existing?.version) || 1;
-  const editingApproved = existing?.status === "approved" && effectiveIntent !== "approve";
+  const editingApproved = existing?.status === "approved";
   const version = editingApproved ? currentVersion + 1 : currentVersion;
   const status = effectiveIntent === "approve" ? "approved" : effectiveIntent === "review" ? "ready_for_review" : "draft";
   const approver = personName(approverPersonId);
@@ -146,12 +151,12 @@ export async function saveIncidentManagement(_state, fd) {
   };
 
   if (editingApproved) {
-    const { error } = await supabase.from("bcp_incident_management_versions").upsert({ assessment_id: existing.id, organization_id: organization.id, owner_id: user.id, version: currentVersion, status: existing.status, snapshot: existing, change_reason: "Approved version preserved before amendment" }, { onConflict: "assessment_id,version" });
+    const { error } = await supabase.from("bcp_incident_management_versions").upsert({ assessment_id: existing.id, organization_id: organization.id, owner_id: user.id, version: currentVersion, status: existing.status, snapshot: existing, change_reason: "Approved version preserved before amendment" }, { onConflict: "assessment_id,version", ignoreDuplicates: true });
     if (error) return { error: error.message };
   }
   let savedId = existing?.id;
   let saveError;
-  if (existing) ({ error: saveError } = await supabase.from("bcp_incident_management_assessments").update(data).eq("id", existing.id).eq("owner_id", user.id));
+  if (existing) ({ error: saveError } = await supabase.from("bcp_incident_management_assessments").update(data).eq("id", existing.id).eq("owner_id", user.id).eq("updated_at", existing.updated_at).select("id").single());
   else {
     const result = await supabase.from("bcp_incident_management_assessments").insert({ ...data, assessment_reference: `BCP-IMS-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}` }).select("id").single();
     savedId = result.data?.id;
@@ -159,7 +164,7 @@ export async function saveIncidentManagement(_state, fd) {
   }
   if (saveError) return { error: saveError.message };
   if (effectiveIntent === "approve") {
-    const { error } = await supabase.from("bcp_incident_management_versions").upsert({ assessment_id: savedId, organization_id: organization.id, owner_id: user.id, version, status, snapshot: { ...data, id: savedId }, change_reason: data.review_comment || "Controlled Module 9 approval" }, { onConflict: "assessment_id,version" });
+    const { error } = await supabase.from("bcp_incident_management_versions").upsert({ assessment_id: savedId, organization_id: organization.id, owner_id: user.id, version, status, snapshot: { ...data, id: savedId }, change_reason: data.review_comment || "Controlled Module 9 approval" }, { onConflict: "assessment_id,version", ignoreDuplicates: true });
     if (error) return { error: error.message };
   }
   if (submissionError) return { error: `Draft saved successfully. Approval was not completed: ${submissionError}`, savedId };
