@@ -10,6 +10,8 @@ import { buildIncidentTeam } from "../../../../lib/bcpIncidentTeamEngine";
 
 import { emergencyContactFor, synchroniseEmergencyCommunications } from "../../../../lib/bcpIncidentEmergencyContacts";
 
+import { buildIncidentRecovery, incidentRecoveryMissing } from "../../../../lib/bcpIncidentRecoveryEngine";
+
 const clean = (value, max = 4000) => String(value ?? "").trim().slice(0, max);
 const parse = (fd, name, fallback) => {
   try {
@@ -74,8 +76,8 @@ export async function saveIncidentManagement(_state, fd) {
   const thresholds = synchroniseIncidentScenarios(rawThresholds, incidentScenarios(sources.hazards), { allScenarios: sources.hazards.scenario_assessments || [] });
   const rawCommunications = parse(fd, "warning_communications", []);
   const actionPlan = parse(fd, "incident_action_plan", []);
-  const recovery = parse(fd, "recovery_stand_down", {});
-  if (![teams, rawThresholds, rawCommunications, actionPlan].every(Array.isArray) || !recovery || typeof recovery !== "object" || Array.isArray(recovery)) return { error: "Invalid Module 9 form data." };
+  const rawRecovery = parse(fd, "recovery_stand_down", {});
+  if (![teams, rawThresholds, rawCommunications, actionPlan].every(Array.isArray) || !rawRecovery || typeof rawRecovery !== "object" || Array.isArray(rawRecovery)) return { error: "Invalid Module 9 form data." };
   const communications = synchroniseEmergencyCommunications(rawCommunications, sources.site);
   const invalidEmergencyLinks = communications.filter((item) => item.emergencyContactKey && !emergencyContactFor(item, sources.site));
   const contextParties = new Map((Array.isArray(sources.context?.interested_parties) ? sources.context.interested_parties : []).map((party) => [party.id, party]));
@@ -96,6 +98,7 @@ export async function saveIncidentManagement(_state, fd) {
     ...teams.flatMap((item) => [item.leadPersonId, item.alternatePersonId]),
     ...communications.map((item) => item.ownerPersonId),
     ...actionPlan.map((item) => item.ownerPersonId),
+    rawRecovery.handbackPersonId, rawRecovery.handbackDeputyPersonId, rawRecovery.welfarePersonId, rawRecovery.reviewPersonId,
     approverPersonId,
   ].map((value) => clean(value, 80)).filter(Boolean))];
   let people = [];
@@ -115,13 +118,17 @@ export async function saveIncidentManagement(_state, fd) {
   communications.forEach((item) => { item.owner = personName(item.ownerPersonId); });
   actionPlan.forEach((item) => { item.owner = personName(item.ownerPersonId); });
 
+  const recoveryContext = { people, hazard: sources.hazards, scenarios: incidentScenarios(sources.hazards), siteName: sources.site.location_name || "", approverPersonId };
+  const recovery = buildIncidentRecovery(rawRecovery, recoveryContext);
+  const recoveryMissing = incidentRecoveryMissing(recovery, recoveryContext);
+
   const checks = [
     Boolean(sources.site && sources.roles && sources.hazards && sources.strategy),
     teams.length > 0 && teams.every((item) => clean(item.name) && clean(item.leadPersonId) && clean(item.alternatePersonId) && item.leadPersonId !== item.alternatePersonId && clean(item.authority) && clean(item.responsibilities) && clean(item.procedure) && (item.procedureMode !== "automatic" || (Array.isArray(item.procedureSelections) && item.procedureSelections.length > 0))),
     thresholds.length > 0 && unresolvedScenarios.length === 0 && thresholds.every((item) => clean(item.scenario) && clean(item.activationCriteria) && clean(item.initialControls) && clean(item.responseLevel)),
     communications.length > 0 && invalidEmergencyLinks.length === 0 && invalidInterestedPartyLinks.length === 0 && communications.every((item) => clean(item.audience) && clean(item.what) && clean(item.when) && clean(item.primaryMethod) && clean(item.fallbackMethod) && clean(item.ownerPersonId) && clean(item.logMethod)),
     actionPlan.length > 0 && invalidActionScenarioLinks.length === 0 && actionPlan.every((item) => clean(item.objective) && clean(item.action) && clean(item.ownerPersonId) && clean(item.priority) && clean(item.status)),
-    ["normalOperationsCriteria", "handbackAuthority", "eocClosureCriteria", "standDownProcess", "employeeSupport", "postIncidentReview", "planAvailability"].every((key) => clean(recovery[key])) && Boolean(approverPersonId),
+    recoveryMissing.length === 0,
   ];
   const labels = ["controlled source links", "response teams, deputies and authority", "activation thresholds", "warning and communication controls (including interested-party and emergency-service source links)", "Incident Action Plan (including scenario links)", "recovery, stand-down and competent approver"];
   const failed = labels.filter((_, index) => !checks[index]);
@@ -154,7 +161,7 @@ export async function saveIncidentManagement(_state, fd) {
     warning_communications: communications,
     incident_action_plan: actionPlan,
     recovery_stand_down: recovery,
-    assurance_summary: { checks, failed, unresolvedScenarios: unresolvedScenarios.map((item) => item.scenario || "Unnamed scenario"), teams: teams.length, thresholds: thresholds.length, communications: communications.length, openActions: actionPlan.filter((item) => item.status !== "closed").length },
+    assurance_summary: { checks, failed, recoveryMissing: recoveryMissing.map((item) => item.label), unresolvedScenarios: unresolvedScenarios.map((item) => item.scenario || "Unnamed scenario"), teams: teams.length, thresholds: thresholds.length, communications: communications.length, openActions: actionPlan.filter((item) => item.status !== "closed").length },
     review_frequency: text("review_frequency", 80) || "Every 12 months",
     next_review_date: text("next_review_date", 30) || null,
     completion_percent: completion,
