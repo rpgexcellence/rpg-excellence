@@ -28,6 +28,7 @@ export default function sitemap() {
     "/privacy",
     "/cookies",
     "/insights",
+    "/insights/the-extra-defender-rca-case-study",
     "/insights/a-word-from-rpg",
     "/insights/iso-9001-readiness",
     "/insights/iso-9001-2026-release",
