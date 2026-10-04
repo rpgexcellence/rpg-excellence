@@ -11,6 +11,8 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 const tools = [
+  {group: "Company", title: "POWRA numbering", description: "Set the company POWRA reference prefix and digit padding. References are allocated automatically on save.", href: "/portal/company/business-profile#powra-numbering", code: "POWRA"},
+  {group: "Company", title: "Site setup", description: "Maintain company sites used by POWRA location selection.", href: "/portal/business-continuity/site-profile", code: "SITE"},
   { group: "Company", title: "Business Profile", description: "View and update the organisation name, industry, country and workforce entered during initial setup.", href: "/portal/company/business-profile", code: "ORG" },
   {
     group: "Diagnostics",
