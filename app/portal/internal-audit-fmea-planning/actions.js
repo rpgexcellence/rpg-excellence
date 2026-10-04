@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { loadFmeaCompanyPeople, selectedFmeaCompanyPerson } from "../../../lib/fmeaCompanyPeople";
 import { createClient } from "../../../lib/supabase/server";
 
 const clean = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
@@ -31,7 +32,7 @@ export async function saveFmeaPlanningAssessment(formData) {
   const credibleEffects = clean(formData.get("credible_effects"));
   const currentControls = clean(formData.get("current_controls"));
   const evidence = clean(formData.get("evidence"));
-  const leadAuditor = clean(formData.get("lead_auditor"));
+  const leadAuditorPersonId = clean(formData.get("lead_auditor_person_id"));
   const decision = clean(formData.get("decision"));
   const decisionRationale = clean(formData.get("decision_rationale"));
   const confirmed = formData.get("lead_auditor_confirmation") === "confirmed";
@@ -41,7 +42,7 @@ export async function saveFmeaPlanningAssessment(formData) {
   const selectedStandards = [...new Set(formData.getAll("standard_codes").map(clean).filter(Boolean))];
   const selectedModifiers = [...new Set(formData.getAll("modifiers").map(clean).filter((key) => Object.hasOwn(MODIFIERS, key)))];
 
-  if (!programmeId || !processArea || !failureMode || !credibleEffects || !currentControls || !evidence || !leadAuditor || !decisionRationale || !confirmed || !likelihood || !detectability || Object.values(consequenceScores).some((value) => !value)) {
+  if (!programmeId || !processArea || !failureMode || !credibleEffects || !currentControls || !evidence || !leadAuditorPersonId || !decisionRationale || !confirmed || !likelihood || !detectability || Object.values(consequenceScores).some((value) => !value)) {
     throw new Error("Complete the process, evidence, scoring, lead-auditor rationale and confirmation before saving.");
   }
   if (!selectedStandards.length) throw new Error("Select at least one applicable standard.");
@@ -69,6 +70,8 @@ export async function saveFmeaPlanningAssessment(formData) {
   if (selectedStandards.some((standard) => !allowedStandards.has(standard))) {
     throw new Error("One or more selected standards are outside the chosen programme scope.");
   }
+
+  const leadAuditor = selectedFmeaCompanyPerson(await loadFmeaCompanyPeople(supabase, user.id), leadAuditorPersonId);
 
   const highestConsequence = Math.max(...Object.values(consequenceScores));
   const baseScore = highestConsequence * likelihood * detectability;
@@ -101,7 +104,7 @@ export async function saveFmeaPlanningAssessment(formData) {
     final_score: finalScore,
     recommended_band: result.band,
     recommended_frequency: result.frequency,
-    lead_auditor_name: leadAuditor,
+    lead_auditor_name: leadAuditor.name,
     lead_auditor_decision: decision,
     decision_rationale: decisionRationale,
     confirmed_at: new Date().toISOString(),
@@ -147,7 +150,7 @@ export async function saveFmeaPlanningAssessment(formData) {
     event_type: "fmea_assessment_added",
     summary: `${reference} added to the programme risk universe`,
     created_by: user.id,
-    event_data: { assessment_id: assessment.id, programme_risk_id: programmeRisk.id, score: finalScore, band: result.band },
+    event_data: { lead_auditor_person_id: leadAuditor.id, lead_auditor_name: leadAuditor.name, assessment_id: assessment.id, programme_risk_id: programmeRisk.id, score: finalScore, band: result.band },
   });
 
   revalidatePath("/portal/internal-audit-fmea-planning");
