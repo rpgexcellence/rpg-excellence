@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 
 import { useActionState, useMemo, useRef, useState } from "react";
 
@@ -2800,41 +2801,9 @@ export default function BCPSiteProfileForm({
     ]);
 
   return (
-    <div className="spxShell">
-      <aside className="spxSide">
-        <div className="spxBrand">
-          RPG <span>Excellence</span>
-        </div>
-        <small>BCP SITE PROFILE</small>
-        <div className="spxOverall">
-          <div>
-            <strong>{completion.percent}%</strong>
-            <span>complete</span>
-          </div>
-          <i>
-            <b style={{ width: `${completion.percent}%` }} />
-          </i>
-          <em>Save progress with “Save &amp; continue”</em>
-        </div>
-        <nav>
-          {steps.map((s, i) => (
-            <button
-              type="button"
-              key={s[0]}
-              onClick={() => setStep(i)}
-              className={step === i ? "active" : ""}
-            >
-              <b>
-                {completion.complete[i] ? "✓" : String(i + 1).padStart(2, "0")}
-              </b>
-              <span>
-                <strong>{s[1]}</strong>
-                <small>{s[2]}</small>
-              </span>
-            </button>
-          ))}
-        </nav>
-        <section className="spxOutputs">
+    <div className="spxShell bcpCardLayout">
+      <BCPModuleNavigation moduleNumber={1} title="Site profile" percent={completion.percent} steps={steps.map(s => ({ label: s[1], hint: s[2] }))} checks={completion.complete} activeStep={step} onSelect={setStep}>
+
           <strong>Generated outputs</strong>
           <span className={completion.percent >= 29 ? "ready" : ""}>
             BIA scope
@@ -2845,8 +2814,8 @@ export default function BCPSiteProfileForm({
           <span className={completion.percent >= 86 ? "ready" : ""}>
             Draft continuity-plan scope
           </span>
-        </section>
-      </aside>
+        
+      </BCPModuleNavigation>
 
       <form
         ref={formRef}
