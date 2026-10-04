@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 
@@ -387,7 +388,7 @@ export default function BCPStrategiesSolutions({
       },
     ]);
   return (
-    <form action={formAction} className="bssShell">
+    <form action={formAction} className="bssShell bcpCardLayout">
       <style>{styles}</style>
       <style>{enhancementStyles}</style>
       {[
@@ -403,39 +404,15 @@ export default function BCPStrategiesSolutions({
       ].map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      <aside>
-        <div className="bssBrand">
-          RPG <span>Excellence</span>
-        </div>
-        <small>BCP MODULE 8</small>
-        <section>
-          <strong>{completion}%</strong>
-          <span>complete</span>
-          <i>
-            <b style={{ width: `${completion}%` }} />
-          </i>
-        </section>
-        <nav>
-          {steps.map((name, i) => (
-            <button
-              type="button"
-              key={name}
-              className={step === i ? "active" : ""}
-              onClick={() => setStep(i)}
-            >
-              <b>{checks[i] ? "✓" : i + 1}</b>
-              <span>{name}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="bssLive">
+      <BCPModuleNavigation moduleNumber={8} title="Strategies & solutions" percent={completion} steps={steps} checks={checks} activeStep={step} onSelect={setStep}>
+
           <b>DYNAMIC ENGINE</b>
           <span>{activities.length} priority activities</span>
           <span>{feasible} feasible solutions</span>
           <span>{activities.length - feasible} recovery gaps</span>
           <span>£{(capital + recurring).toLocaleString()} estimated cost</span>
-        </div>
-      </aside>
+        
+      </BCPModuleNavigation>
       <main>
         <header className="bssTop">
           <div>
