@@ -1,0 +1,5 @@
+import { PLAN_DOCUMENT_CSS } from "../lib/bcpPlanEngine";
+export default function BCPPlanDocument({ document: doc }) {
+  if (!doc?.sections) return <p>No saved document is available.</p>;
+  return <><style>{PLAN_DOCUMENT_CSS}</style><article className="bcpPlanDocument"><header><small>{doc.organisation} · {doc.site}</small><h1>{doc.title}</h1><div className="docMeta"><span>{doc.reference}</span><span>Version {doc.version}</span><span>{doc.status}</span><span>{doc.generatedAt}</span></div>{doc.status !== "approved" && <div className="documentNotice">DRAFT / REVIEW COPY — this plan has not been approved.</div>}</header>{doc.sections.map((section, i) => <section key={section.id}><h2>{i + 1}. {section.title}</h2>{section.blocks.filter((b) => b.body).map((block, j) => <div className="docBlock" key={j}><h3>{block.heading}</h3><p>{block.body}</p></div>)}</section>)}<footer>{doc.reference} · v{doc.version} · Controlled copies are maintained at the locations specified in this plan. Check the version before use.</footer></article></>;
+}
