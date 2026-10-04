@@ -1,9 +1,11 @@
+import PortalWorkspace from "../../components/PortalWorkspace";
+import "./portal-workspace.css";
 import PortalQuickNav from "./PortalQuickNav";
 
 export default function PortalLayout({ children }) {
   return (
     <>
-      {children}
+      <PortalWorkspace>{children}</PortalWorkspace>
       <PortalQuickNav />
       <style>{`
         .rpgQuickNav{
