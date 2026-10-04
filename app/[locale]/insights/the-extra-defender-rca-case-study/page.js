@@ -10,7 +10,6 @@ const title = "The Extra Defender: A Root Cause Analysis Case Study";
 const description =
   "A hypothetical football scenario illustrates how to distinguish a nonconformity from its causes, contain immediate risk, test corrective actions and verify effectiveness.";
 const url = `https://www.rpgexcellence.com/en/insights/${slug}`;
-const image = "/insights/stop-the-pass-rca-case-study.png";
 
 export const metadata = {
   title: `${title} | RPG Insights`,
@@ -21,7 +20,6 @@ export const metadata = {
     description,
     url,
     type: "article",
-    images: [{ url: image, alt: "Stop the pass: a football root cause analysis case study" }],
   },
 };
 
@@ -34,7 +32,6 @@ export default async function ExtraDefenderCaseStudy({ params }) {
     "@type": "Article",
     headline: title,
     description,
-    image: `https://www.rpgexcellence.com${image}`,
     datePublished: "2026-10-03",
     dateModified: "2026-10-03",
     mainEntityOfPage: url,
@@ -58,12 +55,51 @@ export default async function ExtraDefenderCaseStudy({ params }) {
           </p>
 
           <figure className="caseFigure">
-            <img
-              src={image}
-              alt="Diagram showing a pass from the right into a crowded penalty area, with the headline Stop the Pass"
-              width="1280"
-              height="1280"
-            />
+            <svg
+              viewBox="0 0 1280 720"
+              role="img"
+              aria-labelledby="caseDiagramTitle caseDiagramDescription"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <title id="caseDiagramTitle">Stop the pass</title>
+              <desc id="caseDiagramDescription">
+                A magenta passer on the right has a clear route to a receiver
+                near the penalty spot. Cyan defenders crowd the area around
+                the receiver while the route remains open.
+              </desc>
+              <defs>
+                <linearGradient id="casePitch" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stopColor="#06172f" />
+                  <stop offset="1" stopColor="#103b61" />
+                </linearGradient>
+                <marker id="caseArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 Z" fill="#ff398e" />
+                </marker>
+              </defs>
+              <rect width="1280" height="720" rx="22" fill="url(#casePitch)" />
+              <text x="68" y="105" fill="#fff" fontSize="64" fontWeight="900" letterSpacing="-2">STOP THE PASS</text>
+              <text x="72" y="145" fill="#93b8d2" fontSize="20" fontWeight="700" letterSpacing="4">A ROOT CAUSE ANALYSIS CASE STUDY</text>
+              <path d="M45 187 H1235 V670 H45 Z" fill="none" stroke="#b5d0e2" strokeWidth="3" opacity=".72" />
+              <path d="M355 187 V440 H925 V187 M480 187 V273 H800 V187" fill="none" stroke="#b5d0e2" strokeWidth="3" opacity=".72" />
+              <path d="M510 440 A130 130 0 0 0 770 440" fill="none" stroke="#b5d0e2" strokeWidth="3" opacity=".72" />
+              <path d="M540 188 V170 H740 V188" fill="none" stroke="#e7f4fb" strokeWidth="5" />
+              <circle cx="640" cy="365" r="5" fill="#b5d0e2" />
+              <g fill="#37c5ed" stroke="#b1edfa" strokeWidth="3">
+                <circle cx="420" cy="315" r="17" /><circle cx="525" cy="375" r="17" />
+                <circle cx="720" cy="385" r="17" /><circle cx="840" cy="305" r="17" />
+                <circle cx="465" cy="545" r="17" /><circle cx="630" cy="540" r="17" />
+                <circle cx="795" cy="540" r="17" /><circle cx="640" cy="232" r="17" />
+              </g>
+              <g fill="#ff398e" stroke="#ffb5d3" strokeWidth="3">
+                <circle cx="640" cy="345" r="20" />
+                <circle cx="1110" cy="560" r="22" />
+              </g>
+              <path d="M1080 540 C990 440 820 335 677 345" fill="none" stroke="#ff398e" strokeWidth="8" strokeLinecap="round" markerEnd="url(#caseArrow)" />
+              <path d="M1040 591 C970 600 930 574 887 530" fill="none" stroke="#41dcf3" strokeWidth="4" strokeDasharray="11 12" opacity=".9" />
+              <text x="1022" y="630" fill="#fff" fontSize="18" fontWeight="800">PASSER</text>
+              <text x="567" y="319" fill="#fff" fontSize="18" fontWeight="800">RECEIVER</text>
+              <text x="68" y="689" fill="#b7d2e7" fontSize="15" fontWeight="700" letterSpacing="3">RPG EXCELLENCE INSIGHTS</text>
+            </svg>
             <figcaption>
               A conceptual illustration of the passing route. The match and
               tactical decisions described below are hypothetical.
@@ -216,7 +252,7 @@ export default async function ExtraDefenderCaseStudy({ params }) {
         .simpleInner>.kicker{display:block}
         .caseLead{max-width:780px;color:#50647d;font-size:21px;line-height:1.65;margin:20px 0 28px}
         .caseFigure{width:100%;max-width:1280px;margin:0 auto 38px}
-        .caseFigure img{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 18px 42px #071a3d24}
+        .caseFigure svg{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 18px 42px #071a3d24}
         .caseFigure figcaption{color:#617087;font-size:13px;line-height:1.5;margin-top:10px;text-align:center}
         .caseBody{max-width:900px;margin:0 auto;padding:clamp(22px,4vw,42px);font-size:17px;line-height:1.8;color:#334c68}
         .caseBody h2{color:#09254b;font-size:clamp(24px,3vw,31px);line-height:1.2;margin:38px 0 14px}
