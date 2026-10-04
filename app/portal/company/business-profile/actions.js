@@ -9,7 +9,7 @@ export async function saveBusinessProfile(previousState, formData) {
   const text = key => typeof formData.get(key) === "string" ? formData.get(key).trim() : "";
   const name = text("name"), industry = text("industry"), country = text("country"), workforce = text("employees");
   if (!name) return { error: "Organisation name is required." };
-  if (name.length > 180 || industry.length > 160 || country.length > 100) return { error: "Use up to 180 characters for the organisation name, 160 for industry and 100 for country." };
+  if (name.length > 180 || industry.length > 2000 || country.length > 100) return { error: "Use up to 180 characters for the organisation name, 2000 for selected sectors and 100 for country." };
   const employees = workforce ? Number(workforce) : null;
   if (employees !== null && (!Number.isInteger(employees) || employees < 1 || employees > 2147483647)) return { error: "Number of employees must be a positive whole number." };
   const admin = createAdminClient();
