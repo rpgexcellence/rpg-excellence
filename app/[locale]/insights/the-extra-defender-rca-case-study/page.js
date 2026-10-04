@@ -254,7 +254,7 @@ export default async function ExtraDefenderCaseStudy({ params }) {
         .caseFigure{width:100%;max-width:1280px;margin:0 auto 38px}
         .caseFigure svg{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 18px 42px #071a3d24}
         .caseFigure figcaption{color:#617087;font-size:13px;line-height:1.5;margin-top:10px;text-align:center}
-        .caseBody{max-width:900px;margin:0 auto;padding:clamp(22px,4vw,42px);font-size:17px;line-height:1.8;color:#334c68}
+        .caseBody{box-sizing:border-box;width:100%;max-width:1280px;margin:0 auto;padding:clamp(24px,4vw,56px);font-size:17px;line-height:1.8;color:#334c68}
         .caseBody h2{color:#09254b;font-size:clamp(24px,3vw,31px);line-height:1.2;margin:38px 0 14px}
         .caseBody h2:first-child{margin-top:0}
         .caseBody p{margin:0 0 18px}
@@ -262,6 +262,7 @@ export default async function ExtraDefenderCaseStudy({ params }) {
         .caseLesson strong{display:block;color:#09254b;font-size:19px;margin-bottom:8px}
         .caseLesson p{margin:0}
         .caseActions{display:flex;flex-wrap:wrap;gap:12px;margin:28px 0}
+        .caseBody>h2,.caseBody>p,.caseBody>.caseLesson,.caseBody>.caseActions{max-width:1040px;margin-left:auto;margin-right:auto}
         .caseEnd{font-size:21px;font-weight:800;color:#09254b;margin-top:35px!important}
       `}</style>
     </PageShell>
