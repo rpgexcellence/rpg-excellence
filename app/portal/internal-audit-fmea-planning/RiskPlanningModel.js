@@ -29,7 +29,8 @@ function ScoreSelect({ value, onChange, label, name }) {
   return <label className="rpmField"><span>{label}</span><select name={name} value={value} onChange={(event) => onChange(Number(event.target.value))}>{SCALE.map((score) => <option value={score} key={score}>{score}</option>)}</select></label>;
 }
 
-export default function RiskPlanningModel({ saveAction, programmes = [] }) {
+export default function RiskPlanningModel({ saveAction, programmes = [], companyPeople = [] }) {
+  const [leadAuditorId, setLeadAuditorId] = useState("");
   const [programmeId, setProgrammeId] = useState(programmes[0]?.id || "");
   const [siteId, setSiteId] = useState("");
   const [consequences, setConsequences] = useState(Object.fromEntries(CONSEQUENCES.map(([key]) => [key, 1])));
@@ -96,12 +97,12 @@ export default function RiskPlanningModel({ saveAction, programmes = [] }) {
     <section className="rpmPanel">
       <div className="rpmHead"><div><small>LEAD-AUDITOR CONTROL · STEP 5</small><h2>Confirm professional judgement</h2><p>The score is decision support, not an automatic audit mandate. Any departure from the recommendation must remain explainable and traceable.</p></div></div>
       <div className="rpmBody rpmGrid2">
-        <label className="rpmField"><span>Lead auditor *</span><input name="lead_auditor" required placeholder="Name of administering lead auditor" /></label>
+        <label className="rpmField"><span>Lead auditor *</span><select name="lead_auditor_person_id" required value={leadAuditorId} disabled={!companyPeople.length} onChange={(event) => { setLeadAuditorId(event.target.value); setConfirmed(false); }}><option value="" disabled>{companyPeople.length ? "Select a company user" : "No active company users available"}</option>{companyPeople.map((person) => <option key={person.id} value={person.id}>{[person.name, person.position, person.email].filter(Boolean).join(" · ")}</option>)}</select><small>Linked to active users in <a href="/portal/company/people">People, Roles &amp; Access</a>.{!companyPeople.length && " Add or activate a company user, then refresh this page."}</small></label>
         <label className="rpmField"><span>Decision</span><select name="decision" defaultValue="accept"><option value="accept">Accept calculated recommendation</option><option value="increase">Increase audit priority/frequency</option><option value="decrease">Decrease audit priority/frequency</option></select></label>
         <label className="rpmField rpmWide"><span>Decision and override rationale *</span><textarea name="decision_rationale" required value={override} onChange={(event) => { setOverride(event.target.value); setConfirmed(false); }} placeholder="Explain the evidence, assumptions, uncertainty and why the selected audit timing provides appropriate assurance." /></label>
         <label className="rpmConfirm rpmWide"><input type="checkbox" name="lead_auditor_confirmation" value="confirmed" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>I confirm that the scoring is evidence-based, overlapping impacts have not been double-counted, and the audit frequency remains a lead-auditor decision.</span></label>
       </div>
-      <div className="rpmActions"><div style={{display:"flex",gap:9}}><button type="submit" className="rpmSave" disabled={!confirmed || !override.trim()}>Save Assessment</button><button type="button" className="rpmGhost" onClick={() => window.print()}>Print / Save PDF</button></div><span className={confirmed && override.trim() ? "rpmReady" : "rpmPending"}>{confirmed && override.trim() ? "Decision ready to record" : "Rationale and confirmation required"}</span></div>
+      <div className="rpmActions"><div style={{display:"flex",gap:9}}><button type="submit" className="rpmSave" disabled={!leadAuditorId || !confirmed || !override.trim()}>Save Assessment</button><button type="button" className="rpmGhost" onClick={() => window.print()}>Print / Save PDF</button></div><span className={leadAuditorId && confirmed && override.trim() ? "rpmReady" : "rpmPending"}>{leadAuditorId && confirmed && override.trim() ? "Decision ready to record" : "Company user, rationale and confirmation required"}</span></div>
     </section>
   </form>;
 }
