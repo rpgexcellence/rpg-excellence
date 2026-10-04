@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 const catalogue = {
@@ -925,7 +926,7 @@ export default function BCPHazardScenarioAssessment({
       })),
     );
   return (
-    <form ref={formRef} action={formAction} className="hz">
+    <form ref={formRef} action={formAction} className="hz bcpCardLayout">
       <style>{css}</style>
       <style>{iconCss}</style>
       <style>{heatCss}</style>
@@ -957,39 +958,8 @@ export default function BCPHazardScenarioAssessment({
           )}
         </div>
       )}
-      <aside>
-        <div className="brand">
-          RPG <span>Excellence</span>
-        </div>
-        <small>BCP MODULE 5</small>
-        <section>
-          <strong>{completion.percent}%</strong>
-          <span>complete</span>
-          <i>
-            <b style={{ width: `${completion.percent}%` }} />
-          </i>
-        </section>
-        <nav>
-          {steps.map((x, i) => (
-            <button
-              type="button"
-              className={`${step === i ? "active" : ""} ${completion.complete[i] ? "complete" : "incomplete"}`}
-              onClick={() => setStep(i)}
-              key={x}
-            >
-              <b>{completion.complete[i] ? "✓" : i + 1}</b>
-              <span>
-                <strong>{x}</strong>
-                <small>
-                  {completion.complete[i]
-                    ? "Complete"
-                    : `${completion.remaining[i]} requirement${completion.remaining[i] === 1 ? "" : "s"} remaining`}
-                </small>
-              </span>
-            </button>
-          ))}
-        </nav>
-        <div className="outputs">
+      <BCPModuleNavigation moduleNumber={5} title="Hazard scenarios" percent={completion.percent} steps={steps.map((label, i) => ({ label, hint: completion.complete[i] ? "Complete" : `${completion.remaining[i]} requirements remaining` }))} checks={completion.complete} activeStep={step} onSelect={setStep}>
+
           <b>Live engine</b>
           <span>{risks.length} scenarios selected</span>
           <span>
@@ -1003,8 +973,8 @@ export default function BCPHazardScenarioAssessment({
           <span>
             {risks.reduce((n, x) => n + x.actions.length, 0)} treatment actions
           </span>
-        </div>
-      </aside>
+        
+      </BCPModuleNavigation>
       <main>
         <header>
           <div>
