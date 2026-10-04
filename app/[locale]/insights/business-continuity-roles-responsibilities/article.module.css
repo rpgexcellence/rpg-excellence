@@ -1,0 +1,10 @@
+.article :global(.hsArticle.wideArticle > article) { max-width: 1280px; min-width: 0; }
+.article :global(.hsArticle.wideArticle .articleBody) { max-width: 1280px; width: 100%; }
+.article :global(.hsArticle .hero) { height: auto; aspect-ratio: auto; object-fit: contain; }
+.article :global(.hsArticle .implementationRoadmap) { margin: 38px 0 !important; }
+.article :global(.hsArticle.fullWidthFigures .articleFigure) { width: 100%; margin: 32px 0 8px; transform: none; }
+.article :global(.hsArticle .cta) { max-width: 100%; box-sizing: border-box; white-space: normal; }
+@media (max-width: 600px) {
+  .article :global(.hsArticle h1) { font-size: clamp(32px, 8vw, 44px); overflow-wrap: break-word; }
+  .article :global(.hsArticle .decision) { padding: 22px 18px; }
+}
