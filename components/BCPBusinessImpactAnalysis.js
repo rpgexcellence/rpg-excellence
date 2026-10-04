@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 
 import { useActionState, useMemo, useState } from "react";
 
@@ -1089,7 +1090,7 @@ export default function BCPBusinessImpactAnalysis({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   return (
-    <form action={formAction} className="biaShell">
+    <form action={formAction} className="biaShell bcpCardLayout">
       <style>{styles}</style>
       <style>{activityEditStyles}</style>
       <style>{ownerStyles}</style>
@@ -1114,32 +1115,8 @@ export default function BCPBusinessImpactAnalysis({
           <span>{formState.error}</span>
         </div>
       )}
-      <aside>
-        <div className="biaBrand">
-          RPG <span>Excellence</span>
-        </div>
-        <small>BCP MODULE 6</small>
-        <section>
-          <strong>{completion}%</strong>
-          <span>complete</span>
-          <i>
-            <b style={{ width: `${completion}%` }} />
-          </i>
-        </section>
-        <nav>
-          {steps.map((name, i) => (
-            <button
-              type="button"
-              key={name}
-              className={step === i ? "active" : ""}
-              onClick={() => go(i)}
-            >
-              <b>{checks[i] ? "✓" : i + 1}</b>
-              <span>{name}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="biaLive">
+      <BCPModuleNavigation moduleNumber={6} title="Business impact analysis" percent={completion} steps={steps} checks={checks} activeStep={step} onSelect={go}>
+
           <b>LIVE ENGINE</b>
           <span>{included.length} activities in scope</span>
           <span>
@@ -1148,8 +1125,8 @@ export default function BCPBusinessImpactAnalysis({
           <span>
             {derived.filter((x) => x.rto <= 24).length} same-day priorities
           </span>
-        </div>
-      </aside>
+        
+      </BCPModuleNavigation>
       <main>
         <header className="biaTop">
           <div>
