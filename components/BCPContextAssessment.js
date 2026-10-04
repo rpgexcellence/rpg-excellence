@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 import { useActionState, useMemo, useState } from "react";
 
 const steps = [
@@ -2428,7 +2429,7 @@ export default function BCPContextAssessment({
   return (
     <form
       action={formAction}
-      className="ctxShell"
+      className="ctxShell bcpCardLayout"
       encType="multipart/form-data"
     >
       <style>{styles}</style>
@@ -2462,34 +2463,8 @@ export default function BCPContextAssessment({
           <span>{formState.error}</span>
         </div>
       )}
-      <aside className="ctxSide">
-        <div className="ctxBrand">
-          RPG <span>Excellence</span>
-        </div>
-        <small>BCP MODULE 3</small>
-        <div className="ctxProgress">
-          <strong>{completion}%</strong>
-          <span>complete</span>
-          <i>
-            <b style={{ width: `${completion}%` }} />
-          </i>
-        </div>
-        <nav>
-          {steps.map((x, i) => (
-            <button
-              type="button"
-              key={x[0]}
-              className={i === step ? "active" : ""}
-              onClick={() => go(i)}
-            >
-              <b>{completionChecks[i] ? "✓" : i + 1}</b>
-              <span>
-                <strong>{x[0]}</strong>
-              </span>
-            </button>
-          ))}
-        </nav>
-        <div className="ctxOutputs">
+      <BCPModuleNavigation moduleNumber={3} title="Context assessment" percent={completion} steps={steps.map(s => ({ label: s[0], hint: s[1] }))} checks={completionChecks} activeStep={step} onSelect={go}>
+
           <strong>Controlled outputs</strong>
           <span className={priorities.length ? "ready" : ""}>
             Context priority register
@@ -2515,8 +2490,8 @@ export default function BCPContextAssessment({
           <span className={scope.statement ? "ready" : ""}>
             BCMS scope statement
           </span>
-        </div>
-      </aside>
+        
+      </BCPModuleNavigation>
       <main className="ctxMain">
         <header className="ctxTop">
           <div>
