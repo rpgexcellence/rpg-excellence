@@ -11,6 +11,7 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 const tools = [
+  { group: "Company", title: "Business Profile", description: "View and update the organisation name, industry, country and workforce entered during initial setup.", href: "/portal/company/business-profile", code: "ORG" },
   {
     group: "Diagnostics",
     title: "Training launch readiness",
