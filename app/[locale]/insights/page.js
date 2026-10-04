@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      "number": "022",
+      "title": "When Disruption Hits, Who Has the Authority to Act?",
+      "description": "RPG Excellence Business Continuity Module 4 connects process ownership, responsibilities, authority, deputies and a controlled RACI to support decisions during disruption.",
+      "href": "business-continuity-roles-responsibilities"
+},
+    {
       number: "021",
       title: "The Extra Defender: A Root Cause Analysis Case Study",
       description: "A hypothetical football scenario shows how containment, evidence-led causal analysis, corrective action and effectiveness checks work together.",
