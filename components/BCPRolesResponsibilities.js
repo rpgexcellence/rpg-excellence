@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 import { useActionState, useEffect, useMemo, useState } from "react";
 
 const uid = () => crypto.randomUUID();
@@ -970,7 +971,7 @@ export default function BCPRolesResponsibilities({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   return (
-    <form action={formAction} className="r4Shell">
+    <form action={formAction} className="r4Shell bcpCardLayout">
       <style>{styles}</style>
       <style>{peopleStyles}</style>
       <style>{assignmentStatusStyles}</style>
@@ -999,32 +1000,8 @@ export default function BCPRolesResponsibilities({
           )}
         </div>
       )}
-      <aside>
-        <div className="r4Brand">
-          RPG <span>Excellence</span>
-        </div>
-        <small>BCP MODULE 4</small>
-        <section>
-          <strong>{completion}%</strong>
-          <span>complete</span>
-          <i>
-            <b style={{ width: `${completion}%` }} />
-          </i>
-        </section>
-        <nav>
-          {steps.map((name, index) => (
-            <button
-              type="button"
-              className={step === index ? "active" : ""}
-              onClick={() => go(index)}
-              key={name}
-            >
-              <b>{completionChecks[index] ? "✓" : index + 1}</b>
-              <span>{name}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="r4Outputs">
+      <BCPModuleNavigation moduleNumber={4} title="Roles & responsibilities" percent={completion} steps={steps} checks={completionChecks} activeStep={step} onSelect={go}>
+
           <b>Controlled outputs</b>
           <span className={assignments.length ? "ready" : ""}>
             Responsibility assignments
@@ -1035,8 +1012,8 @@ export default function BCPRolesResponsibilities({
           <span className={!gaps.length ? "ready" : ""}>
             Assignment assurance
           </span>
-        </div>
-      </aside>
+        
+      </BCPModuleNavigation>
       <main>
         <header className="r4Top">
           <div>
