@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
+import { loadFmeaCompanyPeople } from "../../../lib/fmeaCompanyPeople";
 import RiskPlanningModel from "./RiskPlanningModel";
 import { saveFmeaPlanningAssessment } from "./actions";
 
@@ -12,10 +13,11 @@ export default async function FmeaRiskPlanningPage({ searchParams }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/internal-audit-fmea-planning");
 
-  const [programmesResult, sitesResult, programmeStandardsResult] = await Promise.all([
+  const [programmesResult, sitesResult, programmeStandardsResult, companyPeople] = await Promise.all([
     supabase.from("internal_audit_programmes").select("id,programme_reference,title,status").eq("owner_id", user.id).order("created_at", { ascending: false }),
     supabase.from("internal_audit_programme_sites").select("id,programme_id,site_code,site_name").eq("owner_id", user.id).eq("active", true).order("site_name"),
     supabase.from("internal_audit_programme_standards").select("programme_id,standard_id,internal_audit_standard_catalogue(standard_code,display_name)").eq("owner_id", user.id),
+    loadFmeaCompanyPeople(supabase, user.id),
   ]);
   for (const result of [programmesResult, sitesResult, programmeStandardsResult]) if (result.error) throw new Error(result.error.message);
   const programmes = (programmesResult.data || []).map((programme) => ({
@@ -34,7 +36,7 @@ export default async function FmeaRiskPlanningPage({ searchParams }) {
   {params?.saved && <div className="rpmSaved">Assessment {params.saved} saved as a controlled RPG Excellence record.</div>}
   <section className="rpmHero"><div><span>CONTROLLED DECISION SUPPORT</span><h2>Score the evidence—not the auditor’s instinct.</h2><p>This model helps the administering lead auditor establish consistent audit priority and frequency. It preserves professional judgement while making the evidence, assumptions, calculation and any override transparent.</p></div><div className="rpmHeroNote"><strong>Consequence × Likelihood × Detectability</strong><small>Plus controlled, evidence-based planning modifiers.</small></div></section>
   <section className="rpmGuidance"><article className="rpmGuide"><h3>What FMEA means here</h3><p>A structured planning technique used to consider how a process could fail, the credible effects, how likely failure is and whether existing controls would detect it.</p></article><article className="rpmGuide"><h3>What it does not do</h3><p>It does not replace the lead auditor, prescribe certification outcomes or prove conformity. It produces a transparent planning recommendation.</p></article><article className="rpmGuide"><h3>Evidence hierarchy</h3><ul><li>Legal and certification obligations</li><li>Incidents, findings and complaints</li><li>Performance trends and changes</li><li>Documented control assurance</li></ul></article></section>
-  <RiskPlanningModel saveAction={saveFmeaPlanningAssessment} programmes={programmes} />
+  <RiskPlanningModel saveAction={saveFmeaPlanningAssessment} programmes={programmes} companyPeople={companyPeople} />
   <div className="rpmDisclaimer"><strong>Governance statement:</strong> This is an RPG audit-programme planning method informed by risk-based auditing and risk-assessment principles. It is not a mandatory ISO formula. External challenge remains possible; defensibility comes from consistent definitions, competent judgement, objective evidence, documented overrides and periodic review of the methodology.</div>
   </div></div></main>;
 }
