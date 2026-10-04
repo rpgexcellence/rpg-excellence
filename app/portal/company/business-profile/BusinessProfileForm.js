@@ -1,4 +1,5 @@
 "use client";
+import { BUSINESS_DETAIL_FIELDS, VAT_STATUSES } from "../../../../lib/businessProfileDetails";
 import { useActionState, useState } from "react";
 import { BUSINESS_INDUSTRIES, BUSINESS_COUNTRIES, businessCountryValue, businessIndustrySelection, businessIndustryValue } from "../../../../lib/businessProfileOptions";
 export default function BusinessProfileForm({ action, organization, workforceCount = null }) {
@@ -7,15 +8,23 @@ export default function BusinessProfileForm({ action, organization, workforceCou
   const [industries, setIndustries] = useState(initialIndustry.selected);
   const [otherSelected, setOtherSelected] = useState(Boolean(initialIndustry.custom));
   const [customIndustry, setCustomIndustry] = useState(initialIndustry.custom);
-  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country) });
+  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country), ...Object.fromEntries(BUSINESS_DETAIL_FIELDS.map(item => [item.key, organization[item.key] || ""])), vat_registration_status: organization.vat_registration_status || (organization.vat_number ? "registered" : "not_recorded") });
   const [edited, setEdited] = useState(false);
   const field = key => ({ name:key, value:values[key], onChange:event => {setValues(old => ({...old, [key]:event.target.value}));setEdited(true);} });
+  const detailInput = (key, required = false) => {
+    const item = BUSINESS_DETAIL_FIELDS.find(field => field.key === key);
+    return <label key={key}><span>{item.label}{required ? " *" : ""}</span><input {...field(key)} type={item.type || "text"} maxLength={item.max} autoComplete={item.autocomplete} required={required} placeholder={key === "website" ? "https://www.example.com" : undefined} /></label>;
+  };
   return <form action={formAction} onSubmit={() => setEdited(false)} className="bpForm">
-    <header><small>INITIAL BUSINESS SETUP</small><h2>Your business details</h2><p>Review and update the information entered when you created your RPG workspace.</p></header>
+    <header><small>COMPANY MASTER RECORD</small><h2>Your business details</h2><p>Maintain your business identity, sectors, registration, address and contact details.</p></header>
     {state?.error && <div className="bpMessage error" role="alert">{state.error}</div>}
     {!edited && state?.success && <div className="bpMessage success" role="status">{state.success}</div>}
     <div className="bpFields">
-      <label className="wide"><span>Organisation name *</span><input {...field("name")} required maxLength={180} autoComplete="organization" /></label>
+      <label className="wide"><span>Legal organisation name *</span><input {...field("name")} required maxLength={180} autoComplete="organization" /></label>
+      <div className="bpSectionTitle wide"><h3>Company registration &amp; tax</h3><p>Complete the details that apply to your business. Sole traders can leave the company registration number blank.</p></div>
+      {detailInput("trading_name")}{detailInput("company_registration_number")}{detailInput("registration_authority")}
+      <label><span>VAT registration status</span><select {...field("vat_registration_status")}>{VAT_STATUSES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      {values.vat_registration_status === "registered" && detailInput("vat_number", true)}
       <fieldset className="bpIndustries wide"><legend>Industries / sectors</legend><p>Select every sector that applies to your business.</p>
         <input type="hidden" name="industry" value={businessIndustryValue(industries, otherSelected ? customIndustry : "")} />
         <div className="bpSectorGrid">{[...BUSINESS_INDUSTRIES, "Other"].map((industry, index) => {
@@ -28,7 +37,11 @@ export default function BusinessProfileForm({ action, organization, workforceCou
         <p className="bpSectorSummary" role="status">{industries.length + (otherSelected ? 1 : 0)} sectors selected{industries.length ? ` · ${industries.join(" · ")}` : ""}{otherSelected && customIndustry.trim() ? ` · ${customIndustry.trim()}` : ""}</p>
         {otherSelected && <label className="bpOtherIndustry"><span>Other sector(s) *</span><input aria-label="Other industries" value={customIndustry} onChange={event => {setCustomIndustry(event.target.value);setEdited(true);}} required pattern={".*\\S.*"} maxLength={160} placeholder="Enter your additional sector(s)" /></label>}
       </fieldset>
+      <div className="bpSectionTitle wide"><h3>Registered business address</h3><p>Use your legal registered address or principal business address.</p></div>
+      {detailInput("address_line_1")}{detailInput("address_line_2")}{detailInput("city")}{detailInput("region")}{detailInput("postal_code")}
       <label><span>Country</span><select {...field("country")} autoComplete="country-name"><option value="">Select country</option>{values.country && !BUSINESS_COUNTRIES.some(country => country.name === values.country) && <option value={values.country}>{values.country} — previously saved</option>}{BUSINESS_COUNTRIES.map(country => <option key={country.code} value={country.name}>{country.name}</option>)}</select></label>
+      <div className="bpSectionTitle wide"><h3>Business contact details</h3><p>Company contact information for your organisation profile.</p></div>
+      {detailInput("business_email")}{detailInput("business_phone")}{detailInput("website")}
       <label><span>Workforce — automatic count</span><input value={workforceCount === null ? "Unavailable" : workforceCount} readOnly aria-describedby="bpWorkforceHelp" /><small id="bpWorkforceHelp">Counts all people in your company register, including invited, suspended and directory records. Updates when this page opens. Manage people under <a href="/portal/company/people">People, Roles &amp; Access</a>.</small></label>
     </div>
     <footer><span>Updates apply to your company workspace.</span><button type="submit" disabled={pending}>{pending ? "Saving…" : "Save business profile"}</button></footer>
