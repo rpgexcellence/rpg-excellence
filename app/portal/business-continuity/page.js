@@ -87,7 +87,8 @@ function PortalSidebar() {
             <Link href="/portal/business-continuity/incident-management">
               Incident Management
             </Link>
-            <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
+            <Link href="/portal/business-continuity/plans">BCP Plan</Link>
+          <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
               ISO 22301 Assessment
             </Link>
           </div>
@@ -172,7 +173,8 @@ export default async function BCPHub() {
     bias = [],
     outsourced = [],
     strategies = [],
-    incidents = [];
+    incidents = [],
+    plans = [];
   if (org) {
     ({ data: profiles = [] } = await s
       .from("bcp_site_profiles")
@@ -244,6 +246,8 @@ export default async function BCPHub() {
       .neq("status", "archived")
       .order("updated_at", { ascending: false });
     incidents = incidentsResult.data || [];
+    const plansResult = await s.from("bcp_plans").select("id,plan_reference,plan_title,status,version,completion_percent,next_review_date,updated_at").eq("organization_id",org.id).order("updated_at",{ascending:false});
+    plans = plansResult.data || [];
   }
   const done = training?.filter((x) => x.status === "complete").length || 0;
   const liveRisks = hazards.flatMap((x) =>
@@ -494,6 +498,10 @@ export default async function BCPHub() {
                 : "Start incident-management assessment →"}
             </strong>
           </Link>
+          <Link href={plans?.[0]?.id ? `/portal/business-continuity/plans?id=${plans[0].id}` : "/portal/business-continuity/plans?new=1"}>
+            <ProgressStatus record={plans?.[0]}/><small>MODULE 10 · CLAUSES 8.4.4–8.4.5</small>
+            <h2>Business Continuity Plan</h2><p>Build a controlled, printable plan with priority activity recovery procedures, site hazard activation, resources, contacts and handback arrangements.</p><strong>{plans?.length ? "Continue latest plan →" : "Create your BCP Plan →"}</strong>
+          </Link>
           <Link href="/portal?standard=ISO%2022301%3A2019#new-assessment">
             <small>ISO 22301</small>
             <h2>Gap Analysis</h2>
@@ -680,6 +688,7 @@ export default async function BCPHub() {
             </div>
           )}
         </section>
+        <section className="register"><header><div><h2>Module 10 BCP Plan Register</h2><p>Open a controlled plan or create one for another site.</p></div><Link className="registerAdd" href="/portal/business-continuity/plans?new=1">+ New BCP Plan</Link></header>{plans.length ? plans.map((p)=><Link key={p.id} href={`/portal/business-continuity/plans?id=${p.id}`}><div><strong>{p.plan_title}</strong><small>{p.plan_reference} · Version {p.version} · Review {p.next_review_date || "not set"}</small></div><ProgressStatus record={p}/></Link>) : <div className="registerEmpty">No Module 10 plans yet. Create a plan using the selected site’s linked recovery arrangements.</div>}</section>
       </div>
     </main>
   );
