@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
@@ -257,18 +258,14 @@ export default function BCPIncidentManagement({ action, profiles = [], contexts 
     </article>;
   };
   const savedId = formState.savedId || initial?.id || "";
-  return <form ref={formRef} action={formAction} className="im">
+  return <form ref={formRef} action={formAction} className="im bcpCardLayout">
     <input type="hidden" name="assessment_id" value={savedId} />
     <input type="hidden" name="next_step" value={Math.min(5, step + 1)} />
     {Object.entries(sources).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
     {Object.entries({ assessment_title: title, review_frequency: frequency, next_review_date: date, approver_person_id: approver, review_comment: comment, response_teams: JSON.stringify(teams), activation_thresholds: JSON.stringify(thresholds), warning_communications: JSON.stringify(communications), incident_action_plan: JSON.stringify(actions), recovery_stand_down: JSON.stringify(recovery) }).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
-    <aside>
-      <div className="brand">RPG <span>Excellence</span></div>
-      <small>BCP MODULE 9</small>
-      <div className="completion"><strong>{percent}%</strong><span>complete</span><div className="completionTrack"><i style={{ width: `${percent}%` }} /></div></div>
-      <nav aria-label="Incident management steps">{steps.map((label, index) => <button key={label} type="button" className={step === index ? "active" : ""} aria-current={step === index ? "step" : undefined} onClick={() => setStep(index)}><b>{checks[index] ? "✓" : index + 1}</b><span>{label}</span></button>)}</nav>
-      <div className="outputs"><b>Controlled outputs</b><span className={teams.length ? "ready" : ""}>Response structure · {teams.length} teams</span><span className={thresholds.length ? "ready" : ""}>Activation register · {thresholds.length} scenarios</span><span className={communications.length ? "ready" : ""}>Warning & communication controls</span><span className={actions.length ? "ready" : ""}>Incident Action Plan · {actions.filter((row) => row.status !== "closed").length} open actions</span><span className={checks[5] ? "ready" : ""}>Recovery & stand-down controls</span></div>
-    </aside>
+    <BCPModuleNavigation moduleNumber={9} title="Incident management" percent={percent} steps={steps} checks={checks} activeStep={step} onSelect={setStep}>
+<b>Controlled outputs</b><span className={teams.length ? "ready" : ""}>Response structure · {teams.length} teams</span><span className={thresholds.length ? "ready" : ""}>Activation register · {thresholds.length} scenarios</span><span className={communications.length ? "ready" : ""}>Warning & communication controls</span><span className={actions.length ? "ready" : ""}>Incident Action Plan · {actions.filter((row) => row.status !== "closed").length} open actions</span><span className={checks[5] ? "ready" : ""}>Recovery & stand-down controls</span>
+      </BCPModuleNavigation>
     <section className="workspace"><header className="stepHeader"><div><small>STEP {step + 1} OF 6 · ISO 22301 CLAUSE 8.4</small><h2>{steps[step]}</h2><p>Connect assessed disruptions to the people, decisions and procedures needed to respond and recover.</p></div><b className={`recordStatus ${initial?.status === "approved" ? "approved" : ""}`}>{initial?.status?.replaceAll("_", " ") || "draft"}</b></header><div className="stepDivider" />
       {formState.error && <div className="error" role="alert">{formState.error}</div>}
       <div className="content" key={renderRevision}>
