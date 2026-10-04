@@ -28,16 +28,31 @@ function quarterKey(date = new Date()) {
 export async function createAuditor(formData) {
   const { supabase, user } = await context();
   const organizationId = clean(formData.get("organization_id"));
-  const fullName = clean(formData.get("full_name"));
-  const email = clean(formData.get("email"));
+  const personId = clean(formData.get("company_person_id"));
   const standardIds = [...new Set(formData.getAll("standard_ids").filter(Boolean))];
-  if (!organizationId || !fullName || !validEmail(email)) throw new Error("Organisation, auditor name and a valid email are required.");
+  if (!organizationId || !personId) throw new Error("Select a company user. If none exists, add or activate a user under Administration → People, Roles & Access.");
   if (!standardIds.length) throw new Error("Select at least one standard competence scope.");
+  const { data: organization, error: organizationError } = await supabase.from("organizations")
+    .select("id").eq("id", organizationId).eq("owner_id", user.id).maybeSingle();
+  if (organizationError) throw new Error(organizationError.message);
+  if (!organization) throw new Error("The selected organisation is not available to this account.");
+  const { data: person, error: personError } = await supabase.from("organization_people")
+    .select("id,first_name,last_name,email,position,employee_reference")
+    .eq("id", personId).eq("organization_id", organizationId).eq("account_status", "active").maybeSingle();
+  if (personError) throw new Error(personError.message);
+  if (!person) throw new Error("This company user is no longer active or does not belong to the selected organisation. Add or activate the user under Administration → People, Roles & Access.");
+  const fullName = [person.first_name, person.last_name].filter(Boolean).join(" ").trim();
+  const email = clean(person.email);
+  if (!fullName || !validEmail(email)) throw new Error("Update the user's name and email under Administration → People, Roles & Access before adding the auditor.");
+  const { data: duplicate, error: duplicateError } = await supabase.from("internal_auditor_register")
+    .select("id").eq("owner_id", user.id).eq("organization_id", organizationId).ilike("email", email.replace(/[\\%_]/g, "\\$&")).limit(1).maybeSingle();
+  if (duplicateError) throw new Error(duplicateError.message);
+  if (duplicate) throw new Error("This company user is already in the auditor register. Use their existing auditor record.");
 
   const { data: auditor, error } = await supabase.from("internal_auditor_register").insert({
     owner_id: user.id, organization_id: organizationId, auditor_reference: reference("AUD"),
-    full_name: fullName, email, employee_reference: clean(formData.get("employee_reference")),
-    job_title: clean(formData.get("job_title")), sector_competence: clean(formData.get("sector_competence")),
+    full_name: fullName, email, employee_reference: clean(person.employee_reference),
+    job_title: clean(person.position), sector_competence: clean(formData.get("sector_competence")),
     technical_competence: clean(formData.get("technical_competence")), audit_training: clean(formData.get("audit_training")),
     audit_experience: clean(formData.get("audit_experience")), verification_status: "pending",
   }).select("id").single();
