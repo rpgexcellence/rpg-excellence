@@ -1,4 +1,5 @@
 "use client";
+import BCPModuleNavigation from "./BCPModuleNavigation";
 
  
 
@@ -1595,7 +1596,7 @@ export default function BCPOutsourcedProcessControl({
 
   return (
 
-    <form action={formAction} className="opcShell">
+    <form action={formAction} className="opcShell bcpCardLayout">
 
       <style>{styles}</style>
 
@@ -1635,57 +1636,8 @@ export default function BCPOutsourcedProcessControl({
 
       )}
 
-      <aside>
+      <BCPModuleNavigation moduleNumber={7} title="Outsourced process control" percent={completion} steps={steps} checks={completionChecks} activeStep={step} onSelect={go}>
 
-        <div className="opcBrand">
-
-          RPG <span>Excellence</span>
-
-        </div>
-
-        <small>BCP MODULE 7</small>
-
-        <section>
-
-          <strong>{completion}%</strong>
-
-          <span>complete</span>
-
-          <i>
-
-            <b style={{ width: `${completion}%` }} />
-
-          </i>
-
-        </section>
-
-        <nav>
-
-          {steps.map((name, i) => (
-
-            <button
-
-              type="button"
-
-              key={name}
-
-              className={step === i ? "active" : ""}
-
-              onClick={() => go(i)}
-
-            >
-
-              <b>{completionChecks[i] ? "✓" : i + 1}</b>
-
-              <span>{name}</span>
-
-            </button>
-
-          ))}
-
-        </nav>
-
-        <div className="opcLive">
 
           <b>DYNAMIC ENGINE</b>
 
@@ -1711,9 +1663,8 @@ export default function BCPOutsourcedProcessControl({
 
           </span>
 
-        </div>
-
-      </aside>
+        
+      </BCPModuleNavigation>
 
       <main>
 
