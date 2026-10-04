@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import HsInsightArticle from "../../../../components/HsInsightArticle";
 import { locales } from "../../../../lib/i18n";
-import styles from "./article.module.css";
 
 export const metadata = {
   "title": "When Disruption Hits, Who Has the Authority to Act? | RPG Excellence",
@@ -155,5 +154,21 @@ const article = {
 export default async function Page({ params }) {
   const { locale } = await params;
   if (!locales.includes(locale)) notFound();
-  return <div className={styles.article}><HsInsightArticle locale={locale} article={article} /></div>;
+  return (
+    <div className="rpgRolesInsight">
+      <HsInsightArticle locale={locale} article={article} />
+      <style>{`
+.rpgRolesInsight .hsArticle.wideArticle > article { max-width: 1280px; min-width: 0; }
+.rpgRolesInsight .hsArticle.wideArticle .articleBody { max-width: 1280px; width: 100%; }
+.rpgRolesInsight .hsArticle .hero { height: auto; aspect-ratio: auto; object-fit: contain; }
+.rpgRolesInsight .hsArticle .implementationRoadmap { margin: 38px 0 !important; }
+.rpgRolesInsight .hsArticle.fullWidthFigures .articleFigure { width: 100%; margin: 32px 0 8px; transform: none; }
+.rpgRolesInsight .hsArticle .cta { max-width: 100%; box-sizing: border-box; white-space: normal; }
+@media (max-width: 600px) {
+  .rpgRolesInsight .hsArticle h1 { font-size: clamp(32px, 8vw, 44px); overflow-wrap: break-word; }
+  .rpgRolesInsight .hsArticle .decision { padding: 22px 18px; }
+}
+      `}</style>
+    </div>
+  );
 }
