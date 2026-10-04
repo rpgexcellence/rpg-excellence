@@ -1,13 +1,13 @@
 "use client";
 import { useActionState, useState } from "react";
 import { BUSINESS_INDUSTRIES, BUSINESS_COUNTRIES, businessCountryValue, businessIndustrySelection, businessIndustryValue } from "../../../../lib/businessProfileOptions";
-export default function BusinessProfileForm({ action, organization }) {
+export default function BusinessProfileForm({ action, organization, workforceCount = null }) {
   const [state, formAction, pending] = useActionState(action, null);
   const initialIndustry = businessIndustrySelection(organization.industry);
   const [industries, setIndustries] = useState(initialIndustry.selected);
   const [otherSelected, setOtherSelected] = useState(Boolean(initialIndustry.custom));
   const [customIndustry, setCustomIndustry] = useState(initialIndustry.custom);
-  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country), employees: organization.employees ?? "" });
+  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country) });
   const [edited, setEdited] = useState(false);
   const field = key => ({ name:key, value:values[key], onChange:event => {setValues(old => ({...old, [key]:event.target.value}));setEdited(true);} });
   return <form action={formAction} onSubmit={() => setEdited(false)} className="bpForm">
@@ -29,7 +29,7 @@ export default function BusinessProfileForm({ action, organization }) {
         {otherSelected && <label className="bpOtherIndustry"><span>Other sector(s) *</span><input aria-label="Other industries" value={customIndustry} onChange={event => {setCustomIndustry(event.target.value);setEdited(true);}} required pattern={".*\\S.*"} maxLength={160} placeholder="Enter your additional sector(s)" /></label>}
       </fieldset>
       <label><span>Country</span><select {...field("country")} autoComplete="country-name"><option value="">Select country</option>{values.country && !BUSINESS_COUNTRIES.some(country => country.name === values.country) && <option value={values.country}>{values.country} — previously saved</option>}{BUSINESS_COUNTRIES.map(country => <option key={country.code} value={country.name}>{country.name}</option>)}</select></label>
-      <label><span>Number of employees</span><input {...field("employees")} type="number" min="1" max="2147483647" step="1" inputMode="numeric" /><small>Approximate workforce size. Leave blank if not recorded.</small></label>
+      <label><span>Workforce — automatic count</span><input value={workforceCount === null ? "Unavailable" : workforceCount} readOnly aria-describedby="bpWorkforceHelp" /><small id="bpWorkforceHelp">Counts all people in your company register, including invited, suspended and directory records. Updates when this page opens. Manage people under <a href="/portal/company/people">People, Roles &amp; Access</a>.</small></label>
     </div>
     <footer><span>Updates apply to your company workspace.</span><button type="submit" disabled={pending}>{pending ? "Saving…" : "Save business profile"}</button></footer>
   </form>;
