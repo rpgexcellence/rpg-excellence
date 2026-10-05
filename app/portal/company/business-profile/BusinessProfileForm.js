@@ -1,6 +1,6 @@
 "use client";
-import { BUSINESS_DETAIL_FIELDS, VAT_STATUSES } from "../../../../lib/businessProfileDetails";
-import { useActionState, useState } from "react";
+import { BUSINESS_DETAIL_FIELDS, VAT_STATUSES, BUSINESS_SITE_FIELDS, MAX_ADDITIONAL_BUSINESS_SITES } from "../../../../lib/businessProfileDetails";
+import { useActionState, useState, startTransition } from "react";
 import { BUSINESS_INDUSTRIES, BUSINESS_COUNTRIES, businessCountryValue, businessIndustrySelection, businessIndustryValue } from "../../../../lib/businessProfileOptions";
 export default function BusinessProfileForm({ action, organization, workforceCount = null }) {
   const [state, formAction, pending] = useActionState(action, null);
@@ -8,14 +8,24 @@ export default function BusinessProfileForm({ action, organization, workforceCou
   const [industries, setIndustries] = useState(initialIndustry.selected);
   const [otherSelected, setOtherSelected] = useState(Boolean(initialIndustry.custom));
   const [customIndustry, setCustomIndustry] = useState(initialIndustry.custom);
-  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country), ...Object.fromEntries(BUSINESS_DETAIL_FIELDS.map(item => [item.key, organization[item.key] || ""])), vat_registration_status: organization.vat_registration_status || (organization.vat_number ? "registered" : "not_recorded") });
+  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country), ...Object.fromEntries(BUSINESS_DETAIL_FIELDS.map(item => [item.key, organization[item.key] || ""])), powra_reference_prefix: organization.powra_reference_prefix || "POWRA", powra_reference_padding: organization.powra_reference_padding || 0, vat_registration_status: organization.vat_registration_status || (organization.vat_number ? "registered" : "not_recorded") });
+  const [siteMode, setSiteMode] = useState(organization.business_site_mode === "multiple" ? "multiple" : "single");
+  const [sites, setSites] = useState(() => Array.isArray(organization.business_additional_sites) ? organization.business_additional_sites.map((site, index) => ({...site, uiId: `saved-${index}`})) : []);
+  const emptySite = () => ({...Object.fromEntries(BUSINESS_SITE_FIELDS.map(field => [field.key, ""])), uiId: crypto.randomUUID()});
   const [edited, setEdited] = useState(false);
+  const changeSiteMode = mode => {
+    setSiteMode(mode);
+    if (mode === "multiple" && !sites.length) setSites([emptySite()]);
+    setEdited(true);
+  };
+  const updateSite = (id, key, value) => {setSites(old => old.map(site => site.uiId === id ? {...site, [key]: value} : site));setEdited(true);};
+  const countryOptions = value => <><option value="">Select country</option>{value && !BUSINESS_COUNTRIES.some(country => country.name === value) && <option value={value}>{value} — previously saved</option>}{BUSINESS_COUNTRIES.map(country => <option key={country.code} value={country.name}>{country.name}</option>)}</>;
   const field = key => ({ name:key, value:values[key], onChange:event => {setValues(old => ({...old, [key]:event.target.value}));setEdited(true);} });
   const detailInput = (key, required = false) => {
     const item = BUSINESS_DETAIL_FIELDS.find(field => field.key === key);
     return <label key={key}><span>{item.label}{required ? " *" : ""}</span><input {...field(key)} type={item.type || "text"} maxLength={item.max} autoComplete={item.autocomplete} required={required} placeholder={key === "website" ? "https://www.example.com" : undefined} /></label>;
   };
-  return <form action={formAction} onSubmit={() => setEdited(false)} className="bpForm">
+  return <form onSubmit={event => {event.preventDefault(); if (pending) return; const data = new FormData(event.currentTarget); setEdited(false); startTransition(() => formAction(data));}} className="bpForm">
     <header><small>COMPANY MASTER RECORD</small><h2>Your business details</h2><p>Maintain your business identity, sectors, registration, address and contact details.</p></header>
     {state?.error && <div className="bpMessage error" role="alert">{state.error}</div>}
     {!edited && state?.success && <div className="bpMessage success" role="status">{state.success}</div>}
@@ -37,12 +47,26 @@ export default function BusinessProfileForm({ action, organization, workforceCou
         <p className="bpSectorSummary" role="status">{industries.length + (otherSelected ? 1 : 0)} sectors selected{industries.length ? ` · ${industries.join(" · ")}` : ""}{otherSelected && customIndustry.trim() ? ` · ${customIndustry.trim()}` : ""}</p>
         {otherSelected && <label className="bpOtherIndustry"><span>Other sector(s) *</span><input aria-label="Other industries" value={customIndustry} onChange={event => {setCustomIndustry(event.target.value);setEdited(true);}} required pattern={".*\\S.*"} maxLength={160} placeholder="Enter your additional sector(s)" /></label>}
       </fieldset>
-      <div className="bpSectionTitle wide"><h3>Registered business address</h3><p>Use your legal registered address or principal business address.</p></div>
+      <fieldset className="bpSiteChoice wide"><legend>Business sites</legend><p>Choose whether your business operates from one site or multiple sites.</p><div className="bpSiteChoices">{[{value:"single", label:"Single site", description:"One business address"}, {value:"multiple", label:"Multi-site", description:"Add additional site addresses"}].map(option => <label key={option.value} className={`bpSiteOption${siteMode === option.value ? " selected" : ""}`}><input type="radio" name="business_site_mode" value={option.value} checked={siteMode === option.value} onChange={() => changeSiteMode(option.value)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div>{siteMode === "single" && sites.length > 0 && <p>Additional addresses are retained. Select Multi-site to display them again.</p>}</fieldset>
+      <input type="hidden" name="business_additional_sites" value={JSON.stringify(sites.map(({uiId, ...site}) => site))} />
+      <div className="bpSectionTitle wide"><h3><span className="bpSiteBadge">Site 1</span> Registered business address</h3><p>Use your legal registered address or principal business address.</p></div>
       {detailInput("address_line_1")}{detailInput("address_line_2")}{detailInput("city")}{detailInput("region")}{detailInput("postal_code")}
-      <label><span>Country</span><select {...field("country")} autoComplete="country-name"><option value="">Select country</option>{values.country && !BUSINESS_COUNTRIES.some(country => country.name === values.country) && <option value={values.country}>{values.country} — previously saved</option>}{BUSINESS_COUNTRIES.map(country => <option key={country.code} value={country.name}>{country.name}</option>)}</select></label>
+      <label><span>Country</span><select {...field("country")} autoComplete="country-name">{countryOptions(values.country)}</select></label>
+      {siteMode === "multiple" && <section className="bpAdditionalSites wide" aria-label="Additional business addresses">
+        <p className="bpSiteHelp">Each address is saved with your business profile. Manage site assessments in <a href="/portal/business-continuity/site-profile">BCP Site Profile</a>.</p>
+        {sites.map((site, index) => <fieldset className="bpSiteAddress" key={site.uiId}><legend><span className="bpSiteBadge">Site {index + 2}</span> Additional address</legend><div className="bpSiteAddressFields">{BUSINESS_SITE_FIELDS.map(item => {
+          const required = ["address_line_1", "city", "country"].includes(item.key);
+          const props = {value:site[item.key] || "", onChange:event => updateSite(site.uiId, item.key, event.target.value), required, "aria-label":`Site ${index + 2}: ${item.label}`};
+          return <label key={item.key} className={item.key === "site_name" ? "wide" : undefined}><span>{item.label}{required ? " *" : ""}</span>{item.key === "country" ? <select {...props}>{countryOptions(site.country)}</select> : <input {...props} maxLength={item.max} autoComplete={item.autocomplete ? `section-site${index + 2} ${item.autocomplete}` : "off"} />}</label>;
+        })}</div><button type="button" className="bpRemoveSite" onClick={() => {setSites(old => old.filter(item => item.uiId !== site.uiId));setEdited(true);}} disabled={pending || sites.length === 1} aria-label={`Remove Site ${index + 2}`}>Remove Site {index + 2}</button></fieldset>)}
+        <button type="button" className="bpAddSite" disabled={pending || sites.length >= MAX_ADDITIONAL_BUSINESS_SITES} onClick={() => {setSites(old => [...old, emptySite()]);setEdited(true);}}>＋ Add address</button><small className="bpSiteHelp" role="status">{sites.length + 1} sites including the registered address{sites.length >= MAX_ADDITIONAL_BUSINESS_SITES ? " · Maximum 50 sites reached" : ""}</small>
+      </section>}
       <div className="bpSectionTitle wide"><h3>Business contact details</h3><p>Company contact information for your organisation profile.</p></div>
       {detailInput("business_email")}{detailInput("business_phone")}{detailInput("website")}
       <label><span>Workforce — automatic count</span><input value={workforceCount === null ? "Unavailable" : workforceCount} readOnly aria-describedby="bpWorkforceHelp" /><small id="bpWorkforceHelp">Counts all people in your company register, including invited, suspended and directory records. Updates when this page opens. Manage people under <a href="/portal/company/people">People, Roles &amp; Access</a>.</small></label>
+      <div className="bpSectionTitle wide" id="powra-numbering"><h3>POWRA numbering</h3><p>References are assigned automatically on save. Set your company prefix and optional digit padding. Existing references remain unchanged.</p></div>
+      <label><span>Reference prefix</span><input {...field("powra_reference_prefix")} required maxLength={40} pattern={"[A-Za-z0-9_\\-]+"} /><small>Default: POWRA. Example custom prefix: SITE-POWRA-</small></label>
+      <label><span>Minimum digits</span><select {...field("powra_reference_padding")}>{[0,1,2,3,4,5,6,7,8].map(value => <option key={value} value={value}>{value === 0 ? "No leading zeros" : `${value} digits`}</option>)}</select><small>Next format example: {`${values.powra_reference_prefix}${String(organization.powra_next_number || 1).padStart(Number(values.powra_reference_padding) || 0,"0")}`}. The number is confirmed on save.</small></label>
     </div>
     <footer><span>Updates apply to your company workspace.</span><button type="submit" disabled={pending}>{pending ? "Saving…" : "Save business profile"}</button></footer>
   </form>;
