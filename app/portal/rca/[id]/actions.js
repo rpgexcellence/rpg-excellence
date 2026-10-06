@@ -6,6 +6,8 @@ import { createClient } from "../../../../lib/supabase/server";
 import { RCA_PROFILE_BY_CODE } from "../../../../lib/rca-profile-catalog";
 import { requireAssessmentRemediationAccess } from "../../../../lib/assessment-access";
 
+import {loadRcaCompanyLinks,rcaLinkedFinding,resolveRcaCaseControl,resolveRcaReviewer} from "../../../../lib/rcaCompanyLinks";
+
 const clean = (value) =>
   typeof value === "string" && value.trim()
     ? value.trim()
@@ -90,7 +92,7 @@ function safeFileName(name) {
 async function getOwnedCase(supabase, userId, caseId) {
   const { data, error } = await supabase
     .from("rca_cases")
-    .select("id, current_discipline, status, access_scope, assessment_id")
+    .select("*")
     .eq("id", caseId)
     .eq("owner_id", userId)
     .maybeSingle();
@@ -144,7 +146,11 @@ export async function saveCaseOverview(formData) {
   const { supabase, user } = await context();
   const caseId = clean(formData.get("case_id"));
   if (!caseId) throw new Error("Missing 8D case ID.");
-  await getOwnedCase(supabase, user.id, caseId);
+  const rcaCase=await getOwnedCase(supabase,user.id,caseId);
+  const {data:organization,error:orgError}=await supabase.from("organizations").select("*").eq("id",rcaCase.organization_id).eq("owner_id",user.id).maybeSingle();
+  if(orgError || !organization)throw new Error(orgError?.message || "Company not found.");
+  const [options,linkedFinding]=await Promise.all([loadRcaCompanyLinks(organization),rcaLinkedFinding(supabase,rcaCase,user.id)]);
+  const companyControl=resolveRcaCaseControl(options,rcaCase,linkedFinding,formData);
 
   const title = clean(formData.get("title"));
   if (!title) throw new Error("Case title is required.");
@@ -156,15 +162,11 @@ export async function saveCaseOverview(formData) {
       problem_statement: clean(
         formData.get("problem_statement")
       ),
-      sponsor_name: clean(formData.get("sponsor_name")),
-      leader_name: clean(formData.get("leader_name")),
-      customer_or_stakeholder: clean(
-        formData.get("customer_or_stakeholder")
-      ),
+      ...companyControl,
       product_service_process: clean(
         formData.get("product_service_process")
       ),
-      location: clean(formData.get("location")),
+
       target_close_date: clean(
         formData.get("target_close_date")
       ),
@@ -196,6 +198,13 @@ export async function saveDiscipline(formData) {
     user.id,
     caseId
   );
+
+  let reviewer={};
+  if(intent==="approve") {
+    const {data:organization,error:orgError}=await supabase.from("organizations").select("*").eq("id",rcaCase.organization_id).eq("owner_id",user.id).maybeSingle();
+    if(orgError || !organization)throw new Error(orgError?.message || "Company not found.");
+    reviewer=resolveRcaReviewer(await loadRcaCompanyLinks(organization),formData);
+  }
 
   // Draft work may be saved in a later discipline without falsely approving
   // the preceding gates. Sequential approval is enforced only on submission.
@@ -380,6 +389,7 @@ export async function saveDiscipline(formData) {
       status,
       completion_score: approved ? 100 : 60,
       human_approved: approved,
+      ...(approved ? reviewer : {}),
       approved_by: approved ? user.id : null,
       approved_at: approved
         ? new Date().toISOString()
@@ -422,7 +432,7 @@ export async function saveDiscipline(formData) {
     summary: approved
       ? `D${discipline} approved`
       : `D${discipline} updated`,
-    event_data: { status },
+    event_data: { status, ...(approved ? reviewer : {}), confirmed_by: user.id },
   });
 
   revalidatePath(`/portal/rca/${caseId}`);
