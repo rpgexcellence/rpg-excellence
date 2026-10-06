@@ -28,6 +28,7 @@ export default function sitemap() {
     "/privacy",
     "/cookies",
     "/insights",
+    "/insights/business-continuity-risk-assessment-hazard-scenarios",
     "/insights/business-continuity-roles-responsibilities",
     "/insights/the-extra-defender-rca-case-study",
     "/insights/a-word-from-rpg",
