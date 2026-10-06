@@ -8,6 +8,8 @@ import {
   hasActiveSubscription,
 } from "../../../lib/subscription";
 
+import {loadRcaCompanyLinks,resolveRcaSource} from "../../../lib/rcaCompanyLinks";
+
 const SOURCE_TYPES = [
   "assessment_finding",
   "audit",
@@ -30,7 +32,8 @@ const clean = (value) =>
     ? value.trim()
     : null;
 
-export async function createRcaCase(formData) {
+export async function createRcaCase(previousState,formData) {
+  try {
   const supabase = await createClient();
 
   const {
@@ -85,13 +88,24 @@ export async function createRcaCase(formData) {
     error: organizationError,
   } = await supabase
     .from("organizations")
-    .select("id")
+    .select("*")
     .eq("id", organizationId)
     .eq("owner_id", user.id)
     .maybeSingle();
 
   if (organizationError || !organization) {
     throw new Error("Organisation not found.");
+  }
+
+  if (["audit","supplier"].includes(sourceType)) {
+    const options=await loadRcaCompanyLinks(organization);
+    const link=resolveRcaSource(options,formData);
+    const {data:caseId,error}=await supabase.rpc("rca_open_linked_nc_case",{
+      p_organization_id:organizationId,p_source_type:sourceType,p_audit_id:link.audit?.id || null,
+      p_supplier_id:link.supplier?.id || null,p_finding_id:link.finding.id,p_title:title,p_problem:problemStatement,p_severity:severity
+    });
+    if(error || !caseId)throw new Error(error?.message || "Unable to open the linked NC case.");
+    revalidatePath("/portal/rca");redirect(`/portal/rca/${caseId}`);
   }
 
   const {
@@ -140,4 +154,5 @@ export async function createRcaCase(formData) {
 
   revalidatePath("/portal/rca");
   redirect(`/portal/rca/${rcaCase.id}`);
+  } catch(error) {if(error?.digest?.startsWith("NEXT_REDIRECT"))throw error;return {error:error.message || "Unable to create case."};}
 }
