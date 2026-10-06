@@ -632,18 +632,13 @@ export default async function RcaCasePage({
                       marginTop: "14px",
                     }}
                   >
-                    <RcaGateReviewerField people={companyLinks.people} discipline={discipline} locked={finalOwnerResponseSubmitted}/>
                     <button name="intent" value="save" style={primaryButton} disabled={finalOwnerResponseSubmitted}>
                       Save Progress
                     </button>
                     {!finalOwnerResponseSubmitted && <button name="intent" value="review" style={secondaryButton}>
                       Ready for Review
                     </button>}
-                    {!finalOwnerResponseSubmitted && discipline.status !== "approved" && (
-                      <button name="intent" value="approve" style={approveButton} disabled={!companyLinks.people.length}>
-                        Confirm D{selected} approval
-                      </button>
-                    )}
+                    <RcaGateReviewerField key={discipline.id || selected} people={companyLinks.people} discipline={discipline} locked={finalOwnerResponseSubmitted} approvalLabel={`Confirm D${selected} approval`} approvalStyle={approveButton}/>
                   </div>
                 </form>
               </section>
