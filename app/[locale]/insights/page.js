@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      "number": "023",
+      "title": "Before the Outage: Turn Hazard Scenarios into Accountable Decisions",
+      "description": "RPG Excellence releases BCP Module 5: Risk Assessment – Hazard Scenarios, connecting credible disruption threats, current controls, accountable treatment and a controlled risk register.",
+      "href": "business-continuity-risk-assessment-hazard-scenarios"
+},
+    {
       "number": "022",
       "title": "When Disruption Hits, Who Has the Authority to Act?",
       "description": "RPG Excellence Business Continuity Module 4 connects process ownership, responsibilities, authority, deputies and a controlled RACI to support decisions during disruption.",
