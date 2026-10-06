@@ -19,6 +19,9 @@ import {
   saveDiscipline,
   submitD6ActionForVerification,
 } from "./actions";
+import {loadRcaCompanyLinks,rcaLinkedFinding} from "../../../../lib/rcaCompanyLinks";
+import RcaCaseControlFields from "../../../../components/RcaCaseControlFields";
+import RcaGateReviewerField from "../../../../components/RcaGateReviewerField";
 import RcaLegacyProfileFields from "./RcaLegacyProfileFields";
 const label = (value) =>
   String(value === "effective" ? "effective_verified" : value ?? "")
@@ -154,7 +157,7 @@ export default async function RcaCasePage({
     error: organizationError,
   } = await supabase
     .from("organizations")
-    .select("name")
+    .select("*")
     .eq("id", rcaCase.organization_id)
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -162,6 +165,9 @@ export default async function RcaCasePage({
   if (organizationError) {
     throw new Error(organizationError.message);
   }
+  if(!organization)throw new Error("Company not found.");
+  const [companyLinks,linkedFinding]=await Promise.all([loadRcaCompanyLinks(organization),rcaLinkedFinding(supabase,rcaCase,user.id)]);
+  const linkedSupplierId=linkedFinding?.supplier_id || rcaCase.supplier_id || companyLinks.audits.find(row=>row.id===linkedFinding?.audit_id)?.supplier_id;
   const disciplines = disciplinesResult.data ?? [];
   const team = teamResult.data ?? [];
   const causes = causesResult.data ?? [];
@@ -626,6 +632,7 @@ export default async function RcaCasePage({
                       marginTop: "14px",
                     }}
                   >
+                    <RcaGateReviewerField people={companyLinks.people} discipline={discipline} locked={finalOwnerResponseSubmitted}/>
                     <button name="intent" value="save" style={primaryButton} disabled={finalOwnerResponseSubmitted}>
                       Save Progress
                     </button>
@@ -633,8 +640,8 @@ export default async function RcaCasePage({
                       Ready for Review
                     </button>}
                     {!finalOwnerResponseSubmitted && discipline.status !== "approved" && (
-                      <button name="intent" value="approve" style={approveButton}>
-                        Human Approve D{selected}
+                      <button name="intent" value="approve" style={approveButton} disabled={!companyLinks.people.length}>
+                        Confirm D{selected} approval
                       </button>
                     )}
                   </div>
@@ -847,6 +854,7 @@ export default async function RcaCasePage({
             {selected === 0 && (
               <section style={cardStyle}>
                 <h2>Case control</h2>
+                {linkedFinding && <p>Linked NC: <strong>{linkedFinding.finding_reference}</strong>{linkedSupplierId && ` · ${companyLinks.suppliers.find(row=>row.id===linkedSupplierId)?.legal_name || "Supplier"}`}</p>}
                 <form action={saveCaseOverview}>
                   <input type="hidden" name="case_id" value={id} />
                   <input name="title" defaultValue={rcaCase.title} required style={fieldStyle} />
@@ -857,14 +865,7 @@ export default async function RcaCasePage({
                     placeholder="Initial known facts"
                     style={{ ...fieldStyle, marginTop: "12px" }}
                   />
-                  <div style={formGrid}>
-                    <input name="sponsor_name" defaultValue={rcaCase.sponsor_name ?? ""} placeholder="Sponsor" style={fieldStyle} />
-                    <input name="leader_name" defaultValue={rcaCase.leader_name ?? ""} placeholder="8D leader" style={fieldStyle} />
-                    <input name="customer_or_stakeholder" defaultValue={rcaCase.customer_or_stakeholder ?? ""} placeholder="Customer / stakeholder" style={fieldStyle} />
-                    <input name="product_service_process" defaultValue={rcaCase.product_service_process ?? ""} placeholder="Product / service / process" style={fieldStyle} />
-                    <input name="location" defaultValue={rcaCase.location ?? ""} placeholder="Location" style={fieldStyle} />
-                    <input type="date" name="target_close_date" defaultValue={rcaCase.target_close_date ?? ""} style={fieldStyle} />
-                  </div>
+                  <RcaCaseControlFields options={companyLinks} rcaCase={rcaCase} supplierId={linkedSupplierId}/>
                   <button style={{ ...primaryButton, marginTop: "14px" }}>
                     Save Case Control
                   </button>
