@@ -684,7 +684,16 @@ export async function saveCauseProfile(formData) {
   redirect(`/portal/rca/${caseId}?d=4${modelQuery}`);
 }
 
-export async function addCorrectiveAction(formData) {
+export async function addCorrectiveAction(previousState, formData) {
+  try {
+    return await persistCorrectiveAction(formData);
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return { error: error?.message || "Could not add the controlled action. Please try again." };
+  }
+}
+
+async function persistCorrectiveAction(formData) {
   const { supabase, user } = await context();
   const caseId = clean(formData.get("case_id"));
   const title = clean(formData.get("action_title"));
@@ -702,7 +711,19 @@ export async function addCorrectiveAction(formData) {
     throw new Error("Valid action type and title are required.");
   }
 
-  await getOwnedCase(supabase, user.id, caseId);
+  const rcaCase = await getOwnedCase(supabase, user.id, caseId);
+  const { data: organization, error: organizationError } = await supabase
+    .from("organizations").select("*").eq("id", rcaCase.organization_id)
+    .eq("owner_id", user.id).maybeSingle();
+  if (organizationError || !organization) throw new Error("Company not found.");
+  const options = await loadRcaCompanyLinks(organization);
+  const actionOwner = options.people.find(person => person.id === clean(formData.get("action_owner_person_id")));
+  if (!actionOwner) throw new Error("Select an active action owner from this company's user list. Add or activate users under Administration if needed.");
+  const dueDate = clean(formData.get("due_date"));
+  const parsedDate = dueDate && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) ? new Date(`${dueDate}T00:00:00Z`) : null;
+  if (!parsedDate || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== dueDate) {
+    throw new Error("Select a valid due date for this controlled action.");
+  }
   const discipline = actionType === "containment" ? 3 : 5;
   await assertDisciplineUnlocked(
     supabase,
@@ -750,8 +771,9 @@ export async function addCorrectiveAction(formData) {
       action_type: actionType,
       title,
       description: clean(formData.get("description")),
-      action_owner: clean(formData.get("action_owner")),
-      due_date: clean(formData.get("due_date")),
+      action_owner_person_id: actionOwner.id,
+      action_owner: actionOwner.name,
+      due_date: dueDate,
       effectiveness_criteria: clean(
         formData.get("effectiveness_criteria")
       ),
