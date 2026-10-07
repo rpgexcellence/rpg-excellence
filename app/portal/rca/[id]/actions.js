@@ -443,38 +443,50 @@ export async function saveDiscipline(formData) {
   redirect(`/portal/rca/${caseId}?d=${discipline}${modelQuery}`);
 }
 
-export async function addTeamMember(formData) {
-  const { supabase, user } = await context();
-  const caseId = clean(formData.get("case_id"));
-  const memberName = clean(formData.get("member_name"));
-  const email = clean(formData.get("email"));
+export async function addTeamMember(previousState, formData) {
+  try {
+    const { supabase, user } = await context();
+    const caseId = clean(formData.get("case_id"));
+    const personId = clean(formData.get("organization_person_id"));
+    if (!caseId || !personId) throw new Error("Select an active company user to add to the team.");
 
-  if (!caseId || !memberName || !email) {
-    throw new Error("Case, team member name and email address are required.");
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("Enter a valid team member email address.");
-  }
-
-  await getOwnedCase(supabase, user.id, caseId);
-  await assertDisciplineUnlocked(supabase, user.id, caseId, 1);
-  const { error } = await supabase
-    .from("rca_team_members")
-    .insert({
+    const rcaCase = await getOwnedCase(supabase, user.id, caseId);
+    await assertDisciplineUnlocked(supabase, user.id, caseId, 1);
+    const { data: organization, error: organizationError } = await supabase
+      .from("organizations").select("*").eq("id", rcaCase.organization_id)
+      .eq("owner_id", user.id).maybeSingle();
+    if (organizationError || !organization) throw new Error("Company not found.");
+    const options = await loadRcaCompanyLinks(organization);
+    const person = options.people.find(row => row.id === personId);
+    if (!person) throw new Error("Select an active user from this company's user list. Refresh if the list has changed.");
+    const email = clean(person.email);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("Add a valid email for this user under Administration → People, Roles & Access, then refresh this page.");
+    }
+    const { data: existingMembers, error: membersError } = await supabase
+      .from("rca_team_members").select("organization_person_id,email")
+      .eq("case_id", caseId).eq("owner_id", user.id);
+    if (membersError) throw new Error(membersError.message);
+    if ((existingMembers || []).some(member => member.organization_person_id === person.id ||
+      (!member.organization_person_id && String(member.email || "").trim().toLowerCase() === email.toLowerCase()))) {
+      throw new Error("This company user is already in the cross-functional team.");
+    }
+    const { error } = await supabase.from("rca_team_members").insert({
       case_id: caseId,
       owner_id: user.id,
-      member_name: memberName,
-      role_title: clean(formData.get("role_title")),
+      organization_person_id: person.id,
+      member_name: person.name,
+      role_title: clean(person.position),
       email: email.toLowerCase(),
-      responsibility: clean(
-        formData.get("responsibility")
-      ),
+      responsibility: clean(formData.get("responsibility")),
     });
-
-  if (error) throw new Error(error.message);
-  revalidatePath(`/portal/rca/${caseId}`);
-  redirect(`/portal/rca/${caseId}?d=1`);
+    if (error) throw new Error(error.code === "23505" ? "This company user is already in the cross-functional team." : error.message);
+    revalidatePath(`/portal/rca/${caseId}`);
+    redirect(`/portal/rca/${caseId}?d=1`);
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return { error: error?.message || "Could not add the team member. Please try again." };
+  }
 }
 
 export async function addCauseHypothesis(formData) {
