@@ -2,8 +2,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import {
-  addCauseHypothesis,
-  addCorrectiveAction,
   addCostEntry,
   addAnalysisNode,
   addObjectiveEvidence,
@@ -14,9 +12,7 @@ import {
   recordNoContainmentRequired,
   reviewAnalysisNode,
   reviewCauseHypothesis,
-  saveCauseProfile,
   saveCaseOverview,
-  saveDiscipline,
   submitD6ActionForVerification,
 } from "./actions";
 import {loadRcaCompanyLinks,rcaLinkedFinding} from "../../../../lib/rcaCompanyLinks";
@@ -600,7 +596,7 @@ export default async function RcaCasePage({
                   </div>
                 </div>
 
-                <RcaDisciplineForm action={saveDiscipline}>
+                <RcaDisciplineForm actionName="saveDiscipline">
                   <input type="hidden" name="case_id" value={id} />
                   <input type="hidden" name="discipline" value={selected} />
                   {selected === 4 && activeAnalysisModel && (
@@ -956,7 +952,7 @@ export default async function RcaCasePage({
                 )}
 
                 {selected === 3 && !discipline?.no_action_required && (
-                <RcaDisciplineForm action={addCorrectiveAction}>
+                <RcaDisciplineForm actionName="addCorrectiveAction">
                   <input type="hidden" name="case_id" value={id} />
                   <input type="hidden" name="action_type" value="containment" />
                   <div style={{ ...formGrid, alignItems: "end", marginTop: "16px" }}>
@@ -1151,7 +1147,7 @@ function CorrectiveActionSelectionWorkbench({ caseId, causes, actions, people })
 
       <details style={{ ...causeBuilderStyle, marginTop: "20px" }} open={actions.length === 0}>
         <summary style={{ cursor: "pointer", fontWeight: 800, fontSize: "18px" }}>Add permanent corrective-action candidate</summary>
-        <RcaDisciplineForm action={addCorrectiveAction}>
+        <RcaDisciplineForm actionName="addCorrectiveAction">
           <input type="hidden" name="case_id" value={caseId} />
           <div style={{ ...formGrid, alignItems: "end", marginTop: "16px" }}>
             <select name="action_type" required defaultValue="corrective" style={fieldStyle}>
@@ -1331,7 +1327,7 @@ function CauseCards({ caseId, modelId, causes, people }) {
             <summary style={{ cursor: "pointer", fontWeight: 800 }}>
               {cause.profile_code ? "Review / change RCA profile" : "Complete required RCA profile"}
             </summary>
-            <RcaDisciplineForm action={saveCauseProfile}>
+            <RcaDisciplineForm actionName="saveCauseProfile">
               <input type="hidden" name="case_id" value={caseId} />
               <input type="hidden" name="cause_id" value={cause.id} />
               <input type="hidden" name="model_id" value={modelId} />
@@ -1609,7 +1605,7 @@ function CauseStreamForm({ caseId, causeType, title, people }) {
       <summary style={{ fontWeight: 800, cursor: "pointer", fontSize: "18px" }}>
         {title}
       </summary>
-      <RcaDisciplineForm action={addCauseHypothesis}>
+      <RcaDisciplineForm actionName="addCauseHypothesis">
         <input type="hidden" name="case_id" value={caseId} />
         <input type="hidden" name="cause_type" value={causeType} />
         <RcaLegacyProfileFields people={people} />
