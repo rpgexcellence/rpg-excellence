@@ -1,8 +1,24 @@
 "use client";
 
 import { useActionState, startTransition } from "react";
+import {
+  saveDiscipline,
+  addCorrectiveAction,
+  addCauseHypothesis,
+  saveCauseProfile,
+} from "../app/portal/rca/[id]/actions";
 
-export default function RcaDisciplineForm({ action, children }) {
+const formActions = { saveDiscipline, addCorrectiveAction, addCauseHypothesis, saveCauseProfile };
+
+export default function RcaDisciplineForm({ actionName, children }) {
+  const action = Object.prototype.hasOwnProperty.call(formActions, actionName) ? formActions[actionName] : null;
+  if (typeof action !== "function") {
+    return <div role="alert" style={{ padding: "12px 14px", borderRadius: 10, background: "#fff1f0", color: "#b42318", lineHeight: 1.5 }}>This form could not load its save action. Refresh the page after the deployment completes.</div>;
+  }
+  return <ConnectedForm action={action}>{children}</ConnectedForm>;
+}
+
+function ConnectedForm({ action, children }) {
   const [state, formAction, pending] = useActionState(action, null);
   return <form onSubmit={event => {
     event.preventDefault();
