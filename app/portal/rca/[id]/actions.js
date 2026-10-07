@@ -181,7 +181,16 @@ export async function saveCaseOverview(formData) {
   redirect(`/portal/rca/${caseId}`);
 }
 
-export async function saveDiscipline(formData) {
+export async function saveDiscipline(previousState, formData) {
+  try {
+    return await persistDiscipline(formData);
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return { error: error?.message || "Could not save this discipline. Please try again." };
+  }
+}
+
+async function persistDiscipline(formData) {
   const { supabase, user } = await context();
   const caseId = clean(formData.get("case_id"));
   const discipline = Number(formData.get("discipline"));
@@ -199,11 +208,15 @@ export async function saveDiscipline(formData) {
     caseId
   );
 
-  let reviewer={};
-  if(intent==="approve") {
+  if (!["save", "review", "approve"].includes(intent)) throw new Error("Choose Save Progress, Ready for Review or Approve.");
+  let reviewer = {};
+  const reviewerId = clean(formData.get("reviewer_person_id"));
+  if (intent === "approve" || reviewerId) {
     const {data:organization,error:orgError}=await supabase.from("organizations").select("*").eq("id",rcaCase.organization_id).eq("owner_id",user.id).maybeSingle();
     if(orgError || !organization)throw new Error(orgError?.message || "Company not found.");
     reviewer=resolveRcaReviewer(await loadRcaCompanyLinks(organization),formData);
+  } else if (formData.has("reviewer_person_id")) {
+    reviewer = { reviewer_person_id: null, reviewer_name: null, reviewer_email: null };
   }
 
   // Draft work may be saved in a later discipline without falsely approving
@@ -217,7 +230,7 @@ export async function saveDiscipline(formData) {
     );
   }
 
-  if (!narrative && discipline === 3) {
+  if (!narrative && discipline === 3 && intent !== "save") {
     const { data: d3Decision, error: d3DecisionError } = await supabase
       .from("rca_8d_disciplines")
       .select("no_action_required, no_action_justification")
@@ -239,10 +252,8 @@ export async function saveDiscipline(formData) {
     }
   }
 
-  if (!narrative) {
-    redirect(
-      `/portal/rca/${caseId}?d=${discipline}&error=narrative_required`
-    );
+  if (!narrative && intent !== "save") {
+    throw new Error("Enter evidence, analysis and conclusion before marking this gate ready for review or approving it. Use Save Progress to keep a draft.");
   }
 
   if (intent === "approve" && discipline > 0) {
@@ -385,11 +396,11 @@ export async function saveDiscipline(formData) {
   const { error } = await supabase
     .from("rca_8d_disciplines")
     .update({
-      narrative,
+      narrative: narrative || "",
       status,
       completion_score: approved ? 100 : 60,
       human_approved: approved,
-      ...(approved ? reviewer : {}),
+      ...reviewer,
       approved_by: approved ? user.id : null,
       approved_at: approved
         ? new Date().toISOString()
@@ -432,7 +443,7 @@ export async function saveDiscipline(formData) {
     summary: approved
       ? `D${discipline} approved`
       : `D${discipline} updated`,
-    event_data: { status, ...(approved ? reviewer : {}), confirmed_by: user.id },
+    event_data: { status, ...reviewer, confirmed_by: user.id },
   });
 
   revalidatePath(`/portal/rca/${caseId}`);
