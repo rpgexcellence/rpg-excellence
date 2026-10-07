@@ -22,6 +22,7 @@ import {
 import {loadRcaCompanyLinks,rcaLinkedFinding} from "../../../../lib/rcaCompanyLinks";
 import RcaCaseControlFields from "../../../../components/RcaCaseControlFields";
 import RcaGateReviewerField from "../../../../components/RcaGateReviewerField";
+import RcaTeamMemberForm from "../../../../components/RcaTeamMemberForm";
 import RcaLegacyProfileFields from "./RcaLegacyProfileFields";
 const label = (value) =>
   String(value === "effective" ? "effective_verified" : value ?? "")
@@ -879,21 +880,12 @@ export default async function RcaCasePage({
                         {member.role_title || "Team member"}
                         {member.email ? ` · ${member.email}` : ""}
                       </span>
+                      {member.organization_person_id && <small style={{ color: "#174b3c" }}>Linked company user</small>}
+                      {member.responsibility && <span style={{ color: "#607089" }}>8D responsibility: {member.responsibility}</span>}
                     </div>
                   ))}
                 </div>
-                <form action={addTeamMember} style={{ marginTop: "16px" }}>
-                  <input type="hidden" name="case_id" value={id} />
-                  <div style={formGrid}>
-                    <input name="member_name" required placeholder="Member name" style={fieldStyle} />
-                    <input name="role_title" placeholder="Role" style={fieldStyle} />
-                    <input type="email" name="email" required placeholder="Email address" autoComplete="email" style={fieldStyle} />
-                    <input name="responsibility" placeholder="8D responsibility" style={fieldStyle} />
-                  </div>
-                  <button style={{ ...primaryButton, marginTop: "14px" }}>
-                    Add Team Member
-                  </button>
-                </form>
+                <RcaTeamMemberForm action={addTeamMember} caseId={id} people={companyLinks.people} team={team} locked={finalOwnerResponseSubmitted}/>
               </section>
             )}
 
