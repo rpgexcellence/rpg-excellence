@@ -24,6 +24,7 @@ import RcaCaseControlFields from "../../../../components/RcaCaseControlFields";
 import RcaGateReviewerField from "../../../../components/RcaGateReviewerField";
 import RcaTeamMemberForm from "../../../../components/RcaTeamMemberForm";
 import RcaDisciplineForm from "../../../../components/RcaDisciplineForm";
+import RcaActionOwnerFields from "../../../../components/RcaActionOwnerFields";
 import RcaLegacyProfileFields from "./RcaLegacyProfileFields";
 const label = (value) =>
   String(value === "effective" ? "effective_verified" : value ?? "")
@@ -888,6 +889,7 @@ export default async function RcaCasePage({
             {selected === 5 && (
               <CorrectiveActionSelectionWorkbench
                 caseId={id}
+                people={companyLinks.people}
                 causes={causes.filter((cause) => cause.status === "validated")}
                 actions={actions.filter((action) => action.discipline === 5)}
               />
@@ -953,10 +955,10 @@ export default async function RcaCasePage({
                 )}
 
                 {selected === 3 && !discipline?.no_action_required && (
-                <form action={addCorrectiveAction} style={{ marginTop: "16px" }}>
+                <RcaDisciplineForm action={addCorrectiveAction}>
                   <input type="hidden" name="case_id" value={id} />
                   <input type="hidden" name="action_type" value="containment" />
-                  <div style={formGrid}>
+                  <div style={{ ...formGrid, alignItems: "end", marginTop: "16px" }}>
                     <div style={{ ...fieldStyle, background: "#f4f7fb" }}>
                       <strong>Interim containment action</strong>
                       <div style={{ marginTop: "5px", color: "#607089", fontSize: "13px" }}>
@@ -971,8 +973,7 @@ export default async function RcaCasePage({
                         </option>
                       ))}
                     </select>
-                    <input name="action_owner" placeholder="Action owner" style={fieldStyle} />
-                    <input type="date" name="due_date" style={fieldStyle} />
+                    <RcaActionOwnerFields people={companyLinks.people}/>
                   </div>
                   <input name="action_title" required placeholder="Action title" style={{ ...fieldStyle, marginTop: "12px" }} />
                   <textarea name="description" rows={3} placeholder="What will change?" style={{ ...fieldStyle, marginTop: "12px" }} />
@@ -980,7 +981,7 @@ export default async function RcaCasePage({
                   <button style={{ ...primaryButton, marginTop: "14px" }}>
                     Add Controlled Action
                   </button>
-                </form>
+                </RcaDisciplineForm>
                 )}
               </section>
             )}
@@ -1049,7 +1050,7 @@ function D6EffectivenessWorkbench({ caseId, actions, evidenceRecords }) {
   );
 }
 
-function CorrectiveActionSelectionWorkbench({ caseId, causes, actions }) {
+function CorrectiveActionSelectionWorkbench({ caseId, causes, actions, people }) {
   const causeById = new Map(causes.map((cause) => [cause.id, cause]));
   const selectedActions = actions.filter((action) => action.selection_status === "selected");
   const candidates = actions.filter((action) => action.selection_status === "candidate");
@@ -1149,9 +1150,9 @@ function CorrectiveActionSelectionWorkbench({ caseId, causes, actions }) {
 
       <details style={{ ...causeBuilderStyle, marginTop: "20px" }} open={actions.length === 0}>
         <summary style={{ cursor: "pointer", fontWeight: 800, fontSize: "18px" }}>Add permanent corrective-action candidate</summary>
-        <form action={addCorrectiveAction} style={{ marginTop: "16px" }}>
+        <RcaDisciplineForm action={addCorrectiveAction}>
           <input type="hidden" name="case_id" value={caseId} />
-          <div style={formGrid}>
+          <div style={{ ...formGrid, alignItems: "end", marginTop: "16px" }}>
             <select name="action_type" required defaultValue="corrective" style={fieldStyle}>
               <option value="corrective">Corrective action</option>
               <option value="preventive">Preventive action</option>
@@ -1164,8 +1165,7 @@ function CorrectiveActionSelectionWorkbench({ caseId, causes, actions }) {
                 <option value={cause.id} key={cause.id}>{label(cause.cause_type)}: {cause.statement}</option>
               ))}
             </select>
-            <input name="action_owner" required placeholder="Accountable action owner" style={fieldStyle} />
-            <input type="date" name="due_date" required style={fieldStyle} />
+            <RcaActionOwnerFields people={people}/>
           </div>
           <input name="action_title" required placeholder="Candidate action title" style={{ ...fieldStyle, marginTop: "12px" }} />
           <textarea name="description" required rows={3} placeholder="Describe exactly what will change" style={{ ...fieldStyle, marginTop: "12px" }} />
@@ -1176,7 +1176,7 @@ function CorrectiveActionSelectionWorkbench({ caseId, causes, actions }) {
             <ScoreSelect name="implementation_risk_score" title="Implementation risk" />
           </div>
           <button type="submit" style={{ ...primaryButton, marginTop: "14px" }}>Add Candidate</button>
-        </form>
+        </RcaDisciplineForm>
       </details>
     </section>
   );
