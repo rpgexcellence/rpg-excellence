@@ -23,6 +23,7 @@ import {loadRcaCompanyLinks,rcaLinkedFinding} from "../../../../lib/rcaCompanyLi
 import RcaCaseControlFields from "../../../../components/RcaCaseControlFields";
 import RcaGateReviewerField from "../../../../components/RcaGateReviewerField";
 import RcaTeamMemberForm from "../../../../components/RcaTeamMemberForm";
+import RcaDisciplineForm from "../../../../components/RcaDisciplineForm";
 import RcaLegacyProfileFields from "./RcaLegacyProfileFields";
 const label = (value) =>
   String(value === "effective" ? "effective_verified" : value ?? "")
@@ -598,7 +599,7 @@ export default async function RcaCasePage({
                   </div>
                 </div>
 
-                <form action={saveDiscipline}>
+                <RcaDisciplineForm action={saveDiscipline}>
                   <input type="hidden" name="case_id" value={id} />
                   <input type="hidden" name="discipline" value={selected} />
                   {selected === 4 && activeAnalysisModel && (
@@ -616,7 +617,6 @@ export default async function RcaCasePage({
                   <textarea
                     name="narrative"
                     rows={10}
-                    required={!(selected === 3 && discipline.no_action_required)}
                     defaultValue={discipline.narrative ?? ""}
                     placeholder="Record verified facts, evidence reviewed, analysis performed, decisions made and unresolved uncertainty."
                     style={{
@@ -625,23 +625,8 @@ export default async function RcaCasePage({
                       resize: "vertical",
                     }}
                   />
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "10px",
-                      flexWrap: "wrap",
-                      marginTop: "14px",
-                    }}
-                  >
-                    <button name="intent" value="save" style={primaryButton} disabled={finalOwnerResponseSubmitted}>
-                      Save Progress
-                    </button>
-                    {!finalOwnerResponseSubmitted && <button name="intent" value="review" style={secondaryButton}>
-                      Ready for Review
-                    </button>}
-                    <RcaGateReviewerField key={discipline.id || selected} people={companyLinks.people} discipline={discipline} locked={finalOwnerResponseSubmitted} approvalLabel={`Confirm D${selected} approval`} approvalStyle={approveButton}/>
-                  </div>
-                </form>
+                  <RcaGateReviewerField key={`${discipline.id || selected}:${discipline.reviewer_person_id || ""}:${discipline.status}`} people={companyLinks.people} discipline={discipline} locked={finalOwnerResponseSubmitted} approvalLabel={`Approve D${selected}`} approvalStyle={approveButton} saveStyle={primaryButton} reviewStyle={secondaryButton}/>
+                </RcaDisciplineForm>
               </section>
             )}
 
