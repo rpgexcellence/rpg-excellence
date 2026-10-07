@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+    "number": "024",
+    "title": "When Disruption Hits, What Must Recover First?",
+    "description": "RPG Excellence releases BCP Module 6: Business Impact Analysis, connecting impacts over time, accountable activity owners, recovery objectives and resource dependencies.",
+    "href": "business-continuity-business-impact-analysis"
+},
+    {
       "number": "023",
       "title": "Before the Outage: Turn Hazard Scenarios into Accountable Decisions",
       "description": "RPG Excellence releases BCP Module 5: Risk Assessment – Hazard Scenarios, connecting credible disruption threats, current controls, accountable treatment and a controlled risk register.",
