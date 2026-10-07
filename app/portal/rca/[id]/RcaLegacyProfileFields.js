@@ -21,6 +21,7 @@ const inputStyle = {
 export default function RcaLegacyProfileFields({
   defaults = {},
   compact = false,
+  people,
 }) {
   const initialCategory = defaults.profile_category || "";
   const [categoryCode, setCategoryCode] = useState(initialCategory);
@@ -310,16 +311,18 @@ export default function RcaLegacyProfileFields({
                   <option value="unknown">Unknown</option>
                 </select>
 
-                <input
-                  name="accountable_system_owner"
-                  required
-                  defaultValue={
-                    defaults.accountable_system_owner || ""
-                  }
-                  placeholder="Accountable system owner"
-                  style={inputStyle}
-                />
+                {people !== undefined ? <select name="accountable_system_owner_person_id" required
+                  aria-label="Accountable system owner from company user list"
+                  defaultValue={people.some(person => person.id === defaults.accountable_system_owner_person_id) ? defaults.accountable_system_owner_person_id : defaults.accountable_system_owner ? "legacy" : ""}
+                  style={{ ...inputStyle, fontSize: 16, minHeight: 48 }}>
+                  <option value="">Select accountable company user</option>
+                  {defaults.accountable_system_owner && !people.some(person => person.id === defaults.accountable_system_owner_person_id) && <option value="legacy">Previously recorded: {defaults.accountable_system_owner}</option>}
+                  {people.map(person => <option key={person.id} value={person.id}>{person.name}{person.email ? ` · ${person.email}` : ""}</option>)}
+                </select> : <input name="accountable_system_owner" required defaultValue={defaults.accountable_system_owner || ""} placeholder="Accountable system owner" style={inputStyle}/>}
+
               </div>
+
+              {people !== undefined && !people.length && <p style={{ color: "#8a4600", lineHeight: 1.5 }}>No active company users are available. Add or activate a user under <a href="/portal/company/people">Administration → People, Roles &amp; Access</a>, then refresh.</p>}
 
               <fieldset
                 style={{
