@@ -879,6 +879,7 @@ export default async function RcaCasePage({
               <AnalysisWorkbench
                 caseId={id}
                 problemStatement={rcaCase.problem_statement}
+                people={companyLinks.people}
                 models={analysisModels}
                 activeModel={activeAnalysisModel}
                 nodes={activeAnalysisNodes}
@@ -1191,7 +1192,7 @@ function ScoreSelect({ name, title }) {
   );
 }
 
-function AnalysisWorkbench({ caseId, problemStatement, models, activeModel, nodes, causes }) {
+function AnalysisWorkbench({ caseId, problemStatement, models, activeModel, nodes, causes, people }) {
   const methods = [
     {
       key: "3x5_whys",
@@ -1260,11 +1261,11 @@ function AnalysisWorkbench({ caseId, problemStatement, models, activeModel, node
           <p style={{ color: "#607089" }}>
             Start with the occurrence cause. Add escape or systemic chains only where a separate control or management-system failure exists. Stop at the causal depth supported by evidence; five questions are guidance, not a mandatory quota.
           </p>
-          <CauseCards caseId={caseId} modelId={activeModel.id} causes={causes} />
+          <CauseCards caseId={caseId} modelId={activeModel.id} causes={causes} people={people} />
           <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
-            <CauseStreamForm caseId={caseId} causeType="occurrence" title="Occurrence Cause — 5 Whys" />
-            <CauseStreamForm caseId={caseId} causeType="escape" title="Escape Cause — 5 Whys" />
-            <CauseStreamForm caseId={caseId} causeType="systemic" title="Systemic Cause — 5 Whys" />
+            <CauseStreamForm caseId={caseId} causeType="occurrence" title="1 — Why did this happen?" people={people} />
+            <CauseStreamForm caseId={caseId} causeType="escape" title="2 — Why wasn’t it detected?" people={people} />
+            <CauseStreamForm caseId={caseId} causeType="systemic" title="3 — Why does the system allow this to happen?" people={people} />
           </div>
         </div>
       )}
@@ -1292,7 +1293,7 @@ function AnalysisWorkbench({ caseId, problemStatement, models, activeModel, node
   );
 }
 
-function CauseCards({ caseId, modelId, causes }) {
+function CauseCards({ caseId, modelId, causes, people }) {
   return (
     <div style={{ display: "grid", gap: "14px", marginTop: "18px" }}>
       {causes.map((cause) => (
@@ -1330,18 +1331,18 @@ function CauseCards({ caseId, modelId, causes }) {
             <summary style={{ cursor: "pointer", fontWeight: 800 }}>
               {cause.profile_code ? "Review / change RCA profile" : "Complete required RCA profile"}
             </summary>
-            <form action={saveCauseProfile}>
+            <RcaDisciplineForm action={saveCauseProfile}>
               <input type="hidden" name="case_id" value={caseId} />
               <input type="hidden" name="cause_id" value={cause.id} />
               <input type="hidden" name="model_id" value={modelId} />
-              <RcaLegacyProfileFields defaults={cause} compact />
+              <RcaLegacyProfileFields defaults={cause} compact people={people} />
               {cause.status === "validated" && (
                 <div style={{ ...validationNoticeStyle, margin: "12px 0 0" }}>
                   Changing a validated profile will reopen this cause for human validation and preserve the change in the audit trail.
                 </div>
               )}
               <button type="submit" style={{ ...primaryButton, marginTop: 12 }}>Save RCA Profile</button>
-            </form>
+            </RcaDisciplineForm>
           </details>}
           {cause.status === "validated" && !cause.profile_code && ["escape", "systemic"].includes(cause.cause_type) && (
             <form action={reviewCauseHypothesis} style={{ ...validationNoticeStyle, marginTop: "12px" }}>
@@ -1602,26 +1603,18 @@ function AnalysisNodeForm({ caseId, model, nodes, mode }) {
   );
 }
 
-function CauseStreamForm({ caseId, causeType, title }) {
+function CauseStreamForm({ caseId, causeType, title, people }) {
   return (
     <details style={causeBuilderStyle}>
       <summary style={{ fontWeight: 800, cursor: "pointer", fontSize: "18px" }}>
         {title}
       </summary>
-      <form action={addCauseHypothesis} style={{ marginTop: "16px" }}>
+      <RcaDisciplineForm action={addCauseHypothesis}>
         <input type="hidden" name="case_id" value={caseId} />
         <input type="hidden" name="cause_type" value={causeType} />
-        <RcaLegacyProfileFields />
+        <RcaLegacyProfileFields people={people} />
         <div style={{ ...formGrid, marginTop: "16px" }}>
-          <select name="fishbone_category" defaultValue="process" style={fieldStyle}>
-            <option value="people">Fishbone branch: People</option>
-            <option value="process">Fishbone branch: Process</option>
-            <option value="equipment">Fishbone branch: Equipment</option>
-            <option value="material">Fishbone branch: Material</option>
-            <option value="measurement">Fishbone branch: Measurement</option>
-            <option value="environment">Fishbone branch: Environment</option>
-            <option value="management">Fishbone branch: Management</option>
-          </select>
+          <div style={{ ...fieldStyle, background: "#eef4ff", color: "#173a68", fontWeight: 800 }}>{title}</div>
           <input
             name="statement"
             required
@@ -1650,7 +1643,7 @@ function CauseStreamForm({ caseId, causeType, title }) {
         <button style={{ ...primaryButton, marginTop: "14px" }}>
           Add {label(causeType)} Causal Hypothesis
         </button>
-      </form>
+      </RcaDisciplineForm>
     </details>
   );
 }
