@@ -6,6 +6,7 @@ import PlatformHubsFeature from "../../components/PlatformHubsFeature";
 import HomeConversionSection from "../../components/HomeConversionSection";
 import TrackedLink from "../../components/TrackedLink";
 import NewsletterSignup from "../../components/NewsletterSignup";
+import CustomerJourneyCards from "../../components/CustomerJourneyCards";
 import { copy, locales } from "../../lib/i18n";
 
 const standards = [
@@ -72,7 +73,7 @@ export default async function Home({ params }) {
     <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.map(([code, name]) => <div className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></div>)}</section>
     <section className="customerJourney" id="customer-journey">
       <header><span>YOUR RPG EXCELLENCE JOURNEY</span><h2>From first assessment to verified assurance.</h2><p>Begin with the work you need today. Each stage creates controlled information that supports the next.</p></header>
-      <div className="journeyGrid">{customerJourney.map(([number,title,text],index)=><article key={number}><div><b>{number}</b>{index<customerJourney.length-1&&<i aria-hidden="true">→</i>}</div><h3>{title}</h3><p>{text}</p></article>)}</div>
+      <CustomerJourneyCards stages={customerJourney} />
       <footer><strong>Start with one assessment.</strong><span>Build a connected assurance system as your organisation develops.</span></footer>
     </section>
     <section className="startingPoints" id="solutions"><header><span>CHOOSE WHERE TO START</span><h2>What does your organisation need to achieve?</h2><p>Select an outcome and open the connected RPG Excellence workspace.</p></header><div>{startingPoints.map(([need,product,href])=><Link href={href} key={need}><span>{need}</span><strong>{product}</strong><b>→</b></Link>)}</div></section>
