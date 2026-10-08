@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import styles from "./CustomerJourneyCards.module.css";
+
+const artworkNames = ["start", "understand", "build", "implement", "assure", "demonstrate"];
 
 const stageDetails = [
   { title: "Set up your workspace", message: "Your organisation. Your people. Your systems.", icon: "people", steps: ["Open your account", "Complete your company and site profile", "Register your users", "Assign roles and access", "Select applicable systems and standards"] },
@@ -36,6 +39,8 @@ function JourneyCard({ stage, number }) {
   }} aria-label={`Stage ${number}: ${stage.title}`}>
     <div className={`${styles.rotator} ${flipped ? styles.flipped : ""}`}>
       <div className={`${styles.face} ${styles.front}`} aria-hidden={flipped} inert={flipped}>
+        <Image src={stage.artwork} alt="" fill sizes="(max-width: 600px) 100vw, (max-width: 1050px) 50vw, 33vw" className={styles.artwork} />
+        <div className={styles.shade} aria-hidden="true" />
         <div className={styles.cardTop}><span className={styles.number}>{number}</span><span className={styles.icon}><JourneyIcon type={stage.icon} /></span></div>
         <h3>{stage.title}</h3><p>{stage.message}</p>
         <button ref={frontButton} type="button" onClick={()=>flip(true)} aria-expanded={flipped} aria-controls={`journey-steps-${number}`} aria-label={`View steps: ${stage.title}`}>View steps <span aria-hidden="true">↻</span></button>
@@ -51,6 +56,6 @@ function JourneyCard({ stage, number }) {
 
 export default function CustomerJourneyCards({ stages }) {
   return <div className={styles.grid}>
-    {stages.map(([number, title, message], index) => <JourneyCard key={number} number={number} stage={{ ...stageDetails[index], title, message }} />)}
+    {stages.map(([number, title, message], index) => <JourneyCard key={number} number={number} stage={{ ...stageDetails[index], title, message, artwork: `/journey-cards/${artworkNames[index]}.png` }} />)}
   </div>;
 }
