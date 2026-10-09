@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { atLeast, authorised, loadAssessmentPeople } from "../../../../../lib/assessment-people";
 
 import { updateManagementAction } from "./actions";
 
@@ -55,7 +56,7 @@ export default async function ManagementActionPlanPage({
     error: assessmentError,
   } = await supabase
     .from("assessments")
-    .select("id, standard, status")
+    .select("id, standard, status, organization_id")
     .eq("id", id)
     .eq("owner_id", user.id)
     .single();
@@ -65,6 +66,13 @@ export default async function ManagementActionPlanPage({
   }
 
   const admin = createAdminClient();
+  const people = await loadAssessmentPeople(assessment.organization_id);
+  const actionOwners = people.filter(
+    (person) => atLeast(person, "assessments", "contribute") && authorised(person, "capa_owner", "process_owner", "assessment_owner")
+  );
+  const verifiers = people.filter(
+    (person) => atLeast(person, "assessments", "review") && authorised(person, "effectiveness_verifier")
+  );
 
   const {
     data: findingsData,
@@ -1040,18 +1048,28 @@ export default async function ManagementActionPlanPage({
                           )}
                         </select>
 
-                        <input
-                          name="action_owner"
-                          defaultValue={
-                            plan.action_owner ??
-                            corrective.action_owner ??
-                            ""
-                          }
-                          placeholder="Management owner"
-                          style={
-                            input
-                          }
-                        />
+                        <select
+                          name="action_owner_person_id"
+                          defaultValue={plan.action_owner_person_id ?? corrective.action_owner_person_id ?? ""}
+                          style={input}
+                          required
+                        >
+                          <option value="">Select management action owner</option>
+                          {actionOwners.map((person) => (
+                            <option key={person.id} value={person.id}>{person.name}</option>
+                          ))}
+                        </select>
+
+                        <select
+                          name="verifier_person_id"
+                          defaultValue={plan.verifier_person_id ?? ""}
+                          style={input}
+                        >
+                          <option value="">Select independent verifier</option>
+                          {verifiers.map((person) => (
+                            <option key={person.id} value={person.id}>{person.name}</option>
+                          ))}
+                        </select>
 
                         <input
                           name="target_date"
