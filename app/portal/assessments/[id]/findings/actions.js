@@ -19,6 +19,10 @@ import {
   getAssessmentAccessState,
   requireAssessmentRemediationAccess,
 } from "../../../../../lib/assessment-access";
+import {
+  loadAssessmentPeople,
+  requirePerson,
+} from "../../../../../lib/assessment-people";
 
 const FINDING_STATUSES = [
   "open",
@@ -69,7 +73,7 @@ async function getOwnedAssessment({
     error,
   } = await supabase
     .from("assessments")
-    .select("id, standard, organization_id")
+    .select("id, standard, organization_id, assessment_owner_person_id, effectiveness_verifier_person_id")
     .eq(
       "id",
       assessmentId
@@ -141,7 +145,7 @@ export async function createAssessmentTreatmentCase(formData) {
 
   const { data: finding, error: findingError } = await admin
     .from("assessment_findings")
-    .select("id, finding_type, risk_impact, question_number, finding_statement, objective_evidence, requirement_summary, linked_rca_case_id")
+    .select("id, finding_type, risk_impact, question_number, finding_statement, objective_evidence, requirement_summary, linked_rca_case_id, finding_owner_person_id")
     .eq("id", findingId)
     .eq("assessment_id", assessmentId)
     .eq("owner_id", user.id)
@@ -200,6 +204,8 @@ export async function createAssessmentTreatmentCase(formData) {
           ? "single_assessment"
           : "subscription",
       method: "8d",
+      case_type: treatmentRoute,
+      capa_current_stage: treatmentRoute === "capa" ? "correction" : null,
       source_type: "assessment_finding",
       title: `${treatmentRoute === "8d" ? "8D" : "CAPA"} · ${finding.question_number}`,
       problem_statement:
@@ -210,6 +216,10 @@ export async function createAssessmentTreatmentCase(formData) {
       status: "draft",
       current_discipline: 0,
       detected_at: new Date().toISOString(),
+      accountable_person_id:
+        finding.finding_owner_person_id || assessment.assessment_owner_person_id || null,
+      effectiveness_verifier_person_id:
+        assessment.effectiveness_verifier_person_id || null,
     })
     .select("id, case_reference")
     .single();
@@ -494,10 +504,30 @@ export async function updateCorrectiveAction(
     );
   }
 
-  await getOwnedAssessment({
+  const assessment = await getOwnedAssessment({
     assessmentId,
     userId: user.id,
   });
+
+  const people = await loadAssessmentPeople(assessment.organization_id);
+  const actionOwner = requirePerson(
+    people,
+    cleanText(formData.get("action_owner_person_id")),
+    "Action owner",
+    { moduleKey: "capa_8d", level: "contribute", functions: ["capa_owner"] }
+  );
+  const verifierId = cleanText(formData.get("verifier_person_id"));
+  const verifier = verifierId
+    ? requirePerson(people, verifierId, "Effectiveness verifier", {
+        moduleKey: "capa_8d",
+        level: "review",
+        functions: ["effectiveness_verifier"],
+      })
+    : null;
+
+  if (verifier && verifier.id === actionOwner.id) {
+    throw new Error("The action owner cannot verify their own corrective action.");
+  }
 
   const admin =
     createAdminClient();
@@ -627,12 +657,13 @@ export async function updateCorrectiveAction(
         )
       ),
 
-    action_owner:
-      cleanText(
-        formData.get(
-          "action_owner"
-        )
-      ),
+    action_owner: actionOwner.name,
+    action_owner_person_id: actionOwner.id,
+    verifier_person_id: verifier?.id ?? null,
+    verified_at:
+      controlledActionStatus === "effective"
+        ? new Date().toISOString()
+        : null,
 
     target_date:
       cleanDate(
