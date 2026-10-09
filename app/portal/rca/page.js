@@ -27,7 +27,8 @@ function caseState(item) {
   if (item.status === "closed") return { name: "Closed — verified", tone: "green" };
   if (item.status === "effectiveness_review" || item.current_discipline === 6) return { name: "Awaiting verification", tone: "amber" };
   if (item.status === "cancelled") return { name: "Cancelled", tone: "grey" };
-  return { name: `D${item.current_discipline} · ${label(item.status)}`, tone: "blue" };
+  if(item.case_type === "capa") return { name: `CAPA · ${label(item.capa_current_stage || item.status)}`, tone: "blue" };
+  return { name: `8D · D${item.current_discipline} · ${label(item.status)}`, tone: "blue" };
 }
 
 export default async function RcaRegister({ searchParams }) {
@@ -41,7 +42,7 @@ export default async function RcaRegister({ searchParams }) {
 
   const [organizationsResult, casesResult] = await Promise.all([
     supabase.from("organizations").select("*").eq("owner_id", user.id).order("name"),
-    supabase.from("rca_cases").select("id,case_reference,title,source_type,severity,status,current_discipline,target_close_date,created_at,closed_at,updated_at,organization_id").eq("owner_id", user.id).order("updated_at", { ascending: false }),
+    supabase.from("rca_cases").select("id,case_reference,title,source_type,severity,status,current_discipline,target_close_date,created_at,closed_at,updated_at,organization_id,case_type,capa_current_stage").eq("owner_id", user.id).order("updated_at", { ascending: false }),
   ]);
   if (organizationsResult.error) throw new Error(organizationsResult.error.message);
   if (casesResult.error) throw new Error(casesResult.error.message);
