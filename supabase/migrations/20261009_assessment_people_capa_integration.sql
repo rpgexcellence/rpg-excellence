@@ -1,0 +1,180 @@
+-- Controlled people, access and CAPA integration for clause-based assessments.
+
+alter table public.assessments
+  add column if not exists assessment_owner_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists lead_assessor_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists executive_sponsor_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists approver_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists effectiveness_verifier_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists governance_approved_at timestamptz,
+  add column if not exists governance_approved_by uuid references auth.users(id) on delete set null;
+
+alter table public.assessment_findings
+  add column if not exists process_owner_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists finding_owner_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists closure_approved_by_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists closure_approved_at timestamptz;
+
+alter table public.corrective_actions
+  add column if not exists action_owner_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists verifier_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists verified_at timestamptz;
+
+alter table public.management_action_plan
+  add column if not exists action_owner_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists verifier_person_id uuid references public.organization_people(id) on delete set null;
+
+alter table public.rca_cases
+  add column if not exists accountable_person_id uuid references public.organization_people(id) on delete set null,
+  add column if not exists effectiveness_verifier_person_id uuid references public.organization_people(id) on delete set null;
+
+create index if not exists assessments_lead_assessor_idx
+  on public.assessments(lead_assessor_person_id);
+
+create index if not exists assessment_findings_person_owner_idx
+  on public.assessment_findings(finding_owner_person_id);
+
+create index if not exists corrective_actions_person_owner_idx
+  on public.corrective_actions(action_owner_person_id);
+
+create index if not exists rca_cases_accountable_person_idx
+  on public.rca_cases(accountable_person_id);
+
+create or replace function public.assert_active_organisation_person(
+  target_person uuid,
+  target_organisation uuid,
+  field_label text
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if target_person is null then
+    return;
+  end if;
+
+  if not exists (
+    select 1
+    from public.organization_people
+    where id = target_person
+      and organization_id = target_organisation
+      and account_status = 'active'
+  ) then
+    raise exception '% must be selected from the active Company User list',
+      field_label;
+  end if;
+end
+$$;
+
+create or replace function public.validate_assessment_people()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.assert_active_organisation_person(
+    new.assessment_owner_person_id,
+    new.organization_id,
+    'Assessment owner'
+  );
+
+  perform public.assert_active_organisation_person(
+    new.lead_assessor_person_id,
+    new.organization_id,
+    'Lead assessor'
+  );
+
+  perform public.assert_active_organisation_person(
+    new.executive_sponsor_person_id,
+    new.organization_id,
+    'Executive sponsor'
+  );
+
+  perform public.assert_active_organisation_person(
+    new.approver_person_id,
+    new.organization_id,
+    'Approver'
+  );
+
+  perform public.assert_active_organisation_person(
+    new.effectiveness_verifier_person_id,
+    new.organization_id,
+    'Effectiveness verifier'
+  );
+
+  if new.lead_assessor_person_id is not null
+    and new.approver_person_id = new.lead_assessor_person_id
+  then
+    raise exception 'The lead assessor cannot approve their own assessment';
+  end if;
+
+  return new;
+end
+$$;
+
+drop trigger if exists assessments_validate_people
+  on public.assessments;
+
+create trigger assessments_validate_people
+before insert or update of
+  assessment_owner_person_id,
+  lead_assessor_person_id,
+  executive_sponsor_person_id,
+  approver_person_id,
+  effectiveness_verifier_person_id
+on public.assessments
+for each row
+execute function public.validate_assessment_people();
+
+create or replace function public.validate_assessment_action_people()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  org_id uuid;
+begin
+  select organization_id
+  into org_id
+  from public.assessments
+  where id = new.assessment_id;
+
+  perform public.assert_active_organisation_person(
+    new.action_owner_person_id,
+    org_id,
+    'Action owner'
+  );
+
+  perform public.assert_active_organisation_person(
+    new.verifier_person_id,
+    org_id,
+    'Effectiveness verifier'
+  );
+
+  if new.action_owner_person_id is not null
+    and new.action_owner_person_id = new.verifier_person_id
+  then
+    raise exception 'The action owner cannot verify their own action';
+  end if;
+
+  return new;
+end
+$$;
+
+drop trigger if exists corrective_actions_validate_people
+  on public.corrective_actions;
+
+create trigger corrective_actions_validate_people
+before insert or update of
+  action_owner_person_id,
+  verifier_person_id
+on public.corrective_actions
+for each row
+execute function public.validate_assessment_action_people();
+
+grant execute on function
+  public.assert_active_organisation_person(uuid, uuid, text)
+to authenticated, service_role;
