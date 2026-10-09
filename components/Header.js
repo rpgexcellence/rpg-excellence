@@ -5,7 +5,7 @@ const MICROSOFT_BOOKING_URL =
   "https://bookings.cloud.microsoft/bookwithme/user/3e31957cbcf643eb8e7e828a5eac6aaa%40rpgexcellence.com?anonymous&ismsaljsauthenabled";
 
 const ISO_AT_A_GLANCE = [
-  ["ISO 9001", "Quality management", "iso-9001", "Q"],
+  ["ISO 9001:2026", "Quality management — 2026 edition", "iso-9001", "Q"],
   ["ISO 14001", "Environmental management", "iso-14001", "E"],
   ["ISO 45001", "Occupational health & safety", "iso-45001", "S"],
   ["ISO 22301", "Business continuity", "iso-22301", "B"],
