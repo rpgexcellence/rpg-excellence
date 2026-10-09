@@ -10,6 +10,7 @@ import {
 } from "../../lib/subscription";
 
 const AVAILABLE_ASSESSMENT_STANDARDS = [
+  "ISO 9001:2026",
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
