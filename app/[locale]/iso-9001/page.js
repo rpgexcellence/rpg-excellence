@@ -14,4 +14,3 @@ export default async function Page({ params }) {
   if (!locales.includes(locale)) notFound();
   return <PageShell locale={locale}><StandardGuide guide={getStandardGuide("iso-9001")} locale={locale} /></PageShell>;
 }
-
