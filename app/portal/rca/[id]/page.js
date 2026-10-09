@@ -146,6 +146,7 @@ export default async function RcaCasePage({
   }
 
   const rcaCase = caseResult.data;
+  if (rcaCase.case_type === "capa") redirect(`/portal/rca/${id}/capa`);
   const { data: linkedAuditAction, error: linkedAuditActionError } = await supabase
     .from("internal_audit_action_access").select("id, status, audit_id")
     .eq("rca_case_id", id).eq("owner_id", user.id).limit(1).maybeSingle();
@@ -309,6 +310,14 @@ export default async function RcaCasePage({
             </div>
           </div>
           <div style={{ display: "flex", gap: "10px" }}>
+            {rcaCase.assessment_id && (
+              <Link
+                href={`/portal/assessments/${rcaCase.assessment_id}/findings`}
+                style={linkButton}
+              >
+                ← Source assessment
+              </Link>
+            )}
             <Link href={`/portal/rca/${id}/summary`} style={primaryLinkButton}>
               Executive Summary
             </Link>
