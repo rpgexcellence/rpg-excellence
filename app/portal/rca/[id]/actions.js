@@ -443,6 +443,30 @@ async function persistDiscipline(formData) {
       .eq("owner_id", user.id);
 
     if (caseError) throw new Error(caseError.message);
+
+    /*
+     * Keep the originating assessment finding in step with CAPA-8D.
+     * D8 completion moves the finding to independent verification; it
+     * never bypasses the assessment approver's formal closure decision.
+     */
+    if (
+      discipline === 8 &&
+      rcaCase.assessment_id &&
+      rcaCase.assessment_finding_id
+    ) {
+      const { error: findingSyncError } = await supabase
+        .from("assessment_findings")
+        .update({
+          status: "verification",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", rcaCase.assessment_finding_id)
+        .eq("assessment_id", rcaCase.assessment_id)
+        .eq("owner_id", user.id)
+        .neq("status", "closed");
+
+      if (findingSyncError) throw new Error(findingSyncError.message);
+    }
   }
 
   await supabase.from("rca_case_events").insert({
