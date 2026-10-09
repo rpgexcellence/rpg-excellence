@@ -1,28 +1,18 @@
-"use client";
-import {useMemo,useState} from "react";
+import Link from "next/link";
+import AssessmentGovernanceForm from "../../../../../components/AssessmentGovernanceForm";
+import {requireAssessmentOrganizationAccess} from "../../../../../lib/assessment-organization-access";
+import {loadAssessmentPeople,personName} from "../../../../../lib/assessment-people";
+import {saveAssessmentGovernance} from "./actions";
 
-const Field=({label,help,children})=><label style={{display:"grid",gap:7,fontWeight:850,color:"#102640"}}><span>{label}</span>{children}<small style={{color:"#647b92",fontWeight:500,lineHeight:1.4}}>{help}</small></label>;
-const selectStyle={width:"100%",minWidth:0,height:48,padding:"0 13px",border:"1px solid #cad8e7",borderRadius:10,background:"#fff",font:"inherit",color:"#102640"};
-export default function AssessmentGovernanceForm({action,assessment,people}){
- const [lead,setLead]=useState(assessment.lead_assessor_person_id||"");
- const [approver,setApprover]=useState(assessment.approver_person_id||"");
- const option=(person)=><option key={person.id} value={person.id}>{person.name}{person.position?` · ${person.position}`:""}</option>;
- const owners=useMemo(()=>people.filter(p=>["contribute","review","approve","admin"].includes(p.assessmentLevel)&&p.functions.includes("assessment_owner")),[people]);
- const leads=useMemo(()=>people.filter(p=>["contribute","review","approve","admin"].includes(p.assessmentLevel)&&p.functions.some(f=>["lead_assessor","auditor"].includes(f))),[people]);
- const sponsors=useMemo(()=>people.filter(p=>p.assessmentLevel!=="none"),[people]);
- const approvers=useMemo(()=>people.filter(p=>["approve","admin"].includes(p.assessmentLevel)&&p.functions.includes("approver")&&p.id!==lead),[people,lead]);
- const verifiers=useMemo(()=>people.filter(p=>["review","approve","admin"].includes(p.assessmentLevel)&&p.functions.includes("effectiveness_verifier")&&p.id!==lead),[people,lead]);
- return <form action={action} style={{display:"grid",gap:22}}>
-  <input type="hidden" name="assessment_id" value={assessment.id}/>
-  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:18}}>
-   <Field label="Assessment owner *" help="Accountable for scope, resources, progress and controlled completion."><select style={selectStyle} name="assessment_owner_person_id" required defaultValue={assessment.assessment_owner_person_id||""}><option value="">Select authorised assessment owner</option>{owners.map(option)}</select></Field>
-   <Field label="Lead assessor *" help="Must hold Assessments access and an authorised Lead Assessor or Auditor function."><select style={selectStyle} name="lead_assessor_person_id" required value={lead} onChange={e=>{setLead(e.target.value);if(e.target.value===approver)setApprover("")}}><option value="">Select authorised lead assessor</option>{leads.map(option)}</select></Field>
-   <Field label="Executive sponsor *" help="Leadership contact responsible for resources, barriers and management attention."><select style={selectStyle} name="executive_sponsor_person_id" required defaultValue={assessment.executive_sponsor_person_id||""}><option value="">Select executive sponsor</option>{sponsors.map(option)}</select></Field>
-   <Field label="Assessment approver *" help="Cannot be the lead assessor. Requires Approve or Admin access and the Approver function."><select style={selectStyle} name="approver_person_id" required value={approver} onChange={e=>setApprover(e.target.value)}><option value="">Select independent approver</option>{approvers.map(option)}</select></Field>
-   <Field label="Effectiveness verifier *" help="Independent Company User who verifies corrective-action effectiveness."><select style={selectStyle} name="effectiveness_verifier_person_id" required defaultValue={assessment.effectiveness_verifier_person_id||""}><option value="">Select independent verifier</option>{verifiers.map(option)}</select></Field>
-  </div>
-  {!people.length&&<p style={{color:"#b42318"}}>No active Company Users are available. Add users under Administration → People, Roles &amp; Access.</p>}
-  <label style={{display:"flex",gap:10,alignItems:"flex-start",fontWeight:750,color:"#334b65"}}><input type="checkbox" name="approval_confirmation" required style={{marginTop:3}}/><span>I confirm that the nominated people are authorised, competent for their assigned functions and sufficiently independent for approval and effectiveness verification.</span></label>
-  <button style={{justifySelf:"start",padding:"13px 19px",border:0,borderRadius:10,background:"#245ee8",color:"#fff",fontWeight:900,cursor:"pointer"}}>Save controlled governance</button>
- </form>;
+export default async function AssessmentGovernancePage({params,searchParams}){
+ const {id}=await params,query=await searchParams;
+ const access=await requireAssessmentOrganizationAccess(id,"view"),assessment=access.assessment;
+ const people=await loadAssessmentPeople(assessment.organization_id),byId=new Map(people.map(p=>[p.id,p]));
+ const assignments=[['Assessment owner',assessment.assessment_owner_person_id],['Lead assessor',assessment.lead_assessor_person_id],['Executive sponsor',assessment.executive_sponsor_person_id],['Approver',assessment.approver_person_id],['Effectiveness verifier',assessment.effectiveness_verifier_person_id]];
+ return <main style={{minHeight:"100vh",background:"#edf3fa",padding:"36px clamp(18px,4vw,54px)",color:"#071a33",fontFamily:"Arial,sans-serif"}}><div style={{maxWidth:1200,margin:"0 auto"}}>
+  <header style={{display:"flex",justifyContent:"space-between",gap:20,alignItems:"flex-start",flexWrap:"wrap",marginBottom:22}}><div><span style={{color:"#245ee8",fontWeight:950,fontSize:11,letterSpacing:".12em"}}>CONTROLLED ASSESSMENT GOVERNANCE</span><h1 style={{margin:"6px 0",fontSize:36}}>People roles and access</h1><p style={{margin:0,color:"#617890"}}>{assessment.standard} · Company Users and segregation of duties</p></div><div style={{display:"flex",gap:10}}><Link href={`/portal/assessments/${id}`} style={{padding:"11px 15px",border:"1px solid #cad8e7",borderRadius:9,background:"#fff",color:"#071a33",textDecoration:"none",fontWeight:850}}>← Assessment</Link><Link href="/portal/company/people" style={{padding:"11px 15px",borderRadius:9,background:"#071a33",color:"#fff",textDecoration:"none",fontWeight:850}}>Manage Company Users</Link></div></header>
+  {query?.saved&&<div style={{padding:"14px 17px",border:"1px solid #98d6bc",borderRadius:10,background:"#eefaf5",color:"#08704a",fontWeight:850,marginBottom:16}}>Controlled governance saved and recorded in the access audit trail.</div>}
+  <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12,marginBottom:16}}>{assignments.map(([label,id])=><div key={label} style={{padding:17,border:"1px solid #d7e2ed",borderRadius:12,background:"#fff"}}><small style={{color:"#657b91",fontWeight:850}}>{label}</small><strong style={{display:"block",marginTop:7}}>{id?personName(byId.get(id)):"Not assigned"}</strong></div>)}</section>
+  <section style={{padding:"26px",border:"1px solid #d7e2ed",borderRadius:16,background:"#fff"}}><h2 style={{marginTop:0}}>Controlled role assignment</h2><p style={{color:"#617890",lineHeight:1.6}}>Only active Company Users with the required Assessments permission and professional authorisation are available for controlled roles. Configure missing permissions under Administration → People, Roles &amp; Access.</p>{access.level==="admin"||access.level==="owner"?<AssessmentGovernanceForm action={saveAssessmentGovernance} assessment={assessment} people={people}/>:<p style={{padding:14,background:"#fff8e8",color:"#8a6116",borderRadius:9,fontWeight:800}}>You can view governance, but Assessments Admin access is required to change it.</p>}</section>
+ </div></main>;
 }
