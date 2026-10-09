@@ -10,7 +10,7 @@ import CustomerJourneyCards from "../../components/CustomerJourneyCards";
 import { copy, locales } from "../../lib/i18n";
 
 const standards = [
-  ["ISO 9001", "Quality Management", "iso-9001", "blue", "Strengthen process control, customer focus and continual improvement."],
+  ["ISO 9001:2026", "Quality Management", "iso-9001", "blue", "Strengthen quality culture, ethical leadership, process control and customer confidence."],
   ["ISO 14001", "Environmental Management", "iso-14001", "green", "Control environmental aspects, obligations, risks and operational impact."],
   ["ISO 45001", "Occupational Health & Safety", "iso-45001", "orange", "Manage hazards, worker participation and occupational health and safety risk."],
   ["ISO 22301", "Business Continuity", "iso-22301", "purple", "Build resilient operations through impact analysis, continuity plans and exercising."],
@@ -70,7 +70,7 @@ export default async function Home({ params }) {
       <div className="homeHeroCopy"><div className="homeEyebrow">AUDIT&nbsp;&nbsp; | &nbsp;&nbsp;IMPROVE&nbsp;&nbsp; | &nbsp;&nbsp;SUSTAIN</div><h1>Audit with evidence.<br /><span>Improve with confidence.</span></h1><p>One controlled platform for ISO audits, findings, CAPA-8D and effectiveness verification.</p><div className="homeCtas"><TrackedLink href="/portal" event="assessment_cta_clicked" eventParams={{location:"homepage_hero"}} className="homePrimaryCta">Start free assessment <span>→</span></TrackedLink><a href="#customer-journey" className="homeSecondaryCta"><span className="playIcon">▶</span> See how it works</a><TrackedLink href="/portal/login?mode=create" event="account_creation_clicked" eventParams={{location:"homepage_hero"}} className="homeAccountCta">Create free account <span>→</span></TrackedLink></div><div className="homeTrust"><span>✓ Get started in minutes</span><span>✓ No credit card required</span><span>✓ 14-day subscription trial</span></div></div>
       <ProductDashboard />
     </section>
-    <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.map(([code, name]) => <div className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></div>)}</section>
+    <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.map(([code, name, slug]) => <Link href={`/${locale}/${slug}`} className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></Link>)}</section>
     <section className="customerJourney" id="customer-journey">
       <header><span>YOUR RPG EXCELLENCE JOURNEY</span><h2>From first assessment to verified assurance.</h2><p>Begin with the work you need today. Each stage creates controlled information that supports the next.</p></header>
       <CustomerJourneyCards stages={customerJourney} />
