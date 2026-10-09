@@ -96,3 +96,10 @@
 @media(max-width:1190px){.steps li,.value p{font-size:17px}.records{font-size:15px}.executiveInsight ul{grid-template-columns:1fr}.executiveInsight{padding:20px}}
 @media(max-width:950px){.videoPanel{max-width:none}.heroCopy h1{max-width:none}.executiveInsight ul{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:600px){.executiveInsight ul{grid-template-columns:1fr;gap:16px}.executiveInsight>p:not(.insightLabel){font-size:17px}.back{padding:24px}.steps li,.value p{font-size:17px}.records{font-size:15px}}
+
+/* Simplified commercial section: readable entry points and one worked example. */
+.explore{padding-block:16px 32px}.priorityGrid article{padding:28px;gap:20px}.priorityGrid h3{font-size:25px;line-height:1.25}.priorityGrid p{font-size:18px;line-height:1.65}.priorityGrid a{font-size:17px}
+.scenario{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:36px;padding:36px}.scenarioIntro>p:not(.eyebrow){font-size:18px;line-height:1.65}.scenarioSteps{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.scenarioSteps li{padding:24px}.scenarioSteps li+li:before{display:none}.scenarioSteps h3{font-size:21px}.scenarioSteps p{font-size:17px;line-height:1.6}.scenarioSteps li>span{margin-bottom:12px}
+.benefits{padding-block:0 28px}.capabilities{margin-top:0}.capabilities summary{font-size:18px;padding:22px 0}.capabilityGrid h3{font-size:19px}.capabilityGrid p{font-size:17px;line-height:1.6}
+@media(max-width:1100px){.scenario{grid-template-columns:1fr}.priorityGrid h3{font-size:23px}.priorityGrid p{font-size:17px}}
+@media(max-width:600px){.priorityGrid article{padding:22px;gap:16px}.priorityGrid h3{font-size:22px}.scenario{padding:24px;gap:22px}.scenarioSteps{grid-template-columns:1fr}.scenarioSteps li{padding:20px}.scenarioSteps p{font-size:17px}.capabilities{padding-inline:18px}}
