@@ -20,6 +20,7 @@ import { calculateSimpleOverallScore } from "./assessments/[id]/scoring";
 export const metadata = { title: "RPG Intelligence Dashboard" };
 
 const assessmentStandards = [
+  ["ISO 9001:2026", "ISO 9001:2026 — Quality Management"],
   ["ISO 9001:2015/Amd 1:2024", "ISO 9001 — Quality Management"],
   ["ISO 14001:2026", "ISO 14001 — Environmental Management"],
   [
