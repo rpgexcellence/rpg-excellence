@@ -7,12 +7,12 @@ import styles from "./CustomerJourneyCards.module.css";
 const artworkNames = ["start", "understand", "build", "implement", "assure", "demonstrate"];
 
 const stageDetails = [
-  { title: "Set up your workspace", message: "Your organisation. Your people. Your systems.", icon: "people", steps: ["Open your account", "Complete your company and site profile", "Register your users", "Assign roles and access", "Select applicable systems and standards"] },
-  { title: "Understand your starting point", message: "Know where you stand and what needs attention.", icon: "search", steps: ["Complete a readiness assessment", "Identify applicable requirements", "Assess risks and obligations", "Prioritise the gaps that need attention"] },
-  { title: "Build your management system", message: "Turn requirements into organised controls.", icon: "system", steps: ["Define responsibilities", "Set objectives and measures", "Create controlled registers", "Connect procedures with supporting evidence"] },
-  { title: "Put plans into action", message: "Give everyone clarity on what happens next.", icon: "plan", steps: ["Assign actions and responsibilities", "Manage suppliers and contacts", "Develop competence and retain evidence", "Prepare continuity arrangements"] },
-  { title: "Check and improve", message: "See what works and strengthen what needs attention.", icon: "chart", steps: ["Conduct audits", "Investigate findings and their causes", "Verify corrective actions", "Review performance and improve"] },
-  { title: "Demonstrate", icon: "report", steps: ["Compile management-ready reports", "Connect reports to supporting evidence", "Review assurance and outstanding actions", "Prepare for certification and stakeholder review"] },
+  { title: "Set up your workspace", message: "Your organisation. Your people. Your systems.", icon: "people", value: "Reduce setup coordination and establish clear ownership, access and applicable systems in one workspace.", steps: ["Open your account", "Complete your company and site profile", "Register your users", "Assign roles and access", "Select applicable systems and standards"] },
+  { title: "Understand your starting point", message: "Know where you stand and what needs attention.", icon: "search", value: "Focus time and resources on the gaps and risks that matter most to your organisation.", steps: ["Complete a readiness assessment", "Identify applicable requirements", "Assess risks and obligations", "Prioritise the gaps that need attention"] },
+  { title: "Build your management system", message: "Turn requirements into organised controls.", icon: "system", value: "Reduce duplicated work by connecting responsibilities, controls, registers and supporting evidence.", steps: ["Define responsibilities", "Set objectives and measures", "Create controlled registers", "Connect procedures with supporting evidence"] },
+  { title: "Put plans into action", message: "Give everyone clarity on what happens next.", icon: "plan", value: "Help teams deliver agreed actions with clear ownership and retained evidence of implementation.", steps: ["Assign actions and responsibilities", "Manage suppliers and contacts", "Develop competence and retain evidence", "Prepare continuity arrangements"] },
+  { title: "Check and improve", message: "See what works and strengthen what needs attention.", icon: "chart", value: "Reduce repeat problems by linking findings to root causes, corrective actions and effectiveness checks.", steps: ["Conduct audits", "Investigate findings and their causes", "Verify corrective actions", "Review performance and improve"] },
+  { title: "Demonstrate", icon: "report", value: "Reduce time spent assembling assurance information for management, customers and certification reviews.", steps: ["Compile management-ready reports", "Connect reports to supporting evidence", "Review assurance and outstanding actions", "Prepare for certification and stakeholder review"] },
 ];
 
 function JourneyIcon({ type }) {
@@ -46,8 +46,12 @@ function JourneyCard({ stage, number }) {
         <button ref={frontButton} type="button" onClick={()=>flip(true)} aria-expanded={flipped} aria-controls={`journey-steps-${number}`} aria-label={`View steps: ${stage.title}`}>View steps <span aria-hidden="true">↻</span></button>
       </div>
       <div id={`journey-steps-${number}`} className={`${styles.face} ${styles.back}`} aria-hidden={!flipped} inert={!flipped}>
-        <span className={styles.number}>{number}</span><h3>{stage.title}</h3>
-        <ol>{stage.steps.map(step=><li key={step}><span aria-hidden="true">✓</span>{step}</li>)}</ol>
+        <Image src={stage.artwork} alt="" fill sizes="(max-width: 600px) 100vw, (max-width: 1050px) 50vw, 33vw" className={styles.artwork} />
+        <div className={styles.backShade} aria-hidden="true" />
+        <div className={styles.backTop}><span className={styles.number}>{number}</span><span className={styles.backLabel}>YOUR NEXT STEPS</span><span className={styles.icon}><JourneyIcon type={stage.icon} /></span></div>
+        <h3>{stage.title}</h3>
+        <ol>{stage.steps.map((step, index)=><li key={step}><span aria-hidden="true">{String(index+1).padStart(2,"0")}</span>{step}</li>)}</ol>
+        <div className={styles.valuePanel}><strong>Business value</strong><p>{stage.value}</p></div>
         <button ref={backButton} type="button" onClick={()=>flip(false)} aria-label={`Back to overview: ${stage.title}`}><span aria-hidden="true">↶</span> Back</button>
       </div>
     </div>
