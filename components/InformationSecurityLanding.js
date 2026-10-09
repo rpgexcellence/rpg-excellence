@@ -94,7 +94,7 @@ export default function InformationSecurityLanding({ locale = "en" }) {
             src="https://www.youtube-nocookie.com/embed/QjWB-7huCrQ?autoplay=1&playsinline=1&rel=0"
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /> :
             <button className={styles.videoButton} type="button" onClick={() => setPlaying(true)} aria-label="Watch Information Security Risk: From Assessment to Accountable Action, 1 minute 9 seconds">
-              <Image className={styles.videoArt} src="/isms-journey/controls.png" fill sizes="(max-width: 950px) 90vw, 600px" alt="" priority />
+              <Image className={styles.videoArt} src="/isms-journey/controls.png" fill sizes="(max-width: 950px) 90vw, 46vw" alt="" priority />
               <span className={styles.videoCopy}><span className={styles.videoTitle}>From assessment<br/>to accountable action.</span><span className={styles.videoDuration}>Watch the overview · 1:09</span><span className={styles.playIcon} aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5v14l11-7z" fill="currentColor"/></svg></span></span>
             </button>}
         </div>
@@ -108,7 +108,7 @@ export default function InformationSecurityLanding({ locale = "en" }) {
         {stages.map((stage, index) => <article key={stage.id} className={styles.card} style={{ "--card-tint": stage.tint, "--card-accent": stage.accent }} aria-label={`${index + 1}. ${stage.title}`} onKeyDown={event => { if (event.key === "Escape" && flipped[index]) { event.preventDefault(); turnCard(index, false); } }}>
           <div className={`${styles.cardInner} ${flipped[index] ? styles.isFlipped : ""}`}>
             <div className={`${styles.face} ${styles.front}`} aria-hidden={flipped[index]} inert={flipped[index] ? true : undefined}>
-              <div className={styles.illustration}><Image src={`/isms-journey/${stage.id}.png`} fill sizes="(max-width: 600px) 90vw, (max-width: 950px) 44vw, (max-width: 1190px) 30vw, 240px" alt=""/><span className={styles.number}>{String(index + 1).padStart(2, "0")}</span></div>
+              <div className={styles.illustration}><Image src={`/isms-journey/${stage.id}.png`} fill sizes="(max-width: 600px) 90vw, (max-width: 950px) 44vw, 31vw" alt=""/><span className={styles.number}>{String(index + 1).padStart(2, "0")}</span></div>
               <div className={styles.frontCopy}><h3>{stage.title}</h3><p>{stage.benefit}</p><button ref={node => { frontButtons.current[index] = node; }} className={styles.flipButton} type="button" onClick={() => turnCard(index, true)} aria-label={`View steps for ${stage.title}`}>View steps <span aria-hidden="true">↻</span></button></div>
             </div>
             <div className={`${styles.face} ${styles.back}`} aria-hidden={!flipped[index]} inert={!flipped[index] ? true : undefined}>
@@ -122,6 +122,33 @@ export default function InformationSecurityLanding({ locale = "en" }) {
         </article>)}
       </div>
     </section>
+
+    <section className={`${styles.container} ${styles.explore}`} aria-labelledby="isms-explore-title">
+      <div className={styles.commercialHeading}><p className={styles.eyebrow}>START WITH YOUR PRIORITY</p><h2 id="isms-explore-title">Explore by your priority</h2><p>Choose the work that matters now, then follow the connections through your ISMS.</p></div>
+      <div className={styles.priorityGrid}>
+        <article><span className={`${styles.benefitIcon} ${styles.mint}`}><BenefitIcon type="document"/></span><div><h3>Understand ISO/IEC 27001 readiness</h3><p>Identify gaps, organise supporting evidence and define improvement priorities.</p><Link href="/portal/information-security">Explore gap analysis <span aria-hidden="true">→</span></Link></div></article>
+        <article><span className={`${styles.benefitIcon} ${styles.lavender}`}><BenefitIcon type="target"/></span><div><h3>Prioritise security risks</h3><p>Connect assessment, control decisions and treatment to accountable owners.</p><Link href="/portal/information-security/risk-management">Explore risk management <span aria-hidden="true">→</span></Link></div></article>
+        <article><span className={`${styles.benefitIcon} ${styles.apricot}`}><BenefitIcon type="people"/></span><div><h3>Justify your control decisions</h3><p>Review applicability, ownership, implementation status and evidence.</p><Link href="/portal/soa">Explore the SoA <span aria-hidden="true">→</span></Link></div></article>
+      </div>
+    </section>
+
+    <section className={`${styles.container} ${styles.scenario}`} aria-labelledby="isms-scenario-title">
+      <div className={styles.scenarioIntro}><p className={styles.eyebrow}>ILLUSTRATIVE SCENARIO</p><h2 id="isms-scenario-title">A lost laptop.<br/>A traceable response.</h2><p>Follow a security-risk decision from assessed exposure to owned treatment and review evidence.</p><Link className={styles.textLink} href="/portal/information-security/risk-management">Explore the risk workspace <span aria-hidden="true">→</span></Link></div>
+      <ol className={styles.scenarioSteps}>
+        <li><span>01</span><h3>Assess exposure</h3><p>Consider the information involved, possible consequences and existing protection.</p></li>
+        <li><span>02</span><h3>Review controls</h3><p>Review relevant safeguards, their applicability and evidence of implementation.</p></li>
+        <li><span>03</span><h3>Assign treatment</h3><p>Define further action, the accountable owner and the intended outcome.</p></li>
+        <li><span>04</span><h3>Verify evidence</h3><p>Review implementation evidence and revisit the residual-risk decision.</p></li>
+      </ol>
+    </section>
+
+    <section className={`${styles.container} ${styles.outputs}`} aria-labelledby="isms-outputs-title"><div className={styles.commercialHeading}><h2 id="isms-outputs-title">What your team can manage</h2><p>Build a clear record of what matters, what was decided and what still needs attention.</p></div><ul className={styles.outputGrid}>
+      <li><strong>Defined scope</strong><span>Boundaries, requirements and responsibilities.</span></li>
+      <li><strong>Assessed risks</strong><span>Exposure, rationale and accountable owners.</span></li>
+      <li><strong>Justified SoA</strong><span>Control applicability and supporting decisions.</span></li>
+      <li><strong>Owned treatments</strong><span>Actions, due dates and acceptance decisions.</span></li>
+      <li><strong>Review evidence</strong><span>Implementation records and management priorities.</span></li>
+    </ul></section>
 
     <section className={`${styles.container} ${styles.benefits}`} aria-labelledby="isms-benefits-title">
       <h2 id="isms-benefits-title">What your team gains</h2>
