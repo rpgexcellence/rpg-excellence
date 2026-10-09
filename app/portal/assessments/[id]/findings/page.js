@@ -5,6 +5,11 @@ import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { getAssessmentAccessState } from "../../../../../lib/assessment-access";
 import {
+  atLeast,
+  authorised,
+  loadAssessmentPeople,
+} from "../../../../../lib/assessment-people";
+import {
   createAssessmentTreatmentCase,
   updateFindingStatus,
   updateCorrectiveAction,
@@ -145,6 +150,14 @@ export default async function FindingsPage({
 
   const admin =
     createAdminClient();
+
+  const people = await loadAssessmentPeople(assessment.organization_id);
+  const actionOwners = people.filter(
+    (person) => atLeast(person, "capa_8d", "contribute") && authorised(person, "capa_owner")
+  );
+  const verifiers = people.filter(
+    (person) => atLeast(person, "capa_8d", "review") && authorised(person, "effectiveness_verifier")
+  );
 
   const accessState = await getAssessmentAccessState(
     user.id,
@@ -1026,14 +1039,9 @@ export default async function FindingsPage({
                                 gap: "12px",
                               }}
                             >
-                              <input
-                                name="action_owner"
-                                type="text"
-                                defaultValue={
-                                  action?.action_owner ??
-                                  ""
-                                }
-                                placeholder="Action owner"
+                              <select
+                                name="action_owner_person_id"
+                                defaultValue={action?.action_owner_person_id ?? ""}
                                 style={{
                                   padding:
                                     "12px",
@@ -1041,8 +1049,31 @@ export default async function FindingsPage({
                                     "8px",
                                   border:
                                     "1px solid #d8e0ea",
+                                  background: "#ffffff",
                                 }}
-                              />
+                                required
+                              >
+                                <option value="">Select action owner</option>
+                                {actionOwners.map((person) => (
+                                  <option key={person.id} value={person.id}>{person.name}</option>
+                                ))}
+                              </select>
+
+                              <select
+                                name="verifier_person_id"
+                                defaultValue={action?.verifier_person_id ?? ""}
+                                style={{
+                                  padding: "12px",
+                                  borderRadius: "8px",
+                                  border: "1px solid #d8e0ea",
+                                  background: "#ffffff",
+                                }}
+                              >
+                                <option value="">Select independent verifier</option>
+                                {verifiers.map((person) => (
+                                  <option key={person.id} value={person.id}>{person.name}</option>
+                                ))}
+                              </select>
 
                               <input
                                 name="target_date"
