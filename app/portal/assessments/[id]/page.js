@@ -14,6 +14,7 @@ import {
 } from "./scoring";
 
 const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO 9001:2026",
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
   "ISO 45001:2018",
@@ -165,6 +166,16 @@ export default async function AssessmentPage({
     (question) =>
       question.clause === clause
   );
+
+  let annexGuidance = [];
+  if (assessment.standard === "ISO 9001:2026") {
+    const { data } = await supabase
+      .from("assessment_annex_guidance")
+      .select("reference,title,guidance,scored")
+      .eq("standard", assessment.standard)
+      .order("display_order", { ascending: true });
+    annexGuidance = data ?? [];
+  }
 
   // Load formal findings and corrective actions for advanced assessments.
   let assessmentFindings = [];
@@ -548,6 +559,20 @@ export default async function AssessmentPage({
               marginBottom: "18px",
             }}
           >
+            <Link
+              href={`/portal/assessments/${assessment.id}/governance`}
+              style={{
+                padding: "11px 16px",
+                borderRadius: "8px",
+                background: "#5B42D6",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              People, Roles &amp; Access
+            </Link>
+
             {isIso27001Assessment && (
               <Link
                 href={`/portal/assessments/${assessment.id}/soa`}
@@ -921,6 +946,25 @@ export default async function AssessmentPage({
           </details>
         )}
 
+        {assessment.standard === "ISO 9001:2026" && annexGuidance.length > 0 && (
+          <details style={{ background: "#f7f5ff", border: "1px solid #d9cff6", borderRadius: "12px", padding: "16px 18px", marginBottom: "20px" }}>
+            <summary style={{ cursor: "pointer", color: "#442878", fontWeight: 850 }}>
+              Annex A interpretation guidance — informative and not scored
+            </summary>
+            <p style={{ color: "#617087", lineHeight: 1.6 }}>
+              Use this material to interpret and apply the requirements consistently. It does not create additional conformity requirements.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "10px" }}>
+              {annexGuidance.map((item) => (
+                <div key={item.reference} style={{ background: "white", border: "1px solid #e4def5", borderRadius: "8px", padding: "12px" }}>
+                  <strong style={{ color: "#071A33" }}>{item.reference} {item.title}</strong>
+                  <div style={{ color: "#617087", lineHeight: 1.5, marginTop: "5px" }}>{item.guidance}</div>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
         {/* Assessment form */}
         <form
           action={
@@ -1125,6 +1169,30 @@ export default async function AssessmentPage({
                                   Requirement summary:
                                 </strong>{" "}
                                 {question.requirement_summary}
+                              </div>
+                            )}
+
+                            {question.practical_application && (
+                              <div style={{ background: "#eefaf8", borderLeft: "4px solid #17a89b", padding: "12px 14px", borderRadius: "6px", color: "#40566f", lineHeight: 1.55, fontSize: "14px" }}>
+                                <strong style={{ color: "#071A33" }}>Practical application:</strong>{" "}{question.practical_application}
+                              </div>
+                            )}
+
+                            {question.applicability_guidance && (
+                              <div style={{ background: "#fff8e8", padding: "12px 14px", borderRadius: "8px", color: "#735c17", lineHeight: 1.55, fontSize: "14px" }}>
+                                <strong>Applicability:</strong>{" "}{question.applicability_guidance}
+                              </div>
+                            )}
+
+                            {question.documented_information_guidance && (
+                              <div style={{ background: "#f5f8fc", padding: "12px 14px", borderRadius: "8px", color: "#617087", lineHeight: 1.55, fontSize: "14px" }}>
+                                <strong style={{ color: "#071A33" }}>Documented information:</strong>{" "}{question.documented_information_guidance}
+                              </div>
+                            )}
+
+                            {question.related_requirements && (
+                              <div style={{ background: "#f7f5ff", padding: "12px 14px", borderRadius: "8px", color: "#442878", lineHeight: 1.55, fontSize: "14px" }}>
+                                <strong>Connected workflow:</strong>{" "}{question.related_requirements}
                               </div>
                             )}
 
