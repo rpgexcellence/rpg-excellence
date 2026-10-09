@@ -130,16 +130,16 @@ export default function InformationSecurityLanding({ locale = "en" }) {
     </section>
 
     <section className={`${styles.container} ${styles.explore}`} aria-labelledby="isms-explore-title">
-      <div className={styles.commercialHeading}><p className={styles.eyebrow}>START WITH YOUR PRIORITY</p><h2 id="isms-explore-title">Explore by your priority</h2><p>Choose the work that matters now, then follow the connections through your ISMS.</p></div>
+      <div className={styles.commercialHeading}><p className={styles.eyebrow}>START WITH YOUR PRIORITY</p><h2 id="isms-explore-title">Where do you want to start?</h2><p>Choose one starting point. Explore the detail when you need it.</p></div>
       <div className={styles.priorityGrid}>
-        <article><span className={`${styles.benefitIcon} ${styles.mint}`}><BenefitIcon type="document"/></span><div><h3>Understand ISO/IEC 27001 readiness</h3><p>Identify gaps, organise supporting evidence and define improvement priorities.</p><Link href="/portal/information-security">Explore gap analysis <span aria-hidden="true">→</span></Link></div></article>
-        <article><span className={`${styles.benefitIcon} ${styles.lavender}`}><BenefitIcon type="target"/></span><div><h3>Prioritise security risks</h3><p>Connect assessment, control decisions and treatment to accountable owners.</p><Link href="/portal/information-security/risk-management">Explore risk management <span aria-hidden="true">→</span></Link></div></article>
-        <article><span className={`${styles.benefitIcon} ${styles.apricot}`}><BenefitIcon type="people"/></span><div><h3>Justify your control decisions</h3><p>Review applicability, ownership, implementation status and evidence.</p><Link href="/portal/soa">Explore the SoA <span aria-hidden="true">→</span></Link></div></article>
+        <article><span className={`${styles.benefitIcon} ${styles.mint}`}><BenefitIcon type="document"/></span><div><h3>Understand ISO/IEC 27001 readiness</h3><p>Know what needs attention before committing time and budget. Review gaps and organise the evidence behind your priorities.</p><Link href="/portal/information-security">Explore gap analysis <span aria-hidden="true">→</span></Link></div></article>
+        <article><span className={`${styles.benefitIcon} ${styles.lavender}`}><BenefitIcon type="target"/></span><div><h3>Prioritise security risks</h3><p>Focus effort where exposure matters most. Connect assessment, control decisions and treatment to accountable owners.</p><Link href="/portal/information-security/risk-management">Explore risk management <span aria-hidden="true">→</span></Link></div></article>
+        <article><span className={`${styles.benefitIcon} ${styles.apricot}`}><BenefitIcon type="people"/></span><div><h3>Justify your control decisions</h3><p>Explain why protection is needed. Connect control applicability, ownership and implementation evidence in your Statement of Applicability.</p><Link href="/portal/soa">Explore the SoA <span aria-hidden="true">→</span></Link></div></article>
       </div>
     </section>
 
     <section className={`${styles.container} ${styles.scenario}`} aria-labelledby="isms-scenario-title">
-      <div className={styles.scenarioIntro}><p className={styles.eyebrow}>ILLUSTRATIVE SCENARIO</p><h2 id="isms-scenario-title">A lost laptop.<br/>A traceable response.</h2><p>Follow a security-risk decision from assessed exposure to owned treatment and review evidence.</p><Link className={styles.textLink} href="/portal/information-security/risk-management">Explore the risk workspace <span aria-hidden="true">→</span></Link></div>
+      <div className={styles.scenarioIntro}><p className={styles.eyebrow}>ILLUSTRATIVE SCENARIO</p><h2 id="isms-scenario-title">A lost laptop.<br/>A traceable response.</h2><p>What information was exposed? Were safeguards adequate? Who owns the next action? Follow one decision through four clear steps.</p><Link className={styles.textLink} href="/portal/information-security/risk-management">Explore the risk workspace <span aria-hidden="true">→</span></Link></div>
       <ol className={styles.scenarioSteps}>
         <li><span>01</span><h3>Assess exposure</h3><p>Consider the information involved, possible consequences and existing protection.</p></li>
         <li><span>02</span><h3>Review controls</h3><p>Review relevant safeguards, their applicability and evidence of implementation.</p></li>
@@ -148,22 +148,7 @@ export default function InformationSecurityLanding({ locale = "en" }) {
       </ol>
     </section>
 
-    <section className={`${styles.container} ${styles.outputs}`} aria-labelledby="isms-outputs-title"><div className={styles.commercialHeading}><h2 id="isms-outputs-title">What your team can manage</h2><p>Build a clear record of what matters, what was decided and what still needs attention.</p></div><ul className={styles.outputGrid}>
-      <li><strong>Defined scope</strong><span>Boundaries, requirements and responsibilities.</span></li>
-      <li><strong>Assessed risks</strong><span>Exposure, rationale and accountable owners.</span></li>
-      <li><strong>Justified SoA</strong><span>Control applicability and supporting decisions.</span></li>
-      <li><strong>Owned treatments</strong><span>Actions, due dates and acceptance decisions.</span></li>
-      <li><strong>Review evidence</strong><span>Implementation records and management priorities.</span></li>
-    </ul></section>
-
-    <section className={`${styles.container} ${styles.benefits}`} aria-labelledby="isms-benefits-title">
-      <h2 id="isms-benefits-title">What your team gains</h2>
-      <div className={styles.benefitGrid}>
-        <article><span className={`${styles.benefitIcon} ${styles.mint}`}><BenefitIcon type="target"/></span><div><h3>Clear priorities</h3><p>Focus on the risks that matter to your business objectives.</p></div></article>
-        <article><span className={`${styles.benefitIcon} ${styles.lavender}`}><BenefitIcon type="people"/></span><div><h3>Visible accountability</h3><p>Connect decisions to owners, actions and timelines.</p></div></article>
-        <article><span className={`${styles.benefitIcon} ${styles.apricot}`}><BenefitIcon type="document"/></span><div><h3>Traceable decisions</h3><p>Show a clear link from risk to control, treatment and evidence.</p></div></article>
-      </div>
-      <nav className={styles.connected} aria-label="Connected ISMS workspaces"><Link href="/portal/information-security/risk-management">Risk register <span aria-hidden="true">→</span></Link><Link href="/portal/soa">Statement of Applicability <span aria-hidden="true">→</span></Link><Link href="/portal/information-security/risk-management">Treatment actions <span aria-hidden="true">→</span></Link><Link href="/portal/documents">Evidence <span aria-hidden="true">→</span></Link></nav>
+    <section className={`${styles.container} ${styles.benefits}`} aria-label="Detailed ISMS capabilities">
       <details className={styles.capabilities}><summary>Explore the connected workspace</summary><div className={styles.capabilityGrid}>{capabilities.map(([title, text, href]) => <article key={title}><h3>{title}</h3><p>{text}</p><Link href={href}>Open workspace <span aria-hidden="true">→</span></Link></article>)}</div></details>
     </section>
 
