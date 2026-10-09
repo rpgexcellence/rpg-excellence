@@ -66,6 +66,7 @@ export async function createRcaCase(previousState,formData) {
   );
   const sourceType = rawSourceType?.toLowerCase();
   const severity = rawSeverity?.toLowerCase();
+  const caseType = clean(formData.get("case_type"))?.toLowerCase();
 
   if (!organizationId) {
     throw new Error("Organisation is required.");
@@ -82,6 +83,7 @@ export async function createRcaCase(previousState,formData) {
   if (!SEVERITIES.includes(severity)) {
     throw new Error("Invalid severity.");
   }
+  if (!['capa','8d'].includes(caseType)) throw new Error("Select CAPA or 8D.");
 
   const {
     data: organization,
@@ -105,6 +107,7 @@ export async function createRcaCase(previousState,formData) {
       p_supplier_id:link.supplier?.id || null,p_finding_id:link.finding.id,p_title:title,p_problem:problemStatement,p_severity:severity
     });
     if(error || !caseId)throw new Error(error?.message || "Unable to open the linked NC case.");
+    await supabase.from("rca_cases").update({case_type:caseType,capa_current_stage:caseType==="capa"?"correction":null}).eq("id",caseId).eq("owner_id",user.id);
     revalidatePath("/portal/rca");redirect(`/portal/rca/${caseId}`);
   }
 
@@ -117,6 +120,8 @@ export async function createRcaCase(previousState,formData) {
       owner_id: user.id,
       organization_id: organizationId,
       method: "8d",
+      case_type: caseType,
+      capa_current_stage: caseType === "capa" ? "correction" : null,
       source_type: sourceType,
       title,
       problem_statement: problemStatement,
@@ -145,6 +150,7 @@ export async function createRcaCase(previousState,formData) {
       event_data: {
         source_type: sourceType,
         severity,
+        case_type: caseType,
       },
     });
 
