@@ -10,7 +10,7 @@ const stages = [
     id: "scope", title: "Define scope", benefit: "Set clear boundaries and ownership.",
     tint: "#eef8ff", accent: "#157cb5",
     steps: ["Define the organisation, locations, systems and information covered by your ISMS.", "Identify interested parties and the security requirements that matter.", "Establish responsibilities, policy and governance."],
-    value: "Reduce ambiguity about what needs protection and who is accountable.",
+    value: "Reduce ambiguity about what needs protection and who is accountable. A defined scope helps direct investment towards the information, services and obligations that matter.",
     records: "Context, scope, policy and interested-party requirements.",
     href: "overview", action: "Explore the ISMS journey",
   },
@@ -18,7 +18,7 @@ const stages = [
     id: "risk", title: "Assess risk", benefit: "Prioritise what threatens your business.",
     tint: "#eafaf5", accent: "#087c76",
     steps: ["Identify assets, threats, vulnerabilities and potential consequences.", "Evaluate impact, likelihood and existing controls.", "Record the assessment rationale and accountable risk owner."],
-    value: "Focus resources on the risks that matter to your business.",
+    value: "Focus resources on the risks that matter to your business. Compare potential disruption, information loss and contractual consequences before choosing treatment priorities.",
     records: "Risk assessment and treatment records.",
     href: "/portal/information-security/risk-management", action: "Open the risk workspace",
   },
@@ -26,7 +26,7 @@ const stages = [
     id: "controls", title: "Select controls", benefit: "Choose protection you can justify.",
     tint: "#f4f0ff", accent: "#6550ad",
     steps: ["Choose controls appropriate to your assessed risks and requirements.", "Record applicability and justify inclusion or exclusion in the SoA.", "Connect control ownership, implementation status and supporting evidence."],
-    value: "Make control decisions traceable and easier to explain during reviews.",
+    value: "Make control decisions traceable and easier to explain during reviews. Give management and customer assurance teams a documented rationale for where protection is needed.",
     records: "Statement of Applicability and linked control evidence.",
     href: "/portal/soa", action: "Open the SoA register",
   },
@@ -34,7 +34,7 @@ const stages = [
     id: "treatment", title: "Implement treatment", benefit: "Turn decisions into owned action.",
     tint: "#fff4e9", accent: "#a46122",
     steps: ["Choose the treatment decision and define the intended outcome.", "Assign an owner, due date and implementation actions.", "Retain evidence and record the residual-risk acceptance decision."],
-    value: "Give teams clear ownership and visibility of work still required.",
+    value: "Give teams clear ownership and visibility of work still required. Use owners, deadlines and acceptance decisions to make treatment progress and unresolved exposure easier to review.",
     records: "Treatment actions, implementation evidence and acceptance decisions.",
     href: "/portal/information-security/risk-management", action: "Open risk treatment",
   },
@@ -42,7 +42,7 @@ const stages = [
     id: "monitor", title: "Monitor and improve", benefit: "Verify results with reliable evidence.",
     tint: "#edf7fc", accent: "#157d96",
     steps: ["Monitor risk exposure, control status and overdue treatments.", "Evaluate performance using reliable evidence and review findings.", "Record improvement actions and revisit decisions when circumstances change."],
-    value: "Support management decisions with a clear view of exposure and priorities.",
+    value: "Support management decisions with a clear view of exposure and priorities. Use review evidence to challenge whether controls remain appropriate and where further investment is needed.",
     records: "Management oversight, performance measures and review evidence.",
     href: "/portal/soa/management-board", action: "Open management oversight",
   },
@@ -86,6 +86,12 @@ export default function InformationSecurityLanding({ locale = "en" }) {
         <h1 id="isms-sales-title">Make security decisions you can defend.</h1>
         <p className={styles.promise}>Know what matters. Assign action. Show evidence.</p>
         <p className={styles.lead}>Connect risk assessment, control decisions and accountable treatment in one ISMS workspace.</p>
+        <aside className={styles.executiveInsight} aria-labelledby="isms-executive-title">
+          <p className={styles.insightLabel}>EXECUTIVE INSIGHT</p>
+          <h2 id="isms-executive-title">Know where exposure sits—and what needs a decision.</h2>
+          <p>Bring risk, control ownership and treatment evidence into a connected view so leadership can challenge priorities, allocate resources and explain its decisions.</p>
+          <ul><li><strong>Protect business continuity</strong><span>Identify the information and services your operations depend on.</span></li><li><strong>Direct investment</strong><span>Use assessed exposure and control gaps to inform spending priorities.</span></li><li><strong>Build assurance</strong><span>Organise the rationale and evidence needed for management and customer reviews.</span></li></ul>
+        </aside>
         <div className={styles.actions}><Link className={styles.primary} href={plans}>Explore ISMS plans <span aria-hidden="true">→</span></Link><Link className={styles.textLink} href="/portal/information-security">Explore the workspace <span aria-hidden="true">→</span></Link></div>
       </div>
       <aside className={styles.videoPanel} aria-label="Information-security video overview">
