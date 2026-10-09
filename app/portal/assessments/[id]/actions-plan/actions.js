@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { requireAssessmentWriteAccess } from "../../../../../lib/assessment-access";
+import { loadAssessmentPeople, requirePerson } from "../../../../../lib/assessment-people";
 
 const PRIORITIES = [
   "critical",
@@ -101,7 +102,7 @@ export async function updateManagementAction(
     error: assessmentError,
   } = await supabase
     .from("assessments")
-    .select("id, standard")
+    .select("id, standard, organization_id")
     .eq("id", assessmentId)
     .eq("owner_id", user.id)
     .single();
@@ -115,6 +116,24 @@ export async function updateManagementAction(
   await requireAssessmentWriteAccess(user.id, assessmentId);
 
   const admin = createAdminClient();
+  const people = await loadAssessmentPeople(assessment.organization_id);
+  const actionOwner = requirePerson(
+    people,
+    clean(formData.get("action_owner_person_id")),
+    "Action owner",
+    { moduleKey: "assessments", level: "contribute", functions: ["capa_owner", "process_owner", "assessment_owner"] }
+  );
+  const verifierId = clean(formData.get("verifier_person_id"));
+  const verifier = verifierId
+    ? requirePerson(people, verifierId, "Effectiveness verifier", {
+        moduleKey: "assessments",
+        level: "review",
+        functions: ["effectiveness_verifier"],
+      })
+    : null;
+  if (verifier?.id === actionOwner.id) {
+    throw new Error("The action owner cannot verify their own management action.");
+  }
 
   const {
     data: finding,
@@ -167,9 +186,9 @@ export async function updateManagementAction(
     action_description: actionRequired,
     related_clause: finding.clause ?? null,
     related_finding_id: findingId,
-    action_owner: clean(
-      formData.get("action_owner")
-    ),
+    action_owner: actionOwner.name,
+    action_owner_person_id: actionOwner.id,
+    verifier_person_id: verifier?.id ?? null,
     target_date: clean(
       formData.get("target_date")
     ),
