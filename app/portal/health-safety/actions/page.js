@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../lib/supabase/admin";
+import { requireOrganizationAccess } from "../../../../lib/organization-access";
 
 export const metadata = { title: "Risk Actions & Verification | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -27,14 +28,18 @@ export default async function RiskActionsRegisterPage({ searchParams }) {
   const view = validViews.includes(query?.view) ? query.view : "all";
   const search = String(query?.q || "").trim();
   const searchLower = search.toLowerCase();
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/portal/login?next=${ACTIONS_PATH}`);
+  const access = await requireOrganizationAccess(
+    "risk_management",
+    "view",
+    ACTIONS_PATH,
+  );
+  const supabase = createAdminClient();
+  const organizationId = access.organization.id;
 
   const [actionsResult, assessmentsResult, hazardsResult] = await Promise.all([
-    supabase.from("hs_risk_actions").select("*").eq("owner_id", user.id).order("target_date"),
-    supabase.from("hs_risk_assessments").select("id,assessment_reference,title,site_location,area_department,status").eq("owner_id", user.id),
-    supabase.from("hs_risk_hazards").select("id,hazard_category,hazard_description,residual_score,residual_band").eq("owner_id", user.id),
+    supabase.from("hs_risk_actions").select("*").eq("organization_id", organizationId).order("target_date"),
+    supabase.from("hs_risk_assessments").select("id,assessment_reference,title,site_location,area_department,status").eq("organization_id", organizationId),
+    supabase.from("hs_risk_hazards").select("id,hazard_category,hazard_description,residual_score,residual_band").eq("organization_id", organizationId),
   ]);
   for (const result of [actionsResult, assessmentsResult, hazardsResult]) if (result.error) throw new Error(result.error.message);
 
