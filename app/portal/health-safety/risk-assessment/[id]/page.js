@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "../../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 import HealthSafetyRiskAssessmentEditor from "../../../../../components/HealthSafetyRiskAssessmentEditor";
 
 export const metadata = { title: "Risk Assessment Workspace | RPG Excellence" };
@@ -12,11 +14,15 @@ const label = (value) => String(value || "draft").replaceAll("_", " ").replace(/
 
 async function addHazard(formData) {
   "use server";
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login");
+  const access = await requireOrganizationAccess(
+    "risk_management",
+    "contribute",
+    "/portal/health-safety/risk-assessment",
+  );
+  const { user, organization } = access;
+  const supabase = createAdminClient();
   const assessmentId = String(formData.get("assessment_id") || "");
-  const { data: assessment, error: assessmentError } = await supabase.from("hs_risk_assessments").select("id,organization_id,status").eq("id", assessmentId).eq("owner_id", user.id).single();
+  const { data: assessment, error: assessmentError } = await supabase.from("hs_risk_assessments").select("id,owner_id,organization_id,status").eq("id", assessmentId).eq("organization_id", organization.id).single();
   if (assessmentError || !assessment) throw new Error("Risk assessment could not be accessed.");
   if (["approved", "communicated", "superseded", "archived"].includes(assessment.status)) throw new Error("This controlled version is locked. Create or reopen a review version before changing hazards.");
 
@@ -47,7 +53,7 @@ async function addHazard(formData) {
   const { count, error: countError } = await supabase.from("hs_risk_hazards").select("id", { count: "exact", head: true }).eq("assessment_id", assessmentId);
   if (countError) throw new Error(countError.message);
   const { data: hazard, error: hazardError } = await supabase.from("hs_risk_hazards").insert({
-    assessment_id: assessmentId, owner_id: user.id, organization_id: assessment.organization_id,
+    assessment_id: assessmentId, owner_id: assessment.owner_id, organization_id: assessment.organization_id,
     display_order: (count || 0) + 1, hazard_category: text("hazard_category"),
     hazard_type: text("hazard_type") || null, hazard_description: text("hazard_description"),
     people_exposed: [...exposedGroups.filter((item) => item !== "Others"), ...(exposedGroups.includes("Others") ? [`Other: ${otherExposed}`] : [])].join(", "), harm_description: text("harm_description"),
@@ -64,7 +70,7 @@ async function addHazard(formData) {
     const { count: actionCount } = await supabase.from("hs_risk_actions").select("id", { count: "exact", head: true }).eq("assessment_id", assessmentId);
     const reference = "ACT-" + String((actionCount || 0) + 1).padStart(3, "0");
     const { error: actionError } = await supabase.from("hs_risk_actions").insert({
-      assessment_id: assessmentId, hazard_id: hazard.id, owner_id: user.id,
+      assessment_id: assessmentId, hazard_id: hazard.id, owner_id: assessment.owner_id,
       organization_id: assessment.organization_id, action_reference: reference,
       action_required: actionRequired, responsible_name: text("responsible_name"),
       responsible_email: text("responsible_email") || null, target_date: text("target_date"),
@@ -77,7 +83,7 @@ async function addHazard(formData) {
     }
   }
   await supabase.from("hs_risk_events").insert({
-    assessment_id: assessmentId, owner_id: user.id, organization_id: assessment.organization_id,
+    assessment_id: assessmentId, owner_id: assessment.owner_id, organization_id: assessment.organization_id,
     actor_id: user.id, event_type: "hazard_added",
     event_summary: "Hazard and risk decision recorded",
     event_data: { hazard_id: hazard.id, current_score: currentScore, residual_score: residualScore },
@@ -87,13 +93,16 @@ async function addHazard(formData) {
 
 export default async function RiskAssessmentWorkspacePage({ params }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessment/" + id);
+  const access = await requireOrganizationAccess(
+    "risk_management",
+    "view",
+    "/portal/health-safety/risk-assessment/" + id,
+  );
+  const supabase = createAdminClient();
   const [assessmentResult, hazardsResult, actionsResult] = await Promise.all([
-    supabase.from("hs_risk_assessments").select("*").eq("id", id).eq("owner_id", user.id).maybeSingle(),
-    supabase.from("hs_risk_hazards").select("*").eq("assessment_id", id).eq("owner_id", user.id).order("display_order"),
-    supabase.from("hs_risk_actions").select("*").eq("assessment_id", id).eq("owner_id", user.id).order("target_date"),
+    supabase.from("hs_risk_assessments").select("*").eq("id", id).eq("organization_id", access.organization.id).maybeSingle(),
+    supabase.from("hs_risk_hazards").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("display_order"),
+    supabase.from("hs_risk_actions").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("target_date"),
   ]);
   if (assessmentResult.error || hazardsResult.error || actionsResult.error) throw new Error(assessmentResult.error?.message || hazardsResult.error?.message || actionsResult.error?.message);
   if (!assessmentResult.data) notFound();
