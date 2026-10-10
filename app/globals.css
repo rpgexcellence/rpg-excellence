@@ -2102,6 +2102,24 @@ a {
 .standardGuide.teal {
   --guide-accent: #36d4d8;
 }
+.standardGuide.blue .guideHero {
+  background:
+    radial-gradient(circle at 82% 30%, rgba(38, 128, 205, .34) 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 64%, rgba(45, 210, 202, .22) 0 3px, transparent 4px),
+    radial-gradient(circle at 94% 72%, rgba(38, 128, 205, .28) 0 2px, transparent 3px),
+    linear-gradient(122deg, transparent 57%, rgba(65, 159, 220, .13) 57.15%, transparent 57.4%),
+    linear-gradient(155deg, transparent 68%, rgba(45, 210, 202, .1) 68.15%, transparent 68.4%),
+    radial-gradient(ellipse at 82% 52%, rgba(30, 105, 173, .28), transparent 40%),
+    linear-gradient(90deg, #0a2444 0%, #103963 55%, #154d79 100%);
+}
+.standardGuide.blue .clauseSection {
+  background:
+    radial-gradient(circle at 8% 12%, rgba(43, 127, 205, .18) 0 2px, transparent 3px),
+    radial-gradient(circle at 92% 38%, rgba(45, 210, 202, .14) 0 3px, transparent 4px),
+    linear-gradient(150deg, transparent 64%, rgba(65, 159, 220, .08) 64.15%, transparent 64.35%),
+    radial-gradient(ellipse at 85% 12%, rgba(28, 94, 157, .2), transparent 36%),
+    #0b2442;
+}
 .guideHero {
   padding: 76px max(6vw, 24px);
   display: grid;
