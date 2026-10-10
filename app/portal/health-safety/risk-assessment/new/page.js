@@ -16,6 +16,7 @@ const types = [
   ["lone_working", "Lone working"], ["other", "Other"],
 ];
 const people = ["Employees", "Contractors", "Visitors", "Members of the public", "Young persons", "New or expectant mothers", "Disabled persons", "Lone workers", "Others"];
+const permittedDocumentTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png", "image/webp"];
 
 async function createRiskAssessment(formData) {
   "use server";
@@ -68,7 +69,7 @@ async function createRiskAssessment(formData) {
     assessor_name: assessorSnapshot,
     assessor_person_id: assessor.id,
     assessor_user_id: user.id,
-    assessor_competence_basis: text("assessor_competence_basis") || null,
+    assessor_competence_basis: null,
     assessment_date: assessmentDate,
     review_date: null,
     review_frequency_months: null,
@@ -84,30 +85,30 @@ async function createRiskAssessment(formData) {
     emergency_arrangements: text("emergency_arrangements") || null,
   }).select("id").single();
   if (error) throw new Error(error.message);
-  const permitFile = formData.get("permit_document");
-  if (permitFile instanceof File && permitFile.size) {
-    if (permitFile.size > 10 * 1024 * 1024) {
-      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
-      throw new Error("The permit file must be 10 MB or smaller.");
-    }
-    const permittedTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png", "image/webp"];
-    if (!permittedTypes.includes(permitFile.type)) {
-      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
-      throw new Error("Upload the permit as PDF, Word, JPG, PNG or WebP.");
-    }
-    const safeName = permitFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    const path = `${organisation.id}/${assessment.id}/${randomUUID()}-${safeName}`;
-    const { error: uploadError } = await admin.storage.from("hs-risk-assessment-evidence").upload(path, permitFile, { contentType: permitFile.type, upsert: false });
-    if (uploadError) {
-      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
-      throw new Error(uploadError.message);
-    }
-    const { error: evidenceError } = await admin.from("hs_risk_assessments").update({ permit_document_path: path, permit_document_name: permitFile.name, permit_document_mime_type: permitFile.type, permit_document_size_bytes: permitFile.size }).eq("id", assessment.id).eq("organization_id", organisation.id);
-    if (evidenceError) {
-      await admin.storage.from("hs-risk-assessment-evidence").remove([path]);
-      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
-      throw new Error(evidenceError.message);
-    }
+  const uploadedPaths = [];
+  const uploadDocument = async (field, prefix, columns, label) => {
+    const file = formData.get(field);
+    if (!(file instanceof File) || !file.size) return;
+    if (file.size > 10 * 1024 * 1024) throw new Error(`${label} must be 10 MB or smaller.`);
+    if (!permittedDocumentTypes.includes(file.type)) throw new Error(`Upload ${label} as PDF, Word, JPG, PNG or WebP.`);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = `${organisation.id}/${assessment.id}/${prefix}-${randomUUID()}-${safeName}`;
+    const { error: uploadError } = await admin.storage.from("hs-risk-assessment-evidence").upload(path, file, { contentType: file.type, upsert: false });
+    if (uploadError) throw new Error(uploadError.message);
+    uploadedPaths.push(path);
+    const { error: evidenceError } = await admin.from("hs_risk_assessments").update({
+      [columns.path]: path, [columns.name]: file.name, [columns.mime]: file.type, [columns.size]: file.size,
+    }).eq("id", assessment.id).eq("organization_id", organisation.id);
+    if (evidenceError) throw new Error(evidenceError.message);
+  };
+  try {
+    await uploadDocument("coshh_document", "coshh", { path: "coshh_document_path", name: "coshh_document_name", mime: "coshh_document_mime_type", size: "coshh_document_size_bytes" }, "the COSHH document");
+    await uploadDocument("ssow_document", "ssow", { path: "ssow_document_path", name: "ssow_document_name", mime: "ssow_document_mime_type", size: "ssow_document_size_bytes" }, "the SSOW document");
+    await uploadDocument("permit_document", "permit", { path: "permit_document_path", name: "permit_document_name", mime: "permit_document_mime_type", size: "permit_document_size_bytes" }, "the permit file");
+  } catch (uploadFailure) {
+    if (uploadedPaths.length) await admin.storage.from("hs-risk-assessment-evidence").remove(uploadedPaths);
+    await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
+    throw uploadFailure;
   }
   redirect("/portal/health-safety/risk-assessment/" + assessment.id);
 }
@@ -142,15 +143,16 @@ export default async function NewRiskAssessmentPage() {
         <div className="nrField"><label htmlFor="section_lab">Section / laboratory</label><input id="section_lab" name="section_lab"/></div>
         <div className="nrField full"><label htmlFor="task_description">Activity, task or workplace description *</label><textarea id="task_description" name="task_description" required placeholder="Describe normal work, foreseeable abnormal conditions, equipment, materials and boundaries."/></div>
       </div></section>
-      <section className="nrCard"><div className="nrHead"><span>STEP 1B</span><h2>Assessor and competence</h2><p>Record who completed the assessment and the basis of their competence.</p></div><div className="nrGrid">
+      <section className="nrCard"><div className="nrHead"><span>STEP 1B</span><h2>Assessor details</h2><p>Record who completed the assessment and the date it was completed.</p></div><div className="nrGrid">
         <div className="nrField"><label htmlFor="assessor_person_id">Assessor name *</label><select id="assessor_person_id" name="assessor_person_id" required defaultValue=""><option value="" disabled>{companyPeople?.length ? "Select active company user" : "No active company users available"}</option>{(companyPeople || []).map((person) => <option value={person.id} key={person.id}>{[person.first_name, person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select><small>Linked to <a href="/portal/company/people">Administration → People, Roles &amp; Access</a>.</small><input type="hidden" name="assessor_name" value="linked-company-user"/></div>
-        <div className="nrField"><label htmlFor="assessor_competence_basis">Assessor competence basis</label><input id="assessor_competence_basis" name="assessor_competence_basis" placeholder="Training, knowledge, skills and experience"/></div>
         <div className="nrField"><label htmlFor="assessment_date">Assessment date *</label><input id="assessment_date" name="assessment_date" type="date" defaultValue={today} required/></div>
       </div></section>
       <section className="nrCard"><div className="nrHead"><span>STEP 1C</span><h2>People who may be affected</h2><p>Consider routine, non-routine and vulnerable groups.</p></div><fieldset style={{border:0,padding:0,margin:0}}><legend className="nrLegend">Select at least one group *</legend><div className="nrChecks">{people.map((group) => <label className="nrCheck" key={group}><input type="checkbox" name="persons_at_risk" value={group}/>{group}</label>)}</div></fieldset><div className="nrGrid" style={{marginTop:18}}><div className="nrField full"><label htmlFor="consultation_summary">Worker consultation and input</label><textarea id="consultation_summary" name="consultation_summary" placeholder="Record who was consulted and what practical information they contributed."/></div></div></section>
       <section className="nrCard"><div className="nrHead"><span>STEP 1D</span><h2>Related control information</h2><p>Connect existing safe systems, permits and emergency arrangements.</p></div><div className="nrGrid">
-        <div className="nrField"><label htmlFor="coshh_msds_reference">COSHH / safety data reference</label><input id="coshh_msds_reference" name="coshh_msds_reference"/></div>
-        <div className="nrField"><label htmlFor="safe_system_reference">Safe system of work reference</label><input id="safe_system_reference" name="safe_system_reference"/></div>
+        <div className="nrField"><label htmlFor="coshh_msds_reference">COSHH / safety data reference</label><input id="coshh_msds_reference" name="coshh_msds_reference" placeholder="Document number, title or external link"/></div>
+        <div className="nrField"><label htmlFor="coshh_document">Upload COSHH / safety data document</label><input id="coshh_document" name="coshh_document" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"/><small>Stored securely and available to download from the assessment record.</small></div>
+        <div className="nrField"><label htmlFor="safe_system_reference">Safe system of work reference</label><input id="safe_system_reference" name="safe_system_reference" placeholder="Document number, title or external link"/></div>
+        <div className="nrField"><label htmlFor="ssow_document">Upload SSOW document</label><input id="ssow_document" name="ssow_document" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"/><small>Stored securely and available to download from the assessment record.</small></div>
         <div className="nrField full"><label className="nrPermit"><input type="checkbox" name="permit_required" value="yes"/>Permit to work is required</label></div>
         <div className="nrField full"><label htmlFor="linked_permit_id">Existing company permit</label><select id="linked_permit_id" name="linked_permit_id" defaultValue=""><option value="">No existing RPG permit / enter manually below</option>{(permits || []).map((permit) => <option value={permit.id} key={permit.id}>{permit.permit_reference} · {String(permit.permit_type).replaceAll("_", " ")} · {permit.status}</option>)}</select><small>Links this assessment to the controlled company Permit-to-Work register.</small></div>
         <div className="nrField"><label htmlFor="permit_reference">Manual permit reference / type</label><input id="permit_reference" name="permit_reference" placeholder="Use when the permit is managed outside RPG"/></div>
