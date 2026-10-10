@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../lib/supabase/admin";
+import { requireOrganizationAccess } from "../../../../lib/organization-access";
 
 export const metadata = { title: "Risk Assessment Register | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -26,14 +27,18 @@ export default async function RiskAssessmentRegisterPage({ searchParams }) {
   const view = validViews.includes(query?.view) ? query.view : "all";
   const search = String(query?.q || "").trim();
   const searchLower = search.toLowerCase();
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/portal/login?next=${REGISTER_PATH}`);
+  const access = await requireOrganizationAccess(
+    "risk_management",
+    "view",
+    REGISTER_PATH,
+  );
+  const admin = createAdminClient();
+  const organizationId = access.organization.id;
 
   const [assessmentsResult, hazardsResult, actionsResult] = await Promise.all([
-    supabase.from("hs_risk_assessments").select("id,assessment_reference,title,version,status,assessment_type,site_location,area_department,assessor_name,assessment_date,review_date,updated_at").eq("owner_id", user.id).order("updated_at", { ascending: false }),
-    supabase.from("hs_risk_hazards").select("id,assessment_id,current_score,residual_score,residual_band").eq("owner_id", user.id),
-    supabase.from("hs_risk_actions").select("id,assessment_id,status,target_date").eq("owner_id", user.id),
+    admin.from("hs_risk_assessments").select("id,assessment_reference,title,version,status,assessment_type,site_location,area_department,assessor_name,assessment_date,review_date,updated_at").eq("organization_id", organizationId).order("updated_at", { ascending: false }),
+    admin.from("hs_risk_hazards").select("id,assessment_id,current_score,residual_score,residual_band").eq("organization_id", organizationId),
+    admin.from("hs_risk_actions").select("id,assessment_id,status,target_date").eq("organization_id", organizationId),
   ]);
   for (const result of [assessmentsResult, hazardsResult, actionsResult]) if (result.error) throw new Error(result.error.message);
 
