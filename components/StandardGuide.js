@@ -1,6 +1,7 @@
 import Link from "next/link";
 import StandaloneSoaButton from "./StandaloneSoaButton";
 import GuideFactCards from "./GuideFactCards";
+import { getEnhancedGuide } from "../lib/enhanced-standard-guides";
 
 const ISO9001_2026_EXECUTIVE_LENS = [
   { title:"Quality culture", change:"More explicit attention to the behaviours and shared values that sustain quality.", decision:"Define the behaviours leaders will model, reward and correct across every process.", evidence:"Interview consistency, speak-up records, recognition, competence checks, process adherence and actions where culture weakened outcomes.", challenge:"How do leaders know the stated culture is the culture experienced at the point of work?" },
@@ -70,7 +71,24 @@ function Iso9001Clause({ clause, contactHref }) {
   </details>;
 }
 
+function EnhancedClause({ clause, detail, contactHref, support }) {
+  return <details className="clauseCard isoClauseCard">
+    <summary><span>Clause {clause.number}</span><div><strong>{clause.title}</strong><p>{detail.intent}</p></div><b>Open audit guide</b></summary>
+    <div className="isoClauseBody">
+      <article className="isoClauseRequirements"><h3>Requirement map</h3><ol>{detail.requirements.map(item => <li key={item}>{item}</li>)}</ol></article>
+      <article><h3>Practical application</h3><p>{detail.application}</p></article>
+      <article><h3>Objective evidence and sampling</h3><p>{detail.evidence}</p></article>
+      <article><h3>Auditor challenge questions</h3><ul>{detail.questions.map(item => <li key={item}>{item}</li>)}</ul></article>
+      <article className="isoFailure"><h3>Weakness and escalation indicators</h3><p>{detail.failures}</p></article>
+      <article><h3>Required management output</h3><p>{detail.output}</p></article>
+      <article className="isoFocus"><h3>Assurance focus</h3><p>{detail.focus}</p></article>
+      <article className="rpgSupport"><h3>RPG control pathway</h3><p>{support}</p><Link href={contactHref}>Discuss Clause {clause.number} support →</Link></article>
+    </div>
+  </details>;
+}
+
 export default function StandardGuide({ guide, locale }) {
+  const enhancedGuide = getEnhancedGuide(guide.assessmentStandard);
   const contactHref = `/${locale}/contact?standard=${encodeURIComponent(guide.code)}&topic=${encodeURIComponent("Gap analysis and certification readiness")}`;
   const assessmentHref = guide.assessmentStandard
     ? `/portal?standard=${encodeURIComponent(guide.assessmentStandard)}#new-assessment`
@@ -99,7 +117,7 @@ export default function StandardGuide({ guide, locale }) {
     </section>
     <section className="guideOverview">
       <div><span className="kicker">Overview</span><h2>What this management system is designed to achieve</h2><p>{guide.purpose}</p><p>The value comes from integrating requirements into normal governance and operations—not producing documents solely for an audit.</p></div>
-      {guide.assessmentStandard === "ISO 9001:2026" ? <GuideFactCards facts={ISO9001_2026_FACTS} /> : <div className="guideFacts"><div><span>Structure</span><strong>Clauses 4–10</strong></div><div><span>Approach</span><strong>Risk based</strong></div><div><span>Use</span><strong>Single or integrated</strong></div><div><span>Assurance</span><strong>Evidence led</strong></div></div>}
+      {guide.assessmentStandard === "ISO 9001:2026" ? <GuideFactCards facts={ISO9001_2026_FACTS} /> : enhancedGuide ? <GuideFactCards facts={enhancedGuide.facts} /> : <div className="guideFacts"><div><span>Structure</span><strong>Clauses 4–10</strong></div><div><span>Approach</span><strong>Risk based</strong></div><div><span>Use</span><strong>Single or integrated</strong></div><div><span>Assurance</span><strong>Evidence led</strong></div></div>}
     </section>
     {guide.assessmentStandard === "ISO 9001:2026" && <>
       <section className="isoMilestones" aria-labelledby="iso9001-transition"><div className="isoSectionHead"><span className="kicker">ISSUED EDITION & TRANSITION</span><h2 id="iso9001-transition">A controlled route from publication to certification</h2><p>Use the published 2026 requirements as the baseline and agree the exact transition programme with your certification body.</p></div><div className="isoMilestoneGrid">{ISO9001_2026_MILESTONES.map(([date,title,text]) => <article key={date}><span>{date}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
@@ -115,9 +133,23 @@ export default function StandardGuide({ guide, locale }) {
         <div className="guideFacts">{ISO9001_2026_AUDIT_TRAILS.map(([title, text]) => <div key={title}><span>{title}</span><strong style={{fontSize:"14px",lineHeight:1.35}}>{text}</strong></div>)}</div>
       </section>
     </>}
+    {enhancedGuide && <>
+      <section className="isoMilestones" aria-labelledby={`${guide.accent}-edition-status`}><div className="isoSectionHead"><span className="kicker">EDITION, STATUS & CONTROL BASELINE</span><h2 id={`${guide.accent}-edition-status`}>Use the correct published baseline</h2><p>Confirm the applicable edition, amendments and transition arrangements with your certification body, then translate them into controlled implementation and assurance.</p></div><div className="isoMilestoneGrid">{enhancedGuide.milestones.map(([date,title,text]) => <article key={`${date}-${title}`}><span>{date}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
+      <section className="clauseSection" aria-labelledby={`${guide.accent}-executive-lens`}>
+        <span className="kicker">{enhancedGuide.label}</span>
+        <h2 id={`${guide.accent}-executive-lens`}>The executive assurance brief</h2>
+        <p className="clauseIntro">Each theme connects the standard to a leadership decision, corroborating evidence and an ISO 19011-aligned auditor challenge. Use it to test implementation, not document presence alone.</p>
+        <div className="isoChangeGrid">{enhancedGuide.themes.map((item, index) => <article className="isoChangeCard" key={item.title}><div><span>{String(index + 1).padStart(2,"0")}</span><h3>{item.title}</h3></div><dl><dt>What to address</dt><dd>{item.change}</dd><dt>Leadership decision</dt><dd>{item.decision}</dd><dt>Evidence to corroborate</dt><dd>{item.evidence}</dd><dt>Auditor challenge</dt><dd>{item.challenge}</dd></dl></article>)}</div>
+      </section>
+      <section className="isoBoardSection"><div><span className="kicker">BOARD & MANAGEMENT REVIEW</span><h2>Eight questions that expose readiness</h2><p>Answers should be supported by current evidence, named accountability and a decision—not assurance language alone.</p></div><ol>{enhancedGuide.boardQuestions.map((item,index)=><li key={item}><span>{String(index+1).padStart(2,"0")}</span>{item}</li>)}</ol></section>
+      <section className="guideOverview">
+        <div><span className="kicker">ISO 19011-ALIGNED AUDIT TRAILS</span><h2>Test the system end to end</h2><p>Use risk-based sampling, interviews, observation, records and performance trends to corroborate whether controls operate as an interconnected management system.</p></div>
+        <div className="guideFacts">{enhancedGuide.trails.map(([title, text]) => <div key={title}><span>{title}</span><strong style={{fontSize:"14px",lineHeight:1.35}}>{text}</strong></div>)}</div>
+      </section>
+    </>}
     <section className="clauseSection" id="clauses">
-      <span className="kicker">Clause navigator</span><h2>Key clauses explained</h2><p className="clauseIntro">Open any clause to see practical application, possible evidence, common weaknesses and relevant RPG Excellence support.</p>
-      <div className={`clauseList ${guide.assessmentStandard === "ISO 9001:2026" ? "isoClauseList" : ""}`}>{guide.clauses.map((clause) => guide.assessmentStandard === "ISO 9001:2026" ? <Iso9001Clause key={clause.number} clause={clause} contactHref={contactHref} /> : <details className="clauseCard" key={clause.number}>
+      <span className="kicker">Clause navigator</span><h2>Key clauses explained</h2><p className="clauseIntro">{guide.assessmentStandard === "ISO 9001:2026" || enhancedGuide ? "Open each clause for its requirement map, practical application, evidence and sampling prompts, auditor questions, weaknesses and required management output." : "Open any clause to see practical application, possible evidence, common weaknesses and relevant RPG Excellence support."}</p>
+      <div className={`clauseList ${guide.assessmentStandard === "ISO 9001:2026" || enhancedGuide ? "isoClauseList" : ""}`}>{guide.clauses.map((clause) => guide.assessmentStandard === "ISO 9001:2026" ? <Iso9001Clause key={clause.number} clause={clause} contactHref={contactHref} /> : enhancedGuide ? <EnhancedClause key={clause.number} clause={clause} detail={enhancedGuide.clauses[clause.number]} contactHref={contactHref} support={enhancedGuide.support} /> : <details className="clauseCard" key={clause.number}>
         <summary><span>Clause {clause.number}</span><div><strong>{clause.title}</strong><p>{clause.focus}</p></div><b>Explain this clause</b></summary>
         <div className="clauseExplanation">
           <article><h3>Practical application</h3><p>{clause.application}</p><p><strong>For {guide.code}:</strong> {clause.focus}</p></article>
