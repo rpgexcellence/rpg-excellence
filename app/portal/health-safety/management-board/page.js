@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../lib/supabase/admin";
+import { requireOrganizationAccess } from "../../../../lib/organization-access";
 
 export const metadata = { title: "H&S Management Board | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -10,14 +11,18 @@ const formatDate = (value) => value ? new Intl.DateTimeFormat("en-GB", { day: "2
 const openStatuses = ["open", "accepted", "in_progress", "evidence_submitted", "verification", "partly_effective", "not_effective"];
 
 export default async function HealthSafetyManagementBoard() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/management-board");
+  const access = await requireOrganizationAccess(
+    "risk_management",
+    "view",
+    "/portal/health-safety/management-board",
+  );
+  const supabase = createAdminClient();
+  const organizationId = access.organization.id;
   const [assessmentsResult, hazardsResult, actionsResult, enrolmentsResult] = await Promise.all([
-    supabase.from("hs_risk_assessments").select("id,assessment_reference,title,status,site_location,area_department,review_date,updated_at").eq("owner_id", user.id),
-    supabase.from("hs_risk_hazards").select("id,assessment_id,hazard_category,residual_likelihood,residual_severity,residual_score,current_score,risk_decision").eq("owner_id", user.id),
-    supabase.from("hs_risk_actions").select("id,assessment_id,status,priority,target_date,effectiveness_result").eq("owner_id", user.id),
-    supabase.from("hs_training_enrolments").select("id,status,progress_percent,expires_at").eq("learner_id", user.id),
+    supabase.from("hs_risk_assessments").select("id,assessment_reference,title,status,site_location,area_department,review_date,updated_at").eq("organization_id", organizationId),
+    supabase.from("hs_risk_hazards").select("id,assessment_id,hazard_category,residual_likelihood,residual_severity,residual_score,current_score,risk_decision").eq("organization_id", organizationId),
+    supabase.from("hs_risk_actions").select("id,assessment_id,status,priority,target_date,effectiveness_result").eq("organization_id", organizationId),
+    supabase.from("hs_training_enrolments").select("id,status,progress_percent,expires_at").eq("organization_id", organizationId),
   ]);
   for (const result of [assessmentsResult, hazardsResult, actionsResult, enrolmentsResult]) if (result.error) throw new Error(result.error.message);
   const assessments = assessmentsResult.data || [];
