@@ -1,11 +1,16 @@
 import PortalWorkspace from "../../components/PortalWorkspace";
 import "./portal-workspace.css";
 import PortalQuickNav from "./PortalQuickNav";
+import { createClient } from "../../lib/supabase/server";
+import { getPortalAccess } from "../../lib/portal-access";
 
-export default function PortalLayout({ children }) {
+export default async function PortalLayout({ children }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const access = await getPortalAccess(user);
   return (
     <>
-      <PortalWorkspace>{children}</PortalWorkspace>
+      <PortalWorkspace access={access}>{children}</PortalWorkspace>
       <PortalQuickNav />
       <style>{`
         .rpgQuickNav{
