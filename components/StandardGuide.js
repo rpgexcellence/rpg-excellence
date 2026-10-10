@@ -1,5 +1,6 @@
 import Link from "next/link";
 import StandaloneSoaButton from "./StandaloneSoaButton";
+import GuideFactCards from "./GuideFactCards";
 
 const ISO9001_2026_EXECUTIVE_LENS = [
   { title:"Quality culture", change:"More explicit attention to the behaviours and shared values that sustain quality.", decision:"Define the behaviours leaders will model, reward and correct across every process.", evidence:"Interview consistency, speak-up records, recognition, competence checks, process adherence and actions where culture weakened outcomes.", challenge:"How do leaders know the stated culture is the culture experienced at the point of work?" },
@@ -26,6 +27,13 @@ const ISO9001_2026_BOARD_QUESTIONS = [
   "What recent change was validated before and after implementation?",
   "Which performance trend demands a leadership decision now?",
   "How does management verify that corrective action remains effective?",
+];
+
+const ISO9001_2026_FACTS = [
+  { label:"Structure", value:"Clauses 4–10", points:["Leadership-led process framework", "Seven auditable requirement clauses", "Plan–Do–Check–Act system logic"] },
+  { label:"Approach", value:"Risk based", points:["Treat risks and opportunities distinctly", "Apply controls in proportion to consequence", "Use evidence to test actual effectiveness"] },
+  { label:"Use", value:"Single or integrated", points:["Operate as a standalone QMS", "Integrate with ISO 14001, 45001 or 27001", "Scale controls to context and complexity"] },
+  { label:"Assurance", value:"Evidence led", points:["Follow process trails, not documents alone", "Corroborate interviews with records and trends", "Connect gaps to Findings and CAPA-8D"] },
 ];
 
 const ISO9001_2026_CLAUSES = {
@@ -91,7 +99,7 @@ export default function StandardGuide({ guide, locale }) {
     </section>
     <section className="guideOverview">
       <div><span className="kicker">Overview</span><h2>What this management system is designed to achieve</h2><p>{guide.purpose}</p><p>The value comes from integrating requirements into normal governance and operations—not producing documents solely for an audit.</p></div>
-      <div className="guideFacts"><div><span>Structure</span><strong>Clauses 4–10</strong></div><div><span>Approach</span><strong>Risk based</strong></div><div><span>Use</span><strong>Single or integrated</strong></div><div><span>Assurance</span><strong>Evidence led</strong></div></div>
+      {guide.assessmentStandard === "ISO 9001:2026" ? <GuideFactCards facts={ISO9001_2026_FACTS} /> : <div className="guideFacts"><div><span>Structure</span><strong>Clauses 4–10</strong></div><div><span>Approach</span><strong>Risk based</strong></div><div><span>Use</span><strong>Single or integrated</strong></div><div><span>Assurance</span><strong>Evidence led</strong></div></div>}
     </section>
     {guide.assessmentStandard === "ISO 9001:2026" && <>
       <section className="isoMilestones" aria-labelledby="iso9001-transition"><div className="isoSectionHead"><span className="kicker">ISSUED EDITION & TRANSITION</span><h2 id="iso9001-transition">A controlled route from publication to certification</h2><p>Use the published 2026 requirements as the baseline and agree the exact transition programme with your certification body.</p></div><div className="isoMilestoneGrid">{ISO9001_2026_MILESTONES.map(([date,title,text]) => <article key={date}><span>{date}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
