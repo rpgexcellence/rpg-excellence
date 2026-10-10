@@ -2194,6 +2194,45 @@ a {
   color: var(--guide-accent);
   margin-top: 8px;
 }
+.guideFactCards { perspective: 1200px; }
+.guideFactCard {
+  position: relative;
+  min-height: 108px;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transform-style: preserve-3d;
+  transition: transform .42s ease;
+}
+.guideFactCard:focus-visible { outline: 3px solid #75a5ff; outline-offset: 3px; }
+.guideFactCard.isOpen { transform: rotateY(180deg); }
+.guideFactFace {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px;
+  padding: 16px 20px;
+  background: #071a33;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.guideFactFace small { color: #8eafd0; text-align: center; }
+.guideFactFace strong { color: var(--guide-accent); text-align: center; margin-top: 7px; }
+.guideFactFront em { color: #8eafd0; text-align: center; font-size: 11px; font-style: normal; margin-top: 10px; opacity: .8; }
+.guideFactBack { transform: rotateY(180deg); justify-content: flex-start; overflow: auto; }
+.guideFactBack small, .guideFactBack strong { text-align: left; }
+.guideFactBack ul { margin: 7px 0 0; padding-left: 18px; color: #c5d5e6; font-size: 11px; line-height: 1.35; }
+.guideFactBack li + li { margin-top: 3px; }
+.guideFactCard:hover .guideFactFront { border-color: #4f82d7; background: #0a2241; }
+@media (prefers-reduced-motion: reduce) { .guideFactCard { transition: none; } }
 .clauseSection {
   padding: 76px max(6vw, 24px);
   background: #071a33;
