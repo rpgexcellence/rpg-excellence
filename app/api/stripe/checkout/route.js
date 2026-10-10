@@ -33,7 +33,15 @@ function getSubscriptionPriceId(plan) {
 
   return null;
 }
-const ASSESSMENT_STANDARDS = ["ISO 9001:2015/Amd 1:2024", "ISO 14001:2026", "ISO 45001:2018", "ISO/IEC 17024:2026", "ISO 22301:2019"];
+const ASSESSMENT_STANDARDS = [
+  "ISO 9001:2026",
+  "ISO 9001:2015/Amd 1:2024",
+  "ISO 14001:2026",
+  "ISO 45001:2018",
+  "ISO/IEC 27001:2022",
+  "ISO/IEC 17024:2026",
+  "ISO 22301:2019",
+];
 const TRAINING_PRODUCTS = {
   "risk-assessment-initial": "RA-INITIAL-001",
   "risk-assessment-refresher": "RA-REFRESHER-001",
