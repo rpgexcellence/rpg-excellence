@@ -48,7 +48,15 @@ async function createRevision(formData) {
     review_date: null,
     review_frequency_months: null,
     coshh_msds_reference: source.coshh_msds_reference,
+    coshh_document_path: source.coshh_document_path,
+    coshh_document_name: source.coshh_document_name,
+    coshh_document_mime_type: source.coshh_document_mime_type,
+    coshh_document_size_bytes: source.coshh_document_size_bytes,
     safe_system_reference: source.safe_system_reference,
+    ssow_document_path: source.ssow_document_path,
+    ssow_document_name: source.ssow_document_name,
+    ssow_document_mime_type: source.ssow_document_mime_type,
+    ssow_document_size_bytes: source.ssow_document_size_bytes,
     permit_required: source.permit_required,
     linked_permit_id: source.linked_permit_id,
     permit_reference: source.permit_reference,
@@ -90,6 +98,7 @@ async function createRevision(formData) {
       assessment_id: revision.id, hazard_id: hazardIdMap.get(action.hazard_id) || null,
       owner_id: source.owner_id, organization_id: source.organization_id,
       action_reference: action.action_reference, action_required: action.action_required,
+      responsible_person_id: action.responsible_person_id,
       responsible_name: action.responsible_name, responsible_email: action.responsible_email,
       target_date: action.target_date, priority: action.priority, interim_controls: action.interim_controls,
       status: "open",
@@ -137,6 +146,7 @@ async function addHazard(formData) {
   const exposedGroups = formData.getAll("people_exposed").map(String);
   const otherExposed = text("people_exposed_other");
   const actionRequired = text("action_required");
+  const responsiblePersonId = text("responsible_person_id");
   if (![currentSeverity, currentLikelihood, residualSeverity, residualLikelihood].every((value) => value >= 1 && value <= 5)) throw new Error("Complete all four risk-score selections.");
   if (!exposedGroups.length) throw new Error("Select at least one group who may be harmed.");
   if (exposedGroups.includes("Others") && !otherExposed) throw new Error("Describe the other people who may be harmed.");
@@ -144,7 +154,14 @@ async function addHazard(formData) {
   if (!controls.length && text("additional_controls")) throw new Error("Select the hierarchy level applied to the additional controls.");
   if (decision === "accept" && (!rationale || !authority)) throw new Error("Formal risk acceptance requires a rationale and named authority.");
   if (residualScore >= 10 && (!decision || !authority || !actionRequired)) throw new Error("Elevated residual risk requires a controlled decision, authority and accountable action.");
-  if (actionRequired && (!text("responsible_name") || !text("target_date"))) throw new Error("Every controlled action requires a responsible person and target date.");
+  if (actionRequired && (!responsiblePersonId || !text("target_date"))) throw new Error("Every controlled action requires a responsible company user and target date.");
+
+  let responsiblePerson = null;
+  if (actionRequired) {
+    const { data, error } = await supabase.from("organization_people").select("id,first_name,last_name,email").eq("id", responsiblePersonId).eq("organization_id", organization.id).eq("account_status", "active").maybeSingle();
+    if (error || !data) throw new Error("Select an active responsible person from the Company User list.");
+    responsiblePerson = data;
+  }
 
   const { count, error: countError } = await supabase.from("hs_risk_hazards").select("id", { count: "exact", head: true }).eq("assessment_id", assessmentId);
   if (countError) throw new Error(countError.message);
@@ -168,8 +185,9 @@ async function addHazard(formData) {
     const { error: actionError } = await supabase.from("hs_risk_actions").insert({
       assessment_id: assessmentId, hazard_id: hazard.id, owner_id: assessment.owner_id,
       organization_id: assessment.organization_id, action_reference: reference,
-      action_required: actionRequired, responsible_name: text("responsible_name"),
-      responsible_email: text("responsible_email") || null, target_date: text("target_date"),
+      action_required: actionRequired, responsible_person_id: responsiblePerson.id,
+      responsible_name: [responsiblePerson.first_name, responsiblePerson.last_name].filter(Boolean).join(" ") || responsiblePerson.email,
+      responsible_email: responsiblePerson.email || null, target_date: text("target_date"),
       priority: text("priority") || (residualScore >= 15 ? "critical" : residualScore >= 10 ? "high" : "medium"),
       interim_controls: text("additional_controls") || null,
     });
@@ -195,12 +213,13 @@ export default async function RiskAssessmentWorkspacePage({ params }) {
     "/portal/health-safety/risk-assessment/" + id,
   );
   const supabase = createAdminClient();
-  const [assessmentResult, hazardsResult, actionsResult] = await Promise.all([
+  const [assessmentResult, hazardsResult, actionsResult, peopleResult] = await Promise.all([
     supabase.from("hs_risk_assessments").select("*").eq("id", id).eq("organization_id", access.organization.id).maybeSingle(),
     supabase.from("hs_risk_hazards").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("display_order"),
     supabase.from("hs_risk_actions").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("target_date"),
+    supabase.from("organization_people").select("id,first_name,last_name,email,position").eq("organization_id", access.organization.id).eq("account_status", "active").order("last_name"),
   ]);
-  if (assessmentResult.error || hazardsResult.error || actionsResult.error) throw new Error(assessmentResult.error?.message || hazardsResult.error?.message || actionsResult.error?.message);
+  if (assessmentResult.error || hazardsResult.error || actionsResult.error || peopleResult.error) throw new Error(assessmentResult.error?.message || hazardsResult.error?.message || actionsResult.error?.message || peopleResult.error?.message);
   if (!assessmentResult.data) notFound();
   const assessment = assessmentResult.data;
   const hazards = hazardsResult.data || [];
@@ -211,14 +230,24 @@ export default async function RiskAssessmentWorkspacePage({ params }) {
   const locked = lockedStatuses.includes(assessment.status);
   const levels = { none: 0, view: 1, contribute: 2, review: 3, approve: 4, admin: 5, owner: 6 };
   const canContribute = (levels[access.level] || 0) >= levels.contribute;
+  const signedDocumentUrl = async (path) => {
+    if (!path) return null;
+    const { data } = await supabase.storage.from("hs-risk-assessment-evidence").createSignedUrl(path, 3600);
+    return data?.signedUrl || null;
+  };
+  const [coshhDownloadUrl, ssowDownloadUrl, permitDownloadUrl] = await Promise.all([
+    signedDocumentUrl(assessment.coshh_document_path),
+    signedDocumentUrl(assessment.ssow_document_path),
+    signedDocumentUrl(assessment.permit_document_path),
+  ]);
 
   return <main className="rawPage"><style>{`
-    *{box-sizing:border-box}.rawPage{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.rawShell{max-width:1280px;margin:auto}.rawTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.rawTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.rawTop h1{font-size:34px;margin:7px 0}.rawTop p{margin:0;color:#657b93}.rawButtons{display:flex;gap:9px;flex-wrap:wrap}.rawButton{padding:11px 15px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:850}.rawButton.secondary{background:#fff;color:#173b59;border:1px solid #cbd8e4}.rawSummary{display:grid;grid-template-columns:1.4fr repeat(4,.55fr);gap:12px;margin:23px 0}.rawContext,.rawMetric{padding:18px;border:1px solid #d7e3eb;border-radius:13px;background:#fff}.rawContext strong,.rawContext small,.rawMetric strong,.rawMetric span{display:block}.rawContext small{color:#72869a;margin-top:5px}.rawMetric span{font-size:11px;color:#657b91;font-weight:850}.rawMetric strong{font-size:27px;margin-top:7px}.rawMetric .red{color:#c6352e}.rawPanel{padding:23px;border:1px solid #d7e3eb;border-radius:16px;background:#fff;margin-top:15px}.rawHead{display:flex;justify-content:space-between;gap:15px;align-items:end;margin-bottom:17px}.rawHead h2{margin:0}.rawHead p{margin:5px 0 0;color:#6c8197}.rawPill{padding:7px 10px;border-radius:999px;background:#e7f4ff;color:#145ba9;font-size:11px;font-weight:900}.rawDetails{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.rawDetails div{padding:12px;border-radius:10px;background:#f3f7fa}.rawDetails span,.rawDetails strong{display:block}.rawDetails span{font-size:10px;color:#74889b;font-weight:850}.rawDetails strong{margin-top:5px;font-size:13px}.rawActions{display:grid;gap:8px}.rawAction{display:grid;grid-template-columns:1.4fr .7fr .6fr .55fr;gap:13px;padding:14px;border:1px solid #e0e8ee;border-radius:10px}.rawAction strong,.rawAction small{display:block}.rawAction small{color:#788b9e;margin-top:4px}.rawEmpty{padding:20px;border-radius:10px;background:#f2f6f9;color:#657b91}@media(max-width:900px){.rawSummary{grid-template-columns:1fr 1fr}.rawContext{grid-column:1/-1}.rawDetails{grid-template-columns:1fr 1fr}.rawAction{grid-template-columns:1fr auto}.rawAction>:nth-child(2),.rawAction>:nth-child(3){display:none}}@media(max-width:520px){.rawSummary,.rawDetails{grid-template-columns:1fr}.rawContext{grid-column:auto}}
+    *{box-sizing:border-box}.rawPage{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.rawShell{max-width:1280px;margin:auto}.rawTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.rawTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.rawTop h1{font-size:34px;margin:7px 0}.rawTop p{margin:0;color:#657b93}.rawButtons{display:flex;gap:9px;flex-wrap:wrap}.rawButton{padding:11px 15px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:850}.rawButton.secondary{background:#fff;color:#173b59;border:1px solid #cbd8e4}.rawSummary{display:grid;grid-template-columns:1.4fr repeat(4,.55fr);gap:12px;margin:23px 0}.rawContext,.rawMetric{padding:18px;border:1px solid #d7e3eb;border-radius:13px;background:#fff}.rawContext strong,.rawContext small,.rawMetric strong,.rawMetric span{display:block}.rawContext small{color:#72869a;margin-top:5px}.rawMetric span{font-size:11px;color:#657b91;font-weight:850}.rawMetric strong{font-size:27px;margin-top:7px}.rawMetric .red{color:#c6352e}.rawPanel{padding:23px;border:1px solid #d7e3eb;border-radius:16px;background:#fff;margin-top:15px}.rawHead{display:flex;justify-content:space-between;gap:15px;align-items:end;margin-bottom:17px}.rawHead h2{margin:0}.rawHead p{margin:5px 0 0;color:#6c8197}.rawPill{padding:7px 10px;border-radius:999px;background:#e7f4ff;color:#145ba9;font-size:11px;font-weight:900}.rawDetails{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.rawDetails div{padding:12px;border-radius:10px;background:#f3f7fa}.rawDetails span,.rawDetails strong{display:block}.rawDetails span{font-size:10px;color:#74889b;font-weight:850}.rawDetails strong{margin-top:5px;font-size:13px}.rawDownload{display:inline-block;margin-top:7px;color:#075fa8;font-size:12px;font-weight:900;text-decoration:none}.rawDownload:hover{text-decoration:underline}.rawActions{display:grid;gap:8px}.rawAction{display:grid;grid-template-columns:1.4fr .7fr .6fr .55fr;gap:13px;padding:14px;border:1px solid #e0e8ee;border-radius:10px}.rawAction strong,.rawAction small{display:block}.rawAction small{color:#788b9e;margin-top:4px}.rawEmpty{padding:20px;border-radius:10px;background:#f2f6f9;color:#657b91}@media(max-width:900px){.rawSummary{grid-template-columns:1fr 1fr}.rawContext{grid-column:1/-1}.rawDetails{grid-template-columns:1fr 1fr}.rawAction{grid-template-columns:1fr auto}.rawAction>:nth-child(2),.rawAction>:nth-child(3){display:none}}@media(max-width:520px){.rawSummary,.rawDetails{grid-template-columns:1fr}.rawContext{grid-column:auto}}
   `}</style><div className="rawShell">
     <header className="rawTop"><div><small>{assessment.assessment_reference} · VERSION {assessment.version}</small><h1>{assessment.title}</h1><p>{label(assessment.assessment_type)} · {assessment.site_location || assessment.area_department || "Location not set"}</p></div><div className="rawButtons"><Link className="rawButton secondary" href="/portal/health-safety/risk-assessment">← Register</Link><Link className="rawButton secondary" href="/portal/health-safety">H&amp;S Hub</Link>{["approved", "communicated", "superseded"].includes(assessment.status) && <a className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/report"} target="_blank" rel="noreferrer">▤ Controlled PDF</a>}{revisionableStatuses.includes(assessment.status) && canContribute && <form action={createRevision}><input type="hidden" name="assessment_id" value={id}/><button className="rawButton" type="submit">Create new revision</button></form>}{!locked && canContribute && <Link className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/edit"}>Edit assessment details</Link>}<Link className="rawButton" href={"/portal/health-safety/risk-assessment/" + id + "/review"}>Review &amp; approval</Link></div></header>
     <section className="rawSummary"><div className="rawContext"><strong>{assessment.task_description}</strong><small>Assessed by {assessment.assessor_name || "Not assigned"} on {formatDate(assessment.assessment_date)} · review {formatDate(assessment.review_date)}</small></div><div className="rawMetric"><span>HAZARDS</span><strong>{hazards.length}</strong></div><div className="rawMetric"><span>HIGHEST RESIDUAL</span><strong className={highest >= 10 ? "red" : ""}>{highest || "—"}</strong></div><div className="rawMetric"><span>ELEVATED</span><strong className={elevated ? "red" : ""}>{elevated}</strong></div><div className="rawMetric"><span>OPEN ACTIONS</span><strong>{openActions.length}</strong></div></section>
-    <section className="rawPanel"><div className="rawHead"><div><h2>Assessment context</h2><p>Scope, people and supporting arrangements.</p></div><span className="rawPill">{label(assessment.status)}</span></div><div className="rawDetails"><div><span>AREA / DEPARTMENT</span><strong>{assessment.area_department || "—"}</strong></div><div><span>SECTION / LAB</span><strong>{assessment.section_lab || "—"}</strong></div><div><span>PEOPLE AT RISK</span><strong>{assessment.persons_at_risk?.join(", ") || "—"}</strong></div><div><span>COMPETENCE BASIS</span><strong>{assessment.assessor_competence_basis || "—"}</strong></div><div><span>SAFE SYSTEM</span><strong>{assessment.safe_system_reference || "—"}</strong></div><div><span>COSHH / MSDS</span><strong>{assessment.coshh_msds_reference || "—"}</strong></div><div><span>PERMIT</span><strong>{assessment.permit_required ? assessment.permit_reference : "Not required"}</strong></div><div><span>CONSULTATION</span><strong>{assessment.consultation_summary || "—"}</strong></div></div></section>
-    <section className="rawPanel"><div className="rawHead"><div><h2>Hazards and risk decisions</h2><p>{locked ? "This controlled version is read-only. Create a new revision to change hazards or controls." : "Evaluate initial risk, apply controls and confirm the residual position."}</p></div></div><HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} addHazardAction={addHazard} readOnly={locked || !canContribute}/></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Assessment context</h2><p>Scope, people and supporting arrangements.</p></div><span className="rawPill">{label(assessment.status)}</span></div><div className="rawDetails"><div><span>AREA / DEPARTMENT</span><strong>{assessment.area_department || "—"}</strong></div><div><span>SECTION / LAB</span><strong>{assessment.section_lab || "—"}</strong></div><div><span>PEOPLE AT RISK</span><strong>{assessment.persons_at_risk?.join(", ") || "—"}</strong></div><div><span>ASSESSOR / DATE</span><strong>{assessment.assessor_name || "—"}<br/>{formatDate(assessment.assessment_date)}</strong></div><div><span>SAFE SYSTEM OF WORK</span><strong>{assessment.safe_system_reference || "—"}</strong>{ssowDownloadUrl && <a className="rawDownload" href={ssowDownloadUrl} download={assessment.ssow_document_name || true}>Download SSOW ↓</a>}</div><div><span>COSHH / SAFETY DATA</span><strong>{assessment.coshh_msds_reference || "—"}</strong>{coshhDownloadUrl && <a className="rawDownload" href={coshhDownloadUrl} download={assessment.coshh_document_name || true}>Download COSHH ↓</a>}</div><div><span>PERMIT</span><strong>{assessment.permit_required ? assessment.permit_reference : "Not required"}</strong>{permitDownloadUrl && <a className="rawDownload" href={permitDownloadUrl} download={assessment.permit_document_name || true}>Download permit ↓</a>}</div><div><span>CONSULTATION</span><strong>{assessment.consultation_summary || "—"}</strong></div></div></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Hazards and risk decisions</h2><p>{locked ? "This controlled version is read-only. Create a new revision to change hazards or controls." : "Evaluate initial risk, apply controls and confirm the residual position."}</p></div></div><HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} companyPeople={peopleResult.data || []} addHazardAction={addHazard} readOnly={locked || !canContribute}/></section>
     <section className="rawPanel"><div className="rawHead"><div><h2>Risk-reduction actions</h2><p>Accountable actions linked directly to identified hazards.</p></div><Link href="/portal/health-safety/actions">Action register →</Link></div>{actions.length ? <div className="rawActions">{actions.map((action) => <div className="rawAction" key={action.id}><div><strong>{action.action_required}</strong><small>{action.action_reference}</small></div><div><strong>{action.responsible_name}</strong><small>Responsible person</small></div><div><strong>{formatDate(action.target_date)}</strong><small>{label(action.priority)} priority</small></div><span className="rawPill">{label(action.status)}</span></div>)}</div> : <div className="rawEmpty">No additional risk-reduction actions have been recorded.</div>}</section>
   </div></main>;
 }
