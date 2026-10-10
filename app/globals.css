@@ -2204,12 +2204,77 @@ a {
   font-size: 17px;
   line-height: 1.65;
 }
+.isoMilestones {
+  padding: 64px max(6vw, 24px);
+  background: #0b2746;
+}
+.isoSectionHead {
+  max-width: 900px;
+}
+.isoSectionHead h2,
+.isoBoardSection h2 {
+  font-size: clamp(32px, 3.5vw, 50px);
+  letter-spacing: -0.035em;
+  margin: 10px 0 14px;
+}
+.isoSectionHead p,
+.isoBoardSection > div > p {
+  color: #b8cce0;
+  font-size: 17px;
+  line-height: 1.65;
+}
+.isoMilestoneGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 30px;
+}
+.isoMilestoneGrid article {
+  background: #071a33;
+  border: 1px solid #2b527d;
+  border-top: 4px solid var(--guide-accent);
+  border-radius: 14px;
+  padding: 22px;
+}
+.isoMilestoneGrid span { color: #7da9ff; font-weight: 900; font-size: 13px; }
+.isoMilestoneGrid h3 { margin: 10px 0 8px; font-size: 18px; }
+.isoMilestoneGrid p { color: #b8cce0; line-height: 1.55; margin: 0; font-size: 14px; }
+.isoChangeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 32px;
+}
+.isoChangeCard {
+  border: 1px solid #2b527d;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #12365f, #0c294a);
+  padding: 24px;
+}
+.isoChangeCard > div { display: flex; align-items: center; gap: 13px; border-bottom: 1px solid #294f77; padding-bottom: 15px; }
+.isoChangeCard > div span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 9px; background: #071a33; color: var(--guide-accent); font-weight: 900; }
+.isoChangeCard h3 { margin: 0; font-size: 21px; }
+.isoChangeCard dl { display: grid; grid-template-columns: 145px 1fr; gap: 11px 16px; margin: 18px 0 0; }
+.isoChangeCard dt { color: #7da9ff; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+.isoChangeCard dd { margin: 0; color: #c7d7e7; line-height: 1.55; font-size: 14px; }
+.isoBoardSection {
+  padding: 68px max(6vw, 24px);
+  background: #12365f;
+  display: grid;
+  grid-template-columns: .78fr 1.22fr;
+  gap: 64px;
+  align-items: start;
+}
+.isoBoardSection ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.isoBoardSection li { display: flex; gap: 13px; align-items: flex-start; background: #071a33; border: 1px solid #2b527d; border-radius: 12px; padding: 16px; color: #d4e0ec; line-height: 1.45; }
+.isoBoardSection li span { color: var(--guide-accent); font-weight: 900; }
 .clauseList {
   display: grid;
   gap: 14px;
   margin-top: 32px;
   max-width: 1280px;
 }
+.isoClauseList { max-width: none; }
 .clauseCard {
   border: 1px solid #2b527d;
   border-radius: 18px;
@@ -2290,6 +2355,25 @@ a {
   border-color: var(--guide-accent);
   background: rgba(42, 102, 236, 0.12);
 }
+.isoClauseBody {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  background: #0d2949;
+}
+.isoClauseBody article { border: 1px solid #294b70; border-radius: 14px; padding: 20px; background: #102f53; }
+.isoClauseBody h3 { margin: 0 0 11px; color: var(--guide-accent); font-size: 15px; }
+.isoClauseBody p, .isoClauseBody li { color: #c3d2e1; line-height: 1.62; }
+.isoClauseBody p { margin: 0; }
+.isoClauseBody ul, .isoClauseBody ol { margin: 0; padding-left: 21px; }
+.isoClauseBody li + li { margin-top: 7px; }
+.isoClauseBody .isoClauseRequirements { grid-column: 1 / -1; background: #0b2340; }
+.isoClauseBody .isoClauseRequirements ol { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 30px; }
+.isoClauseBody .isoFailure { border-color: #b66b55; background: #382a2d; }
+.isoClauseBody .isoFailure h3 { color: #ffac8e; }
+.isoClauseBody .isoFocus { border-color: #397bd2; background: #102f5f; }
+.isoClauseBody .rpgSupport { border-color: var(--guide-accent); background: rgba(42,102,236,.12); }
 .rpgSupport a {
   display: inline-block;
   margin-top: 5px;
@@ -2352,6 +2436,17 @@ a {
   .guideFacts {
     grid-template-columns: 1fr 1fr;
   }
+  .isoMilestoneGrid,
+  .isoChangeGrid,
+  .isoBoardSection,
+  .isoBoardSection ol {
+    grid-template-columns: 1fr 1fr;
+  }
+  .isoBoardSection { gap: 30px; }
+  .isoBoardSection > div { grid-column: 1 / -1; }
+  .isoClauseBody { grid-template-columns: 1fr; }
+  .isoClauseBody .isoClauseRequirements { grid-column: auto; }
+  .isoClauseBody .isoClauseRequirements ol { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .guideFacts {
@@ -2366,6 +2461,13 @@ a {
   .clauseExplanation {
     padding: 16px;
   }
+  .isoMilestoneGrid,
+  .isoChangeGrid,
+  .isoBoardSection,
+  .isoBoardSection ol { grid-template-columns: 1fr; }
+  .isoChangeCard dl { grid-template-columns: 1fr; gap: 5px; }
+  .isoChangeCard dd + dt { margin-top: 8px; }
+  .isoClauseBody { padding: 12px; }
 }
 .guideHeroActions {
   display: grid;
