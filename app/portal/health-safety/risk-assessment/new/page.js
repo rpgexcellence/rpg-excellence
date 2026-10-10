@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
+import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 
 export const metadata = { title: "New Risk Assessment | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -15,12 +17,13 @@ const people = ["Employees", "Contractors", "Visitors", "Members of the public",
 
 async function createRiskAssessment(formData) {
   "use server";
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessment/new");
-  const { data: organisation, error: orgError } = await supabase.from("organizations").select("id").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
-  if (orgError) throw new Error(orgError.message);
-  if (!organisation) throw new Error("Create an organisation before starting a risk assessment.");
+  const access = await requireOrganizationAccess(
+    "risk_management",
+    "contribute",
+    "/portal/health-safety/risk-assessment/new",
+  );
+  const { user, organization: organisation } = access;
+  const admin = createAdminClient();
 
   const text = (name) => String(formData.get(name) || "").trim();
   const title = text("title");
@@ -36,8 +39,8 @@ async function createRiskAssessment(formData) {
   const permitReference = text("permit_reference");
   if (permitRequired && !permitReference) throw new Error("Enter the permit type or reference.");
 
-  const { data: assessment, error } = await supabase.from("hs_risk_assessments").insert({
-    owner_id: user.id,
+  const { data: assessment, error } = await admin.from("hs_risk_assessments").insert({
+    owner_id: organisation.owner_id,
     organization_id: organisation.id,
     title,
     assessment_type: text("assessment_type") || "general",
@@ -67,9 +70,11 @@ async function createRiskAssessment(formData) {
 }
 
 export default async function NewRiskAssessmentPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/risk-assessment/new");
+  await requireOrganizationAccess(
+    "risk_management",
+    "contribute",
+    "/portal/health-safety/risk-assessment/new",
+  );
   const today = new Date().toISOString().slice(0, 10);
 
   return <main className="nrPage"><style>{`
