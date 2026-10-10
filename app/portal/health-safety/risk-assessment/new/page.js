@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
+import { rcaAdministrationLocations } from "../../../../../lib/rcaCompanyLinks";
 
 export const metadata = { title: "New Risk Assessment | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -37,19 +39,34 @@ async function createRiskAssessment(formData) {
   if (!personsAtRisk.length) throw new Error("Select at least one group of people who may be affected.");
   const permitRequired = formData.get("permit_required") === "yes";
   const permitReference = text("permit_reference");
-  if (permitRequired && !permitReference) throw new Error("Enter the permit type or reference.");
+  const administrationLocationId = text("administration_location_id");
+  const assessorPersonId = text("assessor_person_id");
+  const linkedPermitId = text("linked_permit_id");
+  const locations = rcaAdministrationLocations(organisation);
+  const location = locations.find((item) => item.id === administrationLocationId);
+  const [{ data: assessor }, { data: linkedPermit }] = await Promise.all([
+    admin.from("organization_people").select("id,first_name,last_name,email,position").eq("id", assessorPersonId).eq("organization_id", organisation.id).eq("account_status", "active").maybeSingle(),
+    linkedPermitId ? admin.from("hs_permits").select("id,permit_reference").eq("id", linkedPermitId).eq("organization_id", organisation.id).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  if (!location) throw new Error("Select a current business site from Administration → Business Profile.");
+  if (!assessor) throw new Error("Select an active assessor from the Company User list.");
+  if (linkedPermitId && !linkedPermit) throw new Error("The selected company permit is no longer available.");
+  if (permitRequired && !linkedPermit && !permitReference) throw new Error("Select a company permit or enter a manual permit reference.");
+  const assessorSnapshot = [assessor.first_name, assessor.last_name].filter(Boolean).join(" ") || assessor.email;
 
   const { data: assessment, error } = await admin.from("hs_risk_assessments").insert({
     owner_id: organisation.owner_id,
     organization_id: organisation.id,
     title,
     assessment_type: text("assessment_type") || "general",
-    site_location: text("site_location") || null,
+    site_location: location.label,
+    administration_location_id: location.id,
     area_department: text("area_department") || null,
     section_lab: text("section_lab") || null,
     project_number: text("project_number") || null,
     task_description: taskDescription,
-    assessor_name: assessorName,
+    assessor_name: assessorSnapshot,
+    assessor_person_id: assessor.id,
     assessor_user_id: user.id,
     assessor_competence_basis: text("assessor_competence_basis") || null,
     assessment_date: assessmentDate,
@@ -58,7 +75,8 @@ async function createRiskAssessment(formData) {
     coshh_msds_reference: text("coshh_msds_reference") || null,
     safe_system_reference: text("safe_system_reference") || null,
     permit_required: permitRequired,
-    permit_reference: permitReference || null,
+    linked_permit_id: linkedPermit?.id || null,
+    permit_reference: linkedPermit?.permit_reference || permitReference || null,
     associated_documents: text("associated_documents") || null,
     persons_at_risk: personsAtRisk,
     vulnerable_persons_considered: personsAtRisk.some((item) => ["Young persons", "New or expectant mothers", "Disabled persons"].includes(item)),
@@ -66,15 +84,47 @@ async function createRiskAssessment(formData) {
     emergency_arrangements: text("emergency_arrangements") || null,
   }).select("id").single();
   if (error) throw new Error(error.message);
+  const permitFile = formData.get("permit_document");
+  if (permitFile instanceof File && permitFile.size) {
+    if (permitFile.size > 10 * 1024 * 1024) {
+      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
+      throw new Error("The permit file must be 10 MB or smaller.");
+    }
+    const permittedTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png", "image/webp"];
+    if (!permittedTypes.includes(permitFile.type)) {
+      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
+      throw new Error("Upload the permit as PDF, Word, JPG, PNG or WebP.");
+    }
+    const safeName = permitFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = `${organisation.id}/${assessment.id}/${randomUUID()}-${safeName}`;
+    const { error: uploadError } = await admin.storage.from("hs-risk-assessment-evidence").upload(path, permitFile, { contentType: permitFile.type, upsert: false });
+    if (uploadError) {
+      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
+      throw new Error(uploadError.message);
+    }
+    const { error: evidenceError } = await admin.from("hs_risk_assessments").update({ permit_document_path: path, permit_document_name: permitFile.name, permit_document_mime_type: permitFile.type, permit_document_size_bytes: permitFile.size }).eq("id", assessment.id).eq("organization_id", organisation.id);
+    if (evidenceError) {
+      await admin.storage.from("hs-risk-assessment-evidence").remove([path]);
+      await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
+      throw new Error(evidenceError.message);
+    }
+  }
   redirect("/portal/health-safety/risk-assessment/" + assessment.id);
 }
 
 export default async function NewRiskAssessmentPage() {
-  await requireOrganizationAccess(
+  const access = await requireOrganizationAccess(
     "risk_management",
     "contribute",
     "/portal/health-safety/risk-assessment/new",
   );
+  const admin = createAdminClient();
+  const locations = rcaAdministrationLocations(access.organization);
+  const [{ data: companyPeople, error: peopleError }, { data: permits, error: permitsError }] = await Promise.all([
+    admin.from("organization_people").select("id,first_name,last_name,email,position").eq("organization_id", access.organization.id).eq("account_status", "active").order("last_name"),
+    admin.from("hs_permits").select("id,permit_reference,permit_type,task_description,status,valid_until").eq("organization_id", access.organization.id).not("status", "in", '(closed,cancelled)').order("updated_at", { ascending: false }),
+  ]);
+  if (peopleError || permitsError) throw new Error(peopleError?.message || permitsError?.message);
   const today = new Date().toISOString().slice(0, 10);
 
   return <main className="nrPage"><style>{`
@@ -82,18 +132,18 @@ export default async function NewRiskAssessmentPage() {
   `}</style><div className="nrShell">
     <header className="nrTop"><div><small>H&amp;S HUB · GUIDED ASSESSMENT</small><h1>Create a risk assessment</h1><p>Establish the scope and people affected before identifying individual hazards.</p></div><Link className="nrBack" href="/portal/health-safety/risk-assessment">← Risk Assessment Register</Link></header>
     <section className="nrGuide">{[["1","Define context"],["2","Identify hazards"],["3","Evaluate risk"],["4","Control risk"],["5","Approve & review"]].map(([number,title]) => <div key={number}><b>{number}</b><span>{title}</span></div>)}</section>
-    <form className="nrForm" action={createRiskAssessment}>
+    <form className="nrForm" action={createRiskAssessment} encType="multipart/form-data">
       <section className="nrCard"><div className="nrHead"><span>STEP 1A</span><h2>Assessment identity and scope</h2><p>Define clear boundaries for the work being assessed.</p></div><div className="nrGrid">
         <div className="nrField full"><label htmlFor="title">Risk assessment title *</label><input id="title" name="title" required minLength={3} placeholder="For example: Operation of pedestal drill in Engineering Workshop"/></div>
         <div className="nrField"><label htmlFor="assessment_type">Assessment type *</label><select id="assessment_type" name="assessment_type" required>{types.map(([value,title]) => <option value={value} key={value}>{title}</option>)}</select></div>
         <div className="nrField"><label htmlFor="project_number">Project / job number</label><input id="project_number" name="project_number"/></div>
-        <div className="nrField"><label htmlFor="site_location">Site / location</label><input id="site_location" name="site_location"/></div>
+        <div className="nrField"><label htmlFor="administration_location_id">Site / location *</label><select id="administration_location_id" name="administration_location_id" required defaultValue=""><option value="" disabled>{locations.length ? "Select business address" : "No business addresses available"}</option>{locations.map((location) => <option value={location.id} key={location.id}>{location.label}</option>)}</select><small>Linked to <a href="/portal/company/business-profile">Administration → Business Profile</a>.</small></div>
         <div className="nrField"><label htmlFor="area_department">Area / department</label><input id="area_department" name="area_department"/></div>
         <div className="nrField"><label htmlFor="section_lab">Section / laboratory</label><input id="section_lab" name="section_lab"/></div>
         <div className="nrField full"><label htmlFor="task_description">Activity, task or workplace description *</label><textarea id="task_description" name="task_description" required placeholder="Describe normal work, foreseeable abnormal conditions, equipment, materials and boundaries."/></div>
       </div></section>
       <section className="nrCard"><div className="nrHead"><span>STEP 1B</span><h2>Assessor and competence</h2><p>Record who completed the assessment and the basis of their competence.</p></div><div className="nrGrid">
-        <div className="nrField"><label htmlFor="assessor_name">Assessor name *</label><input id="assessor_name" name="assessor_name" required/></div>
+        <div className="nrField"><label htmlFor="assessor_person_id">Assessor name *</label><select id="assessor_person_id" name="assessor_person_id" required defaultValue=""><option value="" disabled>{companyPeople?.length ? "Select active company user" : "No active company users available"}</option>{(companyPeople || []).map((person) => <option value={person.id} key={person.id}>{[person.first_name, person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select><small>Linked to <a href="/portal/company/people">Administration → People, Roles &amp; Access</a>.</small><input type="hidden" name="assessor_name" value="linked-company-user"/></div>
         <div className="nrField"><label htmlFor="assessor_competence_basis">Assessor competence basis</label><input id="assessor_competence_basis" name="assessor_competence_basis" placeholder="Training, knowledge, skills and experience"/></div>
         <div className="nrField"><label htmlFor="assessment_date">Assessment date *</label><input id="assessment_date" name="assessment_date" type="date" defaultValue={today} required/></div>
       </div></section>
@@ -102,7 +152,9 @@ export default async function NewRiskAssessmentPage() {
         <div className="nrField"><label htmlFor="coshh_msds_reference">COSHH / safety data reference</label><input id="coshh_msds_reference" name="coshh_msds_reference"/></div>
         <div className="nrField"><label htmlFor="safe_system_reference">Safe system of work reference</label><input id="safe_system_reference" name="safe_system_reference"/></div>
         <div className="nrField full"><label className="nrPermit"><input type="checkbox" name="permit_required" value="yes"/>Permit to work is required</label></div>
-        <div className="nrField"><label htmlFor="permit_reference">Permit reference / type</label><input id="permit_reference" name="permit_reference"/></div>
+        <div className="nrField full"><label htmlFor="linked_permit_id">Existing company permit</label><select id="linked_permit_id" name="linked_permit_id" defaultValue=""><option value="">No existing RPG permit / enter manually below</option>{(permits || []).map((permit) => <option value={permit.id} key={permit.id}>{permit.permit_reference} · {String(permit.permit_type).replaceAll("_", " ")} · {permit.status}</option>)}</select><small>Links this assessment to the controlled company Permit-to-Work register.</small></div>
+        <div className="nrField"><label htmlFor="permit_reference">Manual permit reference / type</label><input id="permit_reference" name="permit_reference" placeholder="Use when the permit is managed outside RPG"/></div>
+        <div className="nrField"><label htmlFor="permit_document">Upload external permit evidence</label><input id="permit_document" name="permit_document" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"/><small>Optional supporting copy · maximum 10 MB · do not upload passwords or secret credentials.</small></div>
         <div className="nrField"><label htmlFor="associated_documents">Associated documents</label><input id="associated_documents" name="associated_documents"/></div>
         <div className="nrField full"><label htmlFor="emergency_arrangements">Emergency arrangements</label><textarea id="emergency_arrangements" name="emergency_arrangements"/></div>
       </div></section>
