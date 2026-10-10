@@ -8,16 +8,20 @@ export function middleware(request) {
     return NextResponse.redirect(englishUrl, 308);
   }
 
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-rpg-pathname", request.nextUrl.pathname);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+
   const match = request.nextUrl.pathname.match(/^\/audit-actions\/([^/]+)$/);
-  if (!match) return NextResponse.next();
-  const response = NextResponse.next();
-  response.cookies.set("audit_action_token", decodeURIComponent(match[1]), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 14,
-  });
+  if (match) {
+    response.cookies.set("audit_action_token", decodeURIComponent(match[1]), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 14,
+    });
+  }
   return response;
 }
 
