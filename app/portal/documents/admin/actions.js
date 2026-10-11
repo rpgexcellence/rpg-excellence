@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
+import { resolvePortalAdminAccess } from "../../../../lib/portal-admin-access";
 
 const DOCUMENT_TYPES = [
   "Procedure",
@@ -156,18 +157,16 @@ async function requireDocumentAdmin() {
     createAdminClient();
 
   const {
-    data: adminAccess,
+    access: adminAccess,
     error: adminAccessError,
-  } = await admin
-    .from("portal_admins")
-    .select("role, active")
-    .eq("user_id", user.id)
-    .eq("active", true)
-    .in("role", [
+  } = await resolvePortalAdminAccess({
+    admin,
+    user,
+    allowedRoles: [
       "admin",
       "document_controller",
-    ])
-    .maybeSingle();
+    ],
+  });
 
   if (
     adminAccessError ||
