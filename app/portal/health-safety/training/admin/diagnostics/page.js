@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../../lib/supabase/admin";
+import { resolvePortalAdminAccess } from "../../../../../../lib/portal-admin-access";
 
 export const metadata = { title: "Training Readiness | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -22,13 +23,11 @@ export default async function TrainingDiagnosticsPage() {
   if (!user) redirect("/portal/login?next=/portal/health-safety/training/admin/diagnostics");
 
   const admin = createAdminClient();
-  const { data: access, error: accessError } = await admin
-    .from("portal_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .eq("active", true)
-    .eq("role", "admin")
-    .maybeSingle();
+  const { access, error: accessError } = await resolvePortalAdminAccess({
+    admin,
+    user,
+    allowedRoles: ["admin"],
+  });
 
   if (accessError || !access) redirect("/portal/health-safety/training");
 
@@ -161,4 +160,3 @@ export default async function TrainingDiagnosticsPage() {
     </main>
   );
 }
-
