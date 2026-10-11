@@ -1,9 +1,11 @@
 "use server";
 import {redirect} from "next/navigation";
 import {revalidatePath} from "next/cache";
-import {createClient} from "../../../../../lib/supabase/server";
 import {requirePlanAccess} from "../../../../../lib/plan-access";
+import {requireOrganizationAccess} from "../../../../../lib/organization-access";
+import {createAdminClient} from "../../../../../lib/supabase/admin";
 import {loadPermitParticipants,resolvePermitParticipants} from "../../../../../lib/permitParticipants";
+import {loadPermitCompanyOptions,resolvePermitCompanyLinks} from "../../../../../lib/permitCompanyOptions";
 import {COMMON_CONTROLS,COMMON_HAZARDS,PERMIT_CONTROL_RULES,validatePermitSpecificControls} from "../../../../../lib/permitControlRules";
 
 const readJson=(value,fallback)=>{
@@ -20,14 +22,12 @@ const cleanControlValues=(rule,values,people)=>Object.fromEntries(rule.fields.ma
 
 export async function createPermit(previousState,formData){
   try {
-  const supabase=await createClient();
-  const {data:{user}}=await supabase.auth.getUser();
-  if(!user)redirect("/portal/login?next=/portal/health-safety/permits/new");
+  const access=await requireOrganizationAccess("risk_management","contribute","/portal/health-safety/permits/new"),{user,organization:organisation}=access;
   await requirePlanAccess(user.id,"professional","Permit to Work");
-  const {data:organisation,error:orgError}=await supabase.from("organizations").select("id,owner_id,name").eq("owner_id",user.id).order("created_at").limit(1).maybeSingle();
-  if(orgError)throw new Error(orgError.message);if(!organisation)throw new Error("Create an organisation before creating a permit.");
-  const options = await loadPermitParticipants(organisation);
+  const admin=createAdminClient();
+  const [options,companyOptions]=await Promise.all([loadPermitParticipants(organisation),loadPermitCompanyOptions(organisation)]);
   const participants = resolvePermitParticipants(options, organisation, formData);
+  const companyLinks=resolvePermitCompanyLinks(companyOptions,formData);
   const text=name=>String(formData.get(name)||"").trim();
   const permitType=text("permit_type"),rule=PERMIT_CONTROL_RULES[permitType];
   if(!rule)throw new Error("Select a valid permit type.");
@@ -43,16 +43,15 @@ export async function createPermit(previousState,formData){
   const controlValues=cleanControlValues(rule,specific.values,options.people);
   const precautions=[...commonControls,...specific.selected];
   const validFrom=text("valid_from"),validUntil=text("valid_until");
-  if(!text("task_description")||!text("scope_limits")||!text("site_location")||!text("work_area")||!text("asset_reference")||!text("linked_assessment_id")||!text("stop_work_conditions")||!text("emergency_arrangements"))throw new Error("Complete all mandatory permit fields.");
+  if(!text("task_description")||!text("scope_limits")||!text("work_area")||!text("linked_assessment_id")||!text("stop_work_conditions")||!text("emergency_arrangements"))throw new Error("Complete all mandatory permit fields.");
   if(!validFrom||!validUntil||!Number.isFinite(Date.parse(validFrom))||!Number.isFinite(Date.parse(validUntil))||new Date(validUntil)<=new Date(validFrom))throw new Error("The permit expiry must be after its start time.");
   if(text("issuer_declaration")!=="true"||text("receiver_declaration")!=="true")throw new Error("Both permit declarations must be accepted.");
-  const {data:assessment,error:assessmentError}=await supabase.from("hs_risk_assessments").select("id").eq("id",text("linked_assessment_id")).eq("owner_id",user.id).in("status",["approved","communicated"]).maybeSingle();
+  const {data:assessment,error:assessmentError}=await admin.from("hs_risk_assessments").select("id").eq("id",text("linked_assessment_id")).eq("organization_id",organisation.id).in("status",["approved","communicated"]).maybeSingle();
   if(assessmentError)throw new Error(assessmentError.message);if(!assessment)throw new Error("Select one of your approved or communicated risk assessments.");
   const reference=`PTW-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0,6).toUpperCase()}`;
-  const {data,error}=await supabase.from("hs_permits").insert({
-    owner_id:user.id,organization_id:organisation.id,permit_reference:reference,permit_type:permitType,
-    task_description:text("task_description"),scope_limits:text("scope_limits"),site_location:text("site_location"),work_area:text("work_area"),
-    asset_reference:text("asset_reference"),equipment_asset:text("asset_reference"),contractor_company:text("contractor_company")||null,
+  const {data,error}=await admin.from("hs_permits").insert({
+    owner_id:organisation.owner_id,organization_id:organisation.id,permit_reference:reference,permit_type:permitType,
+    task_description:text("task_description"),scope_limits:text("scope_limits"),work_area:text("work_area"),...companyLinks,
     linked_assessment_id:text("linked_assessment_id"),valid_from:new Date(validFrom).toISOString(),valid_until:new Date(validUntil).toISOString(),
     hazards,precautions,permit_specific_controls:{selected:specific.selected,values:controlValues},prohibited_work:text("prohibited_work")||null,
     stop_work_conditions:text("stop_work_conditions"),emergency_arrangements:text("emergency_arrangements"),...participants,
@@ -61,3 +60,4 @@ export async function createPermit(previousState,formData){
   if(error)throw new Error(error.message);revalidatePath("/portal/health-safety/permits");redirect(`/portal/health-safety/permits/${data.id}`);
   } catch(error) { if(error?.digest?.startsWith("NEXT_REDIRECT")) throw error; return {error:error.message || "The permit could not be saved."}; }
 }
+
