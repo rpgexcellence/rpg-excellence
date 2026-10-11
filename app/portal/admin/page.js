@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { createAdminClient } from "../../../lib/supabase/admin";
 import { createClient } from "../../../lib/supabase/server";
+import { resolvePortalAdminAccess } from "../../../lib/portal-admin-access";
 
 export const metadata = {
   title: "Platform Administration | RPG Excellence",
@@ -85,13 +86,11 @@ export default async function PlatformAdminPage() {
   }
 
   const admin = createAdminClient();
-  const { data: access, error: accessError } = await admin
-    .from("portal_admins")
-    .select("role,active")
-    .eq("user_id", user.id)
-    .eq("active", true)
-    .eq("role", "admin")
-    .maybeSingle();
+  const { access, error: accessError } = await resolvePortalAdminAccess({
+    admin,
+    user,
+    allowedRoles: ["admin"],
+  });
 
   if (accessError || !access) {
     redirect("/portal");
