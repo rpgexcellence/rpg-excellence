@@ -9,22 +9,43 @@ import {effectivePermitStatus,getCloseReadiness,getIssueReadiness,requireTransit
 import {getPermitRule} from "../../../../../lib/permitControlRules";
 
 const clean=value=>String(value||"").trim();
-const personName=person=>[person?.first_name,person?.last_name].filter(Boolean).join(" ").trim()||person?.email||"Authorised user";
-const workflowPrompt=(id,message)=>redirect(`/portal/health-safety/permits/${id}?workflowError=${encodeURIComponent(message)}`);
+
+const personName=person=>
+  [person?.first_name,person?.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim()||
+  person?.email||
+  "Authorised user";
+
+const workflowPrompt=(id,message)=>
+  redirect(
+    `/portal/health-safety/permits/${id}?workflowError=${encodeURIComponent(message)}`
+  );
 
 async function context(formData){
   const id=clean(formData.get("id"));
   const supabase=await createClient();
   const {data:{user}}=await supabase.auth.getUser();
 
-  if(!user)redirect(`/portal/login?next=/portal/health-safety/permits/${id}`);
+  if(!user){
+    redirect(
+      `/portal/login?next=/portal/health-safety/permits/${id}`
+    );
+  }
 
-  await requirePlanAccess(user.id,"professional","Permit to Work");
+  await requirePlanAccess(
+    user.id,
+    "professional",
+    "Permit to Work"
+  );
 
   const access=await getPermitAccess(user.id,id);
 
   if(!access.allowed||!access.permit){
-    throw new Error("You do not have access to this permit.");
+    throw new Error(
+      "You do not have access to this permit."
+    );
   }
 
   return {
@@ -33,26 +54,41 @@ async function context(formData){
     access,
     admin:access.admin,
     permit:access.permit,
-    actorName:personName(access.person)||user.email||"Authorised user"
+    actorName:
+      personName(access.person)||
+      user.email||
+      "Authorised user"
   };
 }
 
-async function event(admin,{permit,user,actorName},fromStatus,toStatus,eventType,reason="",eventData={}){
-  const {error}=await admin.from("hs_permit_events").insert({
-    permit_id:permit.id,
-    owner_id:permit.owner_id,
-    organization_id:permit.organization_id,
-    event_type:eventType,
-    from_status:fromStatus,
-    to_status:toStatus,
-    reason:reason||null,
-    actor_id:user.id,
-    actor_name:actorName,
-    permit_version:permit.version||1,
-    event_data:eventData,
-  });
+async function event(
+  admin,
+  {permit,user,actorName},
+  fromStatus,
+  toStatus,
+  eventType,
+  reason="",
+  eventData={}
+){
+  const {error}=await admin
+    .from("hs_permit_events")
+    .insert({
+      permit_id:permit.id,
+      owner_id:permit.owner_id,
+      organization_id:permit.organization_id,
+      event_type:eventType,
+      from_status:fromStatus,
+      to_status:toStatus,
+      reason:reason||null,
+      actor_id:user.id,
+      actor_name:actorName,
+      permit_version:permit.version||1,
+      event_data:eventData,
+    });
 
-  if(error)throw new Error(error.message);
+  if(error){
+    throw new Error(error.message);
+  }
 }
 
 async function relatedRecords(admin,permit){
@@ -74,10 +110,21 @@ async function relatedRecords(admin,permit){
 
     admin
       .from("hs_permits")
-      .select("id,permit_reference,status,task_description")
-      .eq("organization_id",permit.organization_id)
-      .eq("site_location",permit.site_location)
-      .eq("asset_reference",permit.asset_reference)
+      .select(
+        "id,permit_reference,status,task_description"
+      )
+      .eq(
+        "organization_id",
+        permit.organization_id
+      )
+      .eq(
+        "site_location",
+        permit.site_location
+      )
+      .eq(
+        "asset_reference",
+        permit.asset_reference
+      )
       .neq("id",permit.id)
       .in("status",[
         "awaiting_verification",
@@ -92,7 +139,9 @@ async function relatedRecords(admin,permit){
     testsResult,
     conflictsResult
   ]){
-    if(result.error)throw new Error(result.error.message);
+    if(result.error){
+      throw new Error(result.error.message);
+    }
   }
 
   return {
@@ -104,22 +153,26 @@ async function relatedRecords(admin,permit){
 
 export async function changePermitLifecycle(formData){
   const ctx=await context(formData);
+
   const {
     id,
-    user,
     access,
     admin,
-    permit,
-    actorName
+    permit
   }=ctx;
 
   const intent=clean(formData.get("intent"));
   const reason=clean(formData.get("reason"));
-  const confirmation=clean(formData.get("confirmation"));
+  const confirmation=clean(
+    formData.get("confirmation")
+  );
 
   const now=new Date().toISOString();
   const fromStatus=effectivePermitStatus(permit);
-  const records=await relatedRecords(admin,permit);
+  const records=await relatedRecords(
+    admin,
+    permit
+  );
 
   let toStatus=fromStatus;
   let values={updated_at:now};
@@ -128,29 +181,48 @@ export async function changePermitLifecycle(formData){
 
   if(intent==="submit_verification"){
     if(!mayEditPermit(access)){
-      throw new Error("Contributor access is required to submit this permit.");
+      throw new Error(
+        "Contributor access is required to submit this permit."
+      );
     }
 
-    requireTransition(fromStatus,"awaiting_verification");
+    requireTransition(
+      fromStatus,
+      "awaiting_verification"
+    );
+
     toStatus="awaiting_verification";
 
   }else if(intent==="verify"){
     if(!mayVerifyPermit(access)){
-      throw new Error("A permit verifier or issuer must complete verification.");
+      throw new Error(
+        "A permit verifier or issuer must complete verification."
+      );
     }
 
-    requireTransition(fromStatus,"awaiting_acceptance");
+    requireTransition(
+      fromStatus,
+      "awaiting_acceptance"
+    );
 
-    const rule=getPermitRule(permit.permit_type);
+    const rule=getPermitRule(
+      permit.permit_type
+    );
 
-    if(rule.requiresIsolation&&!records.isolations.length){
+    if(
+      rule.requiresIsolation&&
+      !records.isolations.length
+    ){
       workflowPrompt(
         id,
         "Verification cannot be completed yet. Record and verify every required isolation in Safety controls, then return here and complete verification."
       );
     }
 
-    if(rule.requiresAtmosphere&&!records.atmosphereTests.length){
+    if(
+      rule.requiresAtmosphere&&
+      !records.atmosphereTests.length
+    ){
       workflowPrompt(
         id,
         "Verification cannot be completed yet. Record an acceptable atmospheric test in Safety controls, then return here and complete verification."
@@ -162,11 +234,15 @@ export async function changePermitLifecycle(formData){
 
   }else if(intent==="accept_receiver"){
     if(!mayReceivePermit(access)){
-      throw new Error("Only the nominated receiver or a company administrator may accept control of the work.");
+      throw new Error(
+        "Only the nominated receiver or a company administrator may accept control of the work."
+      );
     }
 
     if(fromStatus!=="awaiting_acceptance"){
-      throw new Error("The permit must complete verification before receiver acceptance.");
+      throw new Error(
+        "The permit must complete verification before receiver acceptance."
+      );
     }
 
     values.receiver_declaration=true;
@@ -175,14 +251,24 @@ export async function changePermitLifecycle(formData){
 
   }else if(intent==="issue"){
     if(!mayIssuePermit(access)){
-      throw new Error("An authorised permit issuer is required.");
+      throw new Error(
+        "An authorised permit issuer is required."
+      );
     }
 
-    requireTransition(fromStatus,"issued");
+    requireTransition(
+      fromStatus,
+      "issued"
+    );
 
     const readiness=getIssueReadiness({
-      permit:{...permit,...values},
-      rule:getPermitRule(permit.permit_type),
+      permit:{
+        ...permit,
+        ...values
+      },
+      rule:getPermitRule(
+        permit.permit_type
+      ),
       ...records
     });
 
@@ -207,13 +293,20 @@ export async function changePermitLifecycle(formData){
 
   }else if(intent==="suspend"){
     if(!mayEditPermit(access)){
-      throw new Error("You do not have permission to suspend this permit.");
+      throw new Error(
+        "You do not have permission to suspend this permit."
+      );
     }
 
-    requireTransition(fromStatus,"suspended");
+    requireTransition(
+      fromStatus,
+      "suspended"
+    );
 
     if(!reason){
-      throw new Error("Record why work is being suspended and how the area was left safe.");
+      throw new Error(
+        "Record why work is being suspended and how the area was left safe."
+      );
     }
 
     toStatus="suspended";
@@ -227,13 +320,20 @@ export async function changePermitLifecycle(formData){
 
   }else if(intent==="request_handover"){
     if(!mayEditPermit(access)){
-      throw new Error("You do not have permission to initiate handover.");
+      throw new Error(
+        "You do not have permission to initiate handover."
+      );
     }
 
-    requireTransition(fromStatus,"handover_required");
+    requireTransition(
+      fromStatus,
+      "handover_required"
+    );
 
     if(!reason){
-      throw new Error("Record the current work state, remaining hazards and isolations for handover.");
+      throw new Error(
+        "Record the current work state, remaining hazards and isolations for handover."
+      );
     }
 
     toStatus="handover_required";
@@ -246,13 +346,20 @@ export async function changePermitLifecycle(formData){
 
   }else if(intent==="complete_work"){
     if(!mayReceivePermit(access)){
-      throw new Error("The nominated person in charge must declare the work complete.");
+      throw new Error(
+        "The nominated person in charge must declare the work complete."
+      );
     }
 
-    requireTransition(fromStatus,"awaiting_handback");
+    requireTransition(
+      fromStatus,
+      "awaiting_handback"
+    );
 
     if(!confirmation){
-      throw new Error("Confirm how the worksite was left safe and account for people, tools and materials.");
+      throw new Error(
+        "Confirm how the worksite was left safe and account for people, tools and materials."
+      );
     }
 
     toStatus="awaiting_handback";
@@ -266,20 +373,29 @@ export async function changePermitLifecycle(formData){
 
   }else if(intent==="accept_handback"){
     if(!mayAcceptHandback(access)){
-      throw new Error("An authorised operations or issuing authority must accept hand-back.");
+      throw new Error(
+        "An authorised operations or issuing authority must accept hand-back."
+      );
     }
 
-    requireTransition(fromStatus,"closed");
+    requireTransition(
+      fromStatus,
+      "closed"
+    );
 
     if(!confirmation){
-      throw new Error("Confirm reinstatement, inspection and safe return to service.");
+      throw new Error(
+        "Confirm reinstatement, inspection and safe return to service."
+      );
     }
 
     const candidate={
       ...permit,
-      completion_declared_at:permit.completion_declared_at,
+      completion_declared_at:
+        permit.completion_declared_at,
       handback_accepted_at:now,
-      reinstatement_confirmation:confirmation
+      reinstatement_confirmation:
+        confirmation
     };
 
     const readiness=getCloseReadiness({
@@ -288,8 +404,9 @@ export async function changePermitLifecycle(formData){
     });
 
     if(!readiness.ready){
-      throw new Error(
-        `Permit cannot be closed: ${readiness.blockers.join(" ")}`
+      workflowPrompt(
+        id,
+        `The permit cannot be closed yet. ${readiness.blockers.join(" ")} Open Safety controls, complete controlled reinstatement and independent verification, then return to accept hand-back.`
       );
     }
 
@@ -299,20 +416,29 @@ export async function changePermitLifecycle(formData){
       ...values,
       status:toStatus,
       handback_accepted_at:now,
-      handback_accepted_by:access.person?.id||null,
-      reinstatement_confirmation:confirmation,
+      handback_accepted_by:
+        access.person?.id||null,
+      reinstatement_confirmation:
+        confirmation,
       closed_at:now
     };
 
   }else if(intent==="cancel"){
     if(!mayIssuePermit(access)){
-      throw new Error("An issuer or approver must cancel this permit.");
+      throw new Error(
+        "An issuer or approver must cancel this permit."
+      );
     }
 
-    requireTransition(fromStatus,"cancelled");
+    requireTransition(
+      fromStatus,
+      "cancelled"
+    );
 
     if(!reason){
-      throw new Error("Record why the permit is being cancelled.");
+      throw new Error(
+        "Record why the permit is being cancelled."
+      );
     }
 
     toStatus="cancelled";
@@ -325,10 +451,15 @@ export async function changePermitLifecycle(formData){
     };
 
   }else{
-    throw new Error("Unsupported permit action.");
+    throw new Error(
+      "Unsupported permit action."
+    );
   }
 
-  if(intent!=="issue"&&!["accept_receiver"].includes(intent)){
+  if(
+    intent!=="issue"&&
+    !["accept_receiver"].includes(intent)
+  ){
     values.status=toStatus;
   }
 
@@ -337,7 +468,9 @@ export async function changePermitLifecycle(formData){
     .update(values)
     .eq("id",id);
 
-  if(error)throw new Error(error.message);
+  if(error){
+    throw new Error(error.message);
+  }
 
   await event(
     admin,
@@ -349,6 +482,11 @@ export async function changePermitLifecycle(formData){
     eventData
   );
 
-  revalidatePath(`/portal/health-safety/permits/${id}`);
-  revalidatePath("/portal/health-safety/permits");
+  revalidatePath(
+    `/portal/health-safety/permits/${id}`
+  );
+
+  revalidatePath(
+    "/portal/health-safety/permits"
+  );
 }
