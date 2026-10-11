@@ -28,6 +28,7 @@ export default function sitemap() {
     "/privacy",
     "/cookies",
     "/insights",
+    "/insights/iso-9001-2026-executive-release-analysis",
     "/insights/business-continuity-business-impact-analysis",
     "/insights/business-continuity-risk-assessment-hazard-scenarios",
     "/insights/business-continuity-roles-responsibilities",
