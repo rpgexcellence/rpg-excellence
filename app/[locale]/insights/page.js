@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      "number": "025",
+      "title": "ISO 9001:2026: Turn the Release into Better Business Decisions",
+      "description": "RPG Insights Issue 025: confirmed release changes, executive priorities and a practical 90-day plan, with the RPG ISO 9001:2026 guide and overview video.",
+      "href": "iso-9001-2026-executive-release-analysis"
+},
+    {
     "number": "024",
     "title": "When Disruption Hits, What Must Recover First?",
     "description": "RPG Excellence releases BCP Module 6: Business Impact Analysis, connecting impacts over time, accountable activity owners, recovery objectives and resource dependencies.",
