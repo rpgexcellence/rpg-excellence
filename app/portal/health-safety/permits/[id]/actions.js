@@ -10,6 +10,7 @@ import {getPermitRule} from "../../../../../lib/permitControlRules";
 
 const clean=value=>String(value||"").trim();
 const personName=person=>[person?.first_name,person?.last_name].filter(Boolean).join(" ").trim()||person?.email||"Authorised user";
+const workflowPrompt=(id,message)=>redirect(`/portal/health-safety/permits/${id}?workflowError=${encodeURIComponent(message)}`);
 
 async function context(formData){
   const id=clean(formData.get("id"));
@@ -55,8 +56,8 @@ export async function changePermitLifecycle(formData){
     if(!mayVerifyPermit(access))throw new Error("A permit verifier or issuer must complete verification.");
     requireTransition(fromStatus,"awaiting_acceptance");
     const rule=getPermitRule(permit.permit_type);
-    if(rule.requiresIsolation&&!records.isolations.length)throw new Error("Record and verify the required isolations before completing verification.");
-    if(rule.requiresAtmosphere&&!records.atmosphereTests.length)throw new Error("Record an acceptable atmospheric test before completing verification.");
+    if(rule.requiresIsolation&&!records.isolations.length)workflowPrompt(id,"Verification cannot be completed yet. Record and verify every required isolation in Safety controls, then return here and complete verification.");
+    if(rule.requiresAtmosphere&&!records.atmosphereTests.length)workflowPrompt(id,"Verification cannot be completed yet. Record an acceptable atmospheric test in Safety controls, then return here and complete verification.");
     toStatus="awaiting_acceptance";values.verification_completed_at=now;
   }else if(intent==="accept_receiver"){
     if(!mayReceivePermit(access))throw new Error("Only the nominated receiver or a company administrator may accept control of the work.");
