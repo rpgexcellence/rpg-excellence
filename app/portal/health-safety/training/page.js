@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
+import { resolvePortalAdminAccess } from "../../../../lib/portal-admin-access";
 import TrainingPurchaseButton from "../../../../components/TrainingPurchaseButton";
 
 export const metadata = { title: "Training Academy | RPG Excellence" };
@@ -62,13 +63,13 @@ export default async function TrainingAcademyPage() {
     supabase.from("hs_training_courses").select("id,course_code,title,course_type,description,duration_minutes,pass_mark,validity_months,price_pence,version").eq("active", true).order("course_type"),
     supabase.from("hs_training_enrolments").select("id,course_id,status,progress_percent,started_at,completed_at,expires_at,updated_at").eq("learner_id", user.id).order("updated_at", { ascending: false }),
     supabase.from("hs_training_certificates").select("id,course_id,certificate_number,course_title,score_percent,issued_at,valid_until,revoked_at").eq("learner_id", user.id).order("issued_at", { ascending: false }),
-    admin.from("portal_admins").select("user_id").eq("user_id", user.id).eq("active", true).eq("role", "admin").maybeSingle(),
+    resolvePortalAdminAccess({ admin, user, allowedRoles: ["admin"] }),
   ]);
 
   for (const result of [coursesResult, enrolmentsResult, certificatesResult]) {
     if (result.error) throw new Error(result.error.message);
   }
-  const canAdministerTraining = !adminAccessResult.error && Boolean(adminAccessResult.data);
+  const canAdministerTraining = !adminAccessResult.error && Boolean(adminAccessResult.access);
 
   const courses = coursesResult.data || [];
   const enrolments = enrolmentsResult.data || [];
@@ -92,4 +93,3 @@ export default async function TrainingAcademyPage() {
     <aside className="taGuidance"><strong>Competence reminder</strong><p>Course completion supports knowledge and understanding. Employers must still consider the skills and experience required for the complexity and risk of the work.</p></aside>
   </div></main>;
 }
-
