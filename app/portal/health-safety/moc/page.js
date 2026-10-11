@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient } from "../../../../lib/supabase/server";
+import { requireOrganizationAccess } from "../../../../lib/organization-access";
+import { createAdminClient } from "../../../../lib/supabase/admin";
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Management of Change Register | RPG Excellence",
@@ -16,17 +16,34 @@ const title = (v) =>
         )
       : "—";
 export default async function MocRegister() {
-  const s = await createClient(),
-    {
-      data: { user },
-    } = await s.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/moc");
-  const { data, error } = await s
-    .from("hs_moc_changes")
-    .select("*")
-    .eq("owner_id", user.id)
-    .order("updated_at", { ascending: false });
+  const { organization, level } = await requireOrganizationAccess(
+    "risk_management",
+    "view",
+    "/portal/health-safety/moc",
+  );
+  const admin = createAdminClient();
+  const [{ data, error }, { data: assets = [] }] = await Promise.all([
+    admin
+      .from("hs_moc_changes")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .order("updated_at", { ascending: false }),
+    admin
+      .from("organization_assets")
+      .select(
+        "id,asset_reference,asset_name,site_location_label,operational_status",
+      )
+      .eq("organization_id", organization.id),
+  ]);
   if (error) throw new Error(error.message);
+  const assetById = new Map(assets.map((asset) => [asset.id, asset]));
+  const canCreate = [
+    "contribute",
+    "review",
+    "approve",
+    "admin",
+    "owner",
+  ].includes(level);
   const items = data || [],
     active = items.filter(
       (x) => !["closed", "rejected", "cancelled"].includes(x.status),
@@ -42,7 +59,7 @@ export default async function MocRegister() {
     ).length;
   return (
     <main className="mr">
-      <style>{`*{box-sizing:border-box}.mr{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.ms{max-width:1220px;margin:auto}.mt{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.mt small{color:#087f6c;font-weight:900;letter-spacing:.1em}.mt h1{margin:6px 0;font-size:34px}.mt p{margin:0;color:#657b91}.btn{padding:12px 16px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}.metric{padding:18px;border:1px solid #d5e1e9;border-top:4px solid #1762ef;border-radius:13px;background:#fff}.metric.red{border-color:#d34b40}.metric.amber{border-top-color:#d68a00}.metric.green{border-top-color:#08865f}.metric span,.metric strong{display:block}.metric span{font-size:11px;color:#667d91;font-weight:850}.metric strong{margin-top:5px;font-size:29px}.panel{padding:21px;border:1px solid #d5e1e9;border-radius:15px;background:#fff}.panel h2{margin:0 0 4px}.panel>p{margin:0 0 16px;color:#687f94}.row{display:grid;grid-template-columns:1.35fr .8fr .65fr .75fr .65fr auto;gap:12px;align-items:center;padding:13px;border-top:1px solid #e3eaf0}.row.head{border:0;border-radius:8px;background:#eef4f8;color:#667e93;font-size:11px;font-weight:850}.row strong,.row small{display:block}.row small{margin-top:3px;color:#74899c}.status{justify-self:start;padding:6px 8px;border-radius:999px;background:#e7f2ff;color:#1759ad;font-size:11px;font-weight:850}.path{font-size:10px;font-weight:900;text-transform:uppercase;color:#a24b1c}.open{color:#087f6c;text-decoration:none;font-weight:900}.empty{padding:24px;border-radius:10px;background:#f0f5f8;color:#687e92}@media(max-width:760px){.metrics{grid-template-columns:1fr 1fr}.row{grid-template-columns:1fr auto}.row>:not(:first-child):not(:last-child){display:none}}`}</style>
+      <style>{`*{box-sizing:border-box}.mr{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.ms{max-width:1320px;margin:auto}.mt{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.mt small{color:#087f6c;font-weight:900;letter-spacing:.1em}.mt h1{margin:6px 0;font-size:34px}.mt p{margin:0;color:#657b91}.btn{padding:12px 16px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}.metric{padding:18px;border:1px solid #d5e1e9;border-top:4px solid #1762ef;border-radius:13px;background:#fff}.metric.red{border-color:#d34b40}.metric.amber{border-top-color:#d68a00}.metric.green{border-top-color:#08865f}.metric span,.metric strong{display:block}.metric span{font-size:11px;color:#667d91;font-weight:850}.metric strong{margin-top:5px;font-size:29px}.panel{padding:21px;border:1px solid #d5e1e9;border-radius:15px;background:#fff}.panel h2{margin:0 0 4px}.panel>p{margin:0 0 16px;color:#687f94}.row{display:grid;grid-template-columns:1.35fr 1fr .8fr .55fr .7fr .65fr auto;gap:12px;align-items:center;padding:13px;border-top:1px solid #e3eaf0}.row.head{border:0;border-radius:8px;background:#eef4f8;color:#667e93;font-size:11px;font-weight:850}.row strong,.row small{display:block}.row small{margin-top:3px;color:#74899c}.asset{font-size:11px}.asset strong{color:#173b59}.status{justify-self:start;padding:6px 8px;border-radius:999px;background:#e7f2ff;color:#1759ad;font-size:11px;font-weight:850}.path{font-size:10px;font-weight:900;text-transform:uppercase;color:#a24b1c}.open{color:#087f6c;text-decoration:none;font-weight:900}.empty{padding:24px;border-radius:10px;background:#f0f5f8;color:#687e92}@media(max-width:900px){.metrics{grid-template-columns:1fr 1fr}.row{grid-template-columns:1fr auto}.row>:not(:first-child):not(:last-child){display:none}}`}</style>
       <div className="ms">
         <header className="mt">
           <div>
@@ -53,9 +70,11 @@ export default async function MocRegister() {
               closure.
             </p>
           </div>
-          <Link className="btn" href="/portal/health-safety/moc/new">
-            New change
-          </Link>
+          {canCreate && (
+            <Link className="btn" href="/portal/health-safety/moc/new">
+              New change
+            </Link>
+          )}
         </header>
         <section className="metrics">
           <div className="metric">
@@ -83,32 +102,49 @@ export default async function MocRegister() {
             <div>
               <div className="row head">
                 <span>Change</span>
+                <span>Linked asset</span>
                 <span>Type</span>
                 <span>Pathway</span>
                 <span>Target</span>
                 <span>Status</span>
                 <span>Action</span>
               </div>
-              {items.map((x) => (
-                <div className="row" key={x.id}>
-                  <div>
-                    <strong>{x.title}</strong>
-                    <small>
-                      {x.moc_reference} · {x.department}
-                    </small>
+              {items.map((x) => {
+                const asset = assetById.get(x.organization_asset_id);
+                return (
+                  <div className="row" key={x.id}>
+                    <div>
+                      <strong>{x.title}</strong>
+                      <small>
+                        {x.moc_reference} · {x.department}
+                      </small>
+                    </div>
+                    <div className="asset">
+                      <strong>
+                        {asset
+                          ? `${asset.asset_reference} — ${asset.asset_name}`
+                          : "Not linked"}
+                      </strong>
+                      {asset && (
+                        <small>
+                          {asset.site_location_label || "No site"} ·{" "}
+                          {title(asset.operational_status)}
+                        </small>
+                      )}
+                    </div>
+                    <span>{title(x.change_type)}</span>
+                    <span className="path">{x.pathway}</span>
+                    <span>{date(x.target_date)}</span>
+                    <span className="status">{title(x.status)}</span>
+                    <Link
+                      className="open"
+                      href={`/portal/health-safety/moc/${x.id}`}
+                    >
+                      Open →
+                    </Link>
                   </div>
-                  <span>{title(x.change_type)}</span>
-                  <span className="path">{x.pathway}</span>
-                  <span>{date(x.target_date)}</span>
-                  <span className="status">{title(x.status)}</span>
-                  <Link
-                    className="open"
-                    href={`/portal/health-safety/moc/${x.id}`}
-                  >
-                    Open →
-                  </Link>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="empty">
