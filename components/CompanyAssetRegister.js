@@ -1,42 +1,53 @@
 "use client";
 
-import {useActionState} from "react";
-import {saveCompanyAsset} from "../app/portal/company/assets/actions";
+import Link from "next/link";
+import {useActionState,useState} from "react";
+import {recordAssetMaintenance,saveCompanyAsset} from "../app/portal/company/assets/actions";
 
 const initialState={error:"",success:""};
-const types=[
-  ["plant","Plant"],["equipment","Equipment"],["room_area","Room / area"],
-  ["electrical_system","Electrical system"],["process_system","Process system"],
-  ["vehicle","Vehicle"],["other","Other"],
-];
+const types=[["plant","Plant"],["equipment","Equipment"],["room_area","Room / area"],["electrical_system","Electrical system"],["process_system","Process system"],["vehicle","Vehicle"],["other","Other"]];
+const personLabel=person=>[person.first_name,person.last_name].filter(Boolean).join(" ")||person.email;
 
-export default function CompanyAssetRegister({locations=[]}){
+function Message({state}){return <>{state?.error&&<p className="carMessage error" role="alert">{state.error}</p>}{state?.success&&<p className="carMessage success" role="status">{state.success}</p>}</>;}
+
+export default function CompanyAssetRegister({locations=[],people=[],asset=null}){
   const [state,action,pending]=useActionState(saveCompanyAsset,initialState);
+  const [ppmRequired,setPpmRequired]=useState(Boolean(asset?.ppm_required));
+  const editing=Boolean(asset?.id);
   return <section className="carCard">
-    <style>{`
-      .carCard{background:#fff;border:1px solid #d4e1e9;border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(13,42,68,.05)}
-      .carCard h2{margin:0;color:#071d3a}.carIntro{margin:6px 0 18px;color:#60778e;line-height:1.5}
-      .carGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.carField{display:grid;gap:6px;align-content:start}.carField.full{grid-column:1/-1}
-      .carField label{font-size:12px;font-weight:900;color:#102e4a}.carField input,.carField select,.carField textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid #bfd0dd;border-radius:9px;background:#fbfdff;color:#071d3a;font:inherit}.carField textarea{min-height:88px;resize:vertical}.carField small{color:#6b8195;line-height:1.35}
-      .carActions{display:flex;justify-content:flex-end;margin-top:16px}.carButton{min-height:44px;padding:11px 18px;border:0;border-radius:9px;background:#1762a3;color:#fff;font-weight:900;cursor:pointer}.carButton:disabled{opacity:.58;cursor:wait}
-      .carMessage{margin:0 0 15px;padding:11px 13px;border-radius:9px;font-weight:800}.carMessage.error{background:#fff0ed;color:#a22f25;border:1px solid #efb5ae}.carMessage.success{background:#e9f8f3;color:#08715f;border:1px solid #9fdacb}
-      @media(max-width:700px){.carGrid{grid-template-columns:1fr}.carField.full{grid-column:auto}.carActions,.carButton{width:100%}}
-    `}</style>
-    <h2>Add a controlled company asset</h2>
-    <p className="carIntro">Assets entered here become selectable in Permit to Work. Use a stable reference shown on the equipment, register or drawing.</p>
-    {state?.error&&<p className="carMessage error" role="alert">{state.error}</p>}
-    {state?.success&&<p className="carMessage success" role="status">{state.success}</p>}
+    <style>{styles}</style>
+    <div className="carTitle"><div><h2>{editing?"Edit controlled asset":"Add a controlled company asset"}</h2><p className="carIntro">{editing?"Update identification, ownership, location and maintenance controls. Changes remain linked to the same asset reference.":"The system assigns a unique reference automatically. Assign an accountable Company User before saving."}</p></div>{editing&&<Link href="/portal/company/assets">Cancel edit</Link>}</div>
+    <Message state={state}/>
     <form action={action}>
+      {editing&&<input type="hidden" name="id" value={asset.id}/>}
       <div className="carGrid">
-        <div className="carField"><label htmlFor="asset_reference">Asset reference *</label><input id="asset_reference" name="asset_reference" required maxLength={100} placeholder="e.g. LEV-014"/><small>Use the organisation’s unique asset or equipment number.</small></div>
-        <div className="carField"><label htmlFor="asset_name">Asset name *</label><input id="asset_name" name="asset_name" required maxLength={180} placeholder="e.g. Welding bay extraction unit"/></div>
-        <div className="carField"><label htmlFor="asset_type">Asset type *</label><select id="asset_type" name="asset_type" defaultValue="equipment" required>{types.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></div>
-        <div className="carField"><label htmlFor="site_location_id">Company location *</label><select id="site_location_id" name="site_location_id" defaultValue="" required><option value="" disabled>{locations.length?"Select Business Profile location":"No Business Profile locations available"}</option>{locations.map(item=><option value={item.id} key={item.id}>{item.label}</option>)}</select><small>Managed under Administration → Business Profile.</small></div>
-        <div className="carField"><label htmlFor="area_department">Area / department</label><input id="area_department" name="area_department" maxLength={180} placeholder="e.g. Engineering Hall / Bay 4"/></div>
-        <div className="carField"><label htmlFor="operational_status">Operational status *</label><select id="operational_status" name="operational_status" defaultValue="active"><option value="active">Active</option><option value="out_of_service">Out of service</option><option value="retired">Retired</option></select></div>
-        <div className="carField full"><label htmlFor="description">Description and identification guidance</label><textarea id="description" name="description" maxLength={2000} placeholder="Record manufacturer, model, serial number, system boundary or other information needed to identify the correct asset."/></div>
+        <div className="carField"><label>Asset reference</label><input name="asset_reference" defaultValue={asset?.asset_reference||""} readOnly={editing} placeholder="Generated automatically"/><small>{editing?"Controlled reference cannot be removed.":"Leave blank to generate AST-YEAR-XXXXXX."}</small></div>
+        <div className="carField"><label>Asset name *</label><input name="asset_name" required maxLength={180} defaultValue={asset?.asset_name||""} placeholder="e.g. Welding bay extraction unit"/></div>
+        <div className="carField"><label>Asset type *</label><select name="asset_type" defaultValue={asset?.asset_type||"equipment"} required>{types.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></div>
+        <div className="carField"><label>Criticality *</label><select name="criticality" defaultValue={asset?.criticality||"medium"}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select><small>Rate the consequence of the asset being unavailable or unsafe.</small></div>
+        <div className="carField"><label>Company location *</label><select name="site_location_id" defaultValue={asset?.site_location_id||""} required><option value="" disabled>{locations.length?"Select Business Profile location":"No Business Profile locations available"}</option>{locations.map(item=><option value={item.id} key={item.id}>{item.label}</option>)}</select><small>From Administration → Business Profile.</small></div>
+        <div className="carField"><label>Accountable asset owner *</label><select name="asset_owner_person_id" defaultValue={asset?.asset_owner_person_id||""} required><option value="" disabled>{people.length?"Select active Company User":"No active Company Users available"}</option>{people.map(person=><option value={person.id} key={person.id}>{personLabel(person)}{person.position?` — ${person.position}`:""}</option>)}</select><small>Ownership is controlled through People, Roles &amp; Access.</small></div>
+        <div className="carField"><label>Area / department</label><input name="area_department" maxLength={180} defaultValue={asset?.area_department||""} placeholder="e.g. Engineering Hall / Bay 4"/></div>
+        <div className="carField"><label>Operational status *</label><select name="operational_status" defaultValue={asset?.operational_status||"active"}><option value="active">Active</option><option value="out_of_service">Out of service</option><option value="retired">Retired</option></select></div>
+        <div className="carField"><label>Manufacturer</label><input name="manufacturer" defaultValue={asset?.manufacturer||""}/></div>
+        <div className="carField"><label>Model</label><input name="model" defaultValue={asset?.model||""}/></div>
+        <div className="carField"><label>Serial number</label><input name="serial_number" defaultValue={asset?.serial_number||""}/></div>
+        <div className="carField"><label>Maintenance provider</label><input name="maintenance_provider" defaultValue={asset?.maintenance_provider||""} placeholder="Internal team or approved supplier"/></div>
+        <div className="carField full"><label>Description and identification guidance</label><textarea name="description" maxLength={2000} defaultValue={asset?.description||""} placeholder="Record the asset boundary, function and information needed to identify the correct equipment."/></div>
       </div>
-      <div className="carActions"><button className="carButton" disabled={pending}>{pending?"Saving asset…":"Add to Asset Register"}</button></div>
+      <fieldset className="carPpm"><legend>Planned preventive maintenance (PPM)</legend><label className="carSwitch"><input type="checkbox" checked={ppmRequired} onChange={event=>setPpmRequired(event.target.checked)}/><span>PPM or periodic inspection is required</span></label><input type="hidden" name="ppm_required" value={ppmRequired?"true":"false"}/>{ppmRequired&&<div className="carGrid ppm"><div className="carField"><label>Frequency number *</label><input type="number" min="1" name="ppm_frequency_value" required defaultValue={asset?.ppm_frequency_value||1}/></div><div className="carField"><label>Frequency unit *</label><select name="ppm_frequency_unit" required defaultValue={asset?.ppm_frequency_unit||"months"}><option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option><option value="years">Years</option></select></div><div className="carField"><label>Last maintenance date</label><input type="date" name="last_maintenance_date" defaultValue={asset?.last_maintenance_date||""}/></div><div className="carField"><label>Next maintenance due</label><input type="date" name="next_maintenance_date" defaultValue={asset?.next_maintenance_date||""}/><small>Leave blank to calculate from the frequency.</small></div><div className="carField full"><label>Maintenance requirements / notes</label><textarea name="maintenance_notes" defaultValue={asset?.maintenance_notes||""} placeholder="Define servicing, inspection, calibration or statutory examination requirements."/></div></div>}</fieldset>
+      <fieldset className="carPpm"><legend>Management of Change</legend><label className="carSwitch"><input type="checkbox" name="change_control_required" value="true" defaultChecked={asset?.change_control_required!==false}/><span>Material changes to this asset require Management of Change screening</span></label><p>Changes to duty, location, safeguarding, capacity, process, controls or ownership should be screened before implementation.</p></fieldset>
+      <div className="carActions"><button className="carButton" disabled={pending}>{pending?"Saving asset…":editing?"Save asset changes":"Add to Asset Register"}</button></div>
     </form>
   </section>;
 }
+
+export function AssetMaintenanceForm({assets=[]}){
+  const [state,action,pending]=useActionState(recordAssetMaintenance,initialState);
+  const today=new Date().toISOString().slice(0,10);
+  return <section className="carCard"><style>{styles}</style><h2>Plan or record maintenance</h2><p className="carIntro">Create a controlled PPM record. Enter a completion date only when the work has been completed.</p><Message state={state}/><form action={action}><div className="carGrid"><div className="carField full"><label>Company asset *</label><select name="asset_id" required defaultValue=""><option value="" disabled>Select asset</option>{assets.filter(item=>item.operational_status!=="retired").map(item=><option value={item.id} key={item.id}>{item.asset_reference} — {item.asset_name}</option>)}</select></div><div className="carField"><label>Maintenance type *</label><select name="maintenance_type" defaultValue="planned"><option value="planned">Planned maintenance</option><option value="inspection">Inspection</option><option value="calibration">Calibration</option><option value="statutory">Statutory examination</option><option value="repair">Repair</option><option value="breakdown">Breakdown</option><option value="other">Other</option></select></div><div className="carField"><label>Scheduled date *</label><input type="date" name="scheduled_date" required defaultValue={today}/></div><div className="carField"><label>Completed date</label><input type="date" name="completed_date"/></div><div className="carField"><label>Performed by</label><input name="performed_by" placeholder="Person or approved supplier"/></div><div className="carField full"><label>Work completed / planned scope</label><textarea name="work_completed" placeholder="Record the planned scope or completed maintenance work."/></div><div className="carField full"><label>Evidence reference</label><input name="evidence_reference" placeholder="Certificate, report, work order or controlled-document reference"/></div></div><div className="carActions"><button className="carButton" disabled={pending}>{pending?"Saving record…":"Save maintenance record"}</button></div></form></section>;
+}
+
+const styles=`
+.carCard{background:#fff;border:1px solid #d4e1e9;border-radius:16px;padding:24px;box-shadow:0 10px 30px rgba(13,42,68,.05)}.carTitle{display:flex;justify-content:space-between;gap:16px}.carTitle a{height:max-content;padding:9px 12px;border:1px solid #c7d6e1;border-radius:8px;color:#17436f;text-decoration:none;font-weight:850}.carCard h2{margin:0;color:#071d3a}.carIntro{margin:6px 0 18px;color:#60778e;line-height:1.5}.carGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.carField{display:grid;gap:6px;align-content:start;min-width:0}.carField.full{grid-column:1/-1}.carField label,.carPpm legend{font-size:12px;font-weight:900;color:#102e4a}.carField input,.carField select,.carField textarea{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #bfd0dd;border-radius:9px;background:#fbfdff;color:#071d3a;font:inherit}.carField input[readonly]{background:#eef3f7;color:#587087}.carField textarea{min-height:88px;resize:vertical}.carField small{color:#6b8195;line-height:1.35}.carPpm{margin:18px 0 0;padding:17px;border:1px solid #cfdee8;border-radius:12px}.carPpm legend{padding:0 7px;font-size:15px}.carPpm>p{margin:8px 0 0;color:#687f93;font-size:12px;line-height:1.5}.carGrid.ppm{margin-top:15px}.carSwitch{display:flex;gap:10px;align-items:center;font-weight:800;color:#173b59}.carSwitch input{width:20px;height:20px;accent-color:#087f6c}.carActions{display:flex;justify-content:flex-end;margin-top:18px}.carButton{min-height:44px;padding:11px 18px;border:0;border-radius:9px;background:#1762a3;color:#fff;font-weight:900;cursor:pointer}.carButton:disabled{opacity:.58;cursor:wait}.carMessage{margin:0 0 15px;padding:11px 13px;border-radius:9px;font-weight:800}.carMessage.error{background:#fff0ed;color:#a22f25;border:1px solid #efb5ae}.carMessage.success{background:#e9f8f3;color:#08715f;border:1px solid #9fdacb}@media(max-width:700px){.carGrid{grid-template-columns:1fr}.carField.full{grid-column:auto}.carTitle{display:grid}.carActions,.carButton{width:100%}.carCard{padding:18px}}
+`;
