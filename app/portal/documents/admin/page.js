@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
+import { resolvePortalAdminAccess } from "../../../../lib/portal-admin-access";
 import {
   createControlledDocument,
   createDocumentRevision,
@@ -64,18 +65,16 @@ export default async function DocumentAdminPage() {
     createAdminClient();
 
   const {
-    data: adminAccess,
+    access: adminAccess,
     error: adminAccessError,
-  } = await admin
-    .from("portal_admins")
-    .select("role, active")
-    .eq("user_id", user.id)
-    .eq("active", true)
-    .in("role", [
+  } = await resolvePortalAdminAccess({
+    admin,
+    user,
+    allowedRoles: [
       "admin",
       "document_controller",
-    ])
-    .maybeSingle();
+    ],
+  });
 
   if (
     adminAccessError ||
@@ -133,7 +132,6 @@ export default async function DocumentAdminPage() {
         document.status ===
         "Withdrawn"
     ).length;
-
 
   const revisionFamilies =
     Object.values(
