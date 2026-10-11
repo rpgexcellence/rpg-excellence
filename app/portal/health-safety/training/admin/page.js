@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { resolvePortalAdminAccess } from "../../../../../lib/portal-admin-access";
 
 export const metadata = { title: "Training Administration | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -25,13 +26,11 @@ export default async function TrainingAdminPage() {
   });
 
   const admin = createAdminClient();
-  const { data: access, error: accessError } = await admin
-    .from("portal_admins")
-    .select("role,active")
-    .eq("user_id", user.id)
-    .eq("active", true)
-    .eq("role", "admin")
-    .maybeSingle();
+  const { access, error: accessError } = await resolvePortalAdminAccess({
+    admin,
+    user,
+    allowedRoles: ["admin"],
+  });
 
   if (accessError || !access) {
     console.error("Training admin diagnostic: access denied", {
