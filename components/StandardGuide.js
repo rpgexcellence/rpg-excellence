@@ -1,6 +1,7 @@
 import Link from "next/link";
 import StandaloneSoaButton from "./StandaloneSoaButton";
 import GuideFactCards from "./GuideFactCards";
+import ISO9001OverviewVideo from "./ISO9001OverviewVideo";
 import { getEnhancedGuide } from "../lib/enhanced-standard-guides";
 
 const ISO9001_2026_EXECUTIVE_LENS = [
@@ -97,6 +98,7 @@ export default function StandardGuide({ guide, locale }) {
     <section className="guideHero">
       <div><span className="guideBadge">{guide.code} GUIDE</span><h1>{guide.code} — {guide.title}</h1><p>{guide.summary}</p></div>
       <div className="guideHeroActions">
+        {guide.assessmentStandard === "ISO 9001:2026" && <ISO9001OverviewVideo />}
         <aside><strong>Educational guidance</strong><p>This guide paraphrases key themes for practical understanding. It does not reproduce the standard or replace the official licensed publication, legal advice or accredited certification decisions.</p></aside>
         <div className="assessmentLinkBox">
           <div><span>RPG INTELLIGENCE ASSESSMENT</span><strong>{guide.assessmentStandard ? `Assess your ${guide.code} readiness` : `Explore ${guide.code} assurance support`}</strong><p>{guide.assessmentStandard ? "Open the controlled clause-based assessment, record evidence and generate a management-ready readiness result." : "Open RPG Intelligence to review currently available assessments and assurance tools."}</p></div>
