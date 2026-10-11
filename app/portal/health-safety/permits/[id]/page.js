@@ -20,7 +20,7 @@ export default async function PermitRecordPage({params}){
   const access=await getPermitAccess(user.id,id);if(!access.allowed||!access.permit)notFound();
   const {admin}=access;
   const [permitResult,isolationResult,testResult,handoverResult,eventResult,conflictResult]=await Promise.all([
-    admin.from("hs_permits").select("*,hs_risk_assessments(assessment_reference,title,status)").eq("id",id).single(),
+    admin.from("hs_permits").select("*,hs_risk_assessments!hs_permits_linked_assessment_id_fkey(assessment_reference,title,status)").eq("id",id).single(),
     admin.from("hs_permit_isolations").select("*").eq("permit_id",id).order("created_at"),
     admin.from("hs_permit_atmosphere_tests").select("*").eq("permit_id",id).order("tested_at",{ascending:false}),
     admin.from("hs_permit_handovers").select("*").eq("permit_id",id).order("handed_over_at",{ascending:false}),
