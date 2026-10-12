@@ -104,6 +104,17 @@ export default function StandardGuide({ guide, locale }) {
           <div><span>RPG INTELLIGENCE ASSESSMENT</span><strong>{guide.assessmentStandard ? `Assess your ${guide.code} readiness` : `Explore ${guide.code} assurance support`}</strong><p>{guide.assessmentStandard ? "Open the controlled clause-based assessment, record evidence and generate a management-ready readiness result." : "Open RPG Intelligence to review currently available assessments and assurance tools."}</p></div>
           <Link href={assessmentHref}>{guide.assessmentStandard ? "Start this assessment →" : "Open RPG Intelligence →"}</Link>
         </div>
+        {guide.code === "ISO 14001:2026" && (
+          <div className="assessmentLinkBox">
+            <div>
+              <span>RPG EXCELLENCE PUBLICATION</span>
+              <strong>Decoding ISO 14001:2026 — Practitioner Book</strong>
+              <p>24-page practical reference with seven clause-linked Pocket Guides, worked examples and auditor questions.</p>
+              <small>Digital PDF · £29.99</small>
+            </div>
+            <Link href={`/${locale}/publications/decoding-iso-14001-2026`}>Explore the book →</Link>
+          </div>
+        )}
         {guide.code === "ISO/IEC 27001" && (
           <div className="assessmentLinkBox soaProductBox">
             <div>
