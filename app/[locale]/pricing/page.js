@@ -81,11 +81,6 @@ export default async function Pricing({
       <JsonLd data={courseListSchema} />
       <main className="simplePage" id="subscriptions">
         <div className="simpleInner">
-          <span className="kicker">DIGITAL PUBLICATIONS</span>
-            <h2>Decoding ISO 14001:2026 — £29.99</h2>
-            <p>Independent practitioner reference and seven clause-linked Pocket Guides. One-off PDF purchase.</p>
-            <Link className="button" href={`/${locale}/publications/decoding-iso-14001-2026`}>View publication</Link>
-          </section>
           <span className="kicker">
             PLATFORM, ONE-OFF TOOLS & TRAINING
           </span>
