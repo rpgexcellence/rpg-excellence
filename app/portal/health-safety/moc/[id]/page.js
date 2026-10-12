@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
+import { mocPersonName } from "../../../../../lib/mocCompanyLinks";
 export const dynamic = "force-dynamic";
 const title = (v) =>
     String(v || "")
@@ -34,42 +35,58 @@ async function controlledMoc(id, minimumLevel = "contribute") {
   return { ...context, admin, item };
 }
 
+async function controlledPerson(admin, organizationId, personId, label) {
+  const { data, error } = await admin
+    .from("organization_people")
+    .select("id,first_name,last_name,email,position")
+    .eq("id", personId)
+    .eq("organization_id", organizationId)
+    .eq("account_status", "active")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`${label} must be selected from the active Company User list.`);
+  return { ...data, name: mocPersonName(data) };
+}
+
 async function progress(fd) {
   "use server";
   const id = String(fd.get("id") || ""),
     intent = String(fd.get("intent") || ""),
-    name = String(fd.get("name") || "").trim(),
+    personId = String(fd.get("person_id") || "").trim(),
     comments = String(fd.get("comments") || "").trim(),
     now = new Date().toISOString();
   const { admin, item, organization } = await controlledMoc(id);
+  const person = ["verify_gate", "return_gate", "close"].includes(intent) || intent.startsWith("approve_")
+    ? await controlledPerson(admin, organization.id, personId, intent === "close" ? "Closure approver" : intent.startsWith("approve_") ? "Approver" : "HSE reviewer")
+    : null;
   let values = { updated_at: now };
   if (intent === "verify_gate") {
-    if (!name) throw new Error("Enter the HSE reviewer.");
     values = {
       ...values,
       hse_gate_status: "verified",
-      hse_gate_reviewer: name,
+      hse_reviewer_person_id: person.id,
+      hse_gate_reviewer: person.name,
       hse_gate_comments: comments || null,
       hse_gate_at: now,
       status: item.pathway === "full" ? "risk_review" : "approval",
     };
   } else if (intent === "return_gate") {
-    if (!name || !comments)
+    if (!comments)
       throw new Error("Reviewer and return reason are required.");
     values = {
       ...values,
       hse_gate_status: "returned",
-      hse_gate_reviewer: name,
+      hse_reviewer_person_id: person.id,
+      hse_gate_reviewer: person.name,
       hse_gate_comments: comments,
       hse_gate_at: now,
       status: "returned",
     };
   } else if (intent.startsWith("approve_")) {
-    if (!name) throw new Error("Enter the approver name.");
     const role = intent.replace("approve_", "");
     const approvals = {
       ...(item.approvals || {}),
-      [role]: { status: "approved", name, comments, at: now },
+      [role]: { status: "approved", person_id: person.id, name: person.name, comments, at: now },
     };
     const required =
       item.pathway === "full"
@@ -92,14 +109,15 @@ async function progress(fd) {
   } else if (intent === "complete_pssr")
     values = { ...values, pssr_complete: true };
   else if (intent === "close") {
-    if (!name || !comments)
+    if (!comments)
       throw new Error(
         "Closure approver and verification comments are required.",
       );
     values = {
       ...values,
       status: "closed",
-      closure_approver: name,
+      closure_approver_person_id: person.id,
+      closure_approver: person.name,
       closure_comments: comments,
       closed_at: now,
     };
@@ -117,24 +135,21 @@ async function addAction(fd) {
   "use server";
   const id = String(fd.get("id") || ""),
     action = String(fd.get("action") || "").trim(),
-    owner = String(fd.get("owner") || "").trim(),
-    email = String(fd.get("owner_email") || "")
-      .trim()
-      .toLowerCase(),
+    responsiblePersonId = String(fd.get("responsible_person_id") || "").trim(),
     target = String(fd.get("target") || "");
-  if (!action || !owner || !email || !target)
+  if (!action || !responsiblePersonId || !target)
     throw new Error(
-      "Complete the action, owner name, owner email and target date.",
+      "Complete the action, select an active Company User and enter the target date.",
     );
-  if (!/^\S+@\S+\.\S+$/.test(email))
-    throw new Error("Enter a valid action-owner email address.");
-  const { admin, user } = await controlledMoc(id);
+  const { admin, user, organization } = await controlledMoc(id);
+  const owner = await controlledPerson(admin, organization.id, responsiblePersonId, "Action owner");
   const { error } = await admin.from("hs_moc_actions").insert({
     moc_id: id,
     owner_id: user.id,
     action_required: action,
-    responsible_name: owner,
-    responsible_email: email,
+    responsible_person_id: owner.id,
+    responsible_name: owner.name,
+    responsible_email: owner.email || null,
     target_date: target,
   });
   if (error) throw new Error(error.message);
@@ -197,19 +212,21 @@ async function verifyAction(fd) {
   const id = String(fd.get("id") || ""),
     moc = String(fd.get("moc") || ""),
     result = String(fd.get("result") || ""),
-    verifier = String(fd.get("verifier") || "").trim(),
+    verifierPersonId = String(fd.get("verifier_person_id") || "").trim(),
     comments = String(fd.get("comments") || "").trim();
-  if (!["successful", "rejected"].includes(result) || !verifier || !comments)
+  if (!["successful", "rejected"].includes(result) || !verifierPersonId || !comments)
     throw new Error(
       "Record the verifier, decision and objective-evidence conclusion.",
     );
-  const { admin, item } = await controlledMoc(moc);
+  const { admin, item, organization } = await controlledMoc(moc);
+  const verifier = await controlledPerson(admin, organization.id, verifierPersonId, "Independent verifier");
   const { error } = await admin
     .from("hs_moc_actions")
     .update({
       status: result === "successful" ? "verified" : "rejected",
       verification_result: result,
-      verifier_name: verifier,
+      verifier_person_id: verifier.id,
+      verifier_name: verifier.name,
       verification_comments: comments,
       verified_at: new Date().toISOString(),
     })
@@ -226,7 +243,7 @@ export default async function MocRecord({ params }) {
     item: controlledItem,
     organization,
   } = await controlledMoc(id, "view");
-  const [{ data: actions }, { data: assessment }, { data: asset }] =
+  const [{ data: actions }, { data: assessment }, { data: asset }, { data: people = [] }, { data: permitLinks = [] }, { data: assessmentLinks = [] }] =
     await Promise.all([
       admin
         .from("hs_moc_actions")
@@ -251,11 +268,25 @@ export default async function MocRecord({ params }) {
             .eq("organization_id", organization.id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      admin
+        .from("organization_people")
+        .select("id,first_name,last_name,email,position")
+        .eq("organization_id", organization.id)
+        .eq("account_status", "active")
+        .order("last_name"),
+      admin
+        .from("hs_moc_permits")
+        .select("relationship_type,hs_permits(id,permit_reference,permit_type,task_description,status)")
+        .eq("moc_id", id),
+      admin
+        .from("hs_moc_risk_assessments")
+        .select("relationship_type,hs_risk_assessments(id,assessment_reference,title,status)")
+        .eq("moc_id", id),
     ]);
   const { data: assetOwner } = asset?.asset_owner_person_id
     ? await admin
         .from("organization_people")
-        .select("id,full_name,email")
+        .select("id,first_name,last_name,email")
         .eq("id", asset.asset_owner_person_id)
         .eq("organization_id", organization.id)
         .maybeSingle()
@@ -264,6 +295,12 @@ export default async function MocRecord({ params }) {
     ...controlledItem,
     hs_risk_assessments: assessment,
   };
+  const companyPeople = people.map((person) => ({ ...person, name: mocPersonName(person) }));
+  const personOptions = (label = "Select active company user") => <><option value="">{companyPeople.length ? label : "No active company users available"}</option>{companyPeople.map((person) => <option value={person.id} key={person.id}>{person.name}{person.position ? ` — ${person.position}` : ""}</option>)}</>;
+  const requestor = companyPeople.find((person) => person.id === item.requestor_person_id);
+  const changeOwner = companyPeople.find((person) => person.id === item.change_owner_person_id);
+  const linkedPermits = permitLinks.map((link) => link.hs_permits).filter(Boolean);
+  const linkedAssessments = assessmentLinks.map((link) => link.hs_risk_assessments).filter(Boolean);
   const approvals = item.approvals || {},
     screen = Array.isArray(item.screening_answers)
       ? item.screening_answers
@@ -298,7 +335,7 @@ export default async function MocRecord({ params }) {
             <h1>{item.title}</h1>
             <p>
               {item.department} · {item.affected_area} · requested by{" "}
-              {item.requestor_name}
+              {requestor?.name || item.requestor_name}
             </p>
           </div>
           <Link className="back" href="/portal/health-safety/moc">
@@ -370,6 +407,18 @@ export default async function MocRecord({ params }) {
             <strong>{date(item.target_date)}</strong>
           </div>
         </section>
+        <section className="panel">
+          <h2>Controlled company connections</h2>
+          <p>Live links to Administration, Company Users and Permit to Work records used by this change.</p>
+          <div className="grid">
+            <div className="box"><span>COMPANY LOCATION</span><strong>{item.administration_location_snapshot || "Not linked"}</strong></div>
+            <div className="box"><span>REQUESTOR</span><strong>{requestor?.name || item.requestor_name || "Not linked"}</strong></div>
+            <div className="box"><span>ACCOUNTABLE CHANGE OWNER</span><strong>{changeOwner?.name || "Not assigned"}</strong></div>
+            <div className="box"><span>LINKED RECORDS</span><strong>{linkedAssessments.length} assessments · {linkedPermits.length} permits</strong></div>
+          </div>
+          {linkedAssessments.length > 0 && <div className="chips" style={{marginTop:12}}>{linkedAssessments.map((assessment) => <Link className="chip" href={`/portal/health-safety/risk-assessment/${assessment.id}`} key={assessment.id}>{assessment.assessment_reference} · {assessment.title}</Link>)}</div>}
+          {linkedPermits.length > 0 && <div className="chips" style={{marginTop:12}}>{linkedPermits.map((permit) => <Link className="chip" href={`/portal/health-safety/permits/${permit.id}`} key={permit.id}>{permit.permit_reference} · {title(permit.status)}</Link>)}</div>}
+        </section>
         {asset && (
           <section className="panel">
             <h2>Linked company asset</h2>
@@ -393,7 +442,7 @@ export default async function MocRecord({ params }) {
               </div>
               <div className="box">
                 <span>ACCOUNTABLE OWNER</span>
-                <strong>{assetOwner?.full_name || "Not assigned"}</strong>
+                <strong>{assetOwner ? mocPersonName(assetOwner) : "Not assigned"}</strong>
               </div>
               <div className="box">
                 <span>CRITICALITY / PPM</span>
@@ -439,7 +488,7 @@ export default async function MocRecord({ params }) {
             <div className="box">
               <span>RISK ASSESSMENT</span>
               <strong>
-                {item.hs_risk_assessments?.assessment_reference || "Not linked"}
+                {linkedAssessments.length ? `${linkedAssessments.length} controlled assessment${linkedAssessments.length === 1 ? "" : "s"}` : item.hs_risk_assessments?.assessment_reference || "Not linked"}
               </strong>
             </div>
           </div>
@@ -490,7 +539,7 @@ export default async function MocRecord({ params }) {
                 <input type="hidden" name="intent" value="verify_gate" />
                 <label>
                   HSE reviewer
-                  <input name="name" required />
+                  <select name="person_id" required defaultValue="">{personOptions()}</select>
                 </label>
                 <label>
                   Comments
@@ -503,7 +552,7 @@ export default async function MocRecord({ params }) {
                 <input type="hidden" name="intent" value="return_gate" />
                 <label>
                   HSE reviewer
-                  <input name="name" required />
+                  <select name="person_id" required defaultValue="">{personOptions()}</select>
                 </label>
                 <label>
                   Correction required
@@ -635,7 +684,7 @@ export default async function MocRecord({ params }) {
                       </label>
                       <label>
                         Independent verifier
-                        <input name="verifier" required />
+                        <select name="verifier_person_id" required defaultValue="">{personOptions()}</select>
                       </label>
                       <label>
                         Evidence reviewed and conclusion
@@ -679,17 +728,8 @@ export default async function MocRecord({ params }) {
                 <input name="action" required />
               </label>
               <label>
-                Action owner name
-                <input name="owner" required />
-              </label>
-              <label>
-                Action owner email
-                <input
-                  type="email"
-                  name="owner_email"
-                  required
-                  placeholder="owner@company.com"
-                />
+                Action owner — Company User
+                <select name="responsible_person_id" required defaultValue="">{personOptions()}</select>
               </label>
               <label>
                 Target date
@@ -729,7 +769,7 @@ export default async function MocRecord({ params }) {
                       />
                       <label>
                         Approver
-                        <input name="name" required />
+                        <select name="person_id" required defaultValue="">{personOptions()}</select>
                       </label>
                       <label>
                         Conditions
@@ -820,7 +860,7 @@ export default async function MocRecord({ params }) {
               <input type="hidden" name="intent" value="close" />
               <label>
                 Closure approver
-                <input name="name" required />
+                <select name="person_id" required defaultValue="">{personOptions()}</select>
               </label>
               <label>
                 Verification and lessons learned
