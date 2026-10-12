@@ -19,6 +19,7 @@ export default async function InsightsPage({ params }) {
   }
 
   const issues = [
+    { number: "026", title: "Decoding ISO 14001:2026: A Practical Reference and Pocket Guide", description: "New RPG Excellence digital publication: clause-by-clause guidance, four practical cases and seven field guides.", href: "../publications/decoding-iso-14001-2026" },
     {
       "number": "025",
       "title": "ISO 9001:2026: Turn the Release into Better Business Decisions",
@@ -260,9 +261,9 @@ export default async function InsightsPage({ params }) {
 
                 <Link
                   className="button"
-                  href={`/${locale}/insights/${issue.href}`}
+                  href={issue.number === "026" ? `/${locale}/publications/decoding-iso-14001-2026` : `/${locale}/insights/${issue.href}`}
                 >
-                  Read Issue {issue.number}
+                  {issue.number === "026" ? "View publication" : `Read Issue ${issue.number}`}
                 </Link>
               </article>
             ))}
