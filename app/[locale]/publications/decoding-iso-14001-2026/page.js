@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { createClient } from "../../../../lib/supabase/server";
+import { isPlatformOwner } from "../../../../lib/portal-admin-access";
 
 import { notFound } from "next/navigation";
 
@@ -16,6 +18,9 @@ export default async function Page({ params, searchParams }) {
 
   if (!locales.includes(locale)) notFound();
 
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const ownerAccess = isPlatformOwner(user);
   const { session_id: sessionId } = await searchParams;
 
   const download = sessionId && /^cs_(test|live)_[a-zA-Z0-9]+$/.test(sessionId)
@@ -36,7 +41,12 @@ export default async function Page({ params, searchParams }) {
 
       <section style={{padding:26,background:"#102b4a",color:"white",borderRadius:12}}><p style={{letterSpacing:2,fontSize:12}}>RPG EXCELLENCE</p><h2 style={{color:"white"}}>DECODING<br/>ISO 14001:2026</h2><p>A practical reference & pocket guide</p><p>24 pages · PDF · 2026 edition</p></section>
 
-      <section style={{padding:26,border:"1px solid #d8e2eb",borderRadius:12}}><h2>£29.99</h2><p>One-off digital purchase. Secure Stripe checkout; download after confirmed payment.</p><PublicationPurchaseButton />
+      <section style={{padding:26,border:"1px solid #d8e2eb",borderRadius:12}}>{ownerAccess ? (
+        <><h2>Administrator access</h2><p>Your RPG Excellence platform-owner account includes access to this publication at no charge.</p>
+        <a className="button" href="/api/publications/iso-14001-2026/download">Download PDF — Owner Access</a></>
+      ) : (
+        <><h2>£29.99</h2><p>One-off digital purchase. Secure Stripe checkout; download after confirmed payment.</p><PublicationPurchaseButton /></>
+      )}
 
       {download && <p style={{marginTop:18}}><a className="button" href={download}>Download your purchased PDF</a><br/><small>Payment and account ownership are checked before delivery. If payment is still processing, try again shortly.</small></p>}
 
