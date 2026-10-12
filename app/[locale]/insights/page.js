@@ -19,6 +19,7 @@ export default async function InsightsPage({ params }) {
   }
 
   const issues = [
+    { number: "027", title: "Decoding ISO 9001:2026: A Practical Guide to Requirements, Evidence and Quality Decisions", description: "New RPG Excellence 33-page digital publication for quality managers, internal auditors and business leaders.", href: "decoding-iso-9001-2026-book" },
     { number: "026", title: "Decoding ISO 14001:2026: A Practical Reference and Pocket Guide", description: "New RPG Excellence digital publication: clause-by-clause guidance, four practical cases and seven field guides.", href: "../publications/decoding-iso-14001-2026" },
     {
       "number": "025",
@@ -273,3 +274,4 @@ export default async function InsightsPage({ params }) {
     </PageShell>
   );
 }
+
