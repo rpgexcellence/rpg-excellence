@@ -105,9 +105,14 @@ export async function POST(request) {
     const body =
       await request.json();
 
-    const purchaseType = ["single_assessment", "standalone_soa", "training_course"].includes(body?.purchaseType)
+    const purchaseType = ["single_assessment", "standalone_soa", "training_course", "digital_publication"].includes(body?.purchaseType)
       ? body.purchaseType
       : "subscription";
+
+    const publicationCode = typeof body?.publication === "string" ? body.publication.trim() : "";
+    if (purchaseType === "digital_publication" && publicationCode !== "ISO14001-2026-GUIDE") {
+      return Response.json({ error: "Unknown publication." }, { status: 400 });
+    }
 
     const plan =
       typeof body?.plan === "string"
@@ -232,7 +237,17 @@ export async function POST(request) {
 
     const trainingPaths = trainingCourse ? getTrainingPaths(trainingCourse.course_code) : null;
 
-    const session = purchaseType === "training_course"
+    const session = purchaseType === "digital_publication"
+      ? await stripe.checkout.sessions.create({
+        ...shared,
+        mode: "payment",
+        success_url: `${origin}/en/publications/decoding-iso-14001-2026?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/en/publications/decoding-iso-14001-2026?checkout=cancelled`,
+        line_items: [{ price_data: { currency: "gbp", unit_amount: 2999,
+          product_data: { name: "Decoding ISO 14001:2026 — A Practical Reference and Pocket Guide", description: "RPG Excellence independent 24-page PDF publication." } }, quantity: 1 }],
+        metadata: { purchase_type: "digital_publication", publication_code: "ISO14001-2026-GUIDE", owner_id: user.id },
+      })
+      : purchaseType === "training_course"
       ? await stripe.checkout.sessions.create({
         ...shared,
         mode: "payment",
