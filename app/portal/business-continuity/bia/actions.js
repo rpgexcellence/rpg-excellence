@@ -309,6 +309,7 @@ export async function saveBia(_previousState, fd) {
       ],
     },
     review_frequency: t("review_frequency") || "Every 6 months",
+    reviewer_person_id: reviewerPersonId || null,
     next_review_date: t("next_review_date") || null,
     completion_percent: completion,
     status,
