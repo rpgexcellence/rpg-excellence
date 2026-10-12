@@ -4,6 +4,11 @@ import { redirect } from "next/navigation";
 import MocInitiationForm from "../../../../../components/MocInitiationForm";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
+import {
+  loadMocCompanyLinks,
+  requireMocPerson,
+  resolveMocLocation,
+} from "../../../../../lib/mocCompanyLinks";
 
 export const metadata = { title: "New Management of Change | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -37,9 +42,13 @@ async function createMoc(formData) {
   const impactAreas = parseList(t("impact_areas"), "The impact-area selections could not be read.");
   const pathway = screening.some((answer) => answer.answer === "yes") ? "full" : "lite";
 
+  const companyOptions = await loadMocCompanyLinks(organization);
+  const requestor = requireMocPerson(companyOptions.people, t("requestor_person_id"), "Requestor");
+  const changeOwner = requireMocPerson(companyOptions.people, t("change_owner_person_id"), "Accountable change owner");
+  const location = resolveMocLocation(companyOptions.locations, t("administration_location_id"));
+
   if (
     !t("title") ||
-    !t("requestor_name") ||
     !t("department") ||
     !t("change_description") ||
     !t("affected_area") ||
@@ -53,19 +62,25 @@ async function createMoc(formData) {
   }
   if (!impactAreas.length) throw new Error("Select at least one impact area.");
 
-  const linkedAssessmentId = t("linked_assessment_id") || null;
-  if (pathway === "full" && !linkedAssessmentId) {
+  const linkedPermitIds = [...new Set(formData.getAll("linked_permit_ids").map(String).filter(Boolean))];
+  const selectedPermits = companyOptions.permits.filter((permit) => linkedPermitIds.includes(permit.id));
+  if (selectedPermits.length !== linkedPermitIds.length) {
+    throw new Error("One or more selected permits are no longer available to this company. Refresh and select again.");
+  }
+
+  const linkedAssessmentIds = [...new Set(formData.getAll("linked_assessment_ids").map(String).filter(Boolean))];
+  const linkedAssessmentId = linkedAssessmentIds[0] || null;
+  if (pathway === "full" && !linkedAssessmentIds.length) {
     throw new Error("A Full MOC must link to an approved risk assessment.");
   }
-  if (linkedAssessmentId) {
-    const { data: assessment } = await admin
+  if (linkedAssessmentIds.length) {
+    const { data: linkedAssessments = [] } = await admin
       .from("hs_risk_assessments")
       .select("id")
-      .eq("id", linkedAssessmentId)
+      .in("id", linkedAssessmentIds)
       .eq("organization_id", organization.id)
-      .in("status", ["approved", "communicated"])
-      .maybeSingle();
-    if (!assessment) throw new Error("Select an approved risk assessment belonging to this company.");
+      .in("status", ["approved", "communicated"]);
+    if (linkedAssessments.length !== linkedAssessmentIds.length) throw new Error("Select only approved risk assessments belonging to this company.");
   }
 
   const organizationAssetId = t("organization_asset_id") || null;
@@ -94,7 +109,11 @@ async function createMoc(formData) {
       organization_id: organization.id,
       moc_reference: mocReference,
       title: t("title"),
-      requestor_name: t("requestor_name"),
+      requestor_person_id: requestor.id,
+      requestor_name: requestor.name,
+      change_owner_person_id: changeOwner.id,
+      administration_location_id: location.id,
+      administration_location_snapshot: location.label,
       department: t("department"),
       date_requested: t("date_requested"),
       change_description: t("change_description"),
@@ -138,6 +157,28 @@ async function createMoc(formData) {
     .single();
 
   if (error) throw new Error(error.message);
+  if (linkedPermitIds.length) {
+    const { error: permitLinkError } = await admin.from("hs_moc_permits").insert(
+      linkedPermitIds.map((permitId) => ({
+        moc_id: created.id,
+        permit_id: permitId,
+        relationship_type: "required_for_change",
+      })),
+    );
+    if (permitLinkError) {
+      await admin.from("hs_moc_changes").delete().eq("id", created.id).eq("organization_id", organization.id);
+      throw new Error(permitLinkError.message);
+    }
+  }
+  if (linkedAssessmentIds.length) {
+    const { error: assessmentLinkError } = await admin.from("hs_moc_risk_assessments").insert(
+      linkedAssessmentIds.map((assessmentId) => ({ moc_id: created.id, assessment_id: assessmentId, relationship_type: "change_risk" })),
+    );
+    if (assessmentLinkError) {
+      await admin.from("hs_moc_changes").delete().eq("id", created.id).eq("organization_id", organization.id);
+      throw new Error(assessmentLinkError.message);
+    }
+  }
   redirect(`/portal/health-safety/moc/${created.id}`);
 }
 
@@ -151,7 +192,7 @@ export default async function NewMoc({ searchParams }) {
   const requestedAssetId = String(params?.asset || "").trim();
   const admin = createAdminClient();
 
-  const [{ data: assessments = [] }, { data: assets = [] }] = await Promise.all([
+  const [{ data: assessments = [] }, { data: assets = [] }, companyOptions] = await Promise.all([
     admin
       .from("hs_risk_assessments")
       .select("id,assessment_reference,title")
@@ -164,6 +205,7 @@ export default async function NewMoc({ searchParams }) {
       .eq("organization_id", organization.id)
       .eq("operational_status", "active")
       .order("asset_reference"),
+    loadMocCompanyLinks(organization),
   ]);
 
   const selectedAsset = assets.find((asset) => asset.id === requestedAssetId) || null;
@@ -186,6 +228,9 @@ export default async function NewMoc({ searchParams }) {
           assets={assets}
           selectedAsset={selectedAsset}
           today={new Date().toISOString().slice(0, 10)}
+          people={companyOptions.people}
+          locations={companyOptions.locations}
+          permits={companyOptions.permits}
         />
       </div>
     </main>
