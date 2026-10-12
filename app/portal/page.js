@@ -427,6 +427,7 @@ export default async function PortalPage({ searchParams }) {
                 </Link>
               </div>
             </div>
+            <SideLink href="/portal/tasks">My Tasks &amp; Approvals</SideLink>
             <SideLink href="/portal/company/people">People, Roles &amp; Access</SideLink>
             <SideLink href="/portal/reports">Reports</SideLink>
           </nav>
@@ -484,7 +485,7 @@ export default async function PortalPage({ searchParams }) {
           </section>
           <section className="pdCommandLower">
             <div className="pdPanel pdAttention">
-              <div className="pdPanelHead"><div><small>PRIORITISED ACTION</small><h2>Requires your attention</h2></div><Link href="/portal/internal-audit-actions">Open action centre →</Link></div>
+              <div className="pdPanelHead"><div><small>PRIORITISED ACTION</small><h2>Requires your attention</h2></div><Link href="/portal/tasks">Open task dashboard →</Link></div>
               {openFindings.length>0&&<Link href="/portal/internal-audit-actions"><b className="critical">Priority</b><div><strong>{openFindings.length} open finding{openFindings.length===1?"":"s"} require controlled action</strong><small>Internal Audit · Findings &amp; Actions</small></div><span>Review →</span></Link>}
               {awaitingVerification.length>0&&<Link href="/portal/rca?view=verification"><b className="warning">Verify</b><div><strong>{awaitingVerification.length} corrective action{awaitingVerification.length===1?" is":"s are"} awaiting effectiveness verification</strong><small>CAPA-8D · Auditor decision required</small></div><span>Review →</span></Link>}
               {activeAudits.length>0&&<Link href="/portal/internal-audits"><b className="information">Audit</b><div><strong>{activeAudits.length} active internal audit{activeAudits.length===1?"":"s"}</strong><small>Review programme status and assigned work</small></div><span>Open →</span></Link>}
