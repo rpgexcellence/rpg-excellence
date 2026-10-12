@@ -74,15 +74,16 @@ export default function Header({ locale, nav, variant = "default" }) {
               {ISO_AT_A_GLANCE.map(([code, name, slug, icon]) => <Link href={`/${locale}/${slug}`} key={code}><i>{icon}</i><span><strong>{code}</strong><small>{name}</small></span><b aria-hidden="true">→</b></Link>)}
             </div>
           </details>
+          <Link href={`/${locale}/publications`}>Publications</Link>
           <a href={`/${locale}#solutions`}>Solutions</a>
           <Link href={`/${locale}/insights`}>Resources</Link>
           <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
           <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
           <Link href={`/${locale}/contact`}>{nav.contact}</Link>
-          <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
         </> : <>
           <Link href={`/${locale}`}>{nav.home}</Link>
           <a href={`/${locale}#iso`}>{nav.services}</a>
+          <Link href={`/${locale}/publications`}>Publications</Link>
           <Link href={`/${locale}/ai-tools`}>{nav.ai}</Link>
           <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
           <Link href={`/${locale}/about`}>{nav.about}</Link>
