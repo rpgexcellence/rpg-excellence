@@ -32,6 +32,18 @@ async function ownedProgramme(supabase, userId, programmeId) {
   };
 }
 
+async function activeCompanyPerson(supabase, organizationId, personId, label) {
+  const { data, error } = await supabase.from("organization_people")
+    .select("id,first_name,last_name,email,position")
+    .eq("id", personId).eq("organization_id", organizationId)
+    .eq("account_status", "active").maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`${label} must be selected from the active Company User list.`);
+  const fullName = [data.first_name, data.last_name].filter(Boolean).join(" ").trim();
+  if (!fullName) throw new Error(`Complete the selected ${label.toLowerCase()}'s name under Administration → People, Roles & Access.`);
+  return { ...data, fullName };
+}
+
 function programmeReference() {
   const year = new Date().getUTCFullYear();
   return `IAP-${year}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
@@ -47,18 +59,18 @@ export async function createProgramme(formData) {
   const organizationId = clean(formData.get("organization_id"));
   const title = clean(formData.get("title"));
   const cycleStart = clean(formData.get("cycle_start"));
-  const leadAuditorName = clean(formData.get("lead_auditor_name"));
-  const leadAuditorEmail = clean(formData.get("lead_auditor_email"));
+  const programmeOwnerPersonId = clean(formData.get("programme_owner_person_id"));
   const objectives = clean(formData.get("objectives"));
   const siteStructure = clean(formData.get("site_structure"));
   const systemModel = clean(formData.get("system_model"));
   const samplingMethod = clean(formData.get("multisite_sampling_method"));
   const standardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
-  if (!organizationId || !title || !cycleStart || !leadAuditorName || !objectives || !["single_site", "multisite"].includes(siteStructure) || !["integrated", "separate", "hybrid"].includes(systemModel)) {
+  if (!organizationId || !title || !cycleStart || !programmeOwnerPersonId || !objectives || !["single_site", "multisite"].includes(siteStructure) || !["integrated", "separate", "hybrid"].includes(systemModel)) {
     throw new Error("Organisation, programme structure, system model, title, cycle start, lead auditor and objectives are required.");
   }
   if (siteStructure === "multisite" && !samplingMethod) throw new Error("Define the multisite sampling and three-year rotation method.");
   if (standardIds.length < 1 || standardIds.length > 5) throw new Error("Select between one and five controlled programme standards.");
+  const programmeOwner = await activeCompanyPerson(supabase, organizationId, programmeOwnerPersonId, "Programme owner");
   const start = new Date(`${cycleStart}T00:00:00Z`);
   if (Number.isNaN(start.getTime())) throw new Error("Enter a valid programme start date.");
   const end = new Date(start);
@@ -78,8 +90,9 @@ export async function createProgramme(formData) {
     owner_id: user.id, organization_id: organizationId, programme_reference: programmeReference(),
     title, description: objectives, cycle_start: cycleStart, cycle_end: cycleEnd,
     start_date: cycleStart, end_date: cycleEnd,
-    lead_auditor_name: leadAuditorName, lead_auditor_email: leadAuditorEmail,
-    programme_owner_name: leadAuditorName, programme_owner_email: leadAuditorEmail,
+    programme_owner_person_id: programmeOwner.id,
+    lead_auditor_name: programmeOwner.fullName, lead_auditor_email: programmeOwner.email,
+    programme_owner_name: programmeOwner.fullName, programme_owner_email: programmeOwner.email,
     objectives, context_and_change: contextAndChange, context_and_priorities: contextAndChange, status: "draft",
     site_structure: siteStructure, system_model: systemModel, central_functions: clean(formData.get("central_functions")),
     multisite_sampling_method: samplingMethod,
@@ -104,19 +117,19 @@ export async function updateProgramme(formData) {
   const existing = await ownedProgramme(supabase, user.id, programmeId);
   const title = clean(formData.get("title"));
   const cycleStart = clean(formData.get("cycle_start"));
-  const leadAuditorName = clean(formData.get("lead_auditor_name"));
-  const leadAuditorEmail = clean(formData.get("lead_auditor_email"));
+  const programmeOwnerPersonId = clean(formData.get("programme_owner_person_id"));
   const objectives = clean(formData.get("objectives"));
   const contextAndChange = clean(formData.get("context_and_change"));
   const siteStructure = clean(formData.get("site_structure"));
   const systemModel = clean(formData.get("system_model"));
   const samplingMethod = clean(formData.get("multisite_sampling_method"));
   const standardIds = [...new Set(formData.getAll("standard_ids").map(clean).filter(Boolean))];
-  if (!title || !cycleStart || !leadAuditorName || !objectives || !["single_site", "multisite"].includes(siteStructure) || !["integrated", "separate", "hybrid"].includes(systemModel)) {
+  if (!title || !cycleStart || !programmeOwnerPersonId || !objectives || !["single_site", "multisite"].includes(siteStructure) || !["integrated", "separate", "hybrid"].includes(systemModel)) {
     throw new Error("Complete all required programme-mandate fields.");
   }
   if (siteStructure === "multisite" && !samplingMethod) throw new Error("Define the multisite sampling and three-year rotation method.");
   if (standardIds.length < 1 || standardIds.length > 5) throw new Error("Select between one and five controlled programme standards.");
+  const programmeOwner = await activeCompanyPerson(supabase, existing.organization_id, programmeOwnerPersonId, "Programme owner");
   const start = new Date(`${cycleStart}T00:00:00Z`);
   if (Number.isNaN(start.getTime())) throw new Error("Enter a valid programme start date.");
   const end = new Date(start); end.setUTCFullYear(end.getUTCFullYear() + 3); end.setUTCDate(end.getUTCDate() - 1);
@@ -143,9 +156,9 @@ export async function updateProgramme(formData) {
   }
   const { error } = await supabase.from("internal_audit_programmes").update({
     title, description: objectives, objectives, cycle_start: cycleStart, cycle_end: cycleEnd,
-    start_date: cycleStart, end_date: cycleEnd, lead_auditor_name: leadAuditorName,
-    lead_auditor_email: leadAuditorEmail, programme_owner_name: leadAuditorName,
-    programme_owner_email: leadAuditorEmail, context_and_change: contextAndChange,
+    start_date: cycleStart, end_date: cycleEnd, programme_owner_person_id: programmeOwner.id,
+    lead_auditor_name: programmeOwner.fullName, lead_auditor_email: programmeOwner.email,
+    programme_owner_name: programmeOwner.fullName, programme_owner_email: programmeOwner.email, context_and_change: contextAndChange,
     context_and_priorities: contextAndChange, site_structure: siteStructure, system_model: systemModel,
     central_functions: clean(formData.get("central_functions")), multisite_sampling_method: samplingMethod,
     updated_at: new Date().toISOString(),
