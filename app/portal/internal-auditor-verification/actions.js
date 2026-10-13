@@ -109,16 +109,22 @@ export async function uploadAuditorQualification(formData) {
 export async function approveInitialAuditor(formData) {
   const { supabase, user } = await context();
   const auditorId = clean(formData.get("auditor_id"));
-  const approver = clean(formData.get("approver_name"));
+  const approverPersonId = clean(formData.get("approver_person_id"));
   const rationale = clean(formData.get("approval_basis"));
   const validityMonths = Math.min(36, Math.max(1, Number(formData.get("validity_months")) || 12));
-  if (!auditorId || !approver || !rationale || formData.get("approval_confirmation") !== "on") throw new Error("Select the auditor and complete the Lead Auditor approval, rationale and confirmation.");
+  if (!auditorId || !approverPersonId || !rationale || formData.get("approval_confirmation") !== "on") throw new Error("Select the auditor and approving Lead Auditor from the Company User list, then complete the rationale and confirmation.");
   const [{ data: auditor, error: auditorError }, { data: qualifications, error: evidenceError }] = await Promise.all([
-    supabase.from("internal_auditor_register").select("id, audit_training, audit_experience").eq("id", auditorId).eq("owner_id", user.id).maybeSingle(),
+    supabase.from("internal_auditor_register").select("id, organization_id, audit_training, audit_experience").eq("id", auditorId).eq("owner_id", user.id).maybeSingle(),
     supabase.from("internal_auditor_qualifications").select("id, evidence_type, expiry_date, evidence_status").eq("auditor_id", auditorId).eq("owner_id", user.id),
   ]);
   if (auditorError || evidenceError) throw new Error(auditorError?.message || evidenceError?.message);
   if (!auditor) throw new Error("Auditor not found.");
+  const { data: approverPerson, error: approverError } = await supabase.from("organization_people")
+    .select("id,first_name,last_name").eq("id", approverPersonId).eq("organization_id", auditor.organization_id)
+    .eq("account_status", "active").maybeSingle();
+  if (approverError) throw new Error(approverError.message);
+  if (!approverPerson) throw new Error("The approving Lead Auditor must be an active Company User.");
+  const approver = [approverPerson.first_name, approverPerson.last_name].filter(Boolean).join(" ").trim();
   if (!auditor.audit_training || !auditor.audit_experience) throw new Error("Record both audit training and audit experience before initial approval.");
   const today = new Date().toISOString().slice(0, 10);
   const currentEvidence = (qualifications || []).filter((item) => !item.expiry_date || item.expiry_date >= today);
@@ -128,7 +134,8 @@ export async function approveInitialAuditor(formData) {
   const { error } = await supabase.from("internal_auditor_register").update({
     verification_status: "verified", active: true, verified_at: now, verified_until: validUntil.toISOString().slice(0, 10),
     verified_by_name: approver, approval_basis: rationale, approval_type: "initial_certification_and_experience",
-    initially_approved_at: now, initially_approved_by: approver, updated_at: now,
+    initially_approved_at: now, initially_approved_by: approver,
+    initially_approved_by_person_id: approverPerson.id, updated_at: now,
   }).eq("id", auditorId).eq("owner_id", user.id);
   if (error) throw new Error(error.message);
   const { error: authorisationError } = await supabase.from("internal_auditor_standard_authorisations").update({ authorisation_status: "authorised", authorised_at: now, authorised_until: validUntil.toISOString().slice(0, 10) }).eq("auditor_id", auditorId).eq("owner_id", user.id);
