@@ -36,7 +36,10 @@ export default async function CompanyAssetsPage({searchParams}){
     assetResult,
     peopleResult,
     maintenanceResult,
-    mocResult
+    mocResult,
+    supplierResult,
+    documentResult,
+    documentLinkResult
   ]=await Promise.all([
     admin
       .from("organization_assets")
@@ -64,13 +67,35 @@ export default async function CompanyAssetsPage({searchParams}){
       .select("id,moc_reference,title,status,organization_asset_id")
       .eq("organization_id",organization.id)
       .not("organization_asset_id","is",null),
+
+    admin
+      .from("suppliers")
+      .select("id,legal_name,approval_status")
+      .eq("organization_id",organization.id)
+      .in("approval_status",["approved","conditionally_approved"])
+      .order("legal_name"),
+
+    admin
+      .from("controlled_documents")
+      .select("id,document_number,title,document_type,revision,status")
+      .eq("status","Current")
+      .in("audience",["Customer","Both"])
+      .order("document_number"),
+
+    admin
+      .from("organization_asset_document_links")
+      .select("asset_id,controlled_document_id")
+      .eq("organization_id",organization.id),
   ]);
 
   for(const result of [
     assetResult,
     peopleResult,
     maintenanceResult,
-    mocResult
+    mocResult,
+    supplierResult,
+    documentResult,
+    documentLinkResult
   ]){
     if(result.error)throw new Error(result.error.message);
   }
@@ -79,6 +104,9 @@ export default async function CompanyAssetsPage({searchParams}){
   const people=peopleResult.data||[];
   const maintenance=maintenanceResult.data||[];
   const mocs=mocResult.data||[];
+  const suppliers=supplierResult.data||[];
+  const documents=documentResult.data||[];
+  const documentLinks=documentLinkResult.data||[];
 
   const editAsset=
     assets.find(item=>item.id===query?.edit)||null;
@@ -86,6 +114,14 @@ export default async function CompanyAssetsPage({searchParams}){
   const peopleById=new Map(
     people.map(person=>[person.id,person])
   );
+  const suppliersById=new Map(suppliers.map(supplier=>[supplier.id,supplier]));
+  const documentsById=new Map(documents.map(document=>[document.id,document]));
+
+  for(const record of maintenance){
+    if(!record.evidence_storage_path)continue;
+    const {data}=await admin.storage.from("asset-maintenance-evidence").createSignedUrl(record.evidence_storage_path,3600);
+    record.evidence_url=data?.signedUrl||null;
+  }
 
   const today=new Date().toISOString().slice(0,10);
   const soon=new Date(Date.now()+30*86400000)
@@ -122,6 +158,10 @@ export default async function CompanyAssetsPage({searchParams}){
       mocs.filter(item=>item.organization_asset_id===asset.id)
     ])
   );
+  const documentsByAsset=new Map(assets.map(asset=>[
+    asset.id,
+    documentLinks.filter(link=>link.asset_id===asset.id).map(link=>documentsById.get(link.controlled_document_id)).filter(Boolean)
+  ]));
 
   return (
     <main className="arPage">
@@ -193,10 +233,13 @@ export default async function CompanyAssetsPage({searchParams}){
             <CompanyAssetRegister
               locations={locations}
               people={people}
+              suppliers={suppliers}
+              documents={documents}
               asset={editAsset}
+              linkedDocumentIds={editAsset?documentLinks.filter(link=>link.asset_id===editAsset.id).map(link=>link.controlled_document_id):[]}
             />
 
-            <AssetMaintenanceForm assets={assets}/>
+            <AssetMaintenanceForm assets={assets} people={people} suppliers={suppliers}/>
           </div>
 
           <section className="arPanel">
@@ -219,6 +262,9 @@ export default async function CompanyAssetsPage({searchParams}){
 
                 const linkedMocs=
                   mocByAsset.get(asset.id)||[];
+                const linkedDocuments=documentsByAsset.get(asset.id)||[];
+                const maintenanceOwner=peopleById.get(asset.maintenance_owner_person_id);
+                const maintenanceSupplier=suppliersById.get(asset.maintenance_supplier_id);
 
                 const isOverdue=
                   asset.ppm_required &&
@@ -310,10 +356,16 @@ export default async function CompanyAssetsPage({searchParams}){
                     )}
 
                     <div className="arHistory">
-                      <span>
-                        {records.length} maintenance record
-                        {records.length===1?"":"s"}
-                      </span>
+                      <details className="arPpmDetails">
+                        <summary>{records.length} maintenance record{records.length===1?"":"s"} - view PPM details</summary>
+                        <div className="arPpmBody">
+                          <div className="arPpmMeta"><span>Delivery</span><strong>{asset.maintenance_owner_type==="supplier"?"Approved supplier":"Internal Facilities / Operations"}</strong></div>
+                          <div className="arPpmMeta"><span>Internal owner</span><strong>{personName(maintenanceOwner)}</strong></div>
+                          {maintenanceSupplier&&<div className="arPpmMeta"><span>Supplier</span><strong>{maintenanceSupplier.legal_name}</strong></div>}
+                          <div className="arPpmMeta"><span>Requirements</span><strong>{asset.maintenance_notes||"No additional requirements recorded"}</strong></div>
+                          {records.length?<div className="arRecordList">{records.map(record=><article key={record.id}><div><strong>{record.maintenance_reference}</strong><span>{title(record.maintenance_type)} - {date(record.scheduled_date)} - {title(record.status)}</span></div><p>{record.work_completed||"No scope or completion notes recorded."}</p><div className="arRecordLinks">{record.evidence_reference&&<span>Reference: {record.evidence_reference}</span>}{record.evidence_url&&<a href={record.evidence_url} target="_blank" rel="noreferrer">Download {record.evidence_file_name||"maintenance evidence"}</a>}</div></article>)}</div>:<p>No PPM activity has been planned or completed for this asset.</p>}
+                        </div>
+                      </details>
 
                       <span>
                         {linkedMocs.length} linked MOC
@@ -326,6 +378,7 @@ export default async function CompanyAssetsPage({searchParams}){
                           {records[0].maintenance_reference}
                         </span>
                       )}
+                      <details className="arDocDetails"><summary>{linkedDocuments.length} linked document{linkedDocuments.length===1?"":"s"}</summary><div>{linkedDocuments.length?linkedDocuments.map(document=><Link href="/portal/documents" key={document.id}>{document.document_number} - {document.title}</Link>):<p>No controlled work instruction or manual linked.</p>}</div></details>
                     </div>
 
                     <div className="arControls">
@@ -634,6 +687,112 @@ const styles=`
   font-weight:850
 }
 
+.arPpmDetails,
+.arDocDetails{
+  position:relative;
+  flex:0 1 auto
+}
+
+.arPpmDetails summary,
+.arDocDetails summary{
+  list-style:none;
+  padding:5px 8px;
+  border-radius:999px;
+  background:#e9f1f7;
+  color:#42627e;
+  font-size:10px;
+  font-weight:850;
+  cursor:pointer
+}
+
+.arPpmDetails summary::-webkit-details-marker,
+.arDocDetails summary::-webkit-details-marker{
+  display:none
+}
+
+.arPpmDetails[open],
+.arDocDetails[open]{
+  flex-basis:100%
+}
+
+.arPpmDetails[open] summary,
+.arDocDetails[open] summary{
+  display:inline-block;
+  background:#dceaf4;
+  color:#173b59
+}
+
+.arPpmBody,
+.arDocDetails>div{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+  margin-top:9px;
+  padding:12px;
+  border:1px solid #cedde7;
+  border-radius:10px;
+  background:#fff
+}
+
+.arPpmMeta{
+  display:grid;
+  gap:3px
+}
+
+.arPpmMeta span{
+  padding:0;
+  background:transparent;
+  font-size:9px;
+  color:#6a8195
+}
+
+.arPpmMeta strong{
+  font-size:12px;
+  overflow-wrap:anywhere
+}
+
+.arRecordList{
+  display:grid;
+  grid-column:1/-1;
+  gap:8px
+}
+
+.arRecordList article{
+  padding:10px;
+  border-left:3px solid #087f6c;
+  border-radius:7px;
+  background:#f3f7fa
+}
+
+.arRecordList article>div:first-child{
+  display:flex;
+  justify-content:space-between;
+  gap:10px
+}
+
+.arRecordList article span,
+.arRecordLinks span{
+  padding:0;
+  background:transparent
+}
+
+.arRecordLinks{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap
+}
+
+.arRecordLinks a,
+.arDocDetails a{
+  color:#1762a3;
+  font-size:11px;
+  font-weight:850
+}
+
+.arDocDetails>div{
+  grid-template-columns:1fr
+}
+
 .arControls{
   display:flex;
   gap:7px;
@@ -731,6 +890,14 @@ const styles=`
 
   .arControls>a{
     text-align:center
+  }
+
+  .arPpmBody{
+    grid-template-columns:1fr
+  }
+
+  .arRecordList{
+    grid-column:auto
   }
 }
 
