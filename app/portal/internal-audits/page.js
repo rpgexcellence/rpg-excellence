@@ -7,6 +7,8 @@ import ProcessScopeSelector from "./ProcessScopeSelector";
 import AuditTypeSupplierSelector from "../../../components/AuditTypeSupplierSelector";
 import AuditSupplierLinkProvider from "../../../components/AuditSupplierLinkProvider";
 import SupplierAuditeeContactFields from "../../../components/SupplierAuditeeContactFields";
+import InternalAuditSiteField from "../../../components/InternalAuditSiteField";
+import { rcaAdministrationLocations } from "../../../lib/rcaCompanyLinks";
 
 const STATUS_LABELS = {
   draft: "Draft", scope_review: "Scope review", team_assignment: "Team assignment",
@@ -52,7 +54,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
   if (!user) redirect("/portal/login?next=/portal/internal-audits");
 
   const [organizationsResult, standardsResult, auditsResult, findingsResult, suppliersResult] = await Promise.all([
-    supabase.from("organizations").select("id, name").eq("owner_id", user.id).order("name"),
+    supabase.from("organizations").select("id,name,address_line_1,address_line_2,city,region,postal_code,country,business_site_mode,business_additional_sites").eq("owner_id", user.id).order("name"),
     supabase.from("internal_audit_standard_catalogue")
       .select("id, display_name, discipline, standard_code").eq("active", true)
       .neq("standard_code", "ISO 19011").order("display_name"),
@@ -74,7 +76,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
     if (result.error) throw new Error(result.error.message);
   }
 
-  const organizations = organizationsResult.data ?? [];
+  const organizations = (organizationsResult.data ?? []).map((organization) => ({ ...organization, locations: rcaAdministrationLocations(organization) }));
   const companyPeopleResult = organizations.length ? await supabase.from("organization_people")
     .select("id,organization_id,first_name,last_name,email,position")
     .in("organization_id", organizations.map((item)=>item.id)).eq("account_status", "active")
@@ -194,7 +196,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
               <form className="iaForm" action={createInternalAudit}>
                 <div className="iaSectionTitle"><b>1</b>Audit mandate</div>
                 <div className="iaGrid3">
-                  <label className="iaField"><span>Organisation *</span><select name="organization_id" required defaultValue={requestedSupplier?.organization_id || ""}><option value="" disabled>Select organisation</option>{organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
+                  <InternalAuditSiteField organizations={organizations} initialOrganizationId={requestedSupplier?.organization_id || ""} />
                   <label className="iaField"><span>Audit title *</span><input name="title" required defaultValue={requestedSupplier ? `${requestedSupplier.legal_name} Supplier Audit` : ""} placeholder="e.g. Integrated UK Operations Audit" /></label>
                   <AuditTypeSupplierSelector />
                   <label className="iaField"><span>Delivery method *</span><select name="audit_method" defaultValue="onsite"><option value="onsite">On-site</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option></select></label>
@@ -210,7 +212,6 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
                   <label className="iaField"><span>Known risks, changes and prior signals</span><textarea name="known_risks_changes" placeholder="Significant change, incidents, complaints, poor performance, recurring findings or emerging risk." /></label>
                 </div>
                 <div className="iaGrid3" style={{marginTop:"17px"}}>
-                  <label className="iaField"><span>Sites and locations</span><input name="sites" placeholder="e.g. Cambridge, Port Talbot" /></label>
                   <label className="iaField"><span>Functions and departments</span><input name="departments" placeholder="e.g. Operations, QHSE, Procurement" /></label>
                   <SupplierAuditeeContactFields companyPeople={companyPeople} />
                 </div>
