@@ -237,6 +237,7 @@ export async function createInternalAudit(formData) {
     formData.get("auditee_contact_email")
   );
   let auditeeContactName = clean(formData.get("auditee_contact_name"));
+  const auditeeContactPersonId = clean(formData.get("auditee_contact_person_id"));
   const supplierContactId = clean(formData.get("supplier_contact_id"));
   const standardIds = uniqueClean(
     formData.getAll("standard_ids")
@@ -277,6 +278,16 @@ export async function createInternalAudit(formData) {
 
   if (auditType === "supplier" && !supplierId) {
     redirect("/portal/internal-audits?create_error=supplier_required#audit-mandate");
+  }
+  if (auditType !== "supplier") {
+    if (!auditeeContactPersonId) throw new Error("Select the primary auditee contact from the active Company User list.");
+    const { data: auditeePerson, error: auditeePersonError } = await supabase.from("organization_people")
+      .select("id,first_name,last_name,email").eq("id", auditeeContactPersonId)
+      .eq("organization_id", organizationId).eq("account_status", "active").maybeSingle();
+    if (auditeePersonError) throw new Error(auditeePersonError.message);
+    if (!auditeePerson) throw new Error("The selected auditee contact is not an active user in this organisation.");
+    auditeeContactName = [auditeePerson.first_name,auditeePerson.last_name].filter(Boolean).join(" ").trim();
+    auditeeEmail = clean(auditeePerson.email);
   }
 
   if (
@@ -407,6 +418,7 @@ export async function createInternalAudit(formData) {
       audit_type: auditType,
       audit_method: auditMethod,
       supplier_id: approvedSupplier?.id || null,
+      auditee_contact_person_id: auditType === "supplier" ? null : auditeeContactPersonId,
       status: "draft",
       current_gate: "scope",
       purpose,
