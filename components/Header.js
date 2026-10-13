@@ -33,7 +33,13 @@ export default function Header({ locale, nav, variant = "default" }) {
         .isoAtGlanceMenu>a strong{font-size:13px}
         .isoAtGlanceMenu>a small{color:#6b8298;font-size:10px;font-weight:600}
         .isoAtGlanceMenu>a>b{color:#245ee8;font-size:15px}
+        .mobileNav{display:none;position:relative;margin-left:auto}
+        .mobileNav>summary{display:grid;width:44px;height:44px;place-items:center;border:1px solid ${variant === "home" ? "#6783a5" : "#d2dce7"};border-radius:11px;background:${variant === "home" ? "#ffffff12" : "#fff"};color:inherit;list-style:none;cursor:pointer}
+        .mobileNav>summary::-webkit-details-marker{display:none}.mobileNavIcon,.mobileNavIcon:before,.mobileNavIcon:after{display:block;width:20px;height:2px;border-radius:3px;background:currentColor;content:""}.mobileNavIcon{position:relative}.mobileNavIcon:before{position:absolute;top:-6px}.mobileNavIcon:after{position:absolute;top:6px}.mobileNav[open] .mobileNavIcon{background:transparent}.mobileNav[open] .mobileNavIcon:before{top:0;transform:rotate(45deg)}.mobileNav[open] .mobileNavIcon:after{top:0;transform:rotate(-45deg)}
+        .mobileNavPanel{position:fixed;z-index:200;top:72px;left:12px;right:12px;max-height:calc(100vh - 88px);overflow:auto;padding:12px;border:1px solid #d6e1ec;border-radius:16px;background:#fff;color:#0a2342;box-shadow:0 24px 65px #03152d40}
+        .mobileNavPanel>a,.mobileIso>summary{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:12px 13px;border-radius:10px;color:#12385f;font-size:14px;font-weight:850;cursor:pointer;list-style:none}.mobileNavPanel>a:after,.mobileIso>summary:after{content:"→";color:#1761e8}.mobileNavPanel>a:hover,.mobileNavPanel>a:focus,.mobileIso>summary:hover{background:#edf4ff;outline:0}.mobileIso>summary::-webkit-details-marker{display:none}.mobileIsoLinks{display:grid;gap:3px;padding:4px 7px 9px 17px;border-left:2px solid #dbe7f4;margin-left:13px}.mobileIsoLinks>a{padding:9px 10px;border-radius:8px;color:#365570;font-size:13px;font-weight:750}.mobileIsoLinks>a:hover{background:#f1f6fc}.mobileNavActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px;padding-top:12px;border-top:1px solid #e2e9f0}.mobileNavActions a{min-height:44px;padding:11px;border-radius:10px;text-align:center;font-size:13px;font-weight:900}.mobileSignIn{border:1px solid #cad7e4;color:#12385f}.mobileStart{background:#1761e8;color:#fff}.mobileYouTube{grid-column:1/-1;background:#fff1f3;color:#c70028}
         @media(max-width:900px){.isoAtGlanceMenu{left:auto;right:0;transform:translate(0,-7px)}.isoAtGlance:hover .isoAtGlanceMenu,.isoAtGlance:focus-within .isoAtGlanceMenu,.isoAtGlance[open] .isoAtGlanceMenu{transform:translate(0,0)}}
+        @media(max-width:1100px){.mobileNav{display:block}.headerActions{display:none!important}.header .brand{width:190px!important;height:60px!important}.header .brand img{width:190px!important;height:60px!important}}
       `}</style>
       <Link
         href={`/${locale}`}
@@ -74,7 +80,6 @@ export default function Header({ locale, nav, variant = "default" }) {
               {ISO_AT_A_GLANCE.map(([code, name, slug, icon]) => <Link href={`/${locale}/${slug}`} key={code}><i>{icon}</i><span><strong>{code}</strong><small>{name}</small></span><b aria-hidden="true">→</b></Link>)}
             </div>
           </details>
-          <Link href={`/${locale}/publications`}>Publications</Link>
           <a href={`/${locale}#solutions`}>Solutions</a>
           <Link href={`/${locale}/insights`}>Resources</Link>
           <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
@@ -83,13 +88,28 @@ export default function Header({ locale, nav, variant = "default" }) {
         </> : <>
           <Link href={`/${locale}`}>{nav.home}</Link>
           <a href={`/${locale}#iso`}>{nav.services}</a>
-          <Link href={`/${locale}/publications`}>Publications</Link>
           <Link href={`/${locale}/ai-tools`}>{nav.ai}</Link>
           <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
           <Link href={`/${locale}/about`}>{nav.about}</Link>
           <Link href={`/${locale}/contact`}>{nav.contact}</Link>
         </>}
       </nav>
+
+      <details className="mobileNav">
+        <summary aria-label="Open website menu"><span className="mobileNavIcon" /></summary>
+        <div className="mobileNavPanel" aria-label="Mobile website navigation">
+          <Link href={`/${locale}`}>Home</Link>
+          <a href={`/${locale}#platform`}>Platform</a>
+          <details className="mobileIso"><summary>ISO at a Glance</summary><div className="mobileIsoLinks">{ISO_AT_A_GLANCE.map(([code, name, slug]) => <Link href={`/${locale}/${slug}`} key={code}><strong>{code}</strong> · {name}</Link>)}</div></details>
+          <a href={`/${locale}#solutions`}>Solutions</a>
+          <Link href={`/${locale}/insights`}>Resources & Publications</Link>
+          <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
+          <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
+          <Link href={`/${locale}/about`}>{nav.about}</Link>
+          <Link href={`/${locale}/contact`}>{nav.contact}</Link>
+          <div className="mobileNavActions"><a className="mobileSignIn" href="/portal/login">Sign in</a><a className="mobileStart" href="/portal">Start assessment</a><a className="mobileYouTube" href="https://www.youtube.com/channel/UCZsXSCzL4ebrKafO2515Sow" target="_blank" rel="noopener noreferrer">Watch RPG Excellence on YouTube</a></div>
+        </div>
+      </details>
 
       <div className="headerActions">
         <a
