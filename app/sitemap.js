@@ -28,6 +28,7 @@ export default function sitemap() {
     "/privacy",
     "/cookies",
     "/insights",
+    "/insights/beyond-the-asset-register",
     "/insights/iso-9001-2026-executive-release-analysis",
     "/insights/business-continuity-business-impact-analysis",
     "/insights/business-continuity-risk-assessment-hazard-scenarios",
