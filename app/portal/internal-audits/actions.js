@@ -458,7 +458,9 @@ export async function createInternalAudit(formData) {
       owner_id: user.id,
       audit_id: audit.id,
       standard_id: standardId,
-      full_or_partial: "full",
+      // Scope is assembled from the controlled process selections below. This
+      // supports both a complete selection and a deliberately focused audit.
+      full_or_partial: "partial",
     })
   );
 
