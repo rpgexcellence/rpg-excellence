@@ -5,6 +5,7 @@ import {revalidatePath} from "next/cache";
 import {requireOrganizationAccess} from "../../../../lib/organization-access";
 import {createAdminClient} from "../../../../lib/supabase/admin";
 import {rcaAdministrationLocations} from "../../../../lib/rcaCompanyLinks";
+import {getUserSubscription,hasPlanAccess} from "../../../../lib/subscription";
 
 const clean=(value,max=2000)=>String(value||"").trim().slice(0,max);
 const ASSET_TYPES=new Set(["plant","equipment","room_area","electrical_system","process_system","vehicle","other"]);
@@ -15,6 +16,8 @@ const MAINTENANCE_TYPES=new Set(["planned","inspection","calibration","statutory
 
 async function assetContext(){
   const access=await requireOrganizationAccess("people_access","admin","/portal/company/assets");
+  const subscription=await getUserSubscription(access.user.id);
+  if(!hasPlanAccess(subscription,"professional"))throw new Error("Asset Management requires the Professional plan.");
   return {...access,admin:createAdminClient()};
 }
 
