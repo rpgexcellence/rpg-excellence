@@ -967,7 +967,7 @@ export async function approveAuditPlan(
 
   const { data: selectedStandards, error: selectedStandardsError } = await supabase
     .from("internal_audit_selected_standards")
-    .select("standard_id, internal_audit_standard_catalogue(standard_code)")
+    .select("standard_id, full_or_partial, internal_audit_standard_catalogue(standard_code)")
     .eq("audit_id", auditId)
     .eq("owner_id", user.id);
 
@@ -1000,12 +1000,19 @@ export async function approveAuditPlan(
     .filter((link) => selectedProcessPairs.size === 0 || selectedProcessPairs.has(`${link.standard_id}:${link.scope_key}`))
     .map((link) => link.question_id)
     .filter(Boolean))];
-  const questionCoverage = scopedQuestionIds.length
+  const questionCoverageResult = selectedStandardIds.length
     ? await supabase.from("internal_audit_questions")
-        .select("id", { count: "exact", head: true })
-        .in("id", scopedQuestionIds)
+        .select("id, standard_id")
+        .in("standard_id", selectedStandardIds)
         .eq("active", true)
-    : { count: 0, error: null };
+    : { data: [], error: null };
+
+  const questionCoverage = {
+    error: questionCoverageResult.error,
+    count: (questionCoverageResult.data ?? []).filter((question) =>
+      scopedQuestionIds.includes(question.id)
+    ).length,
+  };
 
   if (questionCoverage.error) {
     throw new Error(questionCoverage.error.message);
