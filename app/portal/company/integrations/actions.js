@@ -2,6 +2,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { requirePlanAccess } from "../../../../lib/plan-access";
 import { requirePeopleAdmin } from "../people/actions";
 
 const ALLOWED_PERMISSIONS = new Set([
@@ -37,6 +38,7 @@ function futureExpiry(value) {
 
 export async function createIntegrationApiKey(_previousState, formData) {
   const { user, admin, organization } = await requirePeopleAdmin();
+  await requirePlanAccess(user, "consultant", "Enterprise Integration");
   const { data: controlledOrganization } = await admin
     .from("organizations")
     .select("id,owner_id")
@@ -102,6 +104,7 @@ export async function createIntegrationApiKey(_previousState, formData) {
 
 export async function revokeIntegrationApiKey(_previousState, formData) {
   const { user, admin, organization } = await requirePeopleAdmin();
+  await requirePlanAccess(user, "consultant", "Enterprise Integration");
   const clientId = clean(formData.get("client_id"), 80);
   if (!clientId) return { error: "The API client was not identified." };
 
