@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuditSupplierLink } from "./AuditSupplierLinkProvider";
 
-export default function SupplierAuditeeContactFields() {
+export default function SupplierAuditeeContactFields({ companyPeople = [] }) {
   const { approvedSuppliers, supplierAudit, supplierId } = useAuditSupplierLink();
   const supplier = useMemo(
     () => approvedSuppliers.find((item) => item.id === supplierId) || null,
@@ -22,8 +22,7 @@ export default function SupplierAuditeeContactFields() {
   if (!supplierAudit) {
     return (
       <>
-        <label className="iaField"><span>Primary auditee contact</span><input name="auditee_contact_name" placeholder="Full name" /></label>
-        <label className="iaField"><span>Auditee email</span><input name="auditee_contact_email" type="email" placeholder="name@example.com" /></label>
+        <label className="iaField"><span>Primary auditee contact *</span><select name="auditee_contact_person_id" required defaultValue=""><option value="">Select active Company User</option>{companyPeople.map((person)=><option key={person.id} value={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select><small>Linked to Administration → People, Roles &amp; Access.</small></label>
       </>
     );
   }
