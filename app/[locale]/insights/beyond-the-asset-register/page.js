@@ -9,7 +9,7 @@ export const metadata = {
   openGraph: {
     title: "Beyond the Asset Register",
     description: "Ownership. Maintenance. Evidence. A practical RPG Excellence guide to connected asset assurance.",
-    images: ["/insights/beyond-the-asset-register.png"],
+    images: ["/insights/beyond-the-asset-register-1280.png"],
   },
 };
 
@@ -19,7 +19,7 @@ const article = {
   title: "Beyond the Asset Register: Ownership, Maintenance and Evidence",
   description: metadata.description,
   standfirst: "An asset list tells you what exists. Operational assurance shows who is accountable, which instructions apply, when maintenance is due, who performs it and where the evidence is retained.",
-  image: "/insights/beyond-the-asset-register.png",
+  image: "/insights/beyond-the-asset-register-1280.png",
   imageAlt: "RPG Excellence Beyond the Asset Register cover showing industrial equipment and a digital maintenance dashboard",
   datePublished: "2026-10-13",
   dateModified: "2026-10-13",
