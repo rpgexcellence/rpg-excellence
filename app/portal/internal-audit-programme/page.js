@@ -35,6 +35,12 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
   ]);
   for (const result of [organizationsResult, catalogueResult, programmesResult]) if (result.error) throw new Error(result.error.message);
   const organizations = organizationsResult.data || [];
+  const peopleResult = organizations.length ? await supabase.from("organization_people")
+    .select("id,organization_id,first_name,last_name,email,position")
+    .in("organization_id", organizations.map((item) => item.id))
+    .eq("account_status", "active").order("last_name") : { data: [], error: null };
+  if (peopleResult.error) throw new Error(peopleResult.error.message);
+  const companyPeople = peopleResult.data || [];
   const standards = (catalogueResult.data || []).filter(isProgrammeStandard).filter((item, index, list) => index === list.findIndex((other) => norm(other.standard_code) === norm(item.standard_code)));
   const programmes = (programmesResult.data || []).map((item) => ({
     ...item,
@@ -183,12 +189,9 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <input name="cycle_start" type="date" required />
 </label>
 <label className="iapField">
-<span>Administering lead auditor *</span>
-<input name="lead_auditor_name" required />
-</label>
-<label className="iapField">
-<span>Lead auditor email</span>
-<input name="lead_auditor_email" type="email" />
+<span>Programme owner and administering lead auditor *</span>
+<select name="programme_owner_person_id" required defaultValue=""><option value="" disabled>Select active Company User</option>{companyPeople.map((person) => <option key={person.id} value={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select>
+<small>The selected person is controlled through Administration → People, Roles &amp; Access.</small>
 </label>
 </div>
 <div className="iapGrid2" style={{marginTop:14}}>
@@ -238,8 +241,7 @@ export default async function ThreeYearAuditProgramme({ searchParams }) {
 <div className="iapGrid3">
 <label className="iapField"><span>Programme title *</span><input name="title" required defaultValue={programme.title} /></label>
 <label className="iapField"><span>Cycle start *</span><input name="cycle_start" type="date" required defaultValue={programme.cycle_start} /></label>
-<label className="iapField"><span>Administering lead auditor *</span><input name="lead_auditor_name" required defaultValue={programme.lead_auditor_name} /></label>
-<label className="iapField"><span>Lead auditor email</span><input name="lead_auditor_email" type="email" defaultValue={programme.lead_auditor_email || ""} /></label>
+<label className="iapField"><span>Programme owner and administering lead auditor *</span><select name="programme_owner_person_id" required defaultValue={programme.programme_owner_person_id || ""}><option value="" disabled>Select active Company User</option>{companyPeople.filter((person)=>person.organization_id===programme.organization_id).map((person) => <option key={person.id} value={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select><small>Changing this selection updates the accountable owner and audit-programme contact.</small></label>
 <label className="iapField"><span>Programme site structure *</span><select name="site_structure" required defaultValue={programme.site_structure || "single_site"}><option value="single_site">Single-site organisation</option><option value="multisite">Multisite organisation</option></select></label>
 <label className="iapField"><span>Management-system model *</span><select name="system_model" required defaultValue={programme.system_model || "integrated"}><option value="integrated">Integrated management system</option><option value="separate">Separate management systems</option><option value="hybrid">Hybrid / partly integrated</option></select></label>
 </div>
