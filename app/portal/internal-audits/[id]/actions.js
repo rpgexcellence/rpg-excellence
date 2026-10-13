@@ -8,6 +8,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
+import { rcaAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
 
 const clean = (value) =>
   typeof value === "string" && value.trim()
@@ -56,7 +57,7 @@ async function context(caseId) {
   } = await supabase
     .from("internal_audits")
     .select(
-      "id, audit_reference, organization_id, title, current_gate, status, scope_approved, plan_approved, planned_start_at, planned_end_at, auditee_contact_name, auditee_contact_email, scope_statement, sites, processes"
+      "id, audit_reference, organization_id, supplier_id, audit_type, administration_location_id, administration_location_label, title, current_gate, status, scope_approved, plan_approved, planned_start_at, planned_end_at, auditee_contact_name, auditee_contact_email, scope_statement, sites, processes"
     )
     .eq("id", caseId)
     .eq("owner_id", user.id)
@@ -118,7 +119,18 @@ export async function saveAuditScope(
   const {
     supabase,
     user,
+    audit,
   } = await context(auditId);
+
+  const administrationLocationId = clean(formData.get("administration_location_id"));
+  const { data: organization, error: organizationError } = await supabase.from("organizations")
+    .select("id,name,address_line_1,address_line_2,city,region,postal_code,country,business_site_mode,business_additional_sites")
+    .eq("id", audit.organization_id).eq("owner_id", user.id).maybeSingle();
+  if (organizationError || !organization) throw new Error("The linked organisation is unavailable.");
+  const administrationLocation = administrationLocationId === "legacy"
+    ? { id: audit.administration_location_id, label: audit.sites }
+    : rcaAdministrationLocations(organization).find((item) => item.id === administrationLocationId);
+  if (!administrationLocation?.label) throw new Error("Select a current site from Administration → Business Profile.");
 
   const purpose = clean(
     formData.get("purpose")
@@ -186,10 +198,9 @@ export async function saveAuditScope(
       criteria_summary:
         criteriaSummary,
 
-      sites:
-        clean(
-          formData.get("sites")
-        ),
+      administration_location_id: administrationLocation.id,
+      administration_location_label: administrationLocation.label,
+      sites: administrationLocation.label,
 
       departments:
         clean(
@@ -1467,6 +1478,37 @@ export async function addAuditEvidence(
     );
   }
 
+  const sourceType = clean(formData.get("source_type")) ?? "document";
+  const allowedSourceTypes = ["interview", "recording", "document", "controlled_record", "system", "observation", "external_confirmation", "other"];
+  if (!allowedSourceTypes.includes(sourceType)) throw new Error("Select a valid evidence source.");
+  const sourcePersonId = clean(formData.get("source_person_id"));
+  const sourceSupplierContactId = clean(formData.get("source_supplier_contact_id"));
+  let sourceName = clean(formData.get("source_name"));
+  if (audit.audit_type === "supplier") {
+    if (sourcePersonId) throw new Error("Supplier-audit evidence sources must use the linked supplier contact list.");
+    if (sourceSupplierContactId) {
+      const { data: contact } = await supabase.from("supplier_contacts").select("id,first_name,last_name,email").eq("id", sourceSupplierContactId).eq("supplier_id", audit.supplier_id).eq("owner_id", user.id).eq("is_active", true).maybeSingle();
+      if (!contact) throw new Error("Select a current contact from the linked supplier.");
+      sourceName = [contact.first_name, contact.last_name].filter(Boolean).join(" ") || contact.email;
+    }
+  } else if (sourcePersonId) {
+    if (sourceSupplierContactId) throw new Error("Select one controlled evidence source only.");
+    const { data: person } = await supabase.from("organization_people").select("id,first_name,last_name,email").eq("id", sourcePersonId).eq("organization_id", audit.organization_id).eq("account_status", "active").maybeSingle();
+    if (!person) throw new Error("Select an active Company User as the interviewee or source.");
+    sourceName = [person.first_name, person.last_name].filter(Boolean).join(" ") || person.email;
+  }
+
+  const evidenceFile = formData.get("evidence_file");
+  const hasEvidenceFile = typeof File !== "undefined" && evidenceFile instanceof File && evidenceFile.size > 0;
+  if (hasEvidenceFile && evidenceFile.size > MAX_FINDING_EVIDENCE_BYTES) throw new Error("The evidence file exceeds the 10 MB limit.");
+  if (hasEvidenceFile && !ALLOWED_FINDING_EVIDENCE_TYPES.has(evidenceFile.type)) throw new Error("The evidence file type is not accepted.");
+  let attachmentPath = null;
+  if (hasEvidenceFile) {
+    attachmentPath = `${user.id}/${auditId}/evidence/${crypto.randomUUID()}-${safeEvidenceFileName(evidenceFile.name)}`;
+    const { error: uploadError } = await supabase.storage.from(AUDIT_EVIDENCE_BUCKET).upload(attachmentPath, evidenceFile, { contentType: evidenceFile.type, upsert: false });
+    if (uploadError) throw new Error(`Unable to upload evidence: ${uploadError.message}`);
+  }
+
   const answerId = clean(
     formData.get("answer_id")
   );
@@ -1525,12 +1567,10 @@ export async function addAuditEvidence(
           )
         ),
 
-      source_name:
-        clean(
-          formData.get(
-            "source_name"
-          )
-        ),
+      source_name: sourceName,
+      source_type: sourceType,
+      source_person_id: sourcePersonId,
+      source_supplier_contact_id: sourceSupplierContactId,
 
       source_date:
         clean(
@@ -1539,12 +1579,7 @@ export async function addAuditEvidence(
           )
         ),
 
-      evidence_owner:
-        clean(
-          formData.get(
-            "evidence_owner"
-          )
-        ),
+      evidence_owner: user.user_metadata?.full_name || user.user_metadata?.name || user.email,
 
       process_area:
         clean(
@@ -1573,9 +1608,14 @@ export async function addAuditEvidence(
             "reliability"
           )
         ) ?? "medium",
+      attachment_name: hasEvidenceFile ? evidenceFile.name : null,
+      attachment_path: attachmentPath,
+      attachment_type: hasEvidenceFile ? evidenceFile.type : null,
+      attachment_size: hasEvidenceFile ? evidenceFile.size : null,
     });
 
   if (error) {
+    if (attachmentPath) await supabase.storage.from(AUDIT_EVIDENCE_BUCKET).remove([attachmentPath]);
     throw new Error(
       error.message
     );
@@ -1775,6 +1815,23 @@ export async function addAuditFinding(
   const responsibleOwnerEmail = clean(
     formData.get("responsible_owner_email")
   );
+  const responsibleOwnerPersonId = clean(formData.get("responsible_owner_person_id"));
+  const responsibleOwnerSupplierContactId = clean(formData.get("responsible_owner_supplier_contact_id"));
+  let controlledOwnerName = responsibleOwnerName;
+  let controlledOwnerEmail = responsibleOwnerEmail;
+  if (audit.audit_type === "supplier") {
+    if (!responsibleOwnerSupplierContactId) throw new Error("Select the responsible owner from the linked supplier contact list.");
+    const { data: contact } = await supabase.from("supplier_contacts").select("id,first_name,last_name,email").eq("id", responsibleOwnerSupplierContactId).eq("supplier_id", audit.supplier_id).eq("owner_id", user.id).eq("is_active", true).maybeSingle();
+    if (!contact) throw new Error("The selected supplier owner is no longer available.");
+    controlledOwnerName = [contact.first_name, contact.last_name].filter(Boolean).join(" ") || contact.email;
+    controlledOwnerEmail = contact.email;
+  } else {
+    if (!responsibleOwnerPersonId) throw new Error("Select the responsible owner from the active Company User list.");
+    const { data: person } = await supabase.from("organization_people").select("id,first_name,last_name,email").eq("id", responsibleOwnerPersonId).eq("organization_id", audit.organization_id).eq("account_status", "active").maybeSingle();
+    if (!person) throw new Error("The selected Company User is no longer active.");
+    controlledOwnerName = [person.first_name, person.last_name].filter(Boolean).join(" ") || person.email;
+    controlledOwnerEmail = person.email;
+  }
 
   const riskLevel = clean(
     formData.get("risk_level")
@@ -1854,11 +1911,10 @@ export async function addAuditFinding(
           )
         ),
 
-      responsible_owner_name:
-        responsibleOwnerName,
-
-      responsible_owner_email:
-        responsibleOwnerEmail,
+      responsible_owner_name: controlledOwnerName,
+      responsible_owner_email: controlledOwnerEmail,
+      responsible_owner_person_id: responsibleOwnerPersonId,
+      responsible_owner_supplier_contact_id: responsibleOwnerSupplierContactId,
 
       responsible_owner_phone:
         clean(formData.get("responsible_owner_phone")),
