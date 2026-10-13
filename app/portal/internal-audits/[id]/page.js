@@ -154,12 +154,13 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     : { data: [], error: null };
   if (questionLinksResult.error) throw new Error(questionLinksResult.error.message);
   const scopedQuestionLinks = (questionLinksResult.data ?? []).filter((link) =>
-    selectedProcessPairs.size === 0 || selectedProcessPairs.has(`${link.standard_id}:${link.scope_key}`)
+    selectedProcessPairs.size === 0 ||
+    selectedProcessPairs.has(`${link.standard_id}:${link.scope_key}`)
   );
   const linkedQuestionIds = [...new Set(scopedQuestionLinks.map((link) => link.question_id).filter(Boolean))];
   const [questionsResult, answersResult, evidenceResult, findingsResult] = await Promise.all([
-    linkedQuestionIds.length
-      ? supabase.from("internal_audit_questions").select("*").in("id", linkedQuestionIds).eq("active", true).order("display_order")
+    standardIds.length
+      ? supabase.from("internal_audit_questions").select("*").in("standard_id", standardIds).eq("active", true).order("display_order")
       : Promise.resolve({ data: [], error: null }),
     supabase.from("internal_audit_answers").select("*").eq("audit_id", id).eq("owner_id", user.id),
     supabase.from("internal_audit_evidence").select("*").eq("audit_id", id).eq("owner_id", user.id).order("created_at", { ascending: false }),
@@ -175,7 +176,9 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     current.push(link);
     linksByQuestion.set(link.question_id, current);
   }
-  const questions = (questionsResult.data ?? []).map((question) => ({
+  const questions = (questionsResult.data ?? [])
+    .filter((question) => linkedQuestionIds.includes(question.id))
+    .map((question) => ({
     ...question,
     criteria_links: linksByQuestion.get(question.id) ?? [],
   }));
