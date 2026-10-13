@@ -75,6 +75,12 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
   }
 
   const organizations = organizationsResult.data ?? [];
+  const companyPeopleResult = organizations.length ? await supabase.from("organization_people")
+    .select("id,organization_id,first_name,last_name,email,position")
+    .in("organization_id", organizations.map((item)=>item.id)).eq("account_status", "active")
+    .order("last_name") : { data: [], error: null };
+  if (companyPeopleResult.error) throw new Error(companyPeopleResult.error.message);
+  const companyPeople = companyPeopleResult.data ?? [];
   const standards = standardsResult.data ?? [];
   const audits = auditsResult.data ?? [];
   const openFindings = findingsResult.data ?? [];
@@ -206,7 +212,7 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
                 <div className="iaGrid3" style={{marginTop:"17px"}}>
                   <label className="iaField"><span>Sites and locations</span><input name="sites" placeholder="e.g. Cambridge, Port Talbot" /></label>
                   <label className="iaField"><span>Functions and departments</span><input name="departments" placeholder="e.g. Operations, QHSE, Procurement" /></label>
-                  <SupplierAuditeeContactFields />
+                  <SupplierAuditeeContactFields companyPeople={companyPeople} />
                 </div>
 
                 <div className="iaDivider" />
