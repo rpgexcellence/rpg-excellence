@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "../../../lib/supabase/server";
+import { rcaAdministrationLocations } from "../../../lib/rcaCompanyLinks";
 
 const AUDIT_TYPES = [
   "internal_system",
@@ -321,7 +322,7 @@ export async function createInternalAudit(formData) {
     error: organizationError,
   } = await supabase
     .from("organizations")
-    .select("id")
+    .select("id,name,address_line_1,address_line_2,city,region,postal_code,country,business_site_mode,business_additional_sites")
     .eq("id", organizationId)
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -333,6 +334,14 @@ export async function createInternalAudit(formData) {
     throw new Error(
       "Organisation not found."
     );
+  }
+
+  const administrationLocationId = clean(formData.get("administration_location_id"));
+  const submittedLocationLabel = clean(formData.get("administration_location_label"));
+  const administrationLocation = rcaAdministrationLocations(organization)
+    .find((item) => item.id === administrationLocationId);
+  if (!administrationLocation || administrationLocation.label !== submittedLocationLabel) {
+    throw new Error("Select a current site from Administration → Business Profile.");
   }
 
   let approvedSupplier = null;
@@ -426,9 +435,9 @@ export async function createInternalAudit(formData) {
         formData.get("objectives")
       ),
       scope_statement: scopeStatement,
-      sites: clean(
-        formData.get("sites")
-      ),
+      administration_location_id: administrationLocation.id,
+      administration_location_label: administrationLocation.label,
+      sites: administrationLocation.label,
       departments: clean(
         formData.get("departments")
       ),
