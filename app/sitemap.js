@@ -14,6 +14,7 @@ export default function sitemap() {
     "/capa-8d",
     "/rca-8d-training",
     "/iso-9001",
+    "/iso-9001-2015",
     "/iso-14001",
     "/iso-45001",
     "/iso-22301",
