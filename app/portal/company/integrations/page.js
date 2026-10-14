@@ -104,7 +104,16 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>6. Read controlled findings</summary>
+              <summary>6. Read controlled suppliers</summary>
+              <div>
+                <pre>{`curl --request GET \\
+  "https://www.rpgexcellence.com/api/v1/integration/suppliers?page=1&page_size=25&approval_status=approved" \\
+  --header "Authorization: Bearer YOUR_API_KEY"`}</pre>
+                <p>The credential requires <code>suppliers:read</code>. Filters include <code>approval_status</code>, <code>criticality</code> and <code>review_status</code>.</p>
+              </div>
+            </details>
+            <details>
+              <summary>7. Read controlled findings</summary>
               <div>
                 <pre>{`curl --request GET \\
   "https://www.rpgexcellence.com/api/v1/integration/findings?page=1&page_size=25&finding_type=major_nc" \\
@@ -113,7 +122,7 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>7. Filters, responses and errors</summary>
+              <summary>8. Filters, responses and errors</summary>
               <div>
                 <ul>
                   <li><code>page</code>: 1 or greater</li>
