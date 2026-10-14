@@ -77,7 +77,25 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>3. Read controlled findings</summary>
+              <summary>3. Read controlled audits</summary>
+              <div>
+                <pre>{`curl --request GET \\
+  "https://www.rpgexcellence.com/api/v1/integration/audits?page=1&page_size=25" \\
+  --header "Authorization: Bearer YOUR_API_KEY"`}</pre>
+                <p>The credential requires <code>audits:read</code>. Filters include <code>status</code>, <code>audit_type</code>, <code>planned_from</code> and <code>planned_to</code>.</p>
+              </div>
+            </details>
+            <details>
+              <summary>4. Read controlled CAPA-8D cases</summary>
+              <div>
+                <pre>{`curl --request GET \\
+  "https://www.rpgexcellence.com/api/v1/integration/capa-8d?page=1&page_size=25&case_type=capa" \\
+  --header "Authorization: Bearer YOUR_API_KEY"`}</pre>
+                <p>The credential requires <code>capa:read</code>. Filters include <code>case_type</code>, <code>status</code>, <code>severity</code>, <code>source_type</code> and <code>target_before</code>.</p>
+              </div>
+            </details>
+            <details>
+              <summary>5. Read controlled findings</summary>
               <div>
                 <pre>{`curl --request GET \\
   "https://www.rpgexcellence.com/api/v1/integration/findings?page=1&page_size=25&finding_type=major_nc" \\
@@ -86,7 +104,7 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>4. Filters, responses and errors</summary>
+              <summary>6. Filters, responses and errors</summary>
               <div>
                 <ul>
                   <li><code>page</code>: 1 or greater</li>
