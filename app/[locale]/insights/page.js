@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "028",
+      title: "Enterprise Integration: Connected Assurance Without Losing Control",
+      description: "How governed API access connects assurance records while preserving organisational boundaries, least privilege and traceability.",
+      href: "enterprise-integration-controlled-access",
+    },
+    {
       number: "027",
       title: "Beyond the Asset Register: Ownership, Maintenance and Evidence",
       description: "How connected ownership, controlled information, PPM, supplier delivery, maintenance evidence and Management of Change turn an asset list into operational assurance.",
