@@ -88,6 +88,10 @@ export default function Footer({ locale }) {
             Privacy
           </Link>
 
+          <Link href={`/${locale}/security-and-trust`}>
+            Security &amp; Trust
+          </Link>
+
           <Link href={`/${locale}/cookies`}>
             Cookies
           </Link>
