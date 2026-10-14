@@ -113,7 +113,16 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>7. Read controlled findings</summary>
+              <summary>7. Read controlled Company Users</summary>
+              <div>
+                <pre>{`curl --request GET \\
+  "https://www.rpgexcellence.com/api/v1/integration/people?page=1&page_size=25&account_status=active" \\
+  --header "Authorization: Bearer YOUR_API_KEY"`}</pre>
+                <p>The credential requires <code>people:read</code>. Filters include <code>account_status</code>, <code>site</code> and <code>department</code>. Authentication and invitation data are never returned.</p>
+              </div>
+            </details>
+            <details>
+              <summary>8. Read controlled findings</summary>
               <div>
                 <pre>{`curl --request GET \\
   "https://www.rpgexcellence.com/api/v1/integration/findings?page=1&page_size=25&finding_type=major_nc" \\
@@ -122,7 +131,7 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>8. Filters, responses and errors</summary>
+              <summary>9. Filters, responses and errors</summary>
               <div>
                 <ul>
                   <li><code>page</code>: 1 or greater</li>
