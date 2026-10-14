@@ -192,6 +192,7 @@ export default async function Pricing({
                 <li>Multi-client operating model</li>
                 <li>Portfolio management boards</li>
                 <li>Executive reports</li>
+                <li>Secure Enterprise Integration API and controlled credentials</li>
                 <li>Priority onboarding support</li>
               </ul>
 
