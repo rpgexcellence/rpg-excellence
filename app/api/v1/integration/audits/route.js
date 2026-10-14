@@ -89,10 +89,7 @@ export async function GET(request) {
     .from("internal_audits")
     .select(
       `id,audit_reference,title,audit_type,audit_method,status,current_gate,
-       planned_start_at,planned_end_at,updated_at,
-       internal_audit_selected_standards(
-         internal_audit_standard_catalogue(display_name)
-       )`,
+       planned_start_at,planned_end_at,updated_at`,
       { count: "exact" }
     )
     .eq("owner_id", client.owner_id)
@@ -117,7 +114,11 @@ export async function GET(request) {
       errorSummary: error.message,
     });
     return integrationJson(
-      { error: "audits_unavailable", message: "The internal audit register could not be retrieved." },
+      {
+        error: "audits_unavailable",
+        message: "The internal audit register could not be retrieved.",
+        diagnostic_code: error.code || "database_query_failed",
+      },
       500,
       requestId
     );
