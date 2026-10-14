@@ -10,6 +10,7 @@ import CustomerJourneyCards from "../../components/CustomerJourneyCards";
 import { copy, locales } from "../../lib/i18n";
 
 const standards = [
+  ["ISO 9001:2015", "Quality Management · Amendment 1:2024", "iso-9001-2015", "blue", "Maintain the established QMS baseline while planning a controlled transition to the 2026 edition."],
   ["ISO 9001:2026", "Quality Management", "iso-9001", "blue", "Strengthen quality culture, ethical leadership, process control and customer confidence."],
   ["ISO 14001", "Environmental Management", "iso-14001", "green", "Control environmental aspects, obligations, risks and operational impact."],
   ["ISO 45001", "Occupational Health & Safety", "iso-45001", "orange", "Manage hazards, worker participation and occupational health and safety risk."],
