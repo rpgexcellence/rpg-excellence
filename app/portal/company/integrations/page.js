@@ -95,7 +95,16 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>5. Read controlled findings</summary>
+              <summary>5. Read controlled assets</summary>
+              <div>
+                <pre>{`curl --request GET \\
+  "https://www.rpgexcellence.com/api/v1/integration/assets?page=1&page_size=25&ppm_status=overdue" \\
+  --header "Authorization: Bearer YOUR_API_KEY"`}</pre>
+                <p>The credential requires <code>assets:read</code>. Filters include <code>asset_type</code>, <code>status</code>, <code>criticality</code> and <code>ppm_status</code>.</p>
+              </div>
+            </details>
+            <details>
+              <summary>6. Read controlled findings</summary>
               <div>
                 <pre>{`curl --request GET \\
   "https://www.rpgexcellence.com/api/v1/integration/findings?page=1&page_size=25&finding_type=major_nc" \\
@@ -104,7 +113,7 @@ export default async function EnterpriseIntegrationsPage() {
               </div>
             </details>
             <details>
-              <summary>6. Filters, responses and errors</summary>
+              <summary>7. Filters, responses and errors</summary>
               <div>
                 <ul>
                   <li><code>page</code>: 1 or greater</li>
