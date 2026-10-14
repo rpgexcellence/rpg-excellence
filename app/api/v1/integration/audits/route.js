@@ -89,11 +89,9 @@ export async function GET(request) {
     .from("internal_audits")
     .select(
       `id,audit_reference,title,audit_type,audit_method,status,current_gate,
-       purpose,objectives,scope_statement,administration_location_label,sites,
-       departments,processes,planned_start_at,planned_end_at,supplier_id,
-       created_at,updated_at,
+       planned_start_at,planned_end_at,updated_at,
        internal_audit_selected_standards(
-         internal_audit_standard_catalogue(standard_code,display_name,edition_label)
+         internal_audit_standard_catalogue(display_name)
        )`,
       { count: "exact" }
     )
