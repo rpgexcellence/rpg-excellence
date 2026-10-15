@@ -96,7 +96,7 @@ export default function Header({ locale, nav, variant = "default" }) {
         </Link>
 
         <nav className="nav homeNav">
-          <a href={`/${locale}#platform`}>Platform</a>
+          <Link href={`/${locale}/ai-tools`}>Platform &amp; Resources</Link>
 
           <details className="isoAtGlance">
             <summary>ISO at a Glance</summary>
@@ -123,7 +123,8 @@ export default function Header({ locale, nav, variant = "default" }) {
           </details>
 
           <a href={`/${locale}#solutions`}>Solutions</a>
-          <Link href={`/${locale}/insights`}>Resources</Link>
+          <Link href={`/${locale}/insights`}>Insights</Link>
+          <Link href={`/${locale}/publications`}>Publications</Link>
           <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
           <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
           <Link href={`/${locale}/about`}>{nav.about}</Link>
@@ -140,7 +141,7 @@ export default function Header({ locale, nav, variant = "default" }) {
             aria-label="Mobile website navigation"
           >
             <Link href={`/${locale}`}>Home</Link>
-            <a href={`/${locale}#platform`}>Platform</a>
+            <Link href={`/${locale}/ai-tools`}>Platform &amp; Resources</Link>
 
             <details className="mobileIso">
               <summary>ISO at a Glance</summary>
@@ -155,9 +156,8 @@ export default function Header({ locale, nav, variant = "default" }) {
             </details>
 
             <a href={`/${locale}#solutions`}>Solutions</a>
-            <Link href={`/${locale}/insights`}>
-              Resources & Publications
-            </Link>
+            <Link href={`/${locale}/insights`}>Insights</Link>
+            <Link href={`/${locale}/publications`}>Publications</Link>
             <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
             <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
             <Link href={`/${locale}/about`}>{nav.about}</Link>
