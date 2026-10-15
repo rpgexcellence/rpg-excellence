@@ -6,36 +6,36 @@ import { locales } from "../../../lib/i18n";
 export const metadata = {
   title: "About RPG Excellence | Practitioner-led Digital Assurance",
   description:
-    "Meet RPG Excellence: a practitioner-led digital assurance business built around evidence, accountability, connected improvement and honest professional boundaries.",
+    "Practical management-system experience, digital tools, training and publications to help organisations understand requirements and put them into practice.",
   alternates: { canonical: "/en/about" },
 };
 
 const values = [
   [
     "01",
-    "Evidence before assertion",
-    "Decisions should be traceable to requirements, observed conditions and controlled records—not confidence alone.",
+    "Practicality",
+    "Tools and guidance should make everyday work easier and support effective management."
   ],
   [
     "02",
-    "Accountability by design",
-    "Important work needs a named owner, a clear deadline, an evidence expectation and visible verification.",
+    "Evidence",
+    "Conclusions should be supported by information that people can review and trust."
   ],
   [
     "03",
-    "Practical over performative",
-    "Management systems should improve real work. We design for the people who assess, operate, lead and act.",
+    "Accountability",
+    "Responsibilities, decisions and actions should have clear ownership."
   ],
   [
     "04",
-    "Connected improvement",
-    "Audits, risks, findings, CAPA, competence and management review should reinforce one another instead of creating silos.",
+    "Clarity",
+    "We explain complex requirements in language people can understand and apply."
   ],
   [
     "05",
-    "Honest boundaries",
-    "Technology supports professional judgement; it does not issue accredited certification or replace competent advice.",
-  ],
+    "Improvement",
+    "Completing an assessment or closing an action should lead to a meaningful result."
+  ]
 ];
 
 const principles = [
@@ -74,19 +74,14 @@ export default async function About({ params }) {
           <div className="aboutHeroShade" />
 
           <div className="aboutHeroCopy">
-            <span className="eyebrow">ABOUT RPG EXCELLENCE</span>
+            <span className="aboutEyebrow">ABOUT RPG EXCELLENCE</span>
 
-            <h1>Assurance should help people make better decisions.</h1>
+            <h1>About RPG Excellence</h1>
 
-            <p>
-              RPG Excellence is a practitioner-led digital assurance business.
-              We turn management-system requirements, operational evidence and
-              improvement work into clear, controlled journeys that leaders and
-              auditors can trust.
-            </p>
+            <p>RPG Excellence brings practical management-system experience into digital tools, training and publications that help organisations understand requirements and put them into practice.</p>
 
-            <div className="heroActions">
-              <Link href="/portal">Explore the platform →</Link>
+            <div className="aboutHeroActions">
+              <Link href={`/${locale}/ai-tools`}>Explore the platform →</Link>
 
               <Link href={`/${locale}/contact`}>
                 Talk to RPG Excellence
@@ -95,40 +90,27 @@ export default async function About({ params }) {
           </div>
         </section>
 
-        <section className="intro">
+        <section className="aboutIntro">
           <div>
-            <span className="eyebrow">WHO WE ARE</span>
+            <span className="aboutEyebrow">WHO WE ARE</span>
 
             <h2>
-              Built from management-system practice—not adapted from generic
-              task software.
+              Built on practical experience in quality, safety and management systems.
             </h2>
           </div>
 
-          <div className="introCopy">
-            <p>
-              RPG Excellence was created around a simple problem:
-              organisations often hold the right information, but it is
-              dispersed across spreadsheets, reports, inboxes and disconnected
-              tools. That makes ownership harder to see and improvement harder
-              to verify.
-            </p>
-
-            <p>
-              Our platform connects ISO readiness, health and safety, business
-              continuity, information security, internal audit, findings and
-              CAPA–8D. The aim is not more administration. It is stronger
-              control, clearer decisions and a defensible evidence trail.
-            </p>
+          <div className="aboutIntroCopy">
+            <p>We created RPG around a familiar challenge: assessments, risks, audits and corrective actions often sit in separate spreadsheets and reports. Information is available, but understanding what needs attention, who owns it and whether it has been resolved takes too much effort.</p>
+            <p>Our platform, RPG Intelligence, connects these activities so that requirements lead to evidence, findings lead to action, and improvement can be verified. Alongside the platform, our practitioner guides and training help people develop the knowledge and confidence to make sound decisions.</p>
           </div>
         </section>
 
-        <section className="purposeBand">
+        <section className="aboutPurposeBand">
           <div>
             <span>OUR PURPOSE</span>
 
             <strong>
-              Make credible assurance more practical, connected and useful.
+              Help organisations understand requirements and put them into practice.
             </strong>
           </div>
 
@@ -136,17 +118,16 @@ export default async function About({ params }) {
             <span>OUR PROMISE</span>
 
             <strong>
-              Keep people accountable for judgement while technology organises
-              the evidence.
+              Support sound decisions with clear responsibilities and evidence people can trust.
             </strong>
           </div>
         </section>
 
-        <section className="values">
+        <section className="aboutValues">
           <header>
-            <span className="eyebrow">WHAT WE VALUE</span>
+            <span className="aboutEyebrow">WHAT WE VALUE</span>
 
-            <h2>The principles behind every RPG workflow.</h2>
+            <h2>What matters to us</h2>
 
             <p>
               These values shape how assessments are structured, how actions
@@ -154,7 +135,7 @@ export default async function About({ params }) {
             </p>
           </header>
 
-          <div className="valueGrid">
+          <div className="aboutValueGrid">
             {values.map(([number, title, body]) => (
               <article key={number}>
                 <b>{number}</b>
@@ -165,9 +146,9 @@ export default async function About({ params }) {
           </div>
         </section>
 
-        <section className="approach">
-          <div className="approachLead">
-            <span className="eyebrow">HOW WE WORK</span>
+        <section className="aboutApproach">
+          <div className="aboutApproachLead">
+            <span className="aboutEyebrow">HOW WE WORK</span>
 
             <h2>
               Structured enough for audit. Practical enough for operations.
@@ -179,7 +160,7 @@ export default async function About({ params }) {
             </p>
           </div>
 
-          <div className="approachSteps">
+          <div className="aboutApproachSteps">
             {principles.map(([title, body], index) => (
               <article key={title}>
                 <span>0{index + 1}</span>
@@ -193,27 +174,14 @@ export default async function About({ params }) {
           </div>
         </section>
 
-        <section className="boundary">
-          <div>
-            <span className="eyebrow">OUR PROFESSIONAL BOUNDARY</span>
-
-            <h2>
-              Decision support—not a substitute for competent judgement.
-            </h2>
-          </div>
-
-          <p>
-            RPG Excellence helps users structure assessment, evidence, risk and
-            improvement. It does not issue accredited certification and does
-            not replace legal, technical, security or certification advice.
-            Final decisions remain with appropriately authorised and competent
-            people.
-          </p>
+        <section className="aboutBoundary">
+          <div><span className="aboutEyebrow">PEOPLE AND TECHNOLOGY</span><h2>Professional judgement remains with people.</h2></div>
+          <p>Technology supports this work. Professional judgement and responsibility remain with the people making the decisions.</p>
         </section>
 
         <section className="aboutCta">
           <div>
-            <span className="eyebrow">
+            <span className="aboutEyebrow">
               START WHERE THE NEED IS CLEAREST
             </span>
 
@@ -247,7 +215,7 @@ const styles = `
   color: #071d3a;
 }
 
-.eyebrow {
+.aboutEyebrow {
   display: block;
   color: #47dfd0;
   font-size: 11px;
@@ -305,13 +273,13 @@ const styles = `
   line-height: 1.65;
 }
 
-.heroActions {
+.aboutHeroActions {
   display: flex;
   gap: 12px;
   margin-top: 30px;
 }
 
-.heroActions a,
+.aboutHeroActions a,
 .aboutCta a {
   display: inline-flex;
   align-items: center;
@@ -325,25 +293,25 @@ const styles = `
   font-weight: 900;
 }
 
-.heroActions a:first-child,
+.aboutHeroActions a:first-child,
 .aboutCta .primary {
   border-color: #2f64ed;
   background: #2f64ed;
 }
 
-.intro,
-.approach,
-.boundary {
+.aboutIntro,
+.aboutApproach,
+.aboutBoundary {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 70px;
   padding: 78px 5vw;
 }
 
-.intro h2,
-.values h2,
-.approach h2,
-.boundary h2,
+.aboutIntro h2,
+.aboutValues h2,
+.aboutApproach h2,
+.aboutBoundary h2,
 .aboutCta h2 {
   margin: 13px 0;
   font-size: clamp(35px, 4vw, 57px);
@@ -351,24 +319,24 @@ const styles = `
   letter-spacing: -0.045em;
 }
 
-.intro .eyebrow,
-.values .eyebrow,
-.approach .eyebrow,
-.boundary .eyebrow,
-.aboutCta .eyebrow {
+.aboutIntro .aboutEyebrow,
+.aboutValues .aboutEyebrow,
+.aboutApproach .aboutEyebrow,
+.aboutBoundary .aboutEyebrow,
+.aboutCta .aboutEyebrow {
   color: #235fdf;
 }
 
-.introCopy p,
-.approach p,
-.boundary p,
-.values header > p {
+.aboutIntroCopy p,
+.aboutApproach p,
+.aboutBoundary p,
+.aboutValues header > p {
   color: #526b84;
   font-size: 17px;
   line-height: 1.75;
 }
 
-.purposeBand {
+.aboutPurposeBand {
   display: grid;
   grid-template-columns: 1fr 1fr;
   margin: 0 5vw;
@@ -378,49 +346,49 @@ const styles = `
   color: #fff;
 }
 
-.purposeBand > div {
+.aboutPurposeBand > div {
   padding: 42px;
 }
 
-.purposeBand > div + div {
+.aboutPurposeBand > div + div {
   border-left: 1px solid #ffffff25;
   background: #0c3766;
 }
 
-.purposeBand span,
-.purposeBand strong {
+.aboutPurposeBand span,
+.aboutPurposeBand strong {
   display: block;
 }
 
-.purposeBand span {
+.aboutPurposeBand span {
   color: #57ddd2;
   font-size: 10px;
   font-weight: 950;
   letter-spacing: 0.18em;
 }
 
-.purposeBand strong {
+.aboutPurposeBand strong {
   margin-top: 13px;
   font-size: 25px;
   line-height: 1.35;
 }
 
-.values {
+.aboutValues {
   padding: 82px 5vw;
 }
 
-.values header {
+.aboutValues header {
   max-width: 850px;
 }
 
-.valueGrid {
+.aboutValueGrid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-top: 32px;
 }
 
-.valueGrid article {
+.aboutValueGrid article {
   min-height: 270px;
   padding: 25px;
   border: 1px solid #d4e1ed;
@@ -428,7 +396,7 @@ const styles = `
   background: #fff;
 }
 
-.valueGrid b {
+.aboutValueGrid b {
   display: grid;
   place-items: center;
   width: 38px;
@@ -438,31 +406,31 @@ const styles = `
   color: #235fdf;
 }
 
-.valueGrid h3 {
+.aboutValueGrid h3 {
   margin: 28px 0 11px;
   font-size: 20px;
 }
 
-.valueGrid p {
+.aboutValueGrid p {
   color: #5c7187;
   font-size: 14px;
   line-height: 1.6;
 }
 
-.approach {
+.aboutApproach {
   background: #fff;
 }
 
-.approachLead {
+.aboutApproachLead {
   max-width: 650px;
 }
 
-.approachSteps {
+.aboutApproachSteps {
   display: grid;
   gap: 12px;
 }
 
-.approachSteps article {
+.aboutApproachSteps article {
   display: grid;
   grid-template-columns: 48px 1fr;
   gap: 17px;
@@ -471,7 +439,7 @@ const styles = `
   border-radius: 14px;
 }
 
-.approachSteps article > span {
+.aboutApproachSteps article > span {
   display: grid;
   place-items: center;
   height: 42px;
@@ -481,16 +449,16 @@ const styles = `
   font-weight: 950;
 }
 
-.approachSteps h3 {
+.aboutApproachSteps h3 {
   margin: 0 0 6px;
 }
 
-.approachSteps p {
+.aboutApproachSteps p {
   margin: 0;
   font-size: 14px;
 }
 
-.boundary {
+.aboutBoundary {
   align-items: center;
   background: #e8f0f9;
 }
@@ -518,7 +486,7 @@ const styles = `
 }
 
 @media (max-width: 1080px) {
-  .valueGrid {
+  .aboutValueGrid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
@@ -551,38 +519,38 @@ const styles = `
     font-size: 45px;
   }
 
-  .heroActions,
+  .aboutHeroActions,
   .aboutCta {
     display: grid;
   }
 
-  .intro,
-  .approach,
-  .boundary {
+  .aboutIntro,
+  .aboutApproach,
+  .aboutBoundary {
     grid-template-columns: 1fr;
     gap: 25px;
     padding: 52px 20px;
   }
 
-  .purposeBand {
+  .aboutPurposeBand {
     grid-template-columns: 1fr;
     margin: 0 20px;
   }
 
-  .purposeBand > div + div {
+  .aboutPurposeBand > div + div {
     border-top: 1px solid #ffffff25;
     border-left: 0;
   }
 
-  .values {
+  .aboutValues {
     padding: 60px 20px;
   }
 
-  .valueGrid {
+  .aboutValueGrid {
     grid-template-columns: 1fr;
   }
 
-  .valueGrid article {
+  .aboutValueGrid article {
     min-height: 0;
   }
 
