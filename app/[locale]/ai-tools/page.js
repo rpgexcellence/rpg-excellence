@@ -4,9 +4,9 @@ import PageShell from "../../../components/PageShell";
 import { locales } from "../../../lib/i18n";
 
 export const metadata = {
-  title: "RPG Excellence Platform | Assess, Audit, Control and Improve",
+  title: "RPG Excellence Platform & Resources | Connected Assurance",
   description:
-    "Explore RPG Excellence assessment, health and safety, internal audit, RCA–8D and practitioner training products.",
+    "Explore RPG Excellence assessments, operational hubs, specialist workspaces, practitioner training and controlled assurance resources.",
   alternates: { canonical: "/en/ai-tools" },
 };
 
@@ -15,7 +15,7 @@ const solutionHubs = [
     title: "Assessment & Gap Analysis",
     description:
       "Run evidence-led ISO readiness assessments, record findings and manage improvement through a controlled portfolio.",
-    status: "Five standards available",
+    status: "Multi-standard assessment portfolio",
     href: "/portal",
     action: "Open assessments",
   },
@@ -23,7 +23,7 @@ const solutionHubs = [
     title: "Health & Safety Hub",
     description:
       "Create and control workplace risk assessments, use the interactive 5×5 matrix, manage actions and build assessor competence.",
-    status: "Operational hub + training",
+    status: "Operational hub and training",
     href: "/hs-hub",
     action: "Explore H&S Hub",
   },
@@ -31,7 +31,7 @@ const solutionHubs = [
     title: "Internal Audit Hub",
     description:
       "Plan programmes, conduct evidence-led audits, control findings and verify corrective-action effectiveness.",
-    status: "Audit workflow + refresher",
+    status: "Audit workflow and refresher",
     href: "/internal-audit",
     action: "Explore Internal Audit",
   },
@@ -39,87 +39,25 @@ const solutionHubs = [
     title: "RCA–8D Hub",
     description:
       "Lead D1–D8 investigations from problem definition and containment through verified causes, actions and closure.",
-    status: "RCA workspace + practitioner course",
+    status: "RCA workspace and practitioner course",
     href: "/capa-8d",
     action: "Explore RCA–8D",
   },
-];
-
-const academyProducts = [
-  ["Risk Assessment Training", "£19.99", "Interactive initial training with practical scenarios and certificate.", "/hs-hub/training"],
-  ["Risk Assessment Refresher", "£12.99", "Focused competence refresher with assessment and certificate.", "/hs-hub/training"],
-  ["Internal Auditor Refresher", "£19.99", "Evidence-led audit judgement, findings and follow-up practice.", "/internal-audit-training"],
-  ["RCA & Corrective Action Practitioner", "£49.99", "180-minute structured course, completed workbook and verifiable certificate.", "/rca-8d-training"],
-];
-
-const operationalCapabilities = [
   {
-    area: "ASSESSMENT CONTROL",
-    title: "Gap Analysis & Readiness",
-    features: [
-      "Five ISO and conformity-assessment frameworks",
-      "Clause-level scoring, evidence and findings",
-      "Management action and corrective-action workflow",
-      "Portfolio management board and executive PDF reports",
-    ],
-    href: "/portal/history?view=management-board",
-  },
-  {
-    area: "HEALTH & SAFETY",
-    title: "Operational Risk Control",
-    features: [
-      "Five-stage workplace risk-assessment workflow",
-      "Interactive 5×5 initial and residual risk matrix",
-      "Owned actions, verification and review control",
-      "Training Academy and certificate register",
-    ],
-    href: "/portal/health-safety",
-  },
-  {
-    area: "INTERNAL AUDIT",
-    title: "Audit Assurance",
-    features: [
-      "Three-year, multi-standard audit programme",
-      "Process-FMEA risk-based planning",
-      "Controlled audit execution, evidence and reporting",
-      "Auditor verification, NC register and management board",
-    ],
-    href: "/portal/internal-audits",
-  },
-  {
-    area: "RCA–8D",
-    title: "Corrective Action",
-    features: [
-      "Controlled D1–D8 investigation gates",
-      "Containment, causal paths and three-direction 5 Why",
-      "Action selection, implementation and extent review",
-      "Independent effectiveness verification and closure",
-    ],
-    href: "/portal/rca",
-  },
-];
-
-const specialistWorkspaces = [
-  {
-    title: "ISO/IEC 27001 Statement of Applicability",
+    title: "Business Continuity Hub",
     description:
-      "A dedicated workspace for all 93 Annex A controls, applicability decisions, implementation status, residual risk and executive reporting.",
-    price: "£129 one-off",
-    href: "/portal/soa",
+      "Connect site profile, context, hazards, BIA, dependencies, continuity plans, exercising and improvement.",
+    status: "ISO 22301 connected workflow",
+    href: "/business-continuity",
+    action: "Explore BCP Hub",
   },
   {
-    title: "Controlled Evidence Library",
+    title: "Information Security Hub",
     description:
-      "Organise evidence by ISO standard, Internal Audit and RCA–CAPA family, with controlled records available across connected workflows.",
-    price: "Included with platform access",
-    href: "/portal/documents",
-  },
-  {
-    title: "Management Reporting",
-    description:
-      "Bring readiness, audit, findings, actions and verification into management-level registers, boards and downloadable reports.",
-    price: "Live portfolio intelligence",
-    href: "/portal/reports",
+      "Connect ISO 27001 gap assessment, information-security risk and Statement of Applicability decisions.",
+    status: "Risk and control assurance",
+    href: "/information-security",
+    action: "Explore ISMS Hub",
   },
 ];
 
@@ -127,6 +65,12 @@ const assessmentModules = [
   {
     title: "ISO 9001 Gap Analysis",
     standard: "ISO 9001:2015/Amd 1:2024",
+    status: "Available now",
+    href: "/portal",
+  },
+  {
+    title: "ISO 9001:2026 Gap Analysis",
+    standard: "ISO 9001:2026 transition readiness",
     status: "Available now",
     href: "/portal",
   },
@@ -149,10 +93,112 @@ const assessmentModules = [
     href: "/portal",
   },
   {
-    title: "ISO/IEC 17024 Gap Analysis",
-    standard: "ISO/IEC 17024:2026",
+    title: "ISO 22301 Gap Analysis",
+    standard: "ISO 22301:2019",
     status: "Available now",
     href: "/portal",
+  },
+];
+
+const operationalCapabilities = [
+  {
+    area: "ASSESSMENT CONTROL",
+    title: "Gap Analysis & Readiness",
+    features: [
+      "Multi-standard assessment portfolio",
+      "Clause-level scoring, guidance and evidence",
+      "Findings and corrective-action workflow",
+      "Management boards and executive reports",
+    ],
+    href: "/portal/history?view=management-board",
+  },
+  {
+    area: "HEALTH & SAFETY",
+    title: "Operational Risk Control",
+    features: [
+      "Workplace risk-assessment workflow",
+      "Interactive initial and residual risk matrix",
+      "Permit, POWRA and management-of-change control",
+      "Owned actions, verification and review",
+    ],
+    href: "/portal/health-safety",
+  },
+  {
+    area: "INTERNAL AUDIT",
+    title: "Audit Assurance",
+    features: [
+      "Risk-based multi-standard audit programmes",
+      "Controlled fieldwork and objective evidence",
+      "Auditor approval and competence verification",
+      "NC register and management visibility",
+    ],
+    href: "/portal/internal-audits",
+  },
+  {
+    area: "RCA–8D",
+    title: "Corrective Action",
+    features: [
+      "Controlled D1–D8 investigation gates",
+      "Containment, causal paths and structured 5 Why",
+      "Action implementation and extent review",
+      "Independent effectiveness verification",
+    ],
+    href: "/portal/rca",
+  },
+];
+
+const academyProducts = [
+  {
+    title: "Risk Assessment Training",
+    price: "£19.99",
+    description:
+      "Interactive initial training with practical scenarios, assessment and certificate.",
+    href: "/hs-hub/training",
+  },
+  {
+    title: "Risk Assessment Refresher",
+    price: "£12.99",
+    description:
+      "Focused competence refresher with assessment and certificate.",
+    href: "/hs-hub/training",
+  },
+  {
+    title: "Internal Auditor Refresher",
+    price: "£19.99",
+    description:
+      "Evidence-led audit judgement, findings and follow-up practice.",
+    href: "/internal-audit-training",
+  },
+  {
+    title: "RCA & Corrective Action Practitioner",
+    price: "£49.99",
+    description:
+      "Structured RCA–8D course, completed workbook and verifiable certificate.",
+    href: "/rca-8d-training",
+  },
+];
+
+const specialistWorkspaces = [
+  {
+    title: "ISO/IEC 27001 Statement of Applicability",
+    description:
+      "A dedicated workspace for all 93 Annex A controls, applicability decisions, implementation status, residual risk and executive reporting.",
+    access: "Available independently or through applicable packages",
+    href: "/portal/soa",
+  },
+  {
+    title: "Controlled Evidence Library",
+    description:
+      "Organise documents and evidence by assessment, audit, CAPA and operational workflow.",
+    access: "Controlled through organisation access rights",
+    href: "/portal/documents",
+  },
+  {
+    title: "Management Reporting",
+    description:
+      "Bring readiness, audits, findings, actions and verification into management-level registers and downloadable reports.",
+    access: "Live portfolio intelligence",
+    href: "/portal/reports",
   },
 ];
 
@@ -263,56 +309,287 @@ const supportingDocumentPacks = [
   },
 ];
 
-const plannedModules = [
-  {
-    title: "Business Continuity Planner",
-    status: "Product roadmap",
-  },
-  {
-    title: "ISO 27001 Risk Register",
-    status: "Product roadmap",
-  },
-];
+const styles = `
+.platformPage {
+  background:
+    radial-gradient(circle at 90% 0%, #dcecff 0, transparent 28%),
+    #f4f8fc;
+  color: #071d3a;
+}
 
-const sectionStyle = {
-  marginTop: "48px",
-};
+.platformHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(350px, 0.75fr);
+  gap: 45px;
+  align-items: center;
+  padding: 78px 5vw 66px;
+  background: linear-gradient(120deg, #061d3b, #0d3e70);
+  color: #fff;
+}
 
-const packGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-  gap: "24px",
-};
+.platformKicker {
+  display: block;
+  color: #56dfd2;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.17em;
+}
 
-const packStyle = {
-  background: "#ffffff",
-  border: "1px solid #d8e0ea",
-  borderRadius: "22px",
-  padding: "28px",
-};
+.platformHero h1 {
+  max-width: 900px;
+  margin: 14px 0 22px;
+  font-size: clamp(46px, 5.5vw, 76px);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
 
-const documentListStyle = {
-  display: "grid",
-  gap: "10px",
-  marginTop: "22px",
-};
+.platformHero p {
+  max-width: 770px;
+  color: #d4e2ef;
+  font-size: 19px;
+  line-height: 1.65;
+}
 
-const documentLinkStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "18px",
-  alignItems: "center",
-  padding: "14px 16px",
-  background: "#f4f7fb",
-  border: "1px solid #dfe6ef",
-  borderRadius: "12px",
-  color: "#071a33",
-  textDecoration: "none",
-};
+.platformBoundary {
+  padding: 27px;
+  border: 1px solid #78dcd855;
+  border-radius: 17px;
+  background: #ffffff0d;
+}
 
-export default async function AiTools({
-  params,
-}) {
+.platformBoundary strong,
+.platformBoundary span {
+  display: block;
+}
+
+.platformBoundary strong {
+  margin-bottom: 11px;
+  font-size: 22px;
+}
+
+.platformBoundary span {
+  color: #c6d8e8;
+  line-height: 1.6;
+}
+
+.platformSection {
+  padding: 72px 5vw;
+}
+
+.platformSection.white {
+  background: #fff;
+}
+
+.sectionHead {
+  max-width: 850px;
+  margin-bottom: 29px;
+}
+
+.sectionHead .platformKicker {
+  color: #235fdf;
+}
+
+.sectionHead h2 {
+  margin: 10px 0 12px;
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1.07;
+  letter-spacing: -0.04em;
+}
+
+.sectionHead p {
+  color: #566e87;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.platformGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.platformCard {
+  display: flex;
+  min-height: 275px;
+  flex-direction: column;
+  padding: 25px;
+  border: 1px solid #d3e0ec;
+  border-radius: 16px;
+  background: #fff;
+  color: #071d3a;
+  text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.platformCard:hover {
+  transform: translateY(-3px);
+  border-color: #91b3ef;
+  box-shadow: 0 16px 34px #173c6615;
+}
+
+.platformCard .cardType {
+  color: #235fdf;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.platformCard h3 {
+  margin: 20px 0 10px;
+  font-size: 22px;
+}
+
+.platformCard p {
+  flex: 1;
+  margin: 0;
+  color: #5a7086;
+  line-height: 1.6;
+}
+
+.platformCard small {
+  display: block;
+  margin-top: 18px;
+  color: #526b84;
+}
+
+.platformCard b {
+  display: block;
+  margin-top: 17px;
+  color: #235fdf;
+}
+
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.capabilityCard {
+  padding: 28px;
+  border: 1px solid #d3e0ec;
+  border-radius: 17px;
+  background: #fff;
+  color: #071d3a;
+  text-decoration: none;
+}
+
+.capabilityCard h3 {
+  margin: 13px 0;
+  font-size: 25px;
+}
+
+.capabilityCard ul {
+  padding-left: 20px;
+  color: #566e87;
+  line-height: 1.8;
+}
+
+.capabilityCard strong {
+  color: #235fdf;
+}
+
+.documentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.documentPack {
+  padding: 28px;
+  border: 1px solid #d3e0ec;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.documentPack h3 {
+  margin: 12px 0 5px;
+  font-size: 25px;
+}
+
+.documentPack > p {
+  color: #60758b;
+}
+
+.documentList {
+  display: grid;
+  gap: 9px;
+  margin-top: 20px;
+}
+
+.documentLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px;
+  border: 1px solid #dfe7ef;
+  border-radius: 11px;
+  background: #f5f8fc;
+  color: #071d3a;
+  text-decoration: none;
+}
+
+.documentLink small,
+.documentLink strong {
+  display: block;
+}
+
+.documentLink small {
+  margin-bottom: 4px;
+  color: #5c7187;
+}
+
+.documentLink > b {
+  flex-shrink: 0;
+  color: #235fdf;
+}
+
+.platformNotice {
+  margin-top: 27px;
+  padding: 20px;
+  border-left: 5px solid #235fdf;
+  border-radius: 10px;
+  background: #eaf1ff;
+  color: #36516c;
+  line-height: 1.65;
+}
+
+@media (max-width: 1050px) {
+  .platformHero {
+    grid-template-columns: 1fr;
+  }
+
+  .platformGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .platformHero,
+  .platformSection {
+    padding: 50px 20px;
+  }
+
+  .platformHero h1 {
+    font-size: 44px;
+  }
+
+  .platformGrid,
+  .capabilityGrid,
+  .documentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .platformCard {
+    min-height: 0;
+  }
+}
+`;
+
+export default async function PlatformResources({ params }) {
   const { locale } = await params;
 
   if (!locales.includes(locale)) {
@@ -321,274 +598,253 @@ export default async function AiTools({
 
   return (
     <PageShell locale={locale}>
-      <main className="simplePage aiPage">
-        <div className="simpleInner">
-          <span className="kicker">
-            RPG EXCELLENCE ASSURANCE PLATFORM
-          </span>
+      <main className="platformPage">
+        <style>{styles}</style>
 
-          <h1>
-            Assess. Audit. Control.
-            Train. Improve.
-          </h1>
-
-          <p className="lead">
-            Connected specialist hubs turn management-system requirements,
-            workplace risks, audit evidence and recurring problems into
-            controlled action—with practical training built into the platform.
-          </p>
-
-          <h2>Choose your operational hub</h2>
-
-          <div className="toolGrid">
-            {solutionHubs.map(({ title, description, status, href, action }) => (
-              <Link
-                className="toolCard toolCardLink"
-                href={href.startsWith("/portal") ? href : `/${locale}${href}`}
-                key={title}
-                style={{ color: "inherit", textDecoration: "none" }}
-              >
-                <span className="toolIcon">◈</span>
-                <strong>{title}</strong>
-                <span>{description}</span>
-                <span>{status}</span>
-                <span aria-hidden="true">{action} →</span>
-              </Link>
-            ))}
-          </div>
-
-          <h2 style={sectionStyle}>Available ISO gap assessments</h2>
-
-          <div className="toolGrid">
-            {assessmentModules.map(
-              ({
-                title,
-                standard,
-                status,
-                href,
-              }) => (
-                <Link
-                  className="toolCard toolCardLink"
-                  href={href}
-                  key={standard}
-                  style={{
-                    color: "inherit",
-                    textDecoration: "none",
-                  }}
-                  aria-label={`Open ${standard} assessment`}
-                >
-                  <span className="toolIcon">
-                    ◈
-                  </span>
-
-                  <strong>{title}</strong>
-
-                  <span>{standard}</span>
-
-                  <span>{status}</span>
-
-                  <span aria-hidden="true">
-                    Start assessment →
-                  </span>
-                </Link>
-              )
-            )}
-          </div>
-
-          <section style={sectionStyle}>
-            <span className="kicker">OPERATIONAL CAPABILITY</span>
-            <h2>What each workspace controls</h2>
-            <p className="lead">
-              The platform extends beyond assessment. Each operational area has
-              its own controlled workflow, management visibility and retained
-              evidence.
-            </p>
-            <div style={packGridStyle}>
-              {operationalCapabilities.map(({ area, title, features, href }) => (
-                <Link
-                  href={href}
-                  key={title}
-                  style={{...packStyle,color:"inherit",textDecoration:"none"}}
-                >
-                  <span className="kicker">{area}</span>
-                  <h3>{title}</h3>
-                  <ul style={{paddingLeft:20,lineHeight:1.75}}>
-                    {features.map((feature) => <li key={feature}>{feature}</li>)}
-                  </ul>
-                  <strong style={{color:"#1f5eea"}}>Open workspace →</strong>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section style={sectionStyle}>
-            <span className="kicker">RPG TRAINING ACADEMY</span>
-            <h2>Practical training with retained evidence</h2>
-            <p className="lead">
-              Individual courses combine interactive exercises, guided
-              feedback, a final assessment and a verifiable certificate.
-            </p>
-            <div className="toolGrid">
-              {academyProducts.map(([title, price, description, href]) => (
-                <Link
-                  className="toolCard toolCardLink"
-                  href={`/${locale}${href}`}
-                  key={title}
-                  style={{ color: "inherit", textDecoration: "none" }}
-                >
-                  <span className="toolIcon">◇</span>
-                  <strong>{title}</strong>
-                  <span>{description}</span>
-                  <span>{price} per learner</span>
-                  <span aria-hidden="true">View course →</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section style={sectionStyle}>
-            <span className="kicker">SPECIALIST WORKSPACES</span>
-            <h2>Controlled tools around the core assurance journey</h2>
-            <div className="toolGrid">
-              {specialistWorkspaces.map(({ title, description, price, href }) => (
-                <Link
-                  className="toolCard toolCardLink"
-                  href={href}
-                  key={title}
-                  style={{color:"inherit",textDecoration:"none"}}
-                >
-                  <span className="toolIcon">◈</span>
-                  <strong>{title}</strong>
-                  <span>{description}</span>
-                  <span>{price}</span>
-                  <span aria-hidden="true">Open →</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section
-            id="supporting-documents"
-            style={sectionStyle}
-          >
-            <span className="kicker">
-              Controlled resources
+        <section className="platformHero">
+          <div>
+            <span className="platformKicker">
+              PLATFORM &amp; PRACTITIONER RESOURCES
             </span>
 
-            <h2>Supporting assessment documents</h2>
+            <h1>
+              One connected route from requirement to verified improvement.
+            </h1>
 
-            <p className="lead">
-              Download practical, editable Word
-              templates for planning assessments,
-              sampling evidence, recording findings,
-              managing actions and reporting readiness.
+            <p>
+              Explore the operational hubs, ISO gap assessments, specialist
+              workspaces, training and controlled document packs available
+              from RPG Excellence.
             </p>
+          </div>
 
-            <div style={packGridStyle}>
-              {supportingDocumentPacks.map(
-                ({
-                  standard,
-                  system,
-                  shortCode,
-                  documents,
-                }) => (
-                  <article
-                    key={standard}
-                    style={packStyle}
-                  >
-                    <span className="kicker">
-                      {shortCode} document pack
-                    </span>
+          <aside className="platformBoundary">
+            <strong>Where RPG Intelligence fits</strong>
 
-                    <h3
-                      style={{
-                        marginBottom: "6px",
-                      }}
-                    >
-                      {standard}
-                    </h3>
+            <span>
+              Automated assistance supports selected assessment and analysis
+              activities. Named people remain responsible for review,
+              approval, action and closure.
+            </span>
+          </aside>
+        </section>
 
-                    <p>{system}</p>
+        <section className="platformSection">
+          <header className="sectionHead">
+            <span className="platformKicker">OPERATIONAL HUBS</span>
+            <h2>Choose the business problem you need to control.</h2>
 
-                    <div style={documentListStyle}>
-                      {documents.map(
-                        ({ code, title, href }) => (
-                          <a
-                            href={href}
-                            key={code}
-                            download
-                            style={documentLinkStyle}
-                            aria-label={`Download ${code} ${title} as a Word document`}
-                          >
-                            <span>
-                              <small
-                                style={{
-                                  display: "block",
-                                  color: "#526783",
-                                  marginBottom: "3px",
-                                }}
-                              >
-                                {code}
-                              </small>
+            <p>
+              Each hub provides a dedicated workflow while connecting evidence,
+              owners, findings, actions and management visibility.
+            </p>
+          </header>
 
-                              <strong>{title}</strong>
-                            </span>
-
-                            <span
-                              aria-hidden="true"
-                              style={{
-                                color: "#1f5eea",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              Word ↓
-                            </span>
-                          </a>
-                        )
-                      )}
-                    </div>
-                  </article>
-                )
-              )}
-            </div>
-
-            <div className="notice">
-              These templates support structured
-              readiness assessment and improvement.
-              They do not constitute certification,
-              legal advice or an accredited audit.
-            </div>
-          </section>
-
-          <h2>Next platform capabilities</h2>
-
-          <div className="toolGrid">
-            {plannedModules.map(
-              ({ title, status }) => (
-                <div
-                  className="toolCard"
+          <div className="platformGrid">
+            {solutionHubs.map(
+              ({ title, description, status, href, action }) => (
+                <Link
+                  className="platformCard"
+                  href={
+                    href.startsWith("/portal")
+                      ? href
+                      : `/${locale}${href}`
+                  }
                   key={title}
                 >
-                  <span className="toolIcon">
-                    ◈
+                  <span className="cardType">RPG OPERATIONAL HUB</span>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                  <small>{status}</small>
+                  <b>{action} →</b>
+                </Link>
+              )
+            )}
+          </div>
+        </section>
+
+        <section className="platformSection white">
+          <header className="sectionHead">
+            <span className="platformKicker">ISO GAP ASSESSMENTS</span>
+            <h2>Assess the selected standard at requirement level.</h2>
+
+            <p>
+              Select the appropriate framework, retain objective evidence,
+              identify gaps and connect findings to accountable improvement.
+            </p>
+          </header>
+
+          <div className="platformGrid">
+            {assessmentModules.map(
+              ({ title, standard, status, href }) => (
+                <Link
+                  className="platformCard"
+                  href={href}
+                  key={standard}
+                  aria-label={`Open ${standard} assessment`}
+                >
+                  <span className="cardType">GAP ANALYSIS</span>
+                  <h3>{title}</h3>
+                  <p>{standard}</p>
+                  <small>{status}</small>
+                  <b>Start assessment →</b>
+                </Link>
+              )
+            )}
+          </div>
+        </section>
+
+        <section className="platformSection">
+          <header className="sectionHead">
+            <span className="platformKicker">OPERATIONAL CAPABILITY</span>
+            <h2>What the connected workspaces control.</h2>
+
+            <p>
+              RPG Excellence extends beyond assessment. Operational records
+              retain ownership, status, evidence and review history.
+            </p>
+          </header>
+
+          <div className="capabilityGrid">
+            {operationalCapabilities.map(
+              ({ area, title, features, href }) => (
+                <Link
+                  className="capabilityCard"
+                  href={href}
+                  key={title}
+                >
+                  <span className="platformKicker">{area}</span>
+                  <h3>{title}</h3>
+
+                  <ul>
+                    {features.map((feature) => (
+                      <li key={feature}>{feature}</li>
+                    ))}
+                  </ul>
+
+                  <strong>Open workspace →</strong>
+                </Link>
+              )
+            )}
+          </div>
+        </section>
+
+        <section className="platformSection white">
+          <header className="sectionHead">
+            <span className="platformKicker">SPECIALIST WORKSPACES</span>
+            <h2>Controlled records around the assurance journey.</h2>
+          </header>
+
+          <div className="platformGrid">
+            {specialistWorkspaces.map(
+              ({ title, description, access, href }) => (
+                <Link
+                  className="platformCard"
+                  href={href}
+                  key={title}
+                >
+                  <span className="cardType">SPECIALIST WORKSPACE</span>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                  <small>{access}</small>
+                  <b>Open workspace →</b>
+                </Link>
+              )
+            )}
+          </div>
+        </section>
+
+        <section className="platformSection">
+          <header className="sectionHead">
+            <span className="platformKicker">RPG TRAINING ACADEMY</span>
+            <h2>Practical learning with retained evidence.</h2>
+
+            <p>
+              Courses combine guided content, practical application, final
+              assessment and verifiable certificates.
+            </p>
+          </header>
+
+          <div className="platformGrid">
+            {academyProducts.map(
+              ({ title, price, description, href }) => (
+                <Link
+                  className="platformCard"
+                  href={`/${locale}${href}`}
+                  key={title}
+                >
+                  <span className="cardType">PRACTITIONER TRAINING</span>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                  <small>{price} per learner</small>
+                  <b>View course →</b>
+                </Link>
+              )
+            )}
+          </div>
+        </section>
+
+        <section
+          className="platformSection white"
+          id="supporting-documents"
+        >
+          <header className="sectionHead">
+            <span className="platformKicker">CONTROLLED RESOURCES</span>
+            <h2>Supporting assessment documents.</h2>
+
+            <p>
+              Download editable Word templates for assessment planning,
+              evidence sampling, findings, actions and readiness reporting.
+            </p>
+          </header>
+
+          <div className="documentGrid">
+            {supportingDocumentPacks.map(
+              ({ standard, system, shortCode, documents }) => (
+                <article className="documentPack" key={standard}>
+                  <span className="platformKicker">
+                    {shortCode} DOCUMENT PACK
                   </span>
 
-                  <strong>{title}</strong>
+                  <h3>{standard}</h3>
+                  <p>{system}</p>
 
-                  <span>{status}</span>
-                </div>
+                  <div className="documentList">
+                    {documents.map(({ code, title, href }) => (
+                      <a
+                        className="documentLink"
+                        href={href}
+                        key={code}
+                        download
+                        aria-label={`Download ${code} ${title}`}
+                      >
+                        <span>
+                          <small>{code}</small>
+                          <strong>{title}</strong>
+                        </span>
+
+                        <b aria-hidden="true">Word ↓</b>
+                      </a>
+                    ))}
+                  </div>
+                </article>
               )
             )}
           </div>
 
-          <div className="notice">
-            RPG Intelligence supports structured
-            assessment and decision-making. Its
-            outputs do not replace competent-person
-            judgement, professional advice or a
-            site-specific legal review.
+          <div className="platformNotice">
+            These resources support structured assessment and improvement.
+            They do not constitute certification, legal advice or an
+            accredited audit.
           </div>
-        </div>
+
+          <div className="platformNotice">
+            RPG Intelligence is a decision-support layer within selected
+            workflows—not a separate substitute for professional judgement.
+            Outputs require competent review and do not replace legal,
+            technical, security or certification advice.
+          </div>
+        </section>
       </main>
     </PageShell>
   );
