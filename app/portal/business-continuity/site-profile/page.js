@@ -958,7 +958,7 @@ export default async function SiteProfile({ searchParams }) {
 
         .select(
 
-          "id,site_name,site_code,address_line_1,address_line_2,city,region,postal_code,country,timezone,status",
+          "id,site_name,site_code:site_reference,address_line_1,address_line_2,city,region,postal_code,country,timezone,status",
 
         )
 
