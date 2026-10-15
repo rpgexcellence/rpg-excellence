@@ -1,14 +1,3 @@
-RPG Excellence BCP Site Profile Source 
-
-Website location: /components/BCPSiteProfileForm.js 
-
-This document contains the complete verified JavaScript source for the BCP Site Profile form. Copy all text under Complete JavaScript Source into the website file shown above. The source includes the Administration Site Profile connection and passed the Next.js production build. 
-
-Source size: 138,516 bytes    Lines: 3,667 
-
-Important: Copy the complete source. Do not copy only selected pages or omit the closing lines, because an incomplete component will cause an Unexpected eof build error. 
-
- 
 
 Complete JavaScript Source 
 
