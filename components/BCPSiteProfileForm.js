@@ -1,6 +1,3 @@
-
-Complete JavaScript Source 
-
 "use client"; 
 
 import BCPModuleNavigation from "./BCPModuleNavigation"; 
