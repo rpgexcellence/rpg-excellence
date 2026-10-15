@@ -380,23 +380,24 @@ const styles = `
   background: #fff;
 }
 
-.sectionHead {
+.platformSectionHead {
+  display: block;
   max-width: 850px;
   margin-bottom: 29px;
 }
 
-.sectionHead .platformKicker {
+.platformSectionHead .platformKicker {
   color: #235fdf;
 }
 
-.sectionHead h2 {
+.platformSectionHead h2 {
   margin: 10px 0 12px;
   font-size: clamp(32px, 4vw, 52px);
   line-height: 1.07;
   letter-spacing: -0.04em;
 }
 
-.sectionHead p {
+.platformSectionHead p {
   color: #566e87;
   font-size: 17px;
   line-height: 1.65;
@@ -467,7 +468,10 @@ const styles = `
   gap: 15px;
 }
 
-.capabilityCard {
+.platformCapabilityCard {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   padding: 28px;
   border: 1px solid #d3e0ec;
   border-radius: 17px;
@@ -476,18 +480,20 @@ const styles = `
   text-decoration: none;
 }
 
-.capabilityCard h3 {
+.platformCapabilityCard h3 {
   margin: 13px 0;
   font-size: 25px;
 }
 
-.capabilityCard ul {
+.platformCapabilityCard ul {
+  margin: 0 0 20px;
   padding-left: 20px;
   color: #566e87;
   line-height: 1.8;
 }
 
-.capabilityCard strong {
+.platformCapabilityCard strong {
+  margin-top: auto;
   color: #235fdf;
 }
 
@@ -630,7 +636,7 @@ export default async function PlatformResources({ params }) {
         </section>
 
         <section className="platformSection">
-          <header className="sectionHead">
+          <header className="platformSectionHead">
             <span className="platformKicker">OPERATIONAL HUBS</span>
             <h2>Choose the business problem you need to control.</h2>
 
@@ -664,7 +670,7 @@ export default async function PlatformResources({ params }) {
         </section>
 
         <section className="platformSection white">
-          <header className="sectionHead">
+          <header className="platformSectionHead">
             <span className="platformKicker">ISO GAP ASSESSMENTS</span>
             <h2>Assess the selected standard at requirement level.</h2>
 
@@ -695,7 +701,7 @@ export default async function PlatformResources({ params }) {
         </section>
 
         <section className="platformSection">
-          <header className="sectionHead">
+          <header className="platformSectionHead">
             <span className="platformKicker">OPERATIONAL CAPABILITY</span>
             <h2>What the connected workspaces control.</h2>
 
@@ -709,7 +715,7 @@ export default async function PlatformResources({ params }) {
             {operationalCapabilities.map(
               ({ area, title, features, href }) => (
                 <Link
-                  className="capabilityCard"
+                  className="platformCapabilityCard"
                   href={href}
                   key={title}
                 >
@@ -730,7 +736,7 @@ export default async function PlatformResources({ params }) {
         </section>
 
         <section className="platformSection white">
-          <header className="sectionHead">
+          <header className="platformSectionHead">
             <span className="platformKicker">SPECIALIST WORKSPACES</span>
             <h2>Controlled records around the assurance journey.</h2>
           </header>
@@ -755,7 +761,7 @@ export default async function PlatformResources({ params }) {
         </section>
 
         <section className="platformSection">
-          <header className="sectionHead">
+          <header className="platformSectionHead">
             <span className="platformKicker">RPG TRAINING ACADEMY</span>
             <h2>Practical learning with retained evidence.</h2>
 
@@ -788,7 +794,7 @@ export default async function PlatformResources({ params }) {
           className="platformSection white"
           id="supporting-documents"
         >
-          <header className="sectionHead">
+          <header className="platformSectionHead">
             <span className="platformKicker">CONTROLLED RESOURCES</span>
             <h2>Supporting assessment documents.</h2>
 
