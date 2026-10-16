@@ -128,6 +128,40 @@ export async function saveOrganizationSite(
       80,
     );
 
+    let existingSite = null;
+
+    if (id) {
+      const {
+        data,
+        error: existingSiteError,
+      } = await admin
+        .from("organization_sites")
+        .select(
+          "id,site_owner_person_id,site_manager_person_id,hse_contact_person_id,is_primary",
+        )
+        .eq("id", id)
+        .eq(
+          "organization_id",
+          organization.id,
+        )
+        .maybeSingle();
+
+      if (existingSiteError) {
+        throw new Error(
+          existingSiteError.message,
+        );
+      }
+
+      if (!data) {
+        return {
+          error:
+            "The selected Site Profile was not found or is outside your organisation.",
+        };
+      }
+
+      existingSite = data;
+    }
+
     const siteName = clean(
       formData.get("site_name"),
       180,
@@ -165,29 +199,37 @@ export async function saveOrganizationSite(
       };
     }
 
+    const personSelection = (
+      fieldName,
+      currentValue,
+    ) =>
+      formData.has(fieldName)
+        ? clean(
+            formData.get(fieldName),
+            80,
+          ) || null
+        : currentValue || null;
+
     const siteOwnerPersonId =
-      clean(
-        formData.get(
-          "site_owner_person_id",
-        ),
-        80,
-      ) || null;
+      personSelection(
+        "site_owner_person_id",
+        existingSite
+          ?.site_owner_person_id,
+      );
 
     const siteManagerPersonId =
-      clean(
-        formData.get(
-          "site_manager_person_id",
-        ),
-        80,
-      ) || null;
+      personSelection(
+        "site_manager_person_id",
+        existingSite
+          ?.site_manager_person_id,
+      );
 
     const hseContactPersonId =
-      clean(
-        formData.get(
-          "hse_contact_person_id",
-        ),
-        80,
-      ) || null;
+      personSelection(
+        "hse_contact_person_id",
+        existingSite
+          ?.hse_contact_person_id,
+      );
 
     await validateCompanyPeople(
       admin,
@@ -199,9 +241,19 @@ export async function saveOrganizationSite(
       ],
     );
 
+    const primaryControlPresent =
+      formData.get(
+        "is_primary_control",
+      ) === "present";
+
     const isPrimary =
-      formData.get("is_primary") ===
-      "true";
+      primaryControlPresent
+        ? formData.get(
+            "is_primary",
+          ) === "true"
+        : Boolean(
+            existingSite?.is_primary,
+          );
 
     if (isPrimary) {
       const { error: primaryError } =
@@ -548,9 +600,7 @@ export async function archiveOrganizationSite(
     );
   }
 
-  const {
-    error,
-  } = await admin
+  const { error } = await admin
     .from("organization_sites")
     .update({
       status: "archived",
