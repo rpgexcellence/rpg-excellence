@@ -285,13 +285,17 @@ export default async function OrganizationSitesPage({
         </section>
 
         <div className="osLayout">
-          <SiteProfileForm
-            action={
-              saveOrganizationSite
-            }
-            site={selectedSite}
-            people={people}
-          />
+        <SiteProfileForm
+  key={
+    selectedSite?.id ||
+    "new-site"
+  }
+  action={
+    saveOrganizationSite
+  }
+  site={selectedSite}
+  people={people}
+/>
 
           <section className="osList">
             <header>
