@@ -1,36 +1,88 @@
 import Link from "next/link";
-import CompanyAssetRegister,{AssetMaintenanceForm} from "../../../../components/CompanyAssetRegister";
-import {requireOrganizationAccess} from "../../../../lib/organization-access";
-import {createAdminClient} from "../../../../lib/supabase/admin";
-import {rcaAdministrationLocations} from "../../../../lib/rcaCompanyLinks";
-import {changeCompanyAssetStatus} from "./actions";
 
-export const metadata={title:"Company Asset Register | RPG Excellence"};
-export const dynamic="force-dynamic";
+import CompanyAssetRegister, {
+  AssetMaintenanceForm,
+} from "../../../../components/CompanyAssetRegister";
 
-const title=value=>String(value||"")
-  .replaceAll("_"," ")
-  .replace(/\b\w/g,letter=>letter.toUpperCase());
+import {
+  requireOrganizationAccess,
+} from "../../../../lib/organization-access";
 
-const date=value=>value
-  ?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium"})
-    .format(new Date(`${value}T12:00:00Z`))
-  :"—";
+import {
+  createAdminClient,
+} from "../../../../lib/supabase/admin";
 
-const personName=person=>person
-  ?[person.first_name,person.last_name].filter(Boolean).join(" ")||person.email
-  :"Unassigned";
+import {
+  loadAdministrationLocations,
+} from "../../../../lib/rcaCompanyLinks";
 
-export default async function CompanyAssetsPage({searchParams}){
-  const query=await searchParams;
-  const {organization}=await requireOrganizationAccess(
+import {
+  changeCompanyAssetStatus,
+} from "./actions";
+
+export const metadata = {
+  title:
+    "Company Asset Register | RPG Excellence",
+};
+
+export const dynamic =
+  "force-dynamic";
+
+const title = value =>
+  String(value || "")
+    .replaceAll("_", " ")
+    .replace(
+      /\b\w/g,
+      letter =>
+        letter.toUpperCase(),
+    );
+
+const date = value =>
+  value
+    ? new Intl.DateTimeFormat(
+        "en-GB",
+        {
+          dateStyle: "medium",
+        },
+      ).format(
+        new Date(
+          `${value}T12:00:00Z`,
+        ),
+      )
+    : "—";
+
+const personName = person =>
+  person
+    ? [
+        person.first_name,
+        person.last_name,
+      ]
+        .filter(Boolean)
+        .join(" ") ||
+      person.email
+    : "Unassigned";
+
+export default async function CompanyAssetsPage({
+  searchParams,
+}) {
+  const query =
+    await searchParams;
+
+  const {
+    organization,
+  } = await requireOrganizationAccess(
     "people_access",
     "admin",
-    "/portal/company/assets"
+    "/portal/company/assets",
   );
 
-  const admin=createAdminClient();
-  const locations=rcaAdministrationLocations(organization);
+  const admin =
+    createAdminClient();
+
+  const locations =
+    await loadAdministrationLocations(
+      organization,
+    );
 
   const [
     assetResult,
@@ -39,129 +91,308 @@ export default async function CompanyAssetsPage({searchParams}){
     mocResult,
     supplierResult,
     documentResult,
-    documentLinkResult
-  ]=await Promise.all([
+    documentLinkResult,
+  ] = await Promise.all([
     admin
-      .from("organization_assets")
+      .from(
+        "organization_assets",
+      )
       .select("*")
-      .eq("organization_id",organization.id)
-      .order("operational_status")
-      .order("asset_reference"),
+      .eq(
+        "organization_id",
+        organization.id,
+      )
+      .order(
+        "operational_status",
+      )
+      .order(
+        "asset_reference",
+      ),
 
     admin
-      .from("organization_people")
-      .select("id,first_name,last_name,email,position")
-      .eq("organization_id",organization.id)
-      .eq("account_status","active")
+      .from(
+        "organization_people",
+      )
+      .select(
+        "id,first_name,last_name,email,position",
+      )
+      .eq(
+        "organization_id",
+        organization.id,
+      )
+      .eq(
+        "account_status",
+        "active",
+      )
       .order("last_name"),
 
     admin
-      .from("organization_asset_maintenance")
+      .from(
+        "organization_asset_maintenance",
+      )
       .select("*")
-      .eq("organization_id",organization.id)
-      .order("scheduled_date",{ascending:false})
+      .eq(
+        "organization_id",
+        organization.id,
+      )
+      .order(
+        "scheduled_date",
+        {
+          ascending: false,
+        },
+      )
       .limit(100),
 
     admin
-      .from("hs_moc_changes")
-      .select("id,moc_reference,title,status,organization_asset_id")
-      .eq("organization_id",organization.id)
-      .not("organization_asset_id","is",null),
+      .from(
+        "hs_moc_changes",
+      )
+      .select(
+        "id,moc_reference,title,status,organization_asset_id",
+      )
+      .eq(
+        "organization_id",
+        organization.id,
+      )
+      .not(
+        "organization_asset_id",
+        "is",
+        null,
+      ),
 
     admin
       .from("suppliers")
-      .select("id,legal_name,approval_status")
-      .eq("organization_id",organization.id)
-      .in("approval_status",["approved","conditionally_approved"])
+      .select(
+        "id,legal_name,approval_status",
+      )
+      .eq(
+        "organization_id",
+        organization.id,
+      )
+      .in(
+        "approval_status",
+        [
+          "approved",
+          "conditionally_approved",
+        ],
+      )
       .order("legal_name"),
 
     admin
-      .from("controlled_documents")
-      .select("id,document_number,title,document_type,revision,status")
-      .eq("status","Current")
-      .in("audience",["Customer","Both"])
-      .order("document_number"),
+      .from(
+        "controlled_documents",
+      )
+      .select(
+        "id,document_number,title,document_type,revision,status",
+      )
+      .eq(
+        "status",
+        "Current",
+      )
+      .in(
+        "audience",
+        [
+          "Customer",
+          "Both",
+        ],
+      )
+      .order(
+        "document_number",
+      ),
 
     admin
-      .from("organization_asset_document_links")
-      .select("asset_id,controlled_document_id")
-      .eq("organization_id",organization.id),
+      .from(
+        "organization_asset_document_links",
+      )
+      .select(
+        "asset_id,controlled_document_id",
+      )
+      .eq(
+        "organization_id",
+        organization.id,
+      ),
   ]);
 
-  for(const result of [
-    assetResult,
-    peopleResult,
-    maintenanceResult,
-    mocResult,
-    supplierResult,
-    documentResult,
-    documentLinkResult
-  ]){
-    if(result.error)throw new Error(result.error.message);
+  for (
+    const result of [
+      assetResult,
+      peopleResult,
+      maintenanceResult,
+      mocResult,
+      supplierResult,
+      documentResult,
+      documentLinkResult,
+    ]
+  ) {
+    if (result.error) {
+      throw new Error(
+        result.error.message,
+      );
+    }
   }
 
-  const assets=assetResult.data||[];
-  const people=peopleResult.data||[];
-  const maintenance=maintenanceResult.data||[];
-  const mocs=mocResult.data||[];
-  const suppliers=supplierResult.data||[];
-  const documents=documentResult.data||[];
-  const documentLinks=documentLinkResult.data||[];
+  const assets =
+    assetResult.data || [];
 
-  const editAsset=
-    assets.find(item=>item.id===query?.edit)||null;
+  const people =
+    peopleResult.data || [];
 
-  const peopleById=new Map(
-    people.map(person=>[person.id,person])
-  );
-  const suppliersById=new Map(suppliers.map(supplier=>[supplier.id,supplier]));
-  const documentsById=new Map(documents.map(document=>[document.id,document]));
+  const maintenance =
+    maintenanceResult.data || [];
 
-  for(const record of maintenance){
-    if(!record.evidence_storage_path)continue;
-    const {data}=await admin.storage.from("asset-maintenance-evidence").createSignedUrl(record.evidence_storage_path,3600);
-    record.evidence_url=data?.signedUrl||null;
+  const mocs =
+    mocResult.data || [];
+
+  const suppliers =
+    supplierResult.data || [];
+
+  const documents =
+    documentResult.data || [];
+
+  const documentLinks =
+    documentLinkResult.data || [];
+
+  const editAsset =
+    assets.find(
+      item =>
+        item.id === query?.edit,
+    ) || null;
+
+  const peopleById =
+    new Map(
+      people.map(person => [
+        person.id,
+        person,
+      ]),
+    );
+
+  const suppliersById =
+    new Map(
+      suppliers.map(
+        supplier => [
+          supplier.id,
+          supplier,
+        ],
+      ),
+    );
+
+  const documentsById =
+    new Map(
+      documents.map(
+        document => [
+          document.id,
+          document,
+        ],
+      ),
+    );
+
+  for (
+    const record of maintenance
+  ) {
+    if (
+      !record.evidence_storage_path
+    ) {
+      continue;
+    }
+
+    const { data } =
+      await admin.storage
+        .from(
+          "asset-maintenance-evidence",
+        )
+        .createSignedUrl(
+          record.evidence_storage_path,
+          3600,
+        );
+
+    record.evidence_url =
+      data?.signedUrl || null;
   }
 
-  const today=new Date().toISOString().slice(0,10);
-  const soon=new Date(Date.now()+30*86400000)
-    .toISOString()
-    .slice(0,10);
+  const today =
+    new Date()
+      .toISOString()
+      .slice(0, 10);
 
-  const active=assets.filter(
-    item=>item.operational_status==="active"
-  ).length;
+  const soon =
+    new Date(
+      Date.now() +
+        30 * 86400000,
+    )
+      .toISOString()
+      .slice(0, 10);
 
-  const dueSoon=assets.filter(item=>
-    item.ppm_required &&
-    item.operational_status==="active" &&
-    item.next_maintenance_date>=today &&
-    item.next_maintenance_date<=soon
-  ).length;
+  const active =
+    assets.filter(
+      item =>
+        item.operational_status ===
+        "active",
+    ).length;
 
-  const overdue=assets.filter(item=>
-    item.ppm_required &&
-    item.operational_status==="active" &&
-    item.next_maintenance_date<today
-  ).length;
+  const dueSoon =
+    assets.filter(
+      item =>
+        item.ppm_required &&
+        item.operational_status ===
+          "active" &&
+        item.next_maintenance_date >=
+          today &&
+        item.next_maintenance_date <=
+          soon,
+    ).length;
 
-  const maintenanceByAsset=new Map(
-    assets.map(asset=>[
-      asset.id,
-      maintenance.filter(item=>item.asset_id===asset.id)
-    ])
-  );
+  const overdue =
+    assets.filter(
+      item =>
+        item.ppm_required &&
+        item.operational_status ===
+          "active" &&
+        item.next_maintenance_date <
+          today,
+    ).length;
 
-  const mocByAsset=new Map(
-    assets.map(asset=>[
-      asset.id,
-      mocs.filter(item=>item.organization_asset_id===asset.id)
-    ])
-  );
-  const documentsByAsset=new Map(assets.map(asset=>[
-    asset.id,
-    documentLinks.filter(link=>link.asset_id===asset.id).map(link=>documentsById.get(link.controlled_document_id)).filter(Boolean)
-  ]));
+  const maintenanceByAsset =
+    new Map(
+      assets.map(asset => [
+        asset.id,
+        maintenance.filter(
+          item =>
+            item.asset_id ===
+            asset.id,
+        ),
+      ]),
+    );
+
+  const mocByAsset =
+    new Map(
+      assets.map(asset => [
+        asset.id,
+        mocs.filter(
+          item =>
+            item.organization_asset_id ===
+            asset.id,
+        ),
+      ]),
+    );
+
+  const documentsByAsset =
+    new Map(
+      assets.map(asset => [
+        asset.id,
+        documentLinks
+          .filter(
+            link =>
+              link.asset_id ===
+              asset.id,
+          )
+          .map(link =>
+            documentsById.get(
+              link.controlled_document_id,
+            ),
+          )
+          .filter(Boolean),
+      ]),
+    );
 
   return (
     <main className="arPage">
@@ -171,14 +402,19 @@ export default async function CompanyAssetsPage({searchParams}){
         <header className="arTop">
           <div>
             <small>
-              ADMINISTRATION · CONTROLLED COMPANY DATA
+              ADMINISTRATION ·
+              CONTROLLED COMPANY DATA
             </small>
 
-            <h1>Company Asset Register</h1>
+            <h1>
+              Company Asset Register
+            </h1>
 
             <p>
-              Control ownership, location, maintenance and
-              change across the asset lifecycle.
+              Control ownership,
+              location, maintenance
+              and change across the
+              asset lifecycle.
             </p>
           </div>
 
@@ -208,244 +444,526 @@ export default async function CompanyAssetsPage({searchParams}){
 
         <section className="arSummary">
           <div className="arMetric">
-            <span>ACTIVE ASSETS</span>
-            <strong>{active}</strong>
+            <span>
+              ACTIVE ASSETS
+            </span>
+
+            <strong>
+              {active}
+            </strong>
           </div>
 
           <div className="arMetric amber">
-            <span>PPM DUE IN 30 DAYS</span>
-            <strong>{dueSoon}</strong>
+            <span>
+              PPM DUE IN 30 DAYS
+            </span>
+
+            <strong>
+              {dueSoon}
+            </strong>
           </div>
 
           <div className="arMetric red">
-            <span>PPM OVERDUE</span>
-            <strong>{overdue}</strong>
+            <span>
+              PPM OVERDUE
+            </span>
+
+            <strong>
+              {overdue}
+            </strong>
           </div>
 
           <div className="arMetric">
-            <span>LINKED MOC RECORDS</span>
-            <strong>{mocs.length}</strong>
+            <span>
+              LINKED MOC RECORDS
+            </span>
+
+            <strong>
+              {mocs.length}
+            </strong>
           </div>
         </section>
 
         <div className="arLayout">
           <div className="arForms">
             <CompanyAssetRegister
-              locations={locations}
+              locations={
+                locations
+              }
               people={people}
-              suppliers={suppliers}
-              documents={documents}
+              suppliers={
+                suppliers
+              }
+              documents={
+                documents
+              }
               asset={editAsset}
-              linkedDocumentIds={editAsset?documentLinks.filter(link=>link.asset_id===editAsset.id).map(link=>link.controlled_document_id):[]}
+              linkedDocumentIds={
+                editAsset
+                  ? documentLinks
+                      .filter(
+                        link =>
+                          link.asset_id ===
+                          editAsset.id,
+                      )
+                      .map(
+                        link =>
+                          link.controlled_document_id,
+                      )
+                  : []
+              }
             />
 
-            <AssetMaintenanceForm assets={assets} people={people} suppliers={suppliers}/>
+            <AssetMaintenanceForm
+              assets={assets}
+              people={people}
+              suppliers={
+                suppliers
+              }
+            />
           </div>
 
           <section className="arPanel">
-            <h2>Current assets</h2>
+            <h2>
+              Current assets
+            </h2>
 
             <p>
-              Ownership, PPM and change status are visible at
-              asset level. Retired assets remain in the
-              controlled history.
+              Ownership, PPM and
+              change status are
+              visible at asset level.
+              Retired assets remain
+              in the controlled
+              history.
             </p>
 
             <div className="arList">
-              {assets.length ? assets.map(asset=>{
-                const owner=peopleById.get(
-                  asset.asset_owner_person_id
-                );
+              {assets.length ? (
+                assets.map(asset => {
+                  const owner =
+                    peopleById.get(
+                      asset.asset_owner_person_id,
+                    );
 
-                const records=
-                  maintenanceByAsset.get(asset.id)||[];
+                  const records =
+                    maintenanceByAsset.get(
+                      asset.id,
+                    ) || [];
 
-                const linkedMocs=
-                  mocByAsset.get(asset.id)||[];
-                const linkedDocuments=documentsByAsset.get(asset.id)||[];
-                const maintenanceOwner=peopleById.get(asset.maintenance_owner_person_id);
-                const maintenanceSupplier=suppliersById.get(asset.maintenance_supplier_id);
+                  const linkedMocs =
+                    mocByAsset.get(
+                      asset.id,
+                    ) || [];
 
-                const isOverdue=
-                  asset.ppm_required &&
-                  asset.next_maintenance_date<today &&
-                  asset.operational_status==="active";
+                  const linkedDocuments =
+                    documentsByAsset.get(
+                      asset.id,
+                    ) || [];
 
-                return (
-                  <article
-                    className={`arAsset ${
-                      isOverdue?"overdue":""
-                    }`}
-                    key={asset.id}
-                  >
-                    <div className="arAssetTop">
-                      <div>
-                        <h3>
-                          {asset.asset_reference} —{" "}
-                          {asset.asset_name}
-                        </h3>
+                  const maintenanceOwner =
+                    peopleById.get(
+                      asset.maintenance_owner_person_id,
+                    );
 
+                  const maintenanceSupplier =
+                    suppliersById.get(
+                      asset.maintenance_supplier_id,
+                    );
+
+                  const isOverdue =
+                    asset.ppm_required &&
+                    asset.next_maintenance_date <
+                      today &&
+                    asset.operational_status ===
+                      "active";
+
+                  return (
+                    <article
+                      className={`arAsset ${
+                        isOverdue
+                          ? "overdue"
+                          : ""
+                      }`}
+                      key={asset.id}
+                    >
+                      <div className="arAssetTop">
+                        <div>
+                          <h3>
+                            {
+                              asset.asset_reference
+                            }{" "}
+                            —{" "}
+                            {
+                              asset.asset_name
+                            }
+                          </h3>
+
+                          <p>
+                            {title(
+                              asset.asset_type,
+                            )}{" "}
+                            ·{" "}
+                            {asset.site_location_label ||
+                              "No site"}
+
+                            {asset.area_department
+                              ? ` · ${asset.area_department}`
+                              : ""}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`arTag ${asset.operational_status}`}
+                        >
+                          {title(
+                            asset.operational_status,
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="arFacts">
+                        <div>
+                          <span>
+                            OWNER
+                          </span>
+
+                          <strong>
+                            {personName(
+                              owner,
+                            )}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            CRITICALITY
+                          </span>
+
+                          <strong>
+                            {title(
+                              asset.criticality,
+                            )}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            PPM
+                          </span>
+
+                          <strong>
+                            {asset.ppm_required
+                              ? `Every ${asset.ppm_frequency_value} ${asset.ppm_frequency_unit}`
+                              : "Not required"}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            NEXT DUE
+                          </span>
+
+                          <strong
+                            className={
+                              isOverdue
+                                ? "danger"
+                                : ""
+                            }
+                          >
+                            {asset.ppm_required
+                              ? date(
+                                  asset.next_maintenance_date,
+                                )
+                              : "—"}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {asset.description && (
                         <p>
-                          {title(asset.asset_type)} ·{" "}
-                          {asset.site_location_label||"No site"}
-                          {asset.area_department
-                            ?` · ${asset.area_department}`
-                            :""
+                          {
+                            asset.description
                           }
                         </p>
-                      </div>
+                      )}
 
-                      <span
-                        className={`arTag ${
-                          asset.operational_status
-                        }`}
-                      >
-                        {title(asset.operational_status)}
-                      </span>
-                    </div>
+                      <div className="arHistory">
+                        <details className="arPpmDetails">
+                          <summary>
+                            {
+                              records.length
+                            }{" "}
+                            maintenance record
+                            {records.length ===
+                            1
+                              ? ""
+                              : "s"}{" "}
+                            - view PPM details
+                          </summary>
 
-                    <div className="arFacts">
-                      <div>
-                        <span>OWNER</span>
-                        <strong>
-                          {personName(owner)}
-                        </strong>
-                      </div>
+                          <div className="arPpmBody">
+                            <div className="arPpmMeta">
+                              <span>
+                                DELIVERY
+                              </span>
 
-                      <div>
-                        <span>CRITICALITY</span>
-                        <strong>
-                          {title(asset.criticality)}
-                        </strong>
-                      </div>
+                              <strong>
+                                {asset.maintenance_owner_type ===
+                                "supplier"
+                                  ? "Approved supplier"
+                                  : "Internal Facilities / Operations"}
+                              </strong>
+                            </div>
 
-                      <div>
-                        <span>PPM</span>
-                        <strong>
-                          {asset.ppm_required
-                            ?`Every ${
-                              asset.ppm_frequency_value
-                            } ${
-                              asset.ppm_frequency_unit
-                            }`
-                            :"Not required"
-                          }
-                        </strong>
-                      </div>
+                            <div className="arPpmMeta">
+                              <span>
+                                INTERNAL
+                                OWNER
+                              </span>
 
-                      <div>
-                        <span>NEXT DUE</span>
+                              <strong>
+                                {personName(
+                                  maintenanceOwner,
+                                )}
+                              </strong>
+                            </div>
 
-                        <strong
-                          className={
-                            isOverdue?"danger":""
-                          }
-                        >
-                          {asset.ppm_required
-                            ?date(
-                              asset.next_maintenance_date
-                            )
-                            :"—"
-                          }
-                        </strong>
-                      </div>
-                    </div>
+                            {maintenanceSupplier && (
+                              <div className="arPpmMeta">
+                                <span>
+                                  SUPPLIER
+                                </span>
 
-                    {asset.description&&(
-                      <p>{asset.description}</p>
-                    )}
+                                <strong>
+                                  {
+                                    maintenanceSupplier.legal_name
+                                  }
+                                </strong>
+                              </div>
+                            )}
 
-                    <div className="arHistory">
-                      <details className="arPpmDetails">
-                        <summary>{records.length} maintenance record{records.length===1?"":"s"} - view PPM details</summary>
-                        <div className="arPpmBody">
-                          <div className="arPpmMeta"><span>Delivery</span><strong>{asset.maintenance_owner_type==="supplier"?"Approved supplier":"Internal Facilities / Operations"}</strong></div>
-                          <div className="arPpmMeta"><span>Internal owner</span><strong>{personName(maintenanceOwner)}</strong></div>
-                          {maintenanceSupplier&&<div className="arPpmMeta"><span>Supplier</span><strong>{maintenanceSupplier.legal_name}</strong></div>}
-                          <div className="arPpmMeta"><span>Requirements</span><strong>{asset.maintenance_notes||"No additional requirements recorded"}</strong></div>
-                          {records.length?<div className="arRecordList">{records.map(record=><article key={record.id}><div><strong>{record.maintenance_reference}</strong><span>{title(record.maintenance_type)} - {date(record.scheduled_date)} - {title(record.status)}</span></div><p>{record.work_completed||"No scope or completion notes recorded."}</p><div className="arRecordLinks">{record.evidence_reference&&<span>Reference: {record.evidence_reference}</span>}{record.evidence_url&&<a href={record.evidence_url} target="_blank" rel="noreferrer">Download {record.evidence_file_name||"maintenance evidence"}</a>}</div></article>)}</div>:<p>No PPM activity has been planned or completed for this asset.</p>}
-                        </div>
-                      </details>
+                            <div className="arPpmMeta">
+                              <span>
+                                REQUIREMENTS
+                              </span>
 
-                      <span>
-                        {linkedMocs.length} linked MOC
-                        {linkedMocs.length===1?"":"s"}
-                      </span>
+                              <strong>
+                                {asset.maintenance_notes ||
+                                  "No additional requirements recorded"}
+                              </strong>
+                            </div>
 
-                      {records[0]&&(
+                            {records.length ? (
+                              <div className="arRecordList">
+                                {records.map(
+                                  record => (
+                                    <article
+                                      key={
+                                        record.id
+                                      }
+                                    >
+                                      <div>
+                                        <strong>
+                                          {
+                                            record.maintenance_reference
+                                          }
+                                        </strong>
+
+                                        <span>
+                                          {title(
+                                            record.maintenance_type,
+                                          )}{" "}
+                                          -{" "}
+                                          {date(
+                                            record.scheduled_date,
+                                          )}{" "}
+                                          -{" "}
+                                          {title(
+                                            record.status,
+                                          )}
+                                        </span>
+                                      </div>
+
+                                      <p>
+                                        {record.work_completed ||
+                                          "No scope or completion notes recorded."}
+                                      </p>
+
+                                      <div className="arRecordLinks">
+                                        {record.evidence_reference && (
+                                          <span>
+                                            Reference:{" "}
+                                            {
+                                              record.evidence_reference
+                                            }
+                                          </span>
+                                        )}
+
+                                        {record.evidence_url && (
+                                          <a
+                                            href={
+                                              record.evidence_url
+                                            }
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            Download{" "}
+                                            {record.evidence_file_name ||
+                                              "maintenance evidence"}
+                                          </a>
+                                        )}
+                                      </div>
+                                    </article>
+                                  ),
+                                )}
+                              </div>
+                            ) : (
+                              <p>
+                                No PPM activity
+                                has been planned
+                                or completed for
+                                this asset.
+                              </p>
+                            )}
+                          </div>
+                        </details>
+
                         <span>
-                          Latest:{" "}
-                          {records[0].maintenance_reference}
+                          {
+                            linkedMocs.length
+                          }{" "}
+                          linked MOC
+                          {linkedMocs.length ===
+                          1
+                            ? ""
+                            : "s"}
                         </span>
-                      )}
-                      <details className="arDocDetails"><summary>{linkedDocuments.length} linked document{linkedDocuments.length===1?"":"s"}</summary><div>{linkedDocuments.length?linkedDocuments.map(document=><Link href="/portal/documents" key={document.id}>{document.document_number} - {document.title}</Link>):<p>No controlled work instruction or manual linked.</p>}</div></details>
-                    </div>
 
-                    <div className="arControls">
-                      <Link
-                        href={
-                          `/portal/company/assets?edit=${asset.id}`
-                        }
-                      >
-                        Edit details
-                      </Link>
+                        {records[0] && (
+                          <span>
+                            Latest:{" "}
+                            {
+                              records[0]
+                                .maintenance_reference
+                            }
+                          </span>
+                        )}
 
-                      <Link
-                        href={
-                          `/portal/health-safety/moc/new?asset=${asset.id}`
-                        }
-                      >
-                        Start linked MOC
-                      </Link>
+                        <details className="arDocDetails">
+                          <summary>
+                            {
+                              linkedDocuments.length
+                            }{" "}
+                            linked document
+                            {linkedDocuments.length ===
+                            1
+                              ? ""
+                              : "s"}
+                          </summary>
 
-                      {linkedMocs[0]&&(
+                          <div>
+                            {linkedDocuments.length ? (
+                              linkedDocuments.map(
+                                document => (
+                                  <Link
+                                    href="/portal/documents"
+                                    key={
+                                      document.id
+                                    }
+                                  >
+                                    {
+                                      document.document_number
+                                    }{" "}
+                                    -{" "}
+                                    {
+                                      document.title
+                                    }
+                                  </Link>
+                                ),
+                              )
+                            ) : (
+                              <p>
+                                No controlled
+                                work instruction
+                                or manual linked.
+                              </p>
+                            )}
+                          </div>
+                        </details>
+                      </div>
+
+                      <div className="arControls">
                         <Link
-                          href={
-                            `/portal/health-safety/moc/${linkedMocs[0].id}`
-                          }
+                          href={`/portal/company/assets?edit=${asset.id}`}
                         >
-                          Open {linkedMocs[0].moc_reference}
+                          Edit details
                         </Link>
-                      )}
 
-                      <form action={changeCompanyAssetStatus}>
-                        <input
-                          type="hidden"
-                          name="id"
-                          value={asset.id}
-                        />
+                        <Link
+                          href={`/portal/health-safety/moc/new?asset=${asset.id}`}
+                        >
+                          Start linked MOC
+                        </Link>
 
-                        <select
-                          name="status"
-                          defaultValue={
-                            asset.operational_status
-                          }
-                          aria-label={
-                            `Status for ${asset.asset_reference}`
+                        {linkedMocs[0] && (
+                          <Link
+                            href={`/portal/health-safety/moc/${linkedMocs[0].id}`}
+                          >
+                            Open{" "}
+                            {
+                              linkedMocs[0]
+                                .moc_reference
+                            }
+                          </Link>
+                        )}
+
+                        <form
+                          action={
+                            changeCompanyAssetStatus
                           }
                         >
-                          <option value="active">
-                            Active
-                          </option>
+                          <input
+                            type="hidden"
+                            name="id"
+                            value={
+                              asset.id
+                            }
+                          />
 
-                          <option value="out_of_service">
-                            Out of service
-                          </option>
+                          <select
+                            name="status"
+                            defaultValue={
+                              asset.operational_status
+                            }
+                            aria-label={`Status for ${asset.asset_reference}`}
+                          >
+                            <option value="active">
+                              Active
+                            </option>
 
-                          <option value="retired">
-                            Retired
-                          </option>
-                        </select>
+                            <option value="out_of_service">
+                              Out of service
+                            </option>
 
-                        <button>Update status</button>
-                      </form>
-                    </div>
-                  </article>
-                );
-              }):(
+                            <option value="retired">
+                              Retired
+                            </option>
+                          </select>
+
+                          <button>
+                            Update status
+                          </button>
+                        </form>
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
                 <div className="arEmpty">
-                  No company assets recorded yet. Add the
-                  first controlled asset.
+                  No company assets
+                  recorded yet. Add the
+                  first controlled
+                  asset.
                 </div>
               )}
             </div>
@@ -456,7 +974,7 @@ export default async function CompanyAssetsPage({searchParams}){
   );
 }
 
-const styles=`
+const styles = `
 *{
   box-sizing:border-box
 }
