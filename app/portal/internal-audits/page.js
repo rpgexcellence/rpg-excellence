@@ -8,7 +8,7 @@ import AuditTypeSupplierSelector from "../../../components/AuditTypeSupplierSele
 import AuditSupplierLinkProvider from "../../../components/AuditSupplierLinkProvider";
 import SupplierAuditeeContactFields from "../../../components/SupplierAuditeeContactFields";
 import InternalAuditSiteField from "../../../components/InternalAuditSiteField";
-import { rcaAdministrationLocations } from "../../../lib/rcaCompanyLinks";
+import { loadAdministrationLocations } from "../../../lib/rcaCompanyLinks";
 
 const STATUS_LABELS = {
   draft: "Draft", scope_review: "Scope review", team_assignment: "Team assignment",
@@ -76,7 +76,12 @@ export default async function InternalAuditCommandCentre({ searchParams }) {
     if (result.error) throw new Error(result.error.message);
   }
 
-  const organizations = (organizationsResult.data ?? []).map((organization) => ({ ...organization, locations: rcaAdministrationLocations(organization) }));
+  const organizations = await Promise.all(
+    (organizationsResult.data ?? []).map(async (organization) => ({
+      ...organization,
+      locations: await loadAdministrationLocations(organization),
+    })),
+  );
   const companyPeopleResult = organizations.length ? await supabase.from("organization_people")
     .select("id,organization_id,first_name,last_name,email,position")
     .in("organization_id", organizations.map((item)=>item.id)).eq("account_status", "active")
