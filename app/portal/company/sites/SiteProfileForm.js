@@ -254,6 +254,12 @@ export default function SiteProfileForm({
 
         <label className="osPrimary">
           <input
+            type="hidden"
+            name="is_primary_control"
+            value="present"
+          />
+
+          <input
             type="checkbox"
             name="is_primary"
             value="true"
