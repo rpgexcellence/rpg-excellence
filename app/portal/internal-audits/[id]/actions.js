@@ -8,7 +8,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { createClient } from "../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../lib/supabase/admin";
-import { rcaAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
+import { loadAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
 
 const clean = (value) =>
   typeof value === "string" && value.trim()
@@ -127,10 +127,12 @@ export async function saveAuditScope(
     .select("id,name,address_line_1,address_line_2,city,region,postal_code,country,business_site_mode,business_additional_sites")
     .eq("id", audit.organization_id).eq("owner_id", user.id).maybeSingle();
   if (organizationError || !organization) throw new Error("The linked organisation is unavailable.");
-  const administrationLocation = administrationLocationId === "legacy"
-    ? { id: audit.administration_location_id, label: audit.sites }
-    : rcaAdministrationLocations(organization).find((item) => item.id === administrationLocationId);
-  if (!administrationLocation?.label) throw new Error("Select a current site from Administration → Business Profile.");
+  const administrationLocations = await loadAdministrationLocations(organization);
+  const administrationLocation = administrationLocations
+    .find((item) => item.id === administrationLocationId);
+  if (!administrationLocation?.label) {
+    throw new Error("Select a current site from Administration → Site Profile.");
+  }
 
   const purpose = clean(
     formData.get("purpose")
