@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "../../../lib/supabase/server";
-import { rcaAdministrationLocations } from "../../../lib/rcaCompanyLinks";
+import { loadAdministrationLocations } from "../../../lib/rcaCompanyLinks";
 
 const AUDIT_TYPES = [
   "internal_system",
@@ -338,10 +338,11 @@ export async function createInternalAudit(formData) {
 
   const administrationLocationId = clean(formData.get("administration_location_id"));
   const submittedLocationLabel = clean(formData.get("administration_location_label"));
-  const administrationLocation = rcaAdministrationLocations(organization)
+  const administrationLocations = await loadAdministrationLocations(organization);
+  const administrationLocation = administrationLocations
     .find((item) => item.id === administrationLocationId);
   if (!administrationLocation || administrationLocation.label !== submittedLocationLabel) {
-    throw new Error("Select a current site from Administration → Business Profile.");
+    throw new Error("Select a current site from Administration → Site Profile.");
   }
 
   let approvedSupplier = null;
