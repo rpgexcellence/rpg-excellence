@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
-import { rcaAdministrationLocations } from "../../../../../lib/rcaCompanyLinks";
+import { loadAdministrationLocations } from "../../../../../lib/rcaCompanyLinks";
 
 export const metadata = { title: "New Risk Assessment | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -43,13 +43,13 @@ async function createRiskAssessment(formData) {
   const administrationLocationId = text("administration_location_id");
   const assessorPersonId = text("assessor_person_id");
   const linkedPermitId = text("linked_permit_id");
-  const locations = rcaAdministrationLocations(organisation);
+  const locations = await loadAdministrationLocations(organisation);
   const location = locations.find((item) => item.id === administrationLocationId);
   const [{ data: assessor }, { data: linkedPermit }] = await Promise.all([
     admin.from("organization_people").select("id,first_name,last_name,email,position").eq("id", assessorPersonId).eq("organization_id", organisation.id).eq("account_status", "active").maybeSingle(),
     linkedPermitId ? admin.from("hs_permits").select("id,permit_reference").eq("id", linkedPermitId).eq("organization_id", organisation.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  if (!location) throw new Error("Select a current business site from Administration → Business Profile.");
+  if (!location) throw new Error("Select a current site from Administration → Site Profile.");
   if (!assessor) throw new Error("Select an active assessor from the Company User list.");
   if (linkedPermitId && !linkedPermit) throw new Error("The selected company permit is no longer available.");
   if (permitRequired && !linkedPermit && !permitReference) throw new Error("Select a company permit or enter a manual permit reference.");
@@ -120,7 +120,7 @@ export default async function NewRiskAssessmentPage() {
     "/portal/health-safety/risk-assessment/new",
   );
   const admin = createAdminClient();
-  const locations = rcaAdministrationLocations(access.organization);
+  const locations = await loadAdministrationLocations(access.organization);
   const [{ data: companyPeople, error: peopleError }, { data: permits, error: permitsError }] = await Promise.all([
     admin.from("organization_people").select("id,first_name,last_name,email,position").eq("organization_id", access.organization.id).eq("account_status", "active").order("last_name"),
     admin.from("hs_permits").select("id,permit_reference,permit_type,task_description,status,valid_until").eq("organization_id", access.organization.id).not("status", "in", '(closed,cancelled)').order("updated_at", { ascending: false }),
@@ -138,7 +138,7 @@ export default async function NewRiskAssessmentPage() {
         <div className="nrField full"><label htmlFor="title">Risk assessment title *</label><input id="title" name="title" required minLength={3} placeholder="For example: Operation of pedestal drill in Engineering Workshop"/></div>
         <div className="nrField"><label htmlFor="assessment_type">Assessment type *</label><select id="assessment_type" name="assessment_type" required>{types.map(([value,title]) => <option value={value} key={value}>{title}</option>)}</select></div>
         <div className="nrField"><label htmlFor="project_number">Project / job number</label><input id="project_number" name="project_number"/></div>
-        <div className="nrField"><label htmlFor="administration_location_id">Site / location *</label><select id="administration_location_id" name="administration_location_id" required defaultValue=""><option value="" disabled>{locations.length ? "Select business address" : "No business addresses available"}</option>{locations.map((location) => <option value={location.id} key={location.id}>{location.label}</option>)}</select><small>Linked to <a href="/portal/company/business-profile">Administration → Business Profile</a>.</small></div>
+        <div className="nrField"><label htmlFor="administration_location_id">Site / location *</label><select id="administration_location_id" name="administration_location_id" required defaultValue=""><option value="" disabled>{locations.length ? "Select controlled site" : "No active Site Profiles available"}</option>{locations.map((location) => <option value={location.id} key={location.id}>{location.label}</option>)}</select><small>Linked to <a href="/portal/company/sites">Administration → Site Profile</a>.</small></div>
         <div className="nrField"><label htmlFor="area_department">Area / department</label><input id="area_department" name="area_department"/></div>
         <div className="nrField"><label htmlFor="section_lab">Section / laboratory</label><input id="section_lab" name="section_lab"/></div>
         <div className="nrField full"><label htmlFor="task_description">Activity, task or workplace description *</label><textarea id="task_description" name="task_description" required placeholder="Describe normal work, foreseeable abnormal conditions, equipment, materials and boundaries."/></div>
