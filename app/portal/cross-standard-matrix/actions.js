@@ -249,7 +249,10 @@ export async function saveCrossStandardControl(
         new Date().toISOString(),
     };
 
-    const { error } = await admin
+    const {
+      data: savedControl,
+      error,
+    } = await admin
       .from(
         "organization_cross_standard_controls",
       )
@@ -262,7 +265,11 @@ export async function saveCrossStandardControl(
           onConflict:
             "organization_id,control_group_id",
         },
-      );
+      )
+      .select(
+        "accountable_person_id,implementation_status,implementation_summary,applicability_notes,last_review_date,next_review_date",
+      )
+      .single();
 
     if (error) {
       throw new Error(
@@ -278,6 +285,7 @@ export async function saveCrossStandardControl(
       success:
         `${group.group_code} saved. ` +
         "Evidence remains subject to each standard's own conformity decision.",
+      control: savedControl,
     };
   } catch (error) {
     return {
