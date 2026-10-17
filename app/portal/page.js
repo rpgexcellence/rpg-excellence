@@ -267,6 +267,7 @@ export default async function PortalPage({ searchParams }) {
     ["Documents & Evidence", "/portal/documents", "Controlled documents and objective evidence", "DOC", "starter"],
     ["Training & Competence", "/portal/health-safety/training", "Purchased learning, assessments and certificates", "L&D", null],
     ["Gap Assessments", "/portal/history", `${assessments.length} assessments · ${standardsInUse.length} standards`, "GAP", null],
+    ["Cross-Standard Matrix", "/portal/cross-standard-matrix", "Integrated control mapping across quality, environment, OH&S, continuity and information security", "IMS", "professional"],
     ["People, Roles & Access", "/portal/company/people", "Company directory, reporting lines, illustrated functions, permissions and QR onboarding", "PPL", null],
   ];
 
