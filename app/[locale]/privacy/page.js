@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageShell from "../../../components/PageShell";
 import { locales } from "../../../lib/i18n";
@@ -22,7 +23,7 @@ export default async function Privacy({ params }) {
           <h1>Privacy Notice</h1>
 
           <p>
-            <strong>Last updated:</strong> 20 August 2026
+            <strong>Last updated:</strong> 17 October 2026
           </p>
 
           <p>
@@ -286,6 +287,15 @@ export default async function Privacy({ params }) {
             information and reviewed appropriately by a human where the
             output may influence important business, compliance, risk
             or management decisions.
+          </p>
+
+          <p>
+            Further information about current capability boundaries,
+            human authority, verification, provider transparency and
+            challenge arrangements is available in the{" "}
+            <Link href={`/${locale}/ai-assurance`}>
+              AI Assurance and Guardrails statement
+            </Link>.
           </p>
 
           <h2>8. Sharing personal data</h2>
