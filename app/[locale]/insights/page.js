@@ -20,6 +20,13 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "029",
+      title: "When the Audit Is Almost Finished—and the Connection Drops",
+      description:
+        "How controlled mobile fieldwork drafts help auditors protect work in progress during temporary loss of site connectivity.",
+      href: "offline-audit-fieldwork",
+    },
+    {
       number: "028",
       title: "Enterprise Integration: Connected Assurance Without Losing Control",
       description: "How governed API access connects assurance records while preserving organisational boundaries, least privilege and traceability.",
