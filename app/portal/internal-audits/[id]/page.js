@@ -5,8 +5,9 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "../../../../lib/supabase/server";
-import { loadAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
+import { rcaAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
 import AuditTeamAssignmentForm from "./AuditTeamAssignmentForm";
+import OfflineAuditDraft from "../../../../components/OfflineAuditDraft";
 import {
   addAuditScheduleItem,
   approveAuditPlan,
@@ -149,9 +150,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   if (supplierContactsResult.error) throw new Error(supplierContactsResult.error.message);
   const companyPeople = companyPeopleResult.data ?? [];
   const supplierContacts = supplierContactsResult.data ?? [];
-  const administrationLocations = organizationResult.data
-    ? await loadAdministrationLocations(organizationResult.data)
-    : [];
+  const administrationLocations = organizationResult.data ? rcaAdministrationLocations(organizationResult.data) : [];
   const loggedPerson = companyPeople.find((person) => person.user_id === user.id) || companyPeople.find((person) => person.email?.toLowerCase() === user.email?.toLowerCase());
   const loggedActorName = [loggedPerson?.first_name, loggedPerson?.last_name].filter(Boolean).join(" ") || user.user_metadata?.full_name || user.email;
   const approvalIdentity = <div className="coming"><strong>Approval recorded by signed-in user</strong><br />{loggedActorName} · {user.email}<br /><small>This identity is locked to the authenticated account and cannot be changed in the form.</small></div>;
@@ -473,7 +472,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                   <label className="field"><span>Scope statement *</span><textarea name="scope_statement" required defaultValue={audit.scope_statement ?? ""} /></label>
                   <label className="field"><span>Scope boundaries</span><textarea name="scope_boundaries" defaultValue={audit.scope_boundaries ?? ""} placeholder="Physical, organisational, functional and time boundaries" /></label>
                 </div>
-                <div className="section"><h3>Criteria and coverage</h3><div className="grid3"><label className="field"><span>Criteria summary *</span><textarea name="criteria_summary" required defaultValue={audit.criteria_summary ?? standards.join("; ")} /></label><label className="field"><span>Site / location *</span><select name="administration_location_id" required defaultValue={audit.administration_location_id ?? ""}><option value="" disabled>{administrationLocations.length ? "Select controlled Site Profile" : "No active Site Profiles available"}</option>{audit.sites && !administrationLocations.some((item) => item.id === audit.administration_location_id) ? <option value={audit.administration_location_id ?? ""} disabled>{audit.sites} · previous location — select a current site</option> : null}{administrationLocations.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select><small>Linked to <Link href="/portal/company/sites">Administration → Site Profile</Link>.</small></label><label className="field"><span>Functions and departments</span><textarea name="departments" defaultValue={audit.departments ?? ""} /></label><label className="field"><span>Processes</span><textarea name="processes" defaultValue={audit.processes ?? ""} /></label><label className="field"><span>Products and services</span><textarea name="products_services" defaultValue={audit.products_services ?? "Not separately specified; confirm against the approved audit scope."} /></label><label className="field"><span>Legal, customer and contractual criteria</span><textarea name="legal_customer_contractual_criteria" defaultValue={audit.legal_customer_contractual_criteria ?? "Applicable statutory, regulatory, customer, contractual and management-system requirements within the approved scope."} /></label></div></div>
+                <div className="section"><h3>Criteria and coverage</h3><div className="grid3"><label className="field"><span>Criteria summary *</span><textarea name="criteria_summary" required defaultValue={audit.criteria_summary ?? standards.join("; ")} /></label><label className="field"><span>Site / location *</span><select name="administration_location_id" required defaultValue={audit.administration_location_id ?? ""}><option value="" disabled>Select Business Profile location</option>{audit.sites && !administrationLocations.some((item) => item.id === audit.administration_location_id) ? <option value="legacy">{audit.sites} · previously recorded</option> : null}{administrationLocations.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select><input type="hidden" name="administration_location_label" value={audit.administration_location_label ?? audit.sites ?? ""} /><small>Linked to Administration → Business Profile.</small></label><label className="field"><span>Functions and departments</span><textarea name="departments" defaultValue={audit.departments ?? ""} /></label><label className="field"><span>Processes</span><textarea name="processes" defaultValue={audit.processes ?? ""} /></label><label className="field"><span>Products and services</span><textarea name="products_services" defaultValue={audit.products_services ?? "Not separately specified; confirm against the approved audit scope."} /></label><label className="field"><span>Legal, customer and contractual criteria</span><textarea name="legal_customer_contractual_criteria" defaultValue={audit.legal_customer_contractual_criteria ?? "Applicable statutory, regulatory, customer, contractual and management-system requirements within the approved scope."} /></label></div></div>
                 <div className="section"><h3>Risk, exclusions and feasibility</h3><div className="grid2"><label className="field"><span>Known risks, changes and prior signals</span><textarea name="known_risks_changes" defaultValue={audit.known_risks_changes ?? "No specific prior signal recorded; confirm through risk-based planning and opening discussions."} /></label><label className="field"><span>Previous audit summary</span><textarea name="previous_audit_summary" defaultValue={audit.previous_audit_summary ?? "No previous audit summary linked. Review available prior findings, CAPA status and performance trends during planning."} /></label><label className="field"><span>Exclusions</span><textarea name="exclusions" defaultValue={audit.exclusions ?? "No exclusions identified at scope review."} /></label><label className="field"><span>Exclusion justification</span><textarea name="exclusion_justification" defaultValue={audit.exclusion_justification ?? "Not applicable where no exclusions are recorded. Any later exclusion requires documented justification and approval."} /></label><label className="field"><span>Confidentiality requirements</span><textarea name="confidentiality_requirements" defaultValue={audit.confidentiality_requirements ?? "Internal—need-to-know access. Protect personal, commercially sensitive and supplier information; use secure controlled links for evidence."} /></label><label className="check"><input type="checkbox" name="feasibility_confirmed" defaultChecked={audit.feasibility_confirmed} /><span><strong>Feasibility confirmed</strong><br />Adequate time, information, access and resources are available.</span></label></div></div>
                 {approvalIdentity}<div className="actionBar"><button className="button secondary" name="intent" value="save">Save Scope</button><button className="button approve" name="intent" value="approve">Approve as {loggedActorName} & Unlock Team →</button></div>
               </form>
@@ -611,6 +610,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
               <h2>Execute the approved audit plan</h2>
               <p className="panelLead">Test the approved criteria, preserve objective evidence and convert verified conclusions into controlled findings. Every conclusion remains traceable to its criterion, auditor and evidence trail.</p>
 
+              <OfflineAuditDraft auditId={id} userId={user.id} scopeId="audit-fieldwork-offline-scope" />
+
               <div className="fieldworkMetrics">
                 <a className="fieldworkMetric criteria" href="#criteria-workbench"><b>{assessedCount}/{questions.length}</b><span>Criteria assessed ↓</span></a>
                 <a className="fieldworkMetric evidence" href="#evidence-register"><b>{evidence.length}</b><span>Evidence records ↓</span></a>
@@ -618,7 +619,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                 <Link className="fieldworkMetric activities" href={`/portal/internal-audits/${id}?gate=plan#audit-agenda`}><b>{schedule.length}</b><span>Approved activities →</span></Link>
               </div>
 
-              <div className="fieldworkLayout">
+              <div className="fieldworkLayout" id="audit-fieldwork-offline-scope">
                 <section className="fieldworkModule criteriaWorkbench" id="criteria-workbench">
                   <div className="fieldworkHead"><div><span className="panelKicker">01 · Criteria execution</span><h3>Audit question workbench</h3><p>Use the approved question bank as a guide—not a checklist substitute. Record what was tested, what the evidence demonstrates and any remaining uncertainty.</p></div><span className="countBadge">{questions.length} criteria</span></div>
                   {questions.length ? <div className="questionList">{questions.map((question, questionIndex) => {
