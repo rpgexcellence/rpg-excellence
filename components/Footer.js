@@ -92,6 +92,10 @@ export default function Footer({ locale }) {
             Security &amp; Trust
           </Link>
 
+          <Link href={`/${locale}/ai-assurance`}>
+            AI Assurance
+          </Link>
+
           <Link href={`/${locale}/cookies`}>
             Cookies
           </Link>
