@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageShell from "../../../components/PageShell";
 import { locales } from "../../../lib/i18n";
@@ -23,7 +24,7 @@ export default async function Terms({ params }) {
           <h1>Terms &amp; Conditions</h1>
 
           <p>
-            <strong>Last updated:</strong> 20 August 2026
+            <strong>Last updated:</strong> 17 October 2026
           </p>
 
           <p>
@@ -289,6 +290,15 @@ export default async function Terms({ params }) {
             RPG Excellence does not warrant that AI-assisted output will be
             error-free or appropriate for every factual or regulatory
             context.
+          </p>
+
+          <p>
+            The current control position, capability boundaries and human
+            review requirements are described in the{" "}
+            <Link href={`/${locale}/ai-assurance`}>
+              AI Assurance and Guardrails statement
+            </Link>. That statement provides operational transparency and
+            does not remove or reduce the limitations in these Terms.
           </p>
 
           <h2>9. Professional and legal advice</h2>
