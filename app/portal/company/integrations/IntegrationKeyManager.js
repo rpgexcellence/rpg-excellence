@@ -26,6 +26,7 @@ const PERMISSION_GROUPS = [
       ["suppliers:read", "Read suppliers"],
       ["suppliers:write", "Create or update suppliers"],
       ["people:read", "Read authorised company-user details"],
+      ["security_incidents:read", "Read security incident records"],
       ["webhooks:manage", "Manage webhook subscriptions"],
     ],
   },
