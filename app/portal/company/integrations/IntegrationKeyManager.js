@@ -26,7 +26,7 @@ const PERMISSION_GROUPS = [
       ["suppliers:read", "Read suppliers"],
       ["suppliers:write", "Create or update suppliers"],
       ["people:read", "Read authorised company-user details"],
-      ["security_incidents:read", "Read security incident records"],
+      ["workplace_inspections:read", "Read Workplace Inspection programmes and records"],
       ["webhooks:manage", "Manage webhook subscriptions"],
     ],
   },
@@ -44,20 +44,28 @@ function dateLabel(value) {
 }
 
 function RevokeControl({ clientId, disabled }) {
-  const [state, action, pending] = useActionState(revokeIntegrationApiKey, initialState);
+  const [state, action, pending] = useActionState(
+    revokeIntegrationApiKey,
+    initialState,
+  );
   return (
     <form action={action} className="integrationRevokeForm">
       <input type="hidden" name="client_id" value={clientId} />
       <button className="integrationDanger" disabled={disabled || pending}>
         {disabled ? "Revoked" : pending ? "Revoking…" : "Revoke key"}
       </button>
-      {state?.error ? <small className="integrationInlineError">{state.error}</small> : null}
+      {state?.error ? (
+        <small className="integrationInlineError">{state.error}</small>
+      ) : null}
     </form>
   );
 }
 
 export default function IntegrationKeyManager({ clients = [] }) {
-  const [state, action, pending] = useActionState(createIntegrationApiKey, initialState);
+  const [state, action, pending] = useActionState(
+    createIntegrationApiKey,
+    initialState,
+  );
   const [copied, setCopied] = useState(false);
 
   async function copyKey() {
@@ -74,7 +82,10 @@ export default function IntegrationKeyManager({ clients = [] }) {
           <div>
             <span>CONTROLLED CREDENTIAL</span>
             <h2>Create an API key</h2>
-            <p>Begin with read-only access and grant write access only where the connected system requires it.</p>
+            <p>
+              Begin with read-only access and grant write access only where the
+              connected system requires it.
+            </p>
           </div>
           <b>Enterprise</b>
         </div>
@@ -82,7 +93,13 @@ export default function IntegrationKeyManager({ clients = [] }) {
         <form action={action} className="integrationForm">
           <label>
             <span>Integration name *</span>
-            <input name="client_name" required minLength={3} maxLength={120} placeholder="For example: SAP quality connector" />
+            <input
+              name="client_name"
+              required
+              minLength={3}
+              maxLength={120}
+              placeholder="For example: SAP quality connector"
+            />
           </label>
           <label>
             <span>Environment *</span>
@@ -94,19 +111,29 @@ export default function IntegrationKeyManager({ clients = [] }) {
           <label>
             <span>Expiry date</span>
             <input name="expires_at" type="date" />
-            <small>Recommended for temporary suppliers and implementation partners.</small>
+            <small>
+              Recommended for temporary suppliers and implementation partners.
+            </small>
           </label>
 
           <fieldset className="integrationPermissions">
             <legend>Permissions *</legend>
-            <p>Permissions apply only to this organisation. API access does not change any user’s portal role.</p>
+            <p>
+              Permissions apply only to this organisation. API access does not
+              change any user’s portal role.
+            </p>
             <div className="integrationPermissionGrid">
               {PERMISSION_GROUPS.map((group) => (
                 <div key={group.title} className="integrationPermissionGroup">
                   <strong>{group.title}</strong>
                   {group.options.map(([value, label]) => (
                     <label key={value}>
-                      <input type="checkbox" name="permissions" value={value} defaultChecked={value === "findings:read"} />
+                      <input
+                        type="checkbox"
+                        name="permissions"
+                        value={value}
+                        defaultChecked={value === "findings:read"}
+                      />
                       <span>{label}</span>
                     </label>
                   ))}
@@ -115,7 +142,9 @@ export default function IntegrationKeyManager({ clients = [] }) {
             </div>
           </fieldset>
 
-          {state?.error ? <div className="integrationMessage error">{state.error}</div> : null}
+          {state?.error ? (
+            <div className="integrationMessage error">{state.error}</div>
+          ) : null}
           <button className="integrationPrimary" disabled={pending}>
             {pending ? "Creating secure key…" : "Create API key"}
           </button>
@@ -126,10 +155,15 @@ export default function IntegrationKeyManager({ clients = [] }) {
             <div>
               <span>DISPLAYED ONCE</span>
               <h3>Copy the API key now</h3>
-              <p>It is stored only as a cryptographic digest and cannot be retrieved after you leave this page.</p>
+              <p>
+                It is stored only as a cryptographic digest and cannot be
+                retrieved after you leave this page.
+              </p>
             </div>
             <code>{state.apiKey}</code>
-            <button type="button" onClick={copyKey}>{copied ? "Copied" : "Copy key"}</button>
+            <button type="button" onClick={copyKey}>
+              {copied ? "Copied" : "Copy key"}
+            </button>
           </div>
         ) : null}
       </section>
@@ -139,9 +173,15 @@ export default function IntegrationKeyManager({ clients = [] }) {
           <div>
             <span>ACTIVE CONNECTIONS</span>
             <h2>API clients</h2>
-            <p>Review credential scope, recent use and expiry. Revoke a key immediately if access is no longer required.</p>
+            <p>
+              Review credential scope, recent use and expiry. Revoke a key
+              immediately if access is no longer required.
+            </p>
           </div>
-          <b>{clients.filter((client) => client.active && !client.revoked_at).length} active</b>
+          <b>
+            {clients.filter((client) => client.active && !client.revoked_at).length}
+            {" "}active
+          </b>
         </div>
         {clients.length ? (
           <div className="integrationClientList">
@@ -152,12 +192,20 @@ export default function IntegrationKeyManager({ clients = [] }) {
                   <div>
                     <strong>{client.client_name}</strong>
                     <code>{client.key_prefix}••••••••</code>
-                    <small>{client.permissions?.join(" · ") || "No permissions"}</small>
+                    <small>
+                      {client.permissions?.join(" · ") || "No permissions"}
+                    </small>
                   </div>
                   <div className="integrationClientMeta">
-                    <span className={revoked ? "revoked" : "active"}>{revoked ? "Revoked" : client.environment}</span>
+                    <span className={revoked ? "revoked" : "active"}>
+                      {revoked ? "Revoked" : client.environment}
+                    </span>
                     <small>Expires: {dateLabel(client.expires_at)}</small>
-                    <small>Last used: {client.last_used_at ? dateLabel(client.last_used_at) : "Never"}</small>
+                    <small>
+                      Last used: {client.last_used_at
+                        ? dateLabel(client.last_used_at)
+                        : "Never"}
+                    </small>
                   </div>
                   <RevokeControl clientId={client.id} disabled={revoked} />
                 </article>
@@ -165,7 +213,9 @@ export default function IntegrationKeyManager({ clients = [] }) {
             })}
           </div>
         ) : (
-          <div className="integrationEmpty">No API keys have been created for this organisation.</div>
+          <div className="integrationEmpty">
+            No API keys have been created for this organisation.
+          </div>
         )}
       </section>
     </>
