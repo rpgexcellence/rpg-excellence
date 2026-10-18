@@ -264,3 +264,299 @@ export async function submitInspectionForReview(previousState, formData) {
     return { error: error.message || "The inspection could not be submitted." };
   }
 }
+
+function assignedPerson(access, personId, roleLabel) {
+  if (!access.person?.id || access.person.id !== personId) {
+    throw new Error("Only the assigned " + roleLabel + " can complete this decision.");
+  }
+}
+
+function refreshControlledViews(inspectionId) {
+  revalidatePath(ROOT + "/" + inspectionId);
+  revalidatePath(ROOT);
+  revalidatePath("/portal/health-safety/management-board");
+  revalidatePath("/portal/tasks");
+  revalidatePath("/portal/management-oversight");
+}
+
+export async function reviewInspection(previousState, formData) {
+  try {
+    const access = await context("contribute");
+    const organizationId = access.organization.id;
+    const inspectionId = required(formData, "inspection_id", "Inspection", 80);
+    const decision = required(formData, "review_decision", "Review decision", 20);
+    const comment = text(formData, "review_comment", 3000);
+    if (!["approved", "returned"].includes(decision)) {
+      throw new Error("Select approve or return for correction.");
+    }
+    if (decision === "returned" && !comment) {
+      throw new Error("Explain what must be corrected before resubmission.");
+    }
+
+    const admin = createAdminClient();
+    const inspection = await loadInspection(admin, organizationId, inspectionId);
+    assignedPerson(access, inspection.reviewer_person_id, "independent reviewer");
+    if (inspection.status !== "awaiting_review") {
+      throw new Error("This inspection is not awaiting independent review.");
+    }
+
+    const [actionResult, findingResult] = await Promise.all([
+      admin
+        .from("hs_workplace_inspection_actions")
+        .select("id,finding_id,status")
+        .eq("organization_id", organizationId)
+        .eq("inspection_id", inspectionId)
+        .neq("status", "cancelled"),
+      admin
+        .from("hs_workplace_inspection_findings")
+        .select("id,finding_type,status")
+        .eq("organization_id", organizationId)
+        .eq("inspection_id", inspectionId)
+        .neq("status", "cancelled"),
+    ]);
+    if (actionResult.error) throw new Error(actionResult.error.message);
+    if (findingResult.error) throw new Error(findingResult.error.message);
+    const actions = actionResult.data || [];
+    const assignedFindingIds = new Set(actions.map((item) => item.finding_id));
+    const findingsWithoutAction = (findingResult.data || []).filter(
+      (finding) =>
+        finding.finding_type !== "positive_practice" &&
+        !assignedFindingIds.has(finding.id),
+    );
+    if (decision === "approved" && findingsWithoutAction.length) {
+      throw new Error(
+        "Assign a controlled action to every applicable finding before approval.",
+      );
+    }
+
+    const now = new Date().toISOString();
+    const hasActions = actions.length > 0;
+    const nextStatus =
+      decision === "returned"
+        ? "in_progress"
+        : hasActions
+          ? "actions_open"
+          : "completed";
+    const { error } = await admin
+      .from("hs_workplace_inspections")
+      .update({
+        status: nextStatus,
+        review_decision: decision,
+        review_comment: comment || null,
+        reviewed_at: now,
+        reviewed_by_user_id: access.user.id,
+        reviewed_by_person_id: access.person.id,
+        returned_at: decision === "returned" ? now : null,
+        closed_at: nextStatus === "completed" ? now : null,
+        closed_by_user_id: nextStatus === "completed" ? access.user.id : null,
+        updated_by_user_id: access.user.id,
+        updated_at: now,
+      })
+      .eq("id", inspectionId)
+      .eq("organization_id", organizationId);
+    if (error) throw new Error(error.message);
+
+    refreshControlledViews(inspectionId);
+    return {
+      success:
+        decision === "returned"
+          ? "Inspection returned to the assigned inspector for correction."
+          : hasActions
+            ? "Inspection approved. Assigned actions must now be completed and verified."
+            : "Inspection approved and closed; no corrective actions remain.",
+    };
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return { error: error.message || "The review decision could not be saved." };
+  }
+}
+
+export async function completeInspectionAction(previousState, formData) {
+  try {
+    const access = await context("contribute");
+    const organizationId = access.organization.id;
+    const inspectionId = required(formData, "inspection_id", "Inspection", 80);
+    const actionId = required(formData, "action_id", "Action", 80);
+    const completionEvidence = required(
+      formData,
+      "completion_evidence",
+      "Completion evidence",
+      3000,
+    );
+    const completionComment = text(formData, "completion_comment", 3000);
+    const admin = createAdminClient();
+    const inspection = await loadInspection(admin, organizationId, inspectionId);
+    if (!["actions_open", "awaiting_verification"].includes(inspection.status)) {
+      throw new Error("The inspection actions are not open for completion.");
+    }
+
+    const { data: action, error: actionError } = await admin
+      .from("hs_workplace_inspection_actions")
+      .select("*")
+      .eq("id", actionId)
+      .eq("inspection_id", inspectionId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (actionError) throw new Error(actionError.message);
+    if (!action) throw new Error("The assigned action was not found.");
+    assignedPerson(access, action.responsible_person_id, "action owner");
+    if (["closed", "cancelled"].includes(action.status)) {
+      throw new Error("This action is already closed or cancelled.");
+    }
+
+    const now = new Date().toISOString();
+    const { error } = await admin
+      .from("hs_workplace_inspection_actions")
+      .update({
+        status: "awaiting_verification",
+        completion_evidence: completionEvidence,
+        completion_comment: completionComment || null,
+        completed_at: now,
+        completed_by_user_id: access.user.id,
+        effectiveness_result: null,
+        verification_comment: null,
+        verified_at: null,
+        verified_by_user_id: null,
+        updated_by_user_id: access.user.id,
+        updated_at: now,
+      })
+      .eq("id", actionId)
+      .eq("organization_id", organizationId);
+    if (error) throw new Error(error.message);
+
+    await admin
+      .from("hs_workplace_inspections")
+      .update({
+        status: "awaiting_verification",
+        closure_requested_at: now,
+        updated_by_user_id: access.user.id,
+        updated_at: now,
+      })
+      .eq("id", inspectionId)
+      .eq("organization_id", organizationId);
+
+    refreshControlledViews(inspectionId);
+    return {
+      success: "Action submitted to the assigned independent verifier.",
+    };
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return { error: error.message || "The action could not be completed." };
+  }
+}
+
+export async function verifyInspectionAction(previousState, formData) {
+  try {
+    const access = await context("contribute");
+    const organizationId = access.organization.id;
+    const inspectionId = required(formData, "inspection_id", "Inspection", 80);
+    const actionId = required(formData, "action_id", "Action", 80);
+    const result = required(
+      formData,
+      "effectiveness_result",
+      "Effectiveness result",
+      30,
+    );
+    const verificationComment = required(
+      formData,
+      "verification_comment",
+      "Verification comment",
+      3000,
+    );
+    if (!["effective", "not_effective"].includes(result)) {
+      throw new Error("Select effective or not effective.");
+    }
+
+    const admin = createAdminClient();
+    const inspection = await loadInspection(admin, organizationId, inspectionId);
+    const { data: action, error: actionError } = await admin
+      .from("hs_workplace_inspection_actions")
+      .select("*")
+      .eq("id", actionId)
+      .eq("inspection_id", inspectionId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (actionError) throw new Error(actionError.message);
+    if (!action) throw new Error("The action awaiting verification was not found.");
+    assignedPerson(access, action.verifier_person_id, "independent verifier");
+    if (action.responsible_person_id === action.verifier_person_id) {
+      throw new Error("The action owner cannot verify their own action.");
+    }
+    if (action.status !== "awaiting_verification") {
+      throw new Error("This action is not awaiting effectiveness verification.");
+    }
+
+    const now = new Date().toISOString();
+    const actionStatus = result === "effective" ? "closed" : "open";
+    const { error } = await admin
+      .from("hs_workplace_inspection_actions")
+      .update({
+        status: actionStatus,
+        effectiveness_result: result,
+        verification_comment: verificationComment,
+        verified_at: now,
+        verified_by_user_id: access.user.id,
+        updated_by_user_id: access.user.id,
+        updated_at: now,
+      })
+      .eq("id", actionId)
+      .eq("organization_id", organizationId);
+    if (error) throw new Error(error.message);
+
+    if (result === "effective") {
+      await admin
+        .from("hs_workplace_inspection_findings")
+        .update({ status: "closed", updated_at: now })
+        .eq("id", action.finding_id)
+        .eq("organization_id", organizationId);
+    } else {
+      await admin
+        .from("hs_workplace_inspection_findings")
+        .update({ status: "assigned", updated_at: now })
+        .eq("id", action.finding_id)
+        .eq("organization_id", organizationId);
+    }
+
+    const { data: remaining, error: remainingError } = await admin
+      .from("hs_workplace_inspection_actions")
+      .select("id,status")
+      .eq("inspection_id", inspectionId)
+      .eq("organization_id", organizationId)
+      .neq("status", "cancelled")
+      .neq("status", "closed");
+    if (remainingError) throw new Error(remainingError.message);
+    const allEffective = result === "effective" && !(remaining || []).length;
+    const hasOpenAction = (remaining || []).some((item) => item.status === "open");
+    const nextInspectionStatus = allEffective
+      ? "completed"
+      : result === "not_effective" || hasOpenAction
+        ? "actions_open"
+        : "awaiting_verification";
+    const { error: inspectionError } = await admin
+      .from("hs_workplace_inspections")
+      .update({
+        status: nextInspectionStatus,
+        closed_at: allEffective ? now : null,
+        closed_by_user_id: allEffective ? access.user.id : null,
+        updated_by_user_id: access.user.id,
+        updated_at: now,
+      })
+      .eq("id", inspection.id)
+      .eq("organization_id", organizationId);
+    if (inspectionError) throw new Error(inspectionError.message);
+
+    refreshControlledViews(inspectionId);
+    return {
+      success: allEffective
+        ? "Action verified effective. All actions are closed and the inspection is complete."
+        : result === "effective"
+          ? "Action verified effective. Other actions still require completion or verification."
+          : "Action assessed as not effective and returned to its assigned owner.",
+    };
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return {
+      error: error.message || "The effectiveness decision could not be saved.",
+    };
+  }
+}
