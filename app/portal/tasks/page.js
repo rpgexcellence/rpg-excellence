@@ -21,6 +21,7 @@ function normalize(row, source) {
     rca: { module:"CAPA-8D", title:value(row.title, row.description), due:value(row.due_date, row.target_date), assignee:row.action_owner_person_id, verifier:row.verifier_person_id, href:`/portal/rca/${row.case_id}` },
     supplier: { module:"Supplier Assurance", title:value(row.action_required, row.action_reference), due:value(row.due_date), assignee:row.accountable_person_id, verifier:row.reviewer_person_id, href:`/portal/suppliers/${row.supplier_id}/qbr` },
     isms: { module:"Information Security", title:value(row.action, row.title), due:value(row.target_date), assignee:row.action_owner_person_id, verifier:row.verifier_person_id, href:"/portal/information-security/risk-management" },
+    security_incident: { module:"Information Security - Security Incidents", title:value(row.title, row.incident_reference), due:value(row.target_recovery_date), assignee:row.incident_lead_person_id, verifier:row.verifier_person_id, href:`/portal/information-security/incidents/${row.id}` },
     maintenance: { module:"Asset Management / PPM", title:value(row.work_completed, row.maintenance_reference, `${words(row.maintenance_type)} maintenance`), due:value(row.scheduled_date), assignee:row.responsible_person_id, verifier:row.verifier_person_id, href:"/portal/company/assets" },
   };
   const config = configs[source];
@@ -71,7 +72,7 @@ export default async function TasksPage({ searchParams }) {
   const organisationOversight = Boolean(access.isOwner || access.isCompanyAdministrator || activeFunctions.has("ims_manager"));
   const siteOversight = activeFunctions.has("site_director");
   const reports = new Set(people.filter((person) => person.manager_person_id === me?.id || person.functional_manager_person_id === me?.id).map((person) => person.id));
-  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...sources.correctiveActions.map((row)=>normalize(row,"capa")), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...sources.assetMaintenance.map((row)=>normalize(row,"maintenance")), ...bcpTasks(sources), ...auditTasks(sources,people)]
+  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...sources.correctiveActions.map((row)=>normalize(row,"capa")), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...sources.ismsIncidents.map((row)=>normalize(row,"security_incident")), ...sources.assetMaintenance.map((row)=>normalize(row,"maintenance")), ...bcpTasks(sources), ...auditTasks(sources,people)]
     .filter((item) => item.title)
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
   const visible = all.filter((item) => organisationOversight || item.assignee === me?.id || item.verifier === me?.id || reports.has(item.assignee) || (siteOversight && me?.site && (item.site === me.site || item.assigneePerson?.site === me.site)));
@@ -110,6 +111,7 @@ export default async function TasksPage({ searchParams }) {
     ["bcp","Business Continuity","BCP","/portal/business-continuity"],
     ["supplier","Supplier Assurance","SUP","/portal/suppliers"],
     ["isms","Information Security","ISMS","/portal/information-security"],
+    ["security_incident","Security Incidents","INC","/portal/information-security/incidents"],
     ["maintenance","Assets & PPM","PPM","/portal/company/assets"],
   ].map(([source,label,code,href]) => {
     const records = baseScope.filter((item)=>item.source===source && !CLOSED.has(item.status));
