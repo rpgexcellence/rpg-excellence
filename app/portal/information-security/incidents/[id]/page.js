@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import SecurityIncidentForm from "../../../../../components/SecurityIncidentForm";
+import SecurityIncidentTimeline from "../../../../../components/SecurityIncidentTimeline";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 import { loadSecurityIncidentOptions } from "../../../../../lib/ismsSecurityIncidents";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
@@ -26,16 +27,22 @@ export default async function SecurityIncidentPage({params,searchParams}) {
     `/portal/information-security/incidents/${id}`,
   );
   const admin=createAdminClient();
-  const [{data:incident,error},options,{data:documentLinks=[]},{data:evidence=[]}]=await Promise.all([
+  const [{data:incident,error},options,{data:documentLinks=[]},{data:evidence=[]},{data:timelineEvents=[],error:timelineError}]=await Promise.all([
     admin.from("isms_security_incidents").select("*").eq("id",id).eq("organization_id",organization.id).maybeSingle(),
     loadSecurityIncidentOptions(organization),
     admin.from("isms_security_incident_documents").select("controlled_document_id").eq("incident_id",id).eq("organization_id",organization.id),
     admin.from("isms_security_incident_evidence").select("id,evidence_type,description,original_file_name,file_size_bytes,created_at").eq("incident_id",id).eq("organization_id",organization.id).order("created_at",{ascending:false}),
+    admin.from("assurance_task_events").select("id,event_type,actor_person_id,actor_user_id,previous_values,current_values,created_at").eq("organization_id",organization.id).eq("source_table","isms_security_incidents").eq("source_id",id).order("created_at",{ascending:false}),
   ]);
 
   if(error)throw new Error(error.message);
+  if(timelineError)throw new Error(timelineError.message);
   if(!incident)notFound();
   const canEdit=["contribute","review","approve","admin","owner"].includes(level);
+  const timeline=timelineEvents.map((event)=>({
+    ...event,
+    actor_name:options.people.find((person)=>person.id===event.actor_person_id||person.user_id===event.actor_user_id)?.name||null,
+  }));
 
   return <main className="sifPage"><style>{pageStyles}</style><div className="sifShell">
     <header><div><small>{incident.incident_reference} · CONTROLLED INCIDENT</small><h1>{incident.title}</h1><p>{organization.name} · {incident.status.replaceAll("_"," ")}</p></div><div className="sifHeaderActions"><Link href={`/portal/information-security/incidents/${id}/report`}>View controlled report</Link><Link href="/portal/information-security/incidents">← Incident Register</Link></div></header>
@@ -48,6 +55,8 @@ export default async function SecurityIncidentPage({params,searchParams}) {
     </div></section>}
 
     {evidence.length>0&&<section className="sifEvidence"><div className="sifEvidenceHead"><div><small>CONTROLLED OBJECTIVE EVIDENCE</small><h2>Recorded evidence</h2></div><span>{evidence.length} file{evidence.length===1?"":"s"}</span></div><div>{evidence.map((item)=><article key={item.id}><strong>{item.original_file_name}</strong><span>{item.evidence_type.replaceAll("_"," ")} · {Math.ceil(item.file_size_bytes/1024)} KB</span><small>{item.description||"No description"}</small><small>Uploaded {displayDateTime(item.created_at)}</small><a href={`/portal/information-security/incidents/${id}/evidence/${item.id}`}>Download evidence ↓</a></article>)}</div></section>}
+
+    <SecurityIncidentTimeline events={timeline}/>
 
     {canEdit
       ? <SecurityIncidentForm action={saveSecurityIncident} incident={incident} options={options} linkedDocumentIds={documentLinks.map((row)=>row.controlled_document_id)}/>
