@@ -55,6 +55,38 @@ function auditTasks(sources, people) {
   return sources.auditAssignments.map((row)=>{const finding=findings.get(row.finding_id)||{};return {id:`audit:${row.id}`,source:"audit",module:"Internal Audit / Findings",title:value(finding.title,finding.finding_reference,"Audit corrective action"),due:value(finding.agreed_date,row.secure_token_expires_at),assignee:byUser.get(row.assignee_user_id),verifier:null,href:`/portal/internal-audit-actions#action-${row.id}`,status:String(row.status||"assigned").toLowerCase(),site:"",ownerName:row.assignee_name,updated:value(row.updated_at,row.created_at)};});
 }
 
+function securityIncidentTasks(sources) {
+  const tasks = [];
+  const add = (incident, role, personId, { onlyWhen = true } = {}) => {
+    if (!personId || !onlyWhen) return;
+    tasks.push({
+      id:`security_incident:${incident.id}:${role.key}`,
+      source:"security_incident",
+      module:"Information Security - Security Incidents",
+      title:`${role.label}: ${value(incident.title, incident.incident_reference)}`,
+      due:value(incident.target_recovery_date),
+      assignee:personId,
+      verifier:null,
+      href:`/portal/information-security/incidents/${incident.id}`,
+      status:String(incident.status || "reported").toLowerCase(),
+      site:value(incident.administration_location_label),
+      ownerName:"",
+      updated:value(incident.updated_at, incident.created_at),
+    });
+  };
+  for (const incident of sources.ismsIncidents) {
+    const active = !["closed","cancelled"].includes(String(incident.status || "").toLowerCase());
+    const verification = incident.status === "awaiting_verification";
+    add(incident,{key:"incident_lead",label:"Incident Lead"},incident.incident_lead_person_id,{onlyWhen:active});
+    add(incident,{key:"technical_lead",label:"Technical Lead"},incident.technical_lead_person_id,{onlyWhen:active});
+    add(incident,{key:"privacy_lead",label:"Privacy Lead"},incident.privacy_lead_person_id,{onlyWhen:active && incident.personal_data_involved});
+    add(incident,{key:"communications_lead",label:"Communications Lead"},incident.communications_lead_person_id,{onlyWhen:active});
+    add(incident,{key:"independent_verifier",label:"Independent Verification"},incident.verifier_person_id,{onlyWhen:verification});
+    add(incident,{key:"closure_approver",label:"Closure Approval"},incident.closure_approved_by_person_id,{onlyWhen:verification});
+  }
+  return tasks;
+}
+
 export default async function TasksPage({ searchParams }) {
   const params = await searchParams;
   const access = await requireOrganizationAccess(null, "view", "/portal/tasks");
@@ -66,16 +98,17 @@ export default async function TasksPage({ searchParams }) {
   ]);
   const people = peopleResult.data || [];
   const personMap = new Map(people.map((person) => [person.id, person]));
-  const me = access.person;
+  const me = access.person || people.find((person) => person.user_id === access.user?.id) || null;
+  const myPersonId = me?.id || "__no_linked_company_user__";
   const today = new Date().toISOString().slice(0,10);
   const activeFunctions = new Set((access.functions || []).filter((item) => item.status === "authorised" && (!item.expires_at || item.expires_at >= today)).map((item) => item.function_key));
   const organisationOversight = Boolean(access.isOwner || access.isCompanyAdministrator || activeFunctions.has("ims_manager"));
   const siteOversight = activeFunctions.has("site_director");
   const reports = new Set(people.filter((person) => person.manager_person_id === me?.id || person.functional_manager_person_id === me?.id).map((person) => person.id));
-  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...sources.correctiveActions.map((row)=>normalize(row,"capa")), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...sources.ismsIncidents.map((row)=>normalize(row,"security_incident")), ...sources.assetMaintenance.map((row)=>normalize(row,"maintenance")), ...bcpTasks(sources), ...auditTasks(sources,people)]
+  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...sources.correctiveActions.map((row)=>normalize(row,"capa")), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...sources.assetMaintenance.map((row)=>normalize(row,"maintenance")), ...bcpTasks(sources), ...auditTasks(sources,people)]
     .filter((item) => item.title)
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
-  const visible = all.filter((item) => organisationOversight || item.assignee === me?.id || item.verifier === me?.id || reports.has(item.assignee) || (siteOversight && me?.site && (item.site === me.site || item.assigneePerson?.site === me.site)));
+  const visible = all.filter((item) => organisationOversight || item.assignee === myPersonId || item.verifier === myPersonId || reports.has(item.assignee) || (siteOversight && me?.site && (item.site === me.site || item.assigneePerson?.site === me.site)));
   const requested = ["mine","team","oversight"].includes(params?.view) ? params.view : "mine";
   const view = requested === "oversight" && !organisationOversight && !siteOversight ? "mine" : requested;
   const moduleFilter = String(params?.module || "all");
@@ -84,11 +117,11 @@ export default async function TasksPage({ searchParams }) {
   const dueSoonLimit = new Date();
   dueSoonLimit.setUTCDate(dueSoonLimit.getUTCDate() + 14);
   const dueSoonDate = dueSoonLimit.toISOString().slice(0,10);
-  const baseScope = visible.filter((item) => view === "mine" ? item.assignee === me?.id || item.verifier === me?.id : view === "team" ? item.assignee === me?.id || item.verifier === me?.id || reports.has(item.assignee) : true);
+  const baseScope = visible.filter((item) => view === "mine" ? item.assignee === myPersonId || item.verifier === myPersonId : view === "team" ? item.assignee === myPersonId || item.verifier === myPersonId || reports.has(item.assignee) : true);
   const scoped = baseScope.filter((item) => {
     const isOpen = !CLOSED.has(item.status);
     const isDueSoon = Boolean(isOpen && item.due && item.due >= today && item.due <= dueSoonDate);
-    const isVerification = VERIFY.has(item.status) || item.verifier === me?.id;
+    const isVerification = VERIFY.has(item.status) || item.verifier === myPersonId;
     if (moduleFilter !== "all" && item.source !== moduleFilter) return false;
     if (stateFilter === "open" && !isOpen) return false;
     if (stateFilter === "overdue" && !item.overdue) return false;
@@ -100,7 +133,7 @@ export default async function TasksPage({ searchParams }) {
   const open = scoped.filter((item)=>!CLOSED.has(item.status));
   const overdue = open.filter((item)=>item.overdue);
   const dueSoon = open.filter((item)=>item.due && item.due >= today && item.due <= dueSoonDate);
-  const verification = open.filter((item)=>VERIFY.has(item.status) || item.verifier === me?.id);
+  const verification = open.filter((item)=>VERIFY.has(item.status) || item.verifier === myPersonId);
   const moduleOptions = [...new Map(baseScope.map((item)=>[item.source,item.module])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const workspaceCards = [
     ["audit","Internal Audit","AUD","/portal/internal-audits"],
@@ -115,7 +148,7 @@ export default async function TasksPage({ searchParams }) {
     ["maintenance","Assets & PPM","PPM","/portal/company/assets"],
   ].map(([source,label,code,href]) => {
     const records = baseScope.filter((item)=>item.source===source && !CLOSED.has(item.status));
-    return { source,label,code,href,open:records.length,overdue:records.filter((item)=>item.overdue).length,decisions:records.filter((item)=>VERIFY.has(item.status) || item.verifier===me?.id).length };
+    return { source,label,code,href,open:records.length,overdue:records.filter((item)=>item.overdue).length,decisions:records.filter((item)=>VERIFY.has(item.status) || item.verifier===myPersonId).length };
   });
 
   return <main className="taskPage"><style>{`
