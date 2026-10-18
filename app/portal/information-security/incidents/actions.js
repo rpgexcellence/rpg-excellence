@@ -21,9 +21,11 @@ const optionalBoolean = (formData, key) => {
   const value = String(formData.get(key) || "");
   return value === "yes" ? true : value === "no" ? false : null;
 };
+
 const INCIDENT_TYPES = new Set(["security_event","unauthorised_access","data_breach","malware","phishing","service_disruption","api_integration","supplier_incident","vulnerability","other"]);
 const SEVERITIES = new Set(["low","medium","high","critical"]);
 const STATUSES = new Set(["reported","triage","contained","investigating","recovery","action_required","awaiting_verification","closed","cancelled"]);
+const VERIFICATION_RESULTS = new Set(["pending","effective","not_effective"]);
 const EVIDENCE_TYPES = new Set(["log","screenshot","request_id","configuration","communication","specialist_report","other"]);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -43,14 +45,16 @@ export async function saveSecurityIncident(formData) {
   const { user, organization } = access;
   const admin = createAdminClient();
   const options = await loadSecurityIncidentOptions(organization);
+
   const id = text(formData, "id", 80);
   const title = text(formData, "title", 220);
   const description = text(formData, "description", 8000);
   const incidentType = text(formData, "incident_type", 60);
   const severity = text(formData, "severity", 20);
-  const status = text(formData, "status", 40) || "reported";
+  const requestedStatus = text(formData, "status", 40) || "reported";
   const detectedAt = text(formData, "detected_at", 40);
-  if (!title || !description || !detectedAt || !INCIDENT_TYPES.has(incidentType) || !SEVERITIES.has(severity) || !STATUSES.has(status)) {
+
+  if (!title || !description || !detectedAt || !INCIDENT_TYPES.has(incidentType) || !SEVERITIES.has(severity) || !STATUSES.has(requestedStatus)) {
     throw new Error("Complete the incident title, description, type, severity and detection date.");
   }
 
@@ -60,17 +64,79 @@ export async function saveSecurityIncident(formData) {
   const communicationsLead = requireIncidentPerson(options.people, text(formData,"communications_lead_person_id",80), "Communications lead", { optional: true });
   const verifier = requireIncidentPerson(options.people, text(formData,"verifier_person_id",80), "Independent verifier", { optional: true });
   const closureApprover = requireIncidentPerson(options.people, text(formData,"closure_approved_by_person_id",80), "Closure approver", { optional: true });
-  if (verifier && verifier.id === incidentLead.id) throw new Error("The incident lead cannot independently verify their own incident.");
 
+  if (verifier && verifier.id === incidentLead.id) {
+    throw new Error("The incident lead cannot independently verify their own incident.");
+  }
+
+  const actor = access.person || options.people.find((person) => person.user_id === user.id) || null;
+  if (!actor) {
+    throw new Error("Your account must be linked to an active Company User before recording controlled decisions.");
+  }
+
+  let existing = null;
+  if (id) {
+    const { data, error } = await admin
+      .from("isms_security_incidents")
+      .select("*")
+      .eq("id", id)
+      .eq("organization_id", organization.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("The security incident could not be found.");
+    existing = data;
+  }
+
+  const verificationResult = text(formData,"verification_result",30) || existing?.verification_result || "pending";
+  const verificationSummary = text(formData,"verification_summary",8000);
+  const closureApprovalConfirmed = checked(formData,"closure_approval_confirmed");
+  const closureApprovalComment = text(formData,"closure_approval_comment",8000);
+  if (!VERIFICATION_RESULTS.has(verificationResult)) throw new Error("Select a valid verification decision.");
+
+  const previousVerificationResult = existing?.verification_result || "pending";
+  const verificationChanged = verificationResult !== previousVerificationResult;
+  const verificationRecordedNow = verificationChanged && verificationResult !== "pending";
+
+  if (verificationRecordedNow && actor.id !== verifier?.id) {
+    throw new Error("Only the assigned Independent Verifier can record the verification decision.");
+  }
+  if (verificationResult !== "pending" && !verificationSummary) {
+    throw new Error("Record the independent verification evidence and conclusion.");
+  }
+
+  const effectiveVerificationRecorded = Boolean(
+    (existing?.verification_result === "effective" && existing?.verified_at) ||
+    (verificationRecordedNow && verificationResult === "effective"),
+  );
+
+  const closureApprovedNow = closureApprovalConfirmed && !existing?.closure_approved_at;
+  if (closureApprovedNow && actor.id !== closureApprover?.id) {
+    throw new Error("Only the assigned Closure Approver can approve closure.");
+  }
+  if (closureApprovedNow && !effectiveVerificationRecorded) {
+    throw new Error("Independent verification must confirm effective recovery before closure can be approved.");
+  }
+  if (closureApprovedNow && !closureApprovalComment) {
+    throw new Error("Record the closure approval rationale.");
+  }
+
+  const closureApprovalRecorded = Boolean(existing?.closure_approved_at || closureApprovedNow);
+  if (requestedStatus === "closed" && (
+    !verifier ||
+    !closureApprover ||
+    !text(formData,"recovery_summary",8000) ||
+    !effectiveVerificationRecorded ||
+    !closureApprovalRecorded
+  )) {
+    throw new Error("Verified recovery evidence, effective independent verification and recorded closure approval are required before closure.");
+  }
+
+  const status = verificationResult === "not_effective" ? "action_required" : requestedStatus;
   const site = resolveIncidentSite(options.sites, text(formData,"administration_location_id",100));
   const linkedFinding = selected(options,"findings",text(formData,"linked_finding_id",80),"Finding");
   const linkedCase = selected(options,"cases",text(formData,"linked_rca_case_id",80),"CAPA-8D case");
   const linkedMoc = selected(options,"changes",text(formData,"linked_moc_id",80),"Management of Change record");
   const linkedBcp = selected(options,"bcpIncidents",text(formData,"linked_bcp_incident_id",80),"BCP incident-management assessment");
-
-  if (status === "closed" && (!verifier || !closureApprover || !text(formData,"recovery_summary",8000))) {
-    throw new Error("Recovery evidence, an independent verifier and a closure approver are required before closure.");
-  }
 
   const payload = {
     organization_id: organization.id,
@@ -94,6 +160,10 @@ export async function saveSecurityIncident(formData) {
     privacy_lead_person_id: privacyLead?.id || null,
     communications_lead_person_id: communicationsLead?.id || null,
     verifier_person_id: verifier?.id || null,
+    verification_result: verificationResult,
+    verification_summary: verificationSummary,
+    verified_at: verificationRecordedNow ? new Date().toISOString() : existing?.verified_at || null,
+    verified_by_user_id: verificationRecordedNow ? user.id : existing?.verified_by_user_id || null,
     personal_data_involved: checked(formData,"personal_data_involved"),
     notification_assessment: text(formData,"notification_assessment",5000),
     ico_notification_required: optionalBoolean(formData,"ico_notification_required"),
@@ -111,8 +181,11 @@ export async function saveSecurityIncident(formData) {
     linked_moc_id: linkedMoc?.id || null,
     linked_bcp_incident_id: linkedBcp?.id || null,
     target_recovery_date: text(formData,"target_recovery_date",20),
-    closed_at: status === "closed" ? new Date().toISOString() : null,
+    closed_at: status === "closed" ? existing?.closed_at || new Date().toISOString() : null,
     closure_approved_by_person_id: closureApprover?.id || null,
+    closure_approval_comment: closureApprovalComment,
+    closure_approved_at: closureApprovedNow ? new Date().toISOString() : existing?.closure_approved_at || null,
+    closure_approved_by_user_id: closureApprovedNow ? user.id : existing?.closure_approved_by_user_id || null,
     updated_by_user_id: user.id,
     updated_at: new Date().toISOString(),
   };
@@ -171,5 +244,6 @@ export async function saveSecurityIncident(formData) {
 
   revalidatePath("/portal/information-security");
   revalidatePath("/portal/information-security/incidents");
+  revalidatePath("/portal/tasks");
   redirect(`/portal/information-security/incidents/${incident.id}?saved=1`);
 }
