@@ -17,6 +17,7 @@ const ALLOWED_PERMISSIONS = new Set([
   "suppliers:read",
   "suppliers:write",
   "people:read",
+  "security_incidents:read",
   "webhooks:manage",
 ]);
 
