@@ -162,9 +162,9 @@ export default async function Pricing({
                 <li>Permit to Work control</li>
                 <li>Management of Change and PSSR workflow</li>
                 <li>Asset Management, ownership and planned maintenance</li>
+                <li>Risk-based Workplace Inspection programmes, fieldwork and actions</li>
+                <li>Online and offline mobile inspection evidence capture</li>
                 <li>Statement of Applicability workspace</li>
-                <li>Cross-Standard Matrix with shared-control and evidence mapping</li>
-                <li>Controlled mobile fieldwork drafts for temporary loss of connectivity</li>
                 <li>Priority support</li>
               </ul>
 
@@ -194,7 +194,8 @@ export default async function Pricing({
                 <li>Multi-client operating model</li>
                 <li>Portfolio management boards</li>
                 <li>Executive reports</li>
-                <li>Secure Enterprise Integration API and controlled credentials</li>
+                <li>Controlled API access, including Workplace Inspection records</li>
+                <li>Integration event history and revocable API credentials</li>
                 <li>Priority onboarding support</li>
               </ul>
 
