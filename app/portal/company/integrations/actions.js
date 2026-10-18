@@ -17,7 +17,7 @@ const ALLOWED_PERMISSIONS = new Set([
   "suppliers:read",
   "suppliers:write",
   "people:read",
-  "security_incidents:read",
+  "workplace_inspections:read",
   "webhooks:manage",
 ]);
 
@@ -40,40 +40,49 @@ function futureExpiry(value) {
 export async function createIntegrationApiKey(_previousState, formData) {
   const { user, admin, organization } = await requirePeopleAdmin();
   await requirePlanAccess(user, "consultant", "Enterprise Integration");
+
   const { data: controlledOrganization } = await admin
     .from("organizations")
     .select("id,owner_id")
     .eq("id", organization.id)
     .single();
+
   if (!controlledOrganization?.owner_id) {
     return { error: "The controlled organisation could not be verified." };
   }
+
   const clientName = clean(formData.get("client_name"), 120);
-  const environment = clean(formData.get("environment"), 10) === "test" ? "test" : "live";
+  const environment =
+    clean(formData.get("environment"), 10) === "test" ? "test" : "live";
   const expiresAt = futureExpiry(formData.get("expires_at"));
   const permissions = Array.from(
     new Set(
       formData
         .getAll("permissions")
         .map(String)
-        .filter((permission) => ALLOWED_PERMISSIONS.has(permission))
-    )
+        .filter((permission) => ALLOWED_PERMISSIONS.has(permission)),
+    ),
   );
 
   if (clientName.length < 3) {
-    return { error: "Enter a client name containing at least three characters." };
+    return {
+      error: "Enter a client name containing at least three characters.",
+    };
   }
   if (!permissions.length) {
     return { error: "Select at least one controlled API permission." };
   }
   if (expiresAt === undefined) {
-    return { error: "Select a future expiry date or leave the expiry blank." };
+    return {
+      error: "Select a future expiry date or leave the expiry blank.",
+    };
   }
 
   const publicId = randomBytes(6).toString("hex");
   const secret = randomBytes(32).toString("base64url");
-  const apiKey = `rpg_${environment}_${publicId}_${secret}`;
-  const keyPrefix = `rpg_${environment}_${publicId}`;
+  const apiKey =
+    "rpg_" + environment + "_" + publicId + "_" + secret;
+  const keyPrefix = "rpg_" + environment + "_" + publicId;
 
   const { data, error } = await admin
     .from("integration_api_clients")
@@ -88,7 +97,9 @@ export async function createIntegrationApiKey(_previousState, formData) {
       expires_at: expiresAt,
       created_by: user.id,
     })
-    .select("id,client_name,key_prefix,environment,permissions,expires_at,created_at")
+    .select(
+      "id,client_name,key_prefix,environment,permissions,expires_at,created_at",
+    )
     .single();
 
   if (error || !data) {
@@ -97,7 +108,8 @@ export async function createIntegrationApiKey(_previousState, formData) {
 
   revalidatePath("/portal/company/integrations");
   return {
-    success: "API key created. Copy it now; RPG Excellence will not display it again.",
+    success:
+      "API key created. Copy it now; RPG Excellence will not display it again.",
     apiKey,
     client: data,
   };
@@ -106,6 +118,7 @@ export async function createIntegrationApiKey(_previousState, formData) {
 export async function revokeIntegrationApiKey(_previousState, formData) {
   const { user, admin, organization } = await requirePeopleAdmin();
   await requirePlanAccess(user, "consultant", "Enterprise Integration");
+
   const clientId = clean(formData.get("client_id"), 80);
   if (!clientId) return { error: "The API client was not identified." };
 
@@ -124,9 +137,15 @@ export async function revokeIntegrationApiKey(_previousState, formData) {
     .maybeSingle();
 
   if (error || !data) {
-    return { error: error?.message || "The API key is already revoked or is not available." };
+    return {
+      error:
+        error?.message ||
+        "The API key is already revoked or is not available.",
+    };
   }
 
   revalidatePath("/portal/company/integrations");
-  return { success: "API key revoked. Requests using it will now be rejected." };
+  return {
+    success: "API key revoked. Requests using it will now be rejected.",
+  };
 }
