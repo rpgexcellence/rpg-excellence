@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { requireOrganizationAccess } from "../../../../lib/organization-access";
 import { requirePlanAccess } from "../../../../lib/plan-access";
 import { createAdminClient } from "../../../../lib/supabase/admin";
+import { synchroniseWorkplaceInspectionSignals } from "../../../../lib/workplace-inspection-signal-sync";
 import {
   AREA_PROFILE_FIELDS,
   buildInspectionPlan,
@@ -207,7 +208,32 @@ export async function createInspectionProgramme(previousState, formData) {
     if (error) throw new Error(error.message);
 
     try {
-      await replaceProgrammePacks(admin, context.organization.id, data.id, plan);
+      await synchroniseWorkplaceInspectionSignals(context.organization.id, data.id);
+      const signals = await loadProgrammeRiskSignals(context.organization.id, {
+        programmeId: data.id,
+        siteId: values.administration_location_id,
+      });
+      const synchronisedPlan = buildInspectionPlan({
+        areaProfile: values.area_profile,
+        signals,
+        frequencyAmount: values.frequency_amount,
+        frequencyUnit: values.frequency_unit,
+        lastInspectionDate: values.last_inspection_date,
+      });
+      const { error: planError } = await admin
+        .from("hs_inspection_programmes")
+        .update({
+          risk_score: synchronisedPlan.riskScore,
+          risk_band: synchronisedPlan.riskBand,
+          next_inspection_date: synchronisedPlan.nextInspectionDate,
+          planning_basis: synchronisedPlan.planningBasis,
+          updated_by_user_id: context.user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", data.id)
+        .eq("organization_id", context.organization.id);
+      if (planError) throw new Error(planError.message);
+      await replaceProgrammePacks(admin, context.organization.id, data.id, synchronisedPlan);
     } catch (error) {
       await admin.from("hs_inspection_programmes").delete().eq("id", data.id);
       throw error;
@@ -237,6 +263,7 @@ export async function updateInspectionProgramme(previousState, formData) {
     if (existingError) throw new Error(existingError.message);
     if (!existing) throw new Error("The inspection programme was not found in your organisation.");
 
+    await synchroniseWorkplaceInspectionSignals(context.organization.id, programmeId);
     const prepared = await programmeInput(formData, context, programmeId);
     const { error } = await prepared.admin
       .from("hs_inspection_programmes")
@@ -380,6 +407,7 @@ export async function refreshInspectionProgramme(previousState, formData) {
     if (error) throw new Error(error.message);
     if (!programme) throw new Error("The inspection programme was not found.");
 
+    await synchroniseWorkplaceInspectionSignals(context.organization.id, programmeId);
     const signals = await loadProgrammeRiskSignals(context.organization.id, {
       programmeId,
       siteId: programme.administration_location_id,
