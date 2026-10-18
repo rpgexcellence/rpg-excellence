@@ -36,7 +36,7 @@ function selected(options, key, value, label) {
   return row;
 }
 
-export async function saveSecurityIncident(formData) {
+async function persistSecurityIncident(formData) {
   const access = await requireOrganizationAccess(
     "information_security",
     "contribute",
@@ -245,5 +245,19 @@ export async function saveSecurityIncident(formData) {
   revalidatePath("/portal/information-security");
   revalidatePath("/portal/information-security/incidents");
   revalidatePath("/portal/tasks");
-  redirect(`/portal/information-security/incidents/${incident.id}?saved=1`);
+  return `/portal/information-security/incidents/${incident.id}?saved=1`;
+}
+
+export async function saveSecurityIncident(previousState, formData) {
+  let destination;
+  try {
+    destination = await persistSecurityIncident(formData);
+  } catch (error) {
+    return {
+      error: error instanceof Error
+        ? error.message
+        : "The security incident could not be saved.",
+    };
+  }
+  redirect(destination);
 }
