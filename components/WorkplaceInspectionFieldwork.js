@@ -93,6 +93,37 @@ export default function WorkplaceInspectionFieldwork({
     if (state?.success) { try { localStorage.removeItem(storageKey); } catch {} }
   }, [state?.success, storageKey]);
 
+  useEffect(() => {
+    const restore = (event) => {
+      if (readOnly || event.detail?.inspectionId !== inspection.id || !Array.isArray(event.detail.rows)) return;
+      const savedById = new Map(event.detail.rows.map((row) => [row.id, row]));
+      if (savedById.size !== responses.length || !responses.every((response) => savedById.has(response.id))) {
+        setValidationError("The draft question set no longer matches this inspection. It was not restored.");
+        return;
+      }
+      setRows(initialRows(responses).map((row) => {
+        const saved = savedById.get(row.id);
+        const response = ["yes", "no", "not_applicable", "not_assessed"].includes(saved.response) ? saved.response : "not_assessed";
+        return { ...row, response, comments_actions: String(saved.comments_actions || ""),
+          not_applicable_justification: String(saved.not_applicable_justification || ""),
+          finding_required: response === "no" || Boolean(saved.finding_required) };
+      }));
+      setRecovered(true);
+      setValidationError("");
+    };
+    const clear = (event) => {
+      if (event.detail?.inspectionId !== inspection.id) return;
+      try { localStorage.removeItem(storageKey); } catch {}
+      setRecovered(false);
+    };
+    window.addEventListener("wpi-restore-device-checklist", restore);
+    window.addEventListener("wpi-clear-device-checklist", clear);
+    return () => {
+      window.removeEventListener("wpi-restore-device-checklist", restore);
+      window.removeEventListener("wpi-clear-device-checklist", clear);
+    };
+  }, [inspection.id, responses, readOnly, storageKey]);
+
   const responseMap = useMemo(() => new Map(responses.map((item) => [item.id, item])), [responses]);
   const assessed = rows.filter((item) => item.response !== "not_assessed").length;
   const failed = rows.filter((item) => item.response === "no").length;
