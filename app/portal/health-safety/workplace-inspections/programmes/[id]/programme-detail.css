@@ -1,0 +1,218 @@
+/* Programme detail only. Keep the existing workplace-inspections.css. */
+.wpiProgrammePage,
+.wpiProgrammePage * {
+  box-sizing: border-box;
+}
+
+.wpiProgrammePage .wpiGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.wpiProgrammePage .wpiPanel {
+  min-width: 0;
+  padding: 24px;
+}
+
+.wpiProgrammePage .wpiPanel h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.wpiProgrammePage .wpiLead {
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+
+.wpiProgrammePage .wpiProgrammeForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+  min-width: 0;
+}
+
+.wpiProgrammePage .wpiField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  color: #172d4d;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wpiProgrammePage .wpiField > span {
+  display: block;
+  font-weight: 600;
+}
+
+.wpiProgrammePage .wpiField input,
+.wpiProgrammePage .wpiField select,
+.wpiProgrammePage .wpiField textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid #b8c9db;
+  border-radius: 8px;
+  background: #fff;
+  color: #172d4d;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.wpiProgrammePage .wpiField select {
+  padding-right: 32px;
+}
+
+.wpiProgrammePage .wpiField textarea {
+  min-height: 128px;
+  resize: vertical;
+}
+
+.wpiProgrammePage .wpiField textarea::placeholder {
+  color: #65758a;
+  opacity: 1;
+}
+
+.wpiProgrammePage .wpiField input:focus-visible,
+.wpiProgrammePage .wpiField select:focus-visible,
+.wpiProgrammePage .wpiField textarea:focus-visible {
+  border-color: #4254e8;
+  outline: 3px solid #cbd3ff;
+  outline-offset: 2px;
+}
+
+.wpiProgrammePage .wpiFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.wpiProgrammePage .wpiScheduleDateTime {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+}
+
+.wpiProgrammePage .wpiGuidance {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dce5ee;
+  border-radius: 10px;
+  background: #f6f9fc;
+}
+
+.wpiProgrammePage .wpiGuidance > strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wpiProgrammePage .wpiGuidance p {
+  margin: 6px 0 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.wpiProgrammePage .wpiProgrammeForm > .wpiButton {
+  align-self: flex-start;
+  max-width: 100%;
+  min-height: 46px;
+  padding: 12px 18px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.wpiProgrammePage .wpiSchedulePanel .wpiProgrammeForm > .wpiButton {
+  align-self: stretch;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.wpiProgrammePage .wpiProfileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.wpiProgrammePage .wpiProfileCard.selected {
+  display: block;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #cddbeb;
+  border-left: 4px solid #4254e8;
+  border-radius: 10px;
+  background: #f7f9fe;
+}
+
+.wpiProgrammePage .wpiProfileCard > span,
+.wpiProgrammePage .wpiProfileCard strong,
+.wpiProgrammePage .wpiProfileCard small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.wpiProgrammePage .wpiProfileCard strong {
+  margin-bottom: 8px;
+  color: #172d4d;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.wpiProgrammePage .wpiProfileCard small {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #53677f;
+}
+
+.wpiProgrammePage .wpiProfileCard small + small {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #dce5ee;
+}
+
+.wpiProgrammePage .wpiRow {
+  min-width: 0;
+  gap: 14px;
+}
+
+.wpiProgrammePage .wpiRow > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .wpiProgrammePage .wpiGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .wpiProgrammePage .wpiPanel {
+    padding: 18px;
+  }
+
+  .wpiProgrammePage .wpiFormGrid,
+  .wpiProgrammePage .wpiScheduleDateTime,
+  .wpiProgrammePage .wpiProfileGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wpiProgrammePage .wpiRow {
+    flex-wrap: wrap;
+  }
+
+  .wpiProgrammePage .wpiRow > div:first-child {
+    flex-basis: 100%;
+  }
+}
