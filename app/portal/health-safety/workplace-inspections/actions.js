@@ -147,6 +147,12 @@ async function programmeInput(formData, context, existingProgrammeId = null) {
   if (templateError) throw new Error(templateError.message);
   if (!template) throw new Error("Select a current Workplace Inspection template.");
 
+  const zoneId = text(formData, "zone_id", 80) || null;
+  if (zoneId) {
+    const {data: zone, error: zoneError} = await admin.from("organization_zones").select("id").eq("id",zoneId).eq("organization_id",organizationId).eq("site_id",siteId).neq("status","archived").maybeSingle();
+    if (zoneError) throw new Error(zoneError.message);
+    if (!zone) throw new Error("Select a current zone belonging to this controlled site.");
+  }
   const lastInspectionDate = text(formData, "last_inspection_date", 10) || null;
   if (lastInspectionDate) validDate(lastInspectionDate, "Last inspection date");
   const areaProfile = areaProfileFromForm(formData);
@@ -172,6 +178,7 @@ async function programmeInput(formData, context, existingProgrammeId = null) {
       template_id: template.id,
       administration_location_id: String(site.id),
       administration_location_label: site.label,
+      zone_id: zoneId,
       area_department: text(formData, "area_department", 180) || null,
       accountable_person_id: accountablePersonId,
       lead_inspector_person_id: leadInspectorPersonId,
@@ -346,6 +353,7 @@ export async function generateScheduledInspection(previousState, formData) {
         administration_location_id: programme.administration_location_id,
         administration_location_label: programme.administration_location_label,
         area_department: programme.area_department,
+        zone_id: programme.zone_id || null,
         planned_start_at: new Date(plannedStart).toISOString(),
         planned_end_at: plannedEnd,
         status: "planned",
