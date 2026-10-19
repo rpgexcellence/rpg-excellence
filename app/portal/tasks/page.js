@@ -6,7 +6,7 @@ import { loadAssuranceTaskSources } from "../../../lib/assurance-task-sources";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My Tasks & Approvals | RPG Excellence" };
 
-const CLOSED = new Set(["closed", "complete", "completed", "effective", "verified", "cancelled", "approved", "verified_effective", "effective_verified"]);
+const CLOSED = new Set(["closed", "complete", "completed", "effective", "verified", "cancelled", "approved", "verified_effective", "effective_verified", "archived"]);
 const VERIFY = new Set(["awaiting_review", "awaiting_verification", "evidence_submitted", "verification", "ready_for_review", "submitted", "verification_requested", "effectiveness_review"]);
 const value = (...items) => items.find((item) => item !== null && item !== undefined && String(item).trim()) || "";
 const words = (input) => String(input || "open").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -17,7 +17,7 @@ function normalize(row, source) {
   const configs = {
     risk: { module:"Risk Management", title:value(row.action_required, row.action_reference), due:value(row.target_date), assignee:row.responsible_person_id, verifier:row.verifier_person_id, href:`/portal/health-safety/actions/${row.id}` },
     moc: { module:"Management of Change", title:value(row.action_required, row.title), due:value(row.target_date), assignee:row.responsible_person_id, verifier:row.verifier_person_id, href:`/portal/health-safety/moc/${row.moc_id}` },
-    capa: { module:"Gap Assessment / CAPA", title:value(row.action_required, row.action, row.title, row.description), due:value(row.target_date, row.due_date), assignee:row.action_owner_person_id, verifier:row.verifier_person_id, href:`/portal/assessments/${row.assessment_id}/actions-plan` },
+    capa: { module:"Gap Assessment / CAPA", title:value(row.action_title, row.action_required, row.corrective_action, row.action, row.title, row.action_description, row.description, row.correction, row.containment_action), due:value(row.target_date, row.due_date), assignee:row.action_owner_person_id, verifier:row.verifier_person_id, href:`/portal/assessments/${row.assessment_id}/actions-plan` },
     rca: { module:"CAPA-8D", title:value(row.title, row.description), due:value(row.due_date, row.target_date), assignee:row.action_owner_person_id, verifier:row.verifier_person_id, href:`/portal/rca/${row.case_id}` },
     supplier: { module:"Supplier Assurance", title:value(row.action_required, row.action_reference), due:value(row.due_date), assignee:row.accountable_person_id, verifier:row.reviewer_person_id, href:`/portal/suppliers/${row.supplier_id}/qbr` },
     isms: { module:"Information Security", title:value(row.action, row.title), due:value(row.target_date), assignee:row.action_owner_person_id, verifier:row.verifier_person_id, href:"/portal/information-security/risk-management" },
@@ -25,27 +25,80 @@ function normalize(row, source) {
     maintenance: { module:"Asset Management / PPM", title:value(row.work_completed, row.maintenance_reference, `${words(row.maintenance_type)} maintenance`), due:value(row.scheduled_date), assignee:row.responsible_person_id, verifier:row.verifier_person_id, href:"/portal/company/assets" },
   };
   const config = configs[source];
-  const status = String(row.status || "open").toLowerCase();
-  return { ...config, id:`${source}:${row.id}`, source, status, site:value(row.site_location, row.site_location_label, row.location), ownerName:value(row.responsible_name, row.accountable_name, row.action_owner), updated:value(row.updated_at, row.created_at) };
+  let status = String(row.status || "open").toLowerCase();
+  if ((source === "capa" && row.taskOrigin === "management" && status === "completed") || (source === "isms" && status === "implemented")) status = "awaiting_verification";
+  if (VERIFY.has(status)) {
+    config.assignee = config.verifier || null;
+    config.verifier = null;
+  } else {
+    config.verifier = null;
+  }
+  return { ...config, id:`${source}:${row.taskOrigin || source}:${row.id}`, source, status, site:value(row.site_location, row.site_location_label, row.location), ownerName:value(row.responsible_name, row.accountable_name, row.action_owner), updated:value(row.updated_at, row.created_at) };
+}
+
+function capaTasks(sources) {
+  const management = sources.managementActions || [];
+  const managementKeys = new Set(management.filter(row => row.related_finding_id).map(row => `${row.assessment_id}:${row.related_finding_id}`));
+  const corrective = sources.correctiveActions || [];
+  return [
+    ...corrective.filter(row => !row.finding_id || !managementKeys.has(`${row.assessment_id}:${row.finding_id}`)).map(row => normalize(row,"capa")),
+    ...management.map(row => {
+      const original = corrective.find(item => row.related_finding_id && item.assessment_id === row.assessment_id && item.finding_id === row.related_finding_id);
+      return normalize({ ...original, ...row, action_owner_person_id:row.action_owner_person_id || original?.action_owner_person_id, verifier_person_id:row.verifier_person_id || original?.verifier_person_id, taskOrigin:"management" },"capa");
+    }),
+  ];
+}
+
+function maintenanceTasks(sources) {
+  const assets = new Map((sources.assets || []).map(row => [row.id, row]));
+  const records = sources.assetMaintenance || [];
+  const tasks = records.map(row => normalize({ ...row, responsible_person_id: row.responsible_person_id || assets.get(row.asset_id)?.maintenance_owner_person_id || assets.get(row.asset_id)?.asset_owner_person_id }, "maintenance"));
+  for (const asset of assets.values()) {
+    if (!asset.ppm_required || !asset.next_maintenance_date || ["disposed", "retired", "inactive", "decommissioned"].includes(asset.operational_status)) continue;
+    const due = String(asset.next_maintenance_date).slice(0,10);
+    const covered = records.some(row => row.asset_id === asset.id && String(row.status || "planned").toLowerCase() !== "cancelled" && String(row.scheduled_date || "").slice(0,10) === due);
+    if (covered) continue;
+    tasks.push({ id:`maintenance-asset:${asset.id}`, source:"maintenance", module:"Asset Management / PPM", title:`Schedule maintenance: ${value(asset.asset_name,asset.asset_reference,"Asset")}`, due, assignee:asset.maintenance_owner_person_id || asset.asset_owner_person_id, href:"/portal/company/assets", status:"planned", site:value(asset.site_location,asset.location), updated:asset.updated_at });
+  }
+  return tasks;
 }
 
 function bcpTasks(sources) {
   const tasks = [];
+  const inactive = row => ["archived", "cancelled", "closed"].includes(row.status);
   const add = (parent, row, key, module, href) => {
-    if (!row?.ownerPersonId || !value(row.action,row.objective,row.requirement,row.name)) return;
-    tasks.push({ id:`bcp:${parent.id}:${key}`, source:"bcp", module, title:value(row.action,row.objective,row.requirement,row.name), due:value(row.dueDate,row.dueAt,parent.next_review_date), assignee:row.ownerPersonId, verifier:parent.approver_person_id || parent.reviewer_person_id, href, status:String(row.status||"open").toLowerCase(), site:value(parent.site_location,parent.location_name), ownerName:value(row.owner), updated:value(parent.updated_at,parent.created_at) });
+    if (inactive(parent) || !value(row?.action,row?.objective,row?.requirement,row?.name)) return;
+    tasks.push({ id:`bcp:${module}:${parent.id}:${key}`, source:"bcp", module, title:value(row.action,row.objective,row.requirement,row.name), due:value(row.dueDate,row.dueAt), assignee:row.ownerPersonId, href, status:String(row.status||"open").toLowerCase(), site:value(parent.site_location,parent.location_name), ownerName:value(row.owner), updated:value(parent.updated_at,parent.created_at) });
   };
-  for (const parent of sources.bcpStrategies) list(parent.implementation_actions).forEach((row,index)=>add(parent,row,index,"Business Continuity - Strategies & Solutions","/portal/business-continuity/strategies-solutions"));
-  for (const parent of sources.bcpOutsourced) for (const control of list(parent.supplier_controls)) list(control.actions).forEach((row,index)=>add(parent,row,`${control.id||control.supplierName}:${index}`,"Business Continuity - Outsourced Processes","/portal/business-continuity/outsourced-processes"));
-  for (const parent of sources.bcpIncident) list(parent.incident_action_plan).forEach((row,index)=>add(parent,row,index,"Business Continuity - Incident Management","/portal/business-continuity/incident-management"));
-  const reviews = [
-    ...sources.bcpBia.map((row)=>[row,"Business Continuity - BIA","/portal/business-continuity/bia",row.reviewer_person_id]),
-    ...sources.bcpOutsourced.map((row)=>[row,"Business Continuity - Outsourced Processes","/portal/business-continuity/outsourced-processes",row.reviewer_person_id]),
-    ...sources.bcpStrategies.map((row)=>[row,"Business Continuity - Strategies & Solutions","/portal/business-continuity/strategies-solutions",row.approver_person_id]),
-    ...sources.bcpIncident.map((row)=>[row,"Business Continuity - Incident Management","/portal/business-continuity/incident-management",row.approver_person_id]),
-    ...sources.bcpPlans.map((row)=>[row,"Business Continuity - Plan","/portal/business-continuity/plans",row.approver_person_id || row.plan_data?.approverPersonId]),
+  for (const parent of sources.bcpStrategies || []) list(parent.implementation_actions).forEach((row,index)=>add(parent,row,index,"Business Continuity - Strategies & Solutions","/portal/business-continuity/strategies-solutions"));
+  for (const parent of sources.bcpOutsourced || []) list(parent.supplier_controls).forEach((control,controlIndex)=>list(control.actions).forEach((row,index)=>add(parent,row,`${controlIndex}:${index}`,"Business Continuity - Outsourced Processes","/portal/business-continuity/outsourced-processes")));
+  for (const parent of sources.bcpIncident || []) list(parent.incident_action_plan).forEach((row,index)=>add(parent,row,index,"Business Continuity - Incident Management","/portal/business-continuity/incident-management"));
+  const definitions = [
+    ["bcpSites","Site Profile","site-profile"], ["bcpContext","Context","context"],
+    ["bcpRoles","Roles","roles"], ["bcpHazards","Hazard Scenarios","hazard-scenarios"],
+    ["bcpBia","BIA","bia"], ["bcpOutsourced","Outsourced Processes","outsourced-processes"],
+    ["bcpStrategies","Strategies & Solutions","strategies-solutions"],
+    ["bcpIncident","Incident Management","incident-management"], ["bcpPlans","Plan","plans"],
   ];
-  for (const [row,module,href,personId] of reviews) if (personId && ["ready_for_review","changes_required","review_due"].includes(row.status)) tasks.push({id:`bcp-review:${row.id}`,source:"bcp",module,title:`Review ${value(row.assessment_title,row.plan_title,"controlled BCP record")}`,due:value(row.next_review_date,row.review_due_date),assignee:personId,verifier:null,href,status:row.status,site:value(row.site_location,row.location_name),ownerName:"",updated:value(row.updated_at,row.created_at)});
+  const today = new Date().toISOString().slice(0,10);
+  for (const [key,label,path] of definitions) for (const row of sources[key] || []) {
+    if (inactive(row)) continue;
+    const due = value(row.next_review_date,row.review_due_date,row.plan_data?.nextReviewDate);
+    const status = String(row.status || "draft").toLowerCase();
+    const correction = status === "changes_required";
+    const pending = status === "ready_for_review";
+    const reviewDue = status === "review_due" || (status === "approved" && due && String(due).slice(0,10) <= today);
+    if (!correction && !pending && !reviewDue) continue;
+    const reviewer = row.approver_person_id || row.reviewer_person_id || row.plan_data?.approverPersonId;
+    const owner = row.plan_owner_person_id || row.plan_data?.planOwnerPersonId;
+    const personId = correction || reviewDue ? owner : reviewer;
+    const coordination = pending && !reviewer;
+    tasks.push({ id:`bcp-review:${key}:${row.id}`, source:"bcp", module:`Business Continuity - ${label}`,
+      title:`${correction ? "Update" : coordination ? "Arrange review of" : reviewDue ? "Renew review of" : "Review"} ${value(row.assessment_title,row.plan_title,label)}`,
+      due, assignee:personId, assigneeUserId:personId ? null : row.owner_id,
+      href:`/portal/business-continuity/${path}`, status:pending && !coordination ? "ready_for_review" : correction ? "changes_required" : "review_due",
+      site:value(row.site_location,row.location_name), ownerName:personId ? "" : "Record owner", updated:value(row.updated_at,row.created_at) });
+  }
   return tasks;
 }
 
@@ -176,7 +229,7 @@ export default async function TasksPage({ searchParams }) {
   const organisationOversight = Boolean(access.isOwner || access.isCompanyAdministrator || activeFunctions.has("ims_manager"));
   const siteOversight = activeFunctions.has("site_director");
   const reports = new Set(people.filter((person) => person.manager_person_id === me?.id || person.functional_manager_person_id === me?.id).map((person) => person.id));
-  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...sources.correctiveActions.map((row)=>normalize(row,"capa")), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...sources.assetMaintenance.map((row)=>normalize(row,"maintenance")), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
+  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
     .filter((item) => item.title)
     .map((item) => ({ ...item, due: item.due ? String(item.due).slice(0,10) : "" }))
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
@@ -233,9 +286,9 @@ export default async function TasksPage({ searchParams }) {
     <header className="taskTop"><div><small>CONNECTED ASSURANCE - CONTROLLED ACCOUNTABILITY</small><h1>My Tasks &amp; Approvals</h1><p>One controlled view of work assigned to you, approvals requiring your decision, due dates and escalations across RPG Excellence.</p></div>{(organisationOversight || siteOversight) ? <Link href="/portal/tasks?view=oversight">Management Oversight</Link> : null}</header>
     <nav className="taskViews"><Link className={view==="mine"?"active":""} href="/portal/tasks?view=mine">My work</Link><Link className={view==="team"?"active":""} href="/portal/tasks?view=team">My team</Link>{(organisationOversight||siteOversight)?<Link className={view==="oversight"?"active":""} href="/portal/tasks?view=oversight">Management oversight</Link>:null}</nav>
     <form className="taskFilters" method="get"><input type="hidden" name="view" value={view}/><select name="module" defaultValue={moduleFilter}><option value="all">All connected modules</option>{moduleOptions.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><select name="status" defaultValue={stateFilter}><option value="all">All statuses</option><option value="open">Open only</option><option value="overdue">Overdue</option><option value="due_soon">Due in 14 days</option><option value="verification">Decision / verification</option></select><input name="q" defaultValue={params?.q||""} placeholder="Search task, module, site or owner"/><button type="submit">Apply filters</button></form>
-    {(sources.sourceErrors || []).length ? <div className="taskNotice" role="alert"><b>Some task sources could not be loaded</b>Counts are incomplete for {[...new Set(sources.sourceErrors.map((item)=>item.label))].join(", ")}. Do not treat missing tasks as zero outstanding work.</div> : null}
-    <section className="taskMetrics"><div className="taskMetric"><span>OPEN RESPONSIBILITIES</span><strong>{open.length}</strong></div><div className="taskMetric red"><span>OVERDUE</span><strong>{overdue.length}</strong></div><div className="taskMetric amber"><span>DUE IN 14 DAYS</span><strong>{dueSoon.length}</strong></div><div className="taskMetric blue"><span>DECISIONS / VERIFICATION</span><strong>{verification.length}</strong></div></section>
-    <section className="workspaceSection"><div className="workspaceTitle"><h2>Connected workspaces</h2><span>Counts follow the selected work view. Select a card to filter outstanding responsibilities.</span></div><div className="workspaceGrid">{workspaceCards.map((card)=><Link className={`workspaceCard ${moduleFilter===card.source?"active":""}`} href={`/portal/tasks?view=${view}&module=${card.source}&status=open`} key={card.source}><b className="workspaceCode">{card.code}</b><div><strong>{card.label}</strong><div className="workspaceStats">{card.unavailable ? <span className="danger">Data incomplete</span> : null}<span><b>{card.open}</b> outstanding</span><span className="danger"><b>{card.overdue}</b> overdue</span><span className="decision"><b>{card.decisions}</b> decisions</span></div></div></Link>)}</div></section>
+    {(sources.sourceErrors || []).length ? <div className="taskNotice" role="alert"><b>Some task sources could not be loaded</b>Counts are incomplete for {[...new Set(sources.sourceErrors.map((item)=>item.label))].join(", ")}. Totals marked + include loaded records only. Unavailable workspace counts are shown as —.</div> : null}
+    <section className="taskMetrics"><div className="taskMetric"><span>OPEN RESPONSIBILITIES</span><strong>{open.length}{sources.sourceErrors?.length ? "+" : ""}</strong></div><div className="taskMetric red"><span>OVERDUE</span><strong>{overdue.length}{sources.sourceErrors?.length ? "+" : ""}</strong></div><div className="taskMetric amber"><span>DUE IN 14 DAYS</span><strong>{dueSoon.length}{sources.sourceErrors?.length ? "+" : ""}</strong></div><div className="taskMetric blue"><span>DECISIONS / VERIFICATION</span><strong>{verification.length}{sources.sourceErrors?.length ? "+" : ""}</strong></div></section>
+    <section className="workspaceSection"><div className="workspaceTitle"><h2>Connected workspaces</h2><span>Counts follow the selected work view. Select a card to filter outstanding responsibilities.</span></div><div className="workspaceGrid">{workspaceCards.map((card)=><Link className={`workspaceCard ${moduleFilter===card.source?"active":""}`} href={`/portal/tasks?view=${view}&module=${card.source}&status=open`} key={card.source}><b className="workspaceCode">{card.code}</b><div><strong>{card.label}</strong><div className="workspaceStats">{card.unavailable ? <span className="danger">Data incomplete</span> : null}<span><b>{card.unavailable ? "—" : card.open}</b> outstanding</span><span className="danger"><b>{card.unavailable ? "—" : card.overdue}</b> overdue</span><span className="decision"><b>{card.unavailable ? "—" : card.decisions}</b> decisions</span></div></div></Link>)}</div></section>
     <div className="taskNotice"><b>Identity-controlled decisions</b>Assignments may be managed by authorised leaders, but completion, approval and verification must be recorded by the signed-in person - not on another user's behalf.</div>
     <section className="taskPanel">{scoped.length?<><div className="taskHead"><span>Task / source</span><span>Assigned person</span><span>Due</span><span>Status</span><span>Record</span></div>{scoped.map((item)=><Link className="taskRow" href={item.href} key={item.id}><div><strong>{item.title}</strong><small>{item.module}{item.site?` - ${item.site}`:""}</small></div><div><strong>{item.assigneePerson?`${item.assigneePerson.first_name} ${item.assigneePerson.last_name}`:item.ownerName||"Not assigned"}</strong><small>{item.assigneePerson?.position||"Company responsibility"}</small></div><div><strong>{date(item.due)}</strong><small>{item.overdue?"Escalation required":"Controlled target"}</small></div><div><span className={`taskStatus ${item.overdue?"overdue":""}`}>{item.overdue?"Overdue":words(item.status)}</span></div><b className="taskOpen">Open &gt;</b></Link>)}</>:<div className="taskEmpty"><strong>No assigned tasks in this view.</strong><br/>New assignments will appear when a Company User is selected in a connected module.</div>}</section>
   </div></main>;
