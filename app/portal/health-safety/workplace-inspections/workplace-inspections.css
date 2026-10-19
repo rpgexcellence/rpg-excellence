@@ -15,6 +15,40 @@
 @media(max-width:1050px){.wpiMetrics{grid-template-columns:repeat(3,1fr)}.wpiGrid{grid-template-columns:1fr}}
 @media(max-width:650px){.wpiPage{padding:20px 12px 60px}.wpiTop h1{font-size:30px}.wpiButtons{width:100%}.wpiButton{flex:1;text-align:center}.wpiHero{grid-template-columns:1fr}.wpiHero strong{font-size:34px}.wpiMetrics{grid-template-columns:1fr 1fr}.wpiRow{grid-template-columns:minmax(0,1fr) auto}.wpiRow .wpiMeta{display:none}.wpiStrip{align-items:flex-start;flex-direction:column}}
 
+/* Evidence capture and saved evidence cards. */
+.wpiPage .wpiEvidenceWorkspace{margin-top:22px}
+.wpiPage .wpiEvidenceSource{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 20px;padding:6px;border:1px solid #d7e2ee;border-radius:12px;background:#f3f7fb;width:fit-content;max-width:100%}
+.wpiPage .wpiEvidenceSource button{min-height:44px;padding:11px 22px;border:1px solid transparent;border-radius:8px;background:transparent;color:#304d6c;font:inherit;font-size:14px;font-weight:700;cursor:pointer;line-height:1.5}
+.wpiPage .wpiEvidenceSource button.selected{border-color:#4254e8;background:#4254e8;color:#fff;box-shadow:0 2px 5px #20326618}
+.wpiPage .wpiEvidenceSource button:hover:not(.selected){border-color:#b9cadb;background:#fff}
+.wpiPage .wpiCamera{display:flex;flex-direction:column;gap:18px;min-width:0;width:100%;padding:24px;border:2px dashed #aabfd6;border-radius:12px;background:#f7faff;line-height:1.6}
+.wpiPage .wpiCamera>span{display:block;min-width:0;order:-1}
+.wpiPage .wpiCamera strong{display:block;margin-bottom:6px;color:#173c62;font-size:16px}
+.wpiPage .wpiCamera small{display:block;max-width:850px;color:#5b7189;font-size:13px;line-height:1.7}
+.wpiPage .wpiCamera input[type=file]{display:block;width:100%;max-width:100%;min-width:0;padding:10px;border:1px solid #c4d3e4;border-radius:8px;background:white;color:#34516f;font:inherit;font-size:14px;line-height:1.6}
+.wpiPage .wpiCamera input[type=file]::file-selector-button{margin-right:14px;padding:10px 16px;border:1px solid #bacce0;border-radius:7px;background:#edf3fb;color:#183e66;font:inherit;font-weight:700;cursor:pointer}
+.wpiPage .wpiCamera input[type=file]:focus-visible{outline:3px solid #b8c8ff;outline-offset:3px}
+.wpiPage .wpiPhotoPreview{display:grid;gap:12px;justify-items:start;padding:18px;border:1px solid #d5e1ea;border-radius:12px;background:#f5f8fc;min-width:0}
+.wpiPage .wpiPhotoPreview img{display:block;max-width:100%;width:auto;max-height:380px;height:auto;object-fit:contain;border-radius:8px}
+.wpiPage .wpiPhotoPreview>span{font-size:13px;color:#5b7189;line-height:1.6}
+.wpiPage .wpiEvidenceGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px;min-width:0}
+.wpiPage .wpiEvidenceCard{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start;padding:20px;border:1px solid #d5e1ea;border-radius:12px;background:#fff;min-width:0}
+.wpiPage .wpiEvidenceIcon{max-width:110px;padding:9px 12px;border-radius:8px;background:#edf2fb;color:#31547d;font-size:11px;font-weight:700;line-height:1.5;overflow-wrap:anywhere}
+.wpiPage .wpiEvidenceCard>div:nth-child(2){min-width:0;overflow-wrap:anywhere;line-height:1.6}
+.wpiPage .wpiEvidenceCard strong{display:block;margin-bottom:6px;font-size:15px;color:#173c62}
+.wpiPage .wpiEvidenceCard small{display:block;color:#61768d;font-size:12px;line-height:1.7}
+.wpiPage .wpiEvidenceCard p{margin:10px 0;color:#405c79;line-height:1.7}
+.wpiPage .wpiEvidenceCard>form{grid-column:1/-1;margin:0}
+.wpiPage .wpiEvidenceCard button{min-height:44px;cursor:pointer;font:inherit;font-size:14px;font-weight:700}
+.wpiPage .wpiEvidenceWorkspace .wpiPanel>.wpiMessage{margin-bottom:18px}
+@media(max-width:650px){
+  .wpiPage .wpiEvidenceSource{width:100%;gap:6px}
+  .wpiPage .wpiEvidenceSource button{flex:1 1 100px;padding:10px 12px}
+  .wpiPage .wpiCamera{padding:18px}
+  .wpiPage .wpiCamera input[type=file]::file-selector-button{display:block;margin:0 0 8px}
+  .wpiPage .wpiEvidenceCard{padding:16px;gap:12px;grid-template-columns:minmax(0,1fr)}
+}
+
 /* Shared inspection forms and fieldwork layout. */
 .wpiPage .wpiShell{width:100%;max-width:none;min-width:0}
 .wpiPage .wpiPanel{min-width:0}
