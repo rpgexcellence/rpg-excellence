@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import WorkplaceInspectionFieldwork from "../../../../../components/WorkplaceInspectionFieldwork";
 import WorkplaceInspectionFindingsPanel from "../../../../../components/WorkplaceInspectionFindingsPanel";
+import OfflineInspectionDraft from "../../../../../components/OfflineInspectionDraft";
 import WorkplaceInspectionActionEditor from "../../../../../components/WorkplaceInspectionActionEditor";
 import WorkplaceInspectionControlWorkflow from "../../../../../components/WorkplaceInspectionControlWorkflow";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
@@ -76,7 +77,7 @@ export default async function WorkplaceInspectionRecordPage({ params }) {
   const failed = responses.filter((item) => item.response === "no").length;
   const openActions = actions.filter((item) => !["closed", "cancelled"].includes(item.status));
 
-  return <main className="wpiPage"><div className="wpiShell">
+  return <main id="inspection-offline-workspace" className="wpiPage"><div className="wpiShell">
     <header className="wpiTop">
       <div><small>{inspection.inspection_reference} · {inspection.status.replaceAll("_", " ").toUpperCase()}</small><h1>{inspection.title}</h1><p>{inspection.administration_location_label}{inspection.area_department ? " · " + inspection.area_department : ""}</p></div>
       <div className="wpiButtons"><a className="wpiButton" href="#inspection-review-actions">Review and actions</a><Link className="wpiButton" href={ROOT}>← Register</Link>{inspection.programme_id ? <Link className="wpiButton" href={ROOT + "/programmes/" + inspection.programme_id}>Programme</Link> : null}<Link className="wpiButton" href={ROOT + "/" + inspection.id + "/evidence"}>Evidence</Link></div>
@@ -98,6 +99,8 @@ export default async function WorkplaceInspectionRecordPage({ params }) {
       <div className="wpiGuidance"><strong>Accountable owner</strong><p>{personLabel(peopleById.get(inspection.accountable_person_id))}</p></div>
       <div className="wpiGuidance"><strong>Independent reviewer</strong><p>{personLabel(peopleById.get(inspection.reviewer_person_id))}</p></div>
     </div>{readOnly && !lockedStatus ? <div className="wpiMessage error"><strong>View-only inspection</strong><span>Only the assigned inspector or authorised management can edit this fieldwork record.</span></div> : null}</section>
+
+    <OfflineInspectionDraft inspectionId={inspection.id} userId={access.user.id} scopeId="inspection-offline-workspace" />
 
     <section id="inspection-review-actions" aria-label="Inspection review and action closure" style={{ marginTop: 20, scrollMarginTop: 24 }}>
       <WorkplaceInspectionActionEditor
