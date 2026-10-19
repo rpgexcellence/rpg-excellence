@@ -13,6 +13,59 @@ const RESPONSES = ["not_assessed", "yes", "no", "not_applicable"];
 const PRIORITIES = ["low", "medium", "high", "critical"];
 const FINDING_TYPES = ["immediate_danger", "unsafe_condition", "unsafe_act", "nonconformity", "environmental", "positive_practice", "opportunity_for_improvement"];
 
+export async function updateInspectionAction(previousState, formData) {
+  try {
+    const access = await context("contribute");
+    const organizationId = access.organization.id;
+    const inspectionId = required(formData, "inspection_id", "Inspection", 80);
+    const actionId = required(formData, "action_id", "Action", 80);
+    const admin = createAdminClient();
+    const inspection = await loadInspection(admin, organizationId, inspectionId);
+    const management = access.isOwner || access.isCompanyAdministrator ||
+      ["review", "approve", "admin", "owner"].includes(access.level);
+    const assigned = access.person?.id &&
+      [inspection.lead_inspector_person_id, inspection.accountable_person_id].includes(access.person.id);
+    if (!management && !assigned) throw new Error("Only authorised management, the lead inspector or the accountable owner can edit an action.");
+    if (["completed", "cancelled"].includes(inspection.status)) throw new Error("This inspection is locked. Its actions cannot be edited.");
+
+    const { data: existing, error: loadError } = await admin.from("hs_workplace_inspection_actions")
+      .select("id,status,updated_at")
+      .eq("id", actionId).eq("inspection_id", inspectionId).eq("organization_id", organizationId).maybeSingle();
+    if (loadError) throw new Error(loadError.message);
+    if (!existing) throw new Error("The action was not found in this inspection.");
+    const editable = ["open", "accepted", "in_progress"];
+    if (!editable.includes(existing.status)) throw new Error("Only open actions can be edited. Actions awaiting verification, closed or cancelled are locked.");
+    const expectedUpdatedAt = required(formData, "expected_updated_at", "Action version", 80);
+    if (expectedUpdatedAt !== existing.updated_at) throw new Error("This action changed since you opened it. Refresh the page before editing.");
+
+    const actionText = required(formData, "action_text", "Required action", 3000);
+    const priority = required(formData, "priority", "Priority", 20);
+    if (!PRIORITIES.includes(priority)) throw new Error("Select a valid priority.");
+    const responsiblePersonId = required(formData, "responsible_person_id", "Responsible owner", 80);
+    const verifierPersonId = required(formData, "verifier_person_id", "Independent verifier", 80);
+    if (responsiblePersonId === verifierPersonId) throw new Error("The action owner cannot verify their own action.");
+    await validateCompanyPeople(organizationId, [responsiblePersonId, verifierPersonId]);
+    const targetDate = required(formData, "target_date", "Target date", 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) throw new Error("Enter a valid target date.");
+    const parsedDate = new Date(targetDate + "T00:00:00.000Z");
+    if (!Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== targetDate) throw new Error("Enter a valid target date.");
+
+    const { data: updated, error } = await admin.from("hs_workplace_inspection_actions")
+      .update({ action_text: actionText, priority,
+        responsible_person_id: responsiblePersonId, verifier_person_id: verifierPersonId,
+        target_date: targetDate, updated_by_user_id: access.user.id, updated_at: new Date().toISOString() })
+      .eq("id", actionId).eq("inspection_id", inspectionId).eq("organization_id", organizationId)
+      .eq("updated_at", expectedUpdatedAt).in("status", editable).select("id").maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!updated) throw new Error("This action changed or was locked while you were editing. Refresh the page.");
+    refreshControlledViews(inspectionId);
+    return { success: "Action updated. The owner, verifier and due date have been saved." };
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return { error: error.message || "The action could not be updated." };
+  }
+}
+
 function text(formData, name, maximum = 3000) {
   const value = String(formData.get(name) || "").trim();
   if (value.length > maximum) throw new Error(name.replaceAll("_", " ") + " is too long.");
