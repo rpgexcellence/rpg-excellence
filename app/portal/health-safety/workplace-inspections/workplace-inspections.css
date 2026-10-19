@@ -14,3 +14,109 @@
 .wpiEmpty{padding:20px;border-radius:10px;background:#f1f6f9;color:#667e93}.wpiAction{grid-template-columns:minmax(0,1fr) auto}.wpiFooter{margin-top:14px;color:#71869a;font-size:12px}.wpiStrip{margin-top:14px;padding:15px 18px;border:1px solid #b9d9d3;border-radius:12px;background:#effaf7;display:flex;justify-content:space-between;gap:15px;align-items:center}.wpiStrip p{margin:0;color:#3d665f}.wpiStrip a{white-space:nowrap;color:#087b69;font-weight:900;text-decoration:none}
 @media(max-width:1050px){.wpiMetrics{grid-template-columns:repeat(3,1fr)}.wpiGrid{grid-template-columns:1fr}}
 @media(max-width:650px){.wpiPage{padding:20px 12px 60px}.wpiTop h1{font-size:30px}.wpiButtons{width:100%}.wpiButton{flex:1;text-align:center}.wpiHero{grid-template-columns:1fr}.wpiHero strong{font-size:34px}.wpiMetrics{grid-template-columns:1fr 1fr}.wpiRow{grid-template-columns:minmax(0,1fr) auto}.wpiRow .wpiMeta{display:none}.wpiStrip{align-items:flex-start;flex-direction:column}}
+
+/* Shared inspection forms and fieldwork layout. */
+.wpiPage .wpiShell{width:100%;max-width:none;min-width:0}
+.wpiPage .wpiPanel{min-width:0}
+.wpiPage .wpiPanel h2{line-height:1.4}
+.wpiPage .wpiLead{line-height:1.6}
+.wpiPage .wpiProgrammeForm,
+.wpiPage .wpiFieldworkForm{display:flex;flex-direction:column;gap:22px;min-width:0;margin:0}
+.wpiPage .wpiField{display:flex;flex-direction:column;gap:8px;min-width:0;margin:0;font-size:14px;line-height:1.5}
+.wpiPage .wpiField>span{display:block;font-weight:700}
+.wpiPage .wpiField input,
+.wpiPage .wpiField select,
+.wpiPage .wpiField textarea{display:block;width:100%;max-width:100%;min-width:0;min-height:46px;margin:0;padding:12px 14px;border:1px solid #b8c9db;border-radius:9px;background:#fff;color:#102c4b;font:inherit;line-height:1.6}
+.wpiPage .wpiField select{padding-right:30px}
+.wpiPage .wpiField textarea{min-height:140px;resize:vertical}
+.wpiPage .wpiField small{color:#5c7188;line-height:1.5}
+.wpiPage .wpiField textarea::placeholder{color:#6b7c90;opacity:1}
+.wpiPage .wpiField input:focus-visible,
+.wpiPage .wpiField select:focus-visible,
+.wpiPage .wpiField textarea:focus-visible,
+.wpiPage button:focus-visible{outline:3px solid #b8c8ff;outline-offset:3px;border-color:#4254e8}
+.wpiPage .wpiField input:disabled,
+.wpiPage .wpiField select:disabled,
+.wpiPage .wpiField textarea:disabled{background:#f2f5f8;color:#52657b;opacity:1}
+.wpiPage .wpiFormGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;min-width:0}
+.wpiPage .wpiFormGrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.wpiPage .wpiGuidance{min-width:0;padding:18px;border:1px solid #d9e4ee;border-radius:10px;background:#f5f8fc;line-height:1.6;overflow-wrap:anywhere}
+.wpiPage .wpiGuidance>strong{display:block;margin-bottom:8px;font-size:14px}
+.wpiPage .wpiGuidance p{margin:8px 0 0;color:#536b83}
+.wpiPage .wpiGuidance small{display:block;color:#536b83;line-height:1.6}
+.wpiPage .wpiProgrammeForm>.wpiButton{align-self:flex-start;min-height:46px;max-width:100%;line-height:1.5;white-space:normal;cursor:pointer}
+.wpiPage button:disabled{cursor:not-allowed;opacity:.65}
+
+.wpiPage .wpiFieldworkBar{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:24px;padding:22px 24px;border:1px solid #d5e1ea;border-radius:14px;background:#fff;align-items:center}
+.wpiPage .wpiFieldworkBar>div{min-width:0}
+.wpiPage .wpiFieldworkBar span{display:block;margin-bottom:7px;color:#5d7288;font-size:12px;font-weight:700}
+.wpiPage .wpiFieldworkBar strong{display:block;font-size:18px;line-height:1.5}
+.wpiPage .wpiProgress{height:8px;margin-top:12px;overflow:hidden;border-radius:8px;background:#e7edf4}
+.wpiPage .wpiProgress i{display:block;height:100%;background:#147c69;border-radius:inherit}
+.wpiPage .wpiQuestionList{display:grid;gap:22px;min-width:0}
+.wpiPage .wpiQuestion{min-width:0;padding:26px;border:1px solid #cfddea;border-left:5px solid #8ba0b8;border-radius:14px;background:#fff}
+.wpiPage .wpiQuestion.failed{border-left-color:#c9342e}
+.wpiPage .wpiQuestion.passed{border-left-color:#078763}
+.wpiPage .wpiQuestion>header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}
+.wpiPage .wpiQuestion>header>div{min-width:0}
+.wpiPage .wpiQuestion>header small{display:block;color:#5c7188;font-size:12px;font-weight:700;line-height:1.5}
+.wpiPage .wpiQuestion h2{margin:8px 0 0;font-size:20px;line-height:1.5;overflow-wrap:anywhere}
+.wpiPage .wpiQuestion>header>span{flex-shrink:0;padding:6px 10px;border-radius:7px;background:#edf2f8;color:#48617e;font-size:12px;font-weight:700}
+.wpiPage .wpiResponseChoices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:800px;margin-bottom:22px}
+.wpiPage .wpiResponseChoices>label{display:flex;align-items:center;gap:10px;min-width:0;min-height:48px;padding:12px 16px;border:1px solid #b9cadb;border-radius:9px;background:#fff;color:#243e5b;cursor:pointer;line-height:1.5}
+.wpiPage .wpiResponseChoices>label.selected{border-color:#4254e8;background:#edf0ff;color:#2838a6;box-shadow:inset 0 0 0 1px #4254e8}
+.wpiPage .wpiResponseChoices input{flex-shrink:0;width:18px;height:18px;margin:0;accent-color:#4254e8}
+.wpiPage .wpiResponseChoices>label:focus-within{outline:3px solid #b8c8ff;outline-offset:2px}
+.wpiPage .wpiQuestionGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;min-width:0}
+.wpiPage .wpiQuestionGrid textarea{width:100%;min-height:160px}
+.wpiPage .wpiFindingToggle{display:flex;align-items:flex-start;gap:10px;line-height:1.6;cursor:pointer}
+.wpiPage .wpiFindingToggle input{flex-shrink:0;width:18px;height:18px;margin:3px 0 0;accent-color:#4254e8}
+.wpiPage .wpiQuestionGuidance{margin-top:20px;border-top:1px solid #dce5ee;padding-top:16px;color:#536b83;line-height:1.7}
+.wpiPage .wpiQuestionGuidance summary{padding:4px 0;color:#254765;font-size:14px;font-weight:700;cursor:pointer}
+.wpiPage .wpiQuestionGuidance>div{padding:16px;margin-top:12px;border-radius:9px;background:#f5f8fc}
+.wpiPage .wpiQuestionGuidance p{margin:6px 0 16px}
+.wpiPage .wpiQuestionGuidance p:last-child{margin-bottom:0}
+.wpiPage .wpiFormFooter{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px;padding:22px 24px;border:1px solid #d5e1ea;border-radius:12px;background:#fff}
+.wpiPage .wpiFormFooter p{margin:0;color:#536b83;line-height:1.6}
+.wpiPage .wpiFormFooter button{min-height:48px;padding:12px 24px;border:1px solid #2f61e8;border-radius:9px;background:#2f61e8;color:white;font:inherit;font-weight:700;cursor:pointer}
+.wpiPage .wpiMessage{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border:1px solid #cbd9e8;border-radius:10px;background:#f2f7fc;color:#244560;line-height:1.6;overflow-wrap:anywhere}
+.wpiPage .wpiMessage.success{background:#effaf3;border-color:#b6dac4;color:#195c36}
+.wpiPage .wpiMessage.error{background:#fff2f2;border-color:#efbbbb;color:#922525}
+.wpiPage .wpiFindingWorkspace,
+.wpiPage .wpiEvidenceWorkspace,
+.wpiPage .wpiWorkflowStack{display:grid;gap:22px;min-width:0}
+.wpiPage .wpiSectionHead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}
+.wpiPage .wpiSectionHead>div{min-width:0}
+.wpiPage .wpiSectionHead small{display:block;margin-bottom:6px;color:#087f6c;font-size:11px;font-weight:700;letter-spacing:.06em}
+.wpiPage .wpiSectionHead p{margin:8px 0 0;color:#61768d;line-height:1.6}
+.wpiPage .wpiSectionHead>span{flex-shrink:0;font-size:13px;color:#536b83}
+.wpiPage .wpiFinding{padding:20px;border:1px solid #d5e1ea;border-radius:12px;min-width:0;overflow-wrap:anywhere}
+.wpiPage .wpiFinding>header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.wpiPage .wpiFinding>header small{display:block;margin-top:6px;color:#61768d}
+.wpiPage .wpiFinding p{line-height:1.7}
+.wpiPage .wpiWorkflowForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.wpiPage .wpiWorkflowForm .wide,
+.wpiPage .wpiWorkflowForm .wpiMessage,
+.wpiPage .wpiWorkflowActions{grid-column:1/-1}
+.wpiPage .wpiWorkflowForm.compact{grid-template-columns:minmax(0,1fr)}
+.wpiPage .wpiWorkflowList{display:grid;gap:20px}
+.wpiPage .wpiWorkflowCard{padding:20px;border:1px solid #d5e1ea;border-radius:12px}
+
+@media(max-width:1000px){
+  .wpiPage .wpiFormGrid.three{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .wpiPage .wpiFieldworkBar{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:650px){
+  .wpiPage .wpiFormGrid,
+  .wpiPage .wpiFormGrid.three,
+  .wpiPage .wpiWorkflowForm{grid-template-columns:minmax(0,1fr)}
+  .wpiPage .wpiQuestion{padding:18px 14px}
+  .wpiPage .wpiQuestion h2{font-size:18px}
+  .wpiPage .wpiQuestion>header{gap:12px}
+  .wpiPage .wpiResponseChoices{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .wpiPage .wpiResponseChoices>label{padding:10px 12px}
+  .wpiPage .wpiFieldworkBar{padding:18px;gap:18px}
+  .wpiPage .wpiSectionHead,.wpiPage .wpiFinding>header{flex-wrap:wrap}
+  .wpiPage .wpiFormFooter button{width:100%}
+  .wpiPage .wpiProgrammeForm>.wpiButton{align-self:stretch;width:100%}
+}
