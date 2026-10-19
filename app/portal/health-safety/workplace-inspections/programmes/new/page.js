@@ -40,11 +40,12 @@ export default async function NewWorkplaceInspectionProgrammePage() {
       <strong>4 steps</strong>
     </section>
 
-    {blockers.length ? <section className="wpiBlocker" role="alert"><strong>Complete the following before creating a programme:</strong><ol>{blockers.map((item) => <li key={item}>{item}</li>)}</ol><div className="wpiButtons"><Link className="wpiButton" href="/portal/company/business-profile">Open Site Profile</Link><Link className="wpiButton" href="/portal/company/people">Open Company Users</Link></div></section> : null}
+    {blockers.length ? <section className="wpiBlocker" role="alert"><strong>Complete the following before creating a programme:</strong><ol>{blockers.map((item) => <li key={item}>{item}</li>)}</ol><div className="wpiButtons"><Link className="wpiButton" href="/portal/company/sites">Open Site Profile</Link><Link className="wpiButton" href="/portal/company/people">Open Company Users</Link></div></section> : null}
 
     {!blockers.length ? <WorkplaceInspectionProgrammeForm
       action={createInspectionProgramme}
       sites={options.sites}
+      zones={options.zones}
       people={options.people}
       templates={options.templates}
       profileFields={AREA_PROFILE_FIELDS}
