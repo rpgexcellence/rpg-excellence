@@ -422,6 +422,7 @@ export default async function OrganizationSitesPage({
                           )}
                         </span>
 
+                        <Link href={`/portal/company/sites/${site.id}/zones`}>Buildings &amp; zones</Link>
                         <Link
                           href={`/portal/company/sites?edit=${site.id}`}
                         >
