@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 
 import WorkplaceInspectionFieldwork from "../../../../../components/WorkplaceInspectionFieldwork";
 import WorkplaceInspectionFindingsPanel from "../../../../../components/WorkplaceInspectionFindingsPanel";
+import WorkplaceInspectionActionEditor from "../../../../../components/WorkplaceInspectionActionEditor";
 import WorkplaceInspectionControlWorkflow from "../../../../../components/WorkplaceInspectionControlWorkflow";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 import { requirePlanAccess } from "../../../../../lib/plan-access";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import {
+  updateInspectionAction,
   completeInspectionAction,
   reviewInspection,
   verifyInspectionAction,
@@ -98,6 +100,13 @@ export default async function WorkplaceInspectionRecordPage({ params }) {
     </div>{readOnly && !lockedStatus ? <div className="wpiMessage error"><strong>View-only inspection</strong><span>Only the assigned inspector or authorised management can edit this fieldwork record.</span></div> : null}</section>
 
     <section id="inspection-review-actions" aria-label="Inspection review and action closure" style={{ marginTop: 20, scrollMarginTop: 24 }}>
+      <WorkplaceInspectionActionEditor
+        inspection={inspection}
+        actions={actions}
+        people={people}
+        action={updateInspectionAction}
+        canEdit={management || Boolean(access.person?.id && [inspection.lead_inspector_person_id, inspection.accountable_person_id].includes(access.person.id))}
+      />
       <WorkplaceInspectionControlWorkflow
         inspection={inspection}
         actions={actions}
