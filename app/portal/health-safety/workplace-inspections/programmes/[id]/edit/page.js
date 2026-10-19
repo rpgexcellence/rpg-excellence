@@ -62,6 +62,7 @@ export default async function EditWorkplaceInspectionProgrammePage({ params }) {
       action={updateInspectionProgramme}
       programme={programme}
       sites={options.sites}
+      zones={options.zones}
       people={options.people}
       templates={options.templates}
       profileFields={AREA_PROFILE_FIELDS}
