@@ -165,7 +165,7 @@ export default function WorkplaceInspectionFieldwork({
       const failedQuestion = row.response === "no";
       const notApplicable = row.response === "not_applicable";
       return <article className={"wpiQuestion " + (failedQuestion ? "failed" : row.response === "yes" ? "passed" : "")} key={row.id}>
-        <header><div><small>{question.section_code} · {question.section_title}</small><h2>{index + 1}. {question.question_text}</h2></div><span>{question.question_code}</span></header>
+        <header><div><small>{question.section_code} · {question.section_title}</small><h2>{question.question_code} · {question.question_text}</h2></div><span>{question.question_code}</span></header>
         <div className="wpiResponseChoices" role="radiogroup" aria-label={question.question_text}>
           <Choice label="Yes" value="yes" row={row} disabled={readOnly} changeRow={changeRow} />
           <Choice label="No" value="no" row={row} disabled={readOnly} changeRow={changeRow} />
