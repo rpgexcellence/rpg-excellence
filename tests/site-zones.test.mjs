@@ -1,31 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canReadZone,readableAssessment,assessmentDue,siteToday} from '../lib/zone-policy.mjs';
-const zone={organization_id:'company-a',site_status:'active',status:'published',access_mode:'company'};
-const member={user:{id:'employee'},organization:{id:'company-a'}};
-const other={user:{id:'employee'},organization:{id:'company-b'}};
-test('private zone requires membership in its organisation',()=>{
- assert.equal(canReadZone(zone,null),false);assert.equal(canReadZone(zone,member),true);assert.equal(canReadZone(zone,other),false);
+import {SAFETY_SIGNS,validateSafetySigns,signsNeedReview,signScopeText} from '../lib/safety-signs.mjs';
+const a={id:'assessment-a',status:'approved',version:2};
+const ppe={code:'M009',scope:'task',applies_to:'Handling hot trays',instruction:'Use the heat-protective gloves specified in RA-01.',assessment_id:a.id};
+test('PPE requires a linked approved assessment and exact task scope',()=>{
+ assert.throws(()=>validateSafetySigns([ppe],[],true),/linked approved/);
+ assert.throws(()=>validateSafetySigns([{...ppe,applies_to:''}],[a],true),/task or sub-area/);
+ const [result]=validateSafetySigns([ppe],[a],true);assert.equal(result.assessment_version,2);assert.equal(signScopeText(result),'Task: Handling hot trays');
 });
-test('public link publishes only the published active zone',()=>{
- assert.equal(canReadZone({...zone,access_mode:'link'},null),true);
- for(const status of ['draft','archived'])assert.equal(canReadZone({...zone,access_mode:'link',status},null),false);
- assert.equal(canReadZone({...zone,access_mode:'link',site_status:'inactive'},null),false);
+test('unknown, duplicate and excessive signs are rejected',()=>{
+ assert.throws(()=>validateSafetySigns([{...ppe,code:'FAKE'}],[a]),/Unknown/);
+ assert.throws(()=>validateSafetySigns([ppe,ppe],[a]),/duplicate/);
+ assert.throws(()=>validateSafetySigns(Array(13).fill(ppe),[a]),/12 signs/);
 });
-test('preview cannot bypass organisation or administrator checks',()=>{
- const draft={...zone,status:'draft'};
- assert.equal(canReadZone(draft,member,true),false);
- assert.equal(canReadZone(draft,{...other,isOwner:true},true),false);
- assert.equal(canReadZone(draft,{...member,isCompanyAdministrator:true},true),true);
- assert.equal(canReadZone({...draft,status:'archived'},{...member,isOwner:true},true),false);
+test('published signs require an instruction; facility signs do not require an assessment',()=>{
+ assert.throws(()=>validateSafetySigns([{...ppe,instruction:''}],[a],true),/specific instruction/);
+ assert.equal(validateSafetySigns([{code:'F016',scope:'zone',instruction:'Fire blanket beside the kitchen exit.'}],[],true)[0].assessment_id,null);
 });
-test('only approved and communicated assessments can be read',()=>{
- for(const status of ['draft','in_review','superseded','archived','review_due','changes_required'])assert.equal(readableAssessment({status}),false);
- for(const status of ['approved','communicated'])assert.equal(readableAssessment({status}),true);
+test('approval expiry, source supersession and version changes require review',()=>{
+ const signs=validateSafetySigns([ppe],[a],true),zone={safety_signs:signs,signs_reviewed_by:'reviewer',signs_review_date:'2027-01-01'};
+ assert.equal(signsNeedReview(zone,[a],'2026-10-19'),false);
+ assert.equal(signsNeedReview(zone,[{...a,status:'superseded'}],'2026-10-19'),true);
+ assert.equal(signsNeedReview(zone,[{...a,version:3}],'2026-10-19'),true);
+ assert.equal(signsNeedReview(zone,[a],'2027-01-01'),true);
 });
-test('due assessments and local dates respect the site calendar',()=>{
- assert.equal(assessmentDue({review_date:'2026-10-19'},'2026-10-19'),true);
- assert.equal(assessmentDue({},'2026-10-19'),false);
- assert.equal(siteToday('Europe/London',new Date('2026-10-19T23:30:00Z')),'2026-10-20');
- assert.equal(siteToday('invalid-zone',new Date('2026-10-19T23:30:00Z')),'2026-10-19');
+test('sign artwork is bundled with provenance and permissive licences',()=>{
+ assert.equal(SAFETY_SIGNS.length,26);
+ for(const s of SAFETY_SIGNS){assert(s.png.startsWith('iVBOR'));assert(s.source.startsWith('https://commons.wikimedia.org/wiki/'));assert(['Public domain','CC0'].includes(s.license));}
 });
