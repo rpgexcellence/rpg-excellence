@@ -23,52 +23,92 @@ export async function GET(request,{params}) {
  if(!['A4','A3'].includes(size))return new Response('Choose A4 or A3.',{status:400});
  const pdf=await PDFDocument.create();pdf.setTitle(`${clean(zone.reference)} - ${clean(zone.name)}`);pdf.setAuthor('RPG Excellence');
  const regular=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
- const navy=rgb(.03,.14,.26),teal=rgb(0,.53,.60),white=rgb(1,1,1),grey=rgb(.32,.41,.48),pale=rgb(.94,.97,.98),red=rgb(.70,.10,.08);
+ const navy=rgb(.025,.12,.23),teal=rgb(0,.61,.68),white=rgb(1,1,1),grey=rgb(.31,.40,.48),pale=rgb(.94,.98,.99),red=rgb(.72,.12,.10),yellow=rgb(1,.77,.03),border=rgb(.78,.87,.90);
+ const W=595.28,H=841.89,left=30,contentWidth=322,right=370,rightWidth=195,bottom=115;
  let page,y;const pages=[];
  const draw=(text,x,baseline,fontSize=12,font=regular,color=navy)=>page.drawText(clean(text),{x,y:baseline,size:fontSize,font,color});
  const lines=(text,maxWidth,fontSize,font=regular)=>{
   const result=[];let line='';for(const word of clean(text).split(' ')){
-   let candidate=line?line+' '+word:word;
+   if(!word)continue;const candidate=line?line+' '+word:word;
    if(font.widthOfTextAtSize(candidate,fontSize)<=maxWidth){line=candidate;continue;}
    if(line)result.push(line);line='';
    for(const char of word){if(font.widthOfTextAtSize(line+char,fontSize)>maxWidth){result.push(line);line=char;}else line+=char;}
   }if(line)result.push(line);return result;
  };
- const newPage=(first=false)=>{
-  page=pdf.addPage([595.28,841.89]);pages.push(page);
-  page.drawRectangle({x:0,y:837,width:595.28,height:5,color:rgb(1,.79,.08)});
-  page.drawRectangle({x:0,y:first?700:751,width:595.28,height:first?137:86,color:navy});
-  draw(first?'MY WORK AREA':`${zone.reference} | AREA SAFETY INSTRUCTIONS`,36,first?793:797,first?15:16,bold,white);
-  if(first){let r=38;while(bold.widthOfTextAtSize(clean(zone.reference),r)>523&&r>12)r--;draw(zone.reference,36,760,r,bold,white);let n=20;while(lines(zone.name,523,n,bold).length>2&&n>10)n--;lines(zone.name,523,n,bold).forEach((l,i)=>draw(l,36,728-i*23,n,bold,white));y=680;}else{lines(zone.name,523,13).slice(0,2).forEach((l,i)=>draw(l,36,776-i*15,13,regular,white));y=727;}
+ const fit=(text,width,start,min=8)=>{let size=start;while(bold.widthOfTextAtSize(clean(text),size)>width&&size>min)size-=.5;return size;};
+ const qr=await pdf.embedPng(await QRCode.toBuffer(url,{width:1000,margin:4,errorCorrectionLevel:'M'}));
+ let photo,logo;
+ try{photo=await pdf.embedPng(await readFile(path.join(process.cwd(),'public/hs-journey/identify.png')));}catch{}
+ try{logo=await pdf.embedPng(await readFile(path.join(process.cwd(),'public/rpg-excellence-logo.png')));}catch{}
+ const sidebar=()=>{
+  page.drawRectangle({x:right,y:bottom,width:rightWidth,height:y-bottom+6,color:pale,borderColor:border,borderWidth:.7});
+  let sy=y-17;
+  draw('ONE CONNECTION',right+14,sy,13,bold,teal);sy-=24;
+  page.drawRectangle({x:right+12,y:sy-169,width:171,height:171,color:white,borderColor:teal,borderWidth:1.5});
+  page.drawImage(qr,{x:right+16,y:sy-165,width:163,height:163});sy-=190;
+  draw('SCAN HERE',right+14,sy,22,bold);sy-=19;
+  for(const l of lines('Open your phone camera and scan the code.',167,10.5)){draw(l,right+14,sy,10.5);sy-=14;}sy-=9;
+  for(const label of [zone.show_inspections?'Workplace inspections':null,zone.show_assessments?'Approved risk assessments':null,'Area safety information','Report a concern'].filter(Boolean)){
+   draw('>',right+14,sy,11,bold,teal);for(const l of lines(label,149,10,bold)){draw(l,right+28,sy,10,bold);sy-=14;}sy-=5;
+  }
+  const accessLines=lines(zone.access_mode==='company'?'Company sign-in required.':'Published area information.',167,9);
+  for(const l of accessLines){draw(l,right+14,sy,9,regular,grey);sy-=12;}
+  sy-=9;for(const l of lines(url,167,7)){draw(l,right+14,sy,7,regular,grey);sy-=10;}
  };
- const ensure=height=>{if(y-height<100)newPage();};
- const paragraph=(text,title,color=navy)=>{
-  if(!text)return;ensure(62);y-=6;draw(title,36,y,15,bold,color);y-=24;
-  for(const line of lines(text,523,11)){ensure(15);draw(line,36,y,11,regular,color);y-=15;}y-=16;
+ const newPage=(first=false)=>{
+  page=pdf.addPage([W,H]);pages.push(page);
+  page.drawRectangle({x:0,y:H-7,width:W,height:7,color:yellow});
+  const headerBottom=first?654:683,headerHeight=H-7-headerBottom;
+  page.drawRectangle({x:0,y:headerBottom,width:W,height:headerHeight,color:navy});
+  if(photo&&first){const pw=290,ph=headerHeight;const scale=Math.max(pw/photo.width,ph/photo.height);page.drawImage(photo,{x:W-photo.width*scale,y:headerBottom,width:photo.width*scale,height:photo.height*scale});page.drawRectangle({x:0,y:headerBottom,width:W,height:headerHeight,color:navy,opacity:.72});page.drawRectangle({x:0,y:headerBottom,width:285,height:headerHeight,color:navy,opacity:.45});}
+  if(logo){page.drawRectangle({x:left,y:785,width:155,height:36,color:white});const scale=Math.min(139/logo.width,28/logo.height);page.drawImage(logo,{x:left+8,y:789,width:logo.width*scale,height:logo.height*scale});}else draw('RPG EXCELLENCE',left,797,19,bold,white);
+  draw('MY WORK AREA',405,799,12,bold,white);
+  const refSize=fit(zone.reference,535,first?57:34,10);draw(zone.reference,left,first?738:739,refSize,bold,white);
+  let nameSize=first?23:17;while(lines(zone.name,535,nameSize,bold).length>(first?2:1)&&nameSize>8)nameSize-=.5;
+  let ny=first?701:713;for(const l of lines(zone.name,535,nameSize,bold)){draw(l,left,ny,nameSize,bold,white);ny-=nameSize+4;}
+  page.drawRectangle({x:left,y:headerBottom+12,width:58,height:4,color:teal});
+  let locationY=headerBottom-18;
+  for(const l of lines(`${site.site_name}${zone.floor_level?' / '+zone.floor_level:''}`,535,9.5)){draw(l,left,locationY,9.5,regular,grey);locationY-=13;}
+  const sloganY=locationY-20;
+  draw('Your area. Your safety.',left,sloganY,25,bold);
+  draw('One connection.',left,sloganY-26,24,bold,teal);
+  y=sloganY-53;
+  sidebar();
+ };
+ const ensure=height=>{if(y-height<bottom)newPage();};
+ const section=(text,title,color=navy)=>{
+  if(!clean(text))return;
+  const body=lines(text,contentWidth-24,11);let index=0,part=0;
+  while(index<body.length){ensure(76);const capacity=Math.max(1,Math.floor((y-bottom-45)/15)),chunk=body.slice(index,index+capacity),height=40+chunk.length*15;
+   page.drawRectangle({x:left,y:y-height,width:contentWidth,height,color:color===red?rgb(1,.96,.95):pale,borderColor:border,borderWidth:.7});
+   page.drawRectangle({x:left,y:y-height,width:3,height,color:color===red?red:teal});
+   draw(title+(part?' / CONTINUED':''),left+12,y-18,fit(title+(part?' / CONTINUED':''),contentWidth-24,11),bold,color);
+   let ty=y-39;for(const l of chunk){draw(l,left+12,ty,11,regular,color);ty-=15;}
+   y-=height+12;index+=chunk.length;part++;
+  }
  };
  newPage(true);
- try {const logo=await pdf.embedPng(await readFile(path.join(process.cwd(),'public/rpg-excellence-logo.png')));const factor=Math.min(180/logo.width,42/logo.height);page.drawRectangle({x:348,y:773,width:210,height:54,color:white});page.drawImage(logo,{x:357,y:779,width:logo.width*factor,height:logo.height*factor});}catch{draw('RPG EXCELLENCE',348,793,17,bold,white);}
- for(const line of lines(`${site.site_name}${zone.floor_level?' / '+zone.floor_level:''}`,350,11)){draw(line,36,y,11,regular,grey);y-=14;}
- y-=14;draw('Your area. Your safety.',36,y,25,bold);y-=27;
- for(const line of lines('Scan for live inspections, approved assessments and updates.',320,12)){draw(line,36,y,12,regular,grey);y-=16;}
- draw(zone.access_mode==='company'?'Company sign-in required':'Published information available through this link',36,y-12,10,regular,grey);
- const qr=await pdf.embedPng(await QRCode.toBuffer(url,{width:1000,margin:4,errorCorrectionLevel:'M'}));
- page.drawImage(qr,{x:410,y:530,width:145,height:145});
- let linkY=y-35;for(const line of lines(url,350,8)){draw(line,36,linkY,8,regular,grey);linkY-=11;}
- y=Math.min(linkY-25,510);
- paragraph(zone.restriction,'RESTRICTION / URGENT INSTRUCTION',red);
- if(signs.length){ensure(45);draw('AREA SIGNS & PPE REQUIREMENTS',36,y,15,bold);y-=27;}
+ section(zone.restriction,'RESTRICTIONS / URGENT INSTRUCTIONS',red);
  for(const sign of signs){const def=signDefinition(sign.code);if(!def)continue;
-  const title=lines(def.title,430,13,bold),scope=lines(signScopeText(sign),430,10),instruction=lines(sign.instruction,430,11),height=Math.max(76,title.length*16+scope.length*13+instruction.length*15+25);
+  const textWidth=contentWidth-87,title=lines(def.title,textWidth,12,bold),scope=lines(signScopeText(sign),textWidth,9.5),instruction=lines(sign.instruction,textWidth,10.5);
+  const height=Math.max(82,20+title.length*15+scope.length*12+instruction.length*14+10);
   ensure(height+12);const top=y;
-  page.drawRectangle({x:36,y:top-height,width:523,height,borderColor:rgb(.78,.85,.89),borderWidth:1,color:pale});
-  const icon=await pdf.embedPng(Buffer.from(def.png,'base64'));page.drawImage(icon,{x:46,y:top-70,width:58,height:58});
-  let ty=top-20;for(const l of title){draw(l,118,ty,13,bold);ty-=16;}for(const l of scope){draw(l,118,ty,10,bold,grey);ty-=13;}ty-=3;for(const l of instruction){draw(l,118,ty,11);ty-=15;}y=top-height-12;
+  page.drawRectangle({x:left,y:top-height,width:contentWidth,height,borderColor:border,borderWidth:.7,color:pale});
+  const icon=await pdf.embedPng(Buffer.from(def.png,'base64'));page.drawImage(icon,{x:left+10,y:top-67,width:56,height:56});
+  let ty=top-19;for(const l of title){draw(l,left+77,ty,12,bold);ty-=15;}for(const l of scope){draw(l,left+77,ty,9.5,bold,grey);ty-=12;}ty-=4;for(const l of instruction){draw(l,left+77,ty,10.5);ty-=14;}y=top-height-12;
  }
- paragraph(zone.key_controls,'PPE & KEY CONTROLS');
- paragraph(zone.emergency_information,'EMERGENCY INFORMATION');
- if(!signs.length&&!zone.key_controls)paragraph('Confirm applicable approved task controls with the area owner before starting work.','BEFORE WORK STARTS');
- for(let i=0;i<pages.length;i++){page=pages[i];page.drawRectangle({x:0,y:0,width:595.28,height:80,color:navy});draw(`Revision ${zone.poster_revision||1} | Issued ${new Date().toISOString().slice(0,10)} | Sheet ${i+1} of ${pages.length}`,36,56,10,bold,white);draw((signs.length?`Review by ${zone.signs_review_date}. `:'')+(pages.length>1?'Display all sheets together.':'Replace outdated copies.'),36,38,11,regular,white);draw('For immediate danger, follow site emergency procedures.',36,20,10,regular,white);if(size==='A3')page.scale(Math.SQRT2,Math.SQRT2);}
+ section(zone.key_controls,'PPE & KEY CONTROLS');
+ section(zone.emergency_information,'EMERGENCY INFORMATION');
+ if(!signs.length&&!zone.key_controls)section('Confirm applicable approved task controls with the area owner before starting work.','BEFORE WORK STARTS');
+ for(let i=0;i<pages.length;i++){
+  page=pages[i];page.drawRectangle({x:0,y:0,width:W,height:95,color:navy});page.drawRectangle({x:0,y:91,width:W,height:4,color:teal});
+  draw('See an issue? Report it here.',left,68,21,bold,white);
+  draw('Scan the QR code to report a concern.',left,51,10,regular,white);
+  draw('For immediate danger, follow site emergency procedures.',left,36,9,regular,white);
+  draw(`Rev ${zone.poster_revision||1} | Issued ${new Date().toISOString().slice(0,10)} | Sheet ${i+1} of ${pages.length}`,left,16,8,bold,white);
+  const review=(signs.length?`Review by ${zone.signs_review_date}. `:'')+(pages.length>1?'Display all sheets.':'Replace outdated copies.');draw(review,307,16,fit(review,258,8,6),regular,white);
+  if(size==='A3')page.scale(Math.SQRT2,Math.SQRT2);
+ }
  const bytes=await pdf.save();const filename=clean(zone.reference).replace(/[^A-Za-z0-9_-]/g,'_')||'zone';
  return new Response(Buffer.from(bytes),{headers:{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="RPG-${filename}-rev${zone.poster_revision||1}-${size}-poster.pdf"`,'Cache-Control':'private, no-store'}});
 }
