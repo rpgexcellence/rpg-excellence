@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import ZoneSafetySigns from '../../../components/ZoneSafetySigns';
+import {signsNeedReview} from '../../../lib/safety-signs.mjs';
 import {requireZonePage,loadZoneSafety,displayDate,personName,unwrap,zoneRoot} from '../../../lib/site-zones';
 import {assessmentDue,siteToday,siteTimezone} from '../../../lib/zone-policy.mjs';
 import '../../portal/company/sites/zones.css';
@@ -10,11 +12,15 @@ export default async function AreaPage({params,searchParams}) {
  const {admin,zone,site,building,access,preview}=await requireZonePage(token,query?.preview==='1');
  const {programmes,inspections,assessments,actions}=await loadZoneSafety(admin,zone);
  const today=siteToday(site.timezone),completed=inspections.filter(i=>i.completed_at).sort((a,b)=>b.completed_at.localeCompare(a.completed_at));
+ const signSources=(zone.safety_signs||[]).filter(s=>s.assessment_id).map(s=>s.assessment_id);
+ const reviewSources=signSources.length?unwrap(await admin.from('hs_risk_assessments').select('id,status,version').eq('organization_id',zone.organization_id).eq('administration_location_id',zone.site_id).in('id',signSources)):[];
+ const safetyReviewDue=signsNeedReview(zone,reviewSources,today);
  const due=programmes.filter(p=>p.next_inspection_date<today).length;
  const next=[...programmes].sort((a,b)=>a.next_inspection_date.localeCompare(b.next_inspection_date))[0];
  let owner=null;
  if(zone.show_owner) owner=unwrap(await admin.from('organization_people').select('first_name,last_name').eq('id',zone.owner_person_id).eq('organization_id',zone.organization_id).eq('account_status','active'))[0];
  return <main className="zone-page"><div className="zone-employee"><header className="zone-brand">RPG EXCELLENCE <small style={{color:'#cce8ee'}}>MY WORK AREA</small></header>{preview&&<p className="zone-notice">Administrator preview · {zone.status}. Employee access follows the saved publication settings.</p>}<small>{site.site_name}{building?' / '+building.name:''}{zone.floor_level?' / '+zone.floor_level:''}</small><h1>{zone.reference}</h1><h2>{zone.name}</h2><p>Zone instructions updated {displayDate(zone.updated_at)}<br/>Live records retrieved {new Date().toLocaleString('en-GB',{timeZone:siteTimezone(site.timezone)})}</p>{zone.restriction&&<section className="zone-restriction" role="note"><strong>RESTRICTION ACTIVE</strong><p className="zone-pre">{zone.restriction}</p></section>}
+ {(zone.safety_signs||[]).length>0&&<section className="zone-panel"><h2>Area signs &amp; PPE requirements</h2>{safetyReviewDue&&<p className="zone-review-warning">Safety-sign review required. Confirm these requirements and the applicable task assessment with the area owner before work starts.</p>}<ZoneSafetySigns signs={zone.safety_signs}/><small>Review due {displayDate(zone.signs_review_date)}. Follow the stated task and sub-area limits.</small></section>}
  <div className="zone-stats">{zone.show_inspections&&<article className="zone-stat"><small>Last recorded completion</small><strong>{completed[0]?displayDate(completed[0].completed_at):'Not recorded'}</strong><span>{actions.length} actions open</span>{due>0&&<p className="zone-secondary">{due} inspection programme(s) overdue</p>}</article>}{zone.show_assessments&&<article className="zone-stat"><small>Approved / communicated assessments</small><strong>{assessments.length} available</strong><span>{assessments.filter(a=>assessmentDue(a,today)).length} review(s) due</span></article>}</div>
  <div className="zone-buttons"><Link className="zone-button" style={{width:'100%'}} href={`/area/${token}/concerns`}>Report a concern →</Link></div><p><small>Reporting requires company sign-in. For immediate danger, follow site emergency procedures.</small></p>
  <nav className="zone-panel" aria-label="Safety information"><h2>Safety information</h2>{zone.show_assessments&&<a className="zone-preview-row" style={{display:'block'}} href="#assessments">Risk assessments →</a>}<a className="zone-preview-row" style={{display:'block'}} href="#controls">PPE &amp; key controls →</a><a className="zone-preview-row" style={{display:'block'}} href="#emergency">Emergency information →</a>{zone.show_inspections&&<a className="zone-preview-row" style={{display:'block'}} href="#inspections">Inspections &amp; action status →</a>}</nav>
