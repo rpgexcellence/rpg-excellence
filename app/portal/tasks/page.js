@@ -6,8 +6,8 @@ import { loadAssuranceTaskSources } from "../../../lib/assurance-task-sources";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My Tasks & Approvals | RPG Excellence" };
 
-const CLOSED = new Set(["closed", "complete", "completed", "effective", "verified", "cancelled", "approved"]);
-const VERIFY = new Set(["awaiting_review", "awaiting_verification", "evidence_submitted", "verification", "ready_for_review"]);
+const CLOSED = new Set(["closed", "complete", "completed", "effective", "verified", "cancelled", "approved", "verified_effective", "effective_verified"]);
+const VERIFY = new Set(["awaiting_review", "awaiting_verification", "evidence_submitted", "verification", "ready_for_review", "submitted", "verification_requested", "effectiveness_review"]);
 const value = (...items) => items.find((item) => item !== null && item !== undefined && String(item).trim()) || "";
 const words = (input) => String(input || "open").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const date = (input) => input ? new Intl.DateTimeFormat("en-GB", { day:"2-digit", month:"short", year:"numeric" }).format(new Date(input)) : "No due date";
@@ -50,9 +50,79 @@ function bcpTasks(sources) {
 }
 
 function auditTasks(sources, people) {
-  const byUser = new Map(people.filter((person)=>person.user_id).map((person)=>[person.user_id,person.id]));
-  const findings = new Map(sources.auditFindings.map((finding)=>[finding.id,finding]));
-  return sources.auditAssignments.map((row)=>{const finding=findings.get(row.finding_id)||{};return {id:`audit:${row.id}`,source:"audit",module:"Internal Audit / Findings",title:value(finding.title,finding.finding_reference,"Audit corrective action"),due:value(finding.agreed_date,row.secure_token_expires_at),assignee:byUser.get(row.assignee_user_id),verifier:null,href:`/portal/internal-audit-actions#action-${row.id}`,status:String(row.status||"assigned").toLowerCase(),site:"",ownerName:row.assignee_name,updated:value(row.updated_at,row.created_at)};});
+  const byUser = new Map(people.filter((person) => person.user_id).map((person) => [person.user_id, person.id]));
+  const personForEmail = (email) => {
+    const matches = people.filter((person) => email && person.email?.toLowerCase() === String(email).toLowerCase());
+    return matches.length === 1 ? matches[0].id : null;
+  };
+  const audits = new Map((sources.internalAudits || []).map((audit) => [audit.id, audit]));
+  const assignments = new Map((sources.auditAssignments || []).map((item) => [item.finding_id, item]));
+  const tasks = [];
+  for (const audit of audits.values()) {
+    if (["closed", "completed", "cancelled", "archived"].includes(audit.status)) continue;
+    const gate = audit.current_gate || "scope";
+    tasks.push({ id: `audit-workflow:${audit.id}`, source: "audit", module: "Internal Audit / Workflow",
+      title: `${words(gate)}: ${value(audit.title, audit.audit_reference, "Internal audit")}`,
+      due: audit.planned_end_at, assignee: byUser.get(audit.owner_id), assigneeUserId: audit.owner_id,
+      href: `/portal/internal-audits/${audit.id}?gate=${encodeURIComponent(gate)}`,
+      status: ["report_review", "scope_review", "team_review", "plan_review"].includes(audit.status) ? "awaiting_review" : "open",
+      site: value(audit.administration_location_label, audit.sites), ownerName: "Audit workspace owner", updated: audit.updated_at });
+  }
+  for (const finding of sources.auditFindings || []) {
+    const audit = audits.get(finding.audit_id);
+    if (!audit || !["major_nc", "minor_nc"].includes(finding.finding_type)) continue;
+    const assignment = assignments.get(finding.id);
+    const closed = CLOSED.has(String(finding.status || "").toLowerCase()) || CLOSED.has(String(assignment?.status || "").toLowerCase());
+    const awaiting = !closed && (VERIFY.has(assignment?.status) ||
+      Boolean(assignment?.d6_verification_requested_at && !assignment?.d6_verification_completed_at));
+    const ownerId = assignment ? byUser.get(assignment.assignee_user_id) || personForEmail(assignment.assignee_email) || finding.responsible_owner_person_id : finding.responsible_owner_person_id;
+    tasks.push({ id: `audit-finding:${finding.id}`, source: "audit", module: "Internal Audit / Findings",
+      title: value(finding.title, finding.finding_reference, "Audit corrective action"), due: finding.agreed_date,
+      assignee: awaiting ? byUser.get(audit.owner_id) : ownerId,
+      assigneeUserId: awaiting ? audit.owner_id : assignment?.assignee_user_id,
+      href: awaiting || !assignment ? `/portal/internal-audits/${audit.id}?gate=actions#action-${finding.id}` : `/portal/internal-audit-actions#action-${assignment.id}`,
+      status: closed ? "closed" : awaiting ? "awaiting_verification" : String(assignment?.status || finding.status || "open").toLowerCase(),
+      site: value(audit.administration_location_label, audit.sites),
+      ownerName: awaiting ? "Audit verification" : value(assignment?.assignee_name, finding.responsible_owner_name),
+      updated: value(assignment?.updated_at, finding.updated_at, finding.created_at) });
+  }
+  return tasks;
+}
+
+function inspectionTasks(sources) {
+  const tasks = [];
+  const inspections = sources.inspections || [];
+  const byId = new Map(inspections.map((item) => [item.id, item]));
+  const root = "/portal/health-safety/workplace-inspections";
+  for (const programme of sources.inspectionProgrammes || []) {
+    if (programme.status !== "active") continue;
+    const scheduled = inspections.some((item) => item.programme_id === programme.id && ["draft", "planned", "due", "in_progress"].includes(item.status));
+    if (!scheduled) tasks.push({ id: `inspection-programme:${programme.id}`, source: "inspection", module: "Workplace Inspections / Scheduling",
+      title: `Schedule inspection: ${programme.title}`, due: programme.next_inspection_date,
+      assignee: programme.lead_inspector_person_id || programme.accountable_person_id,
+      href: `${root}/programmes/${programme.id}`, status: "open", site: programme.administration_location_label, updated: programme.updated_at });
+  }
+  for (const inspection of inspections) {
+    const review = inspection.status === "awaiting_review";
+    if (!review && !["draft", "planned", "due", "in_progress"].includes(inspection.status)) continue;
+    tasks.push({ id: `inspection-record:${inspection.id}`, source: "inspection", module: "Workplace Inspections / " + (review ? "Independent review" : "Fieldwork"),
+      title: `${review ? "Review fieldwork" : "Complete fieldwork"}: ${inspection.title}`,
+      due: value(inspection.planned_end_at, inspection.planned_start_at),
+      assignee: review ? inspection.reviewer_person_id : inspection.lead_inspector_person_id,
+      href: `${root}/${inspection.id}${review ? "#inspection-review-actions" : ""}`,
+      status: review ? "awaiting_review" : inspection.status, site: inspection.administration_location_label, updated: inspection.updated_at });
+  }
+  for (const action of sources.inspectionActions || []) {
+    const inspection = byId.get(action.inspection_id);
+    if (!inspection || inspection.status === "cancelled") continue;
+    const verify = action.status === "awaiting_verification";
+    tasks.push({ id: `inspection-action:${action.id}`, source: "inspection", module: "Workplace Inspections / " + (verify ? "Verification" : "Actions"),
+      title: `${verify ? "Verify action" : "Complete action"}: ${value(action.action_text, action.action_reference)}`,
+      due: action.target_date, assignee: verify ? action.verifier_person_id : action.responsible_person_id,
+      href: `${root}/${action.inspection_id}#inspection-review-actions`, status: action.status,
+      site: inspection.administration_location_label, updated: action.updated_at });
+  }
+  return tasks;
 }
 
 function securityIncidentTasks(sources) {
@@ -96,6 +166,7 @@ export default async function TasksPage({ searchParams }) {
     admin.from("organization_people").select("*").eq("organization_id", organizationId).neq("account_status", "closed"),
     loadAssuranceTaskSources(admin, organizationId),
   ]);
+  if (peopleResult.error) throw new Error(peopleResult.error.message);
   const people = peopleResult.data || [];
   const personMap = new Map(people.map((person) => [person.id, person]));
   const me = access.person || people.find((person) => person.user_id === access.user?.id) || null;
@@ -105,10 +176,13 @@ export default async function TasksPage({ searchParams }) {
   const organisationOversight = Boolean(access.isOwner || access.isCompanyAdministrator || activeFunctions.has("ims_manager"));
   const siteOversight = activeFunctions.has("site_director");
   const reports = new Set(people.filter((person) => person.manager_person_id === me?.id || person.functional_manager_person_id === me?.id).map((person) => person.id));
-  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...sources.correctiveActions.map((row)=>normalize(row,"capa")), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...sources.assetMaintenance.map((row)=>normalize(row,"maintenance")), ...bcpTasks(sources), ...auditTasks(sources,people)]
+  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...sources.correctiveActions.map((row)=>normalize(row,"capa")), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...sources.assetMaintenance.map((row)=>normalize(row,"maintenance")), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
     .filter((item) => item.title)
+    .map((item) => ({ ...item, due: item.due ? String(item.due).slice(0,10) : "" }))
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
-  const visible = all.filter((item) => organisationOversight || item.assignee === myPersonId || item.verifier === myPersonId || reports.has(item.assignee) || (siteOversight && me?.site && (item.site === me.site || item.assigneePerson?.site === me.site)));
+  const isMine = (item) => item.assignee === myPersonId || item.verifier === myPersonId || item.assigneeUserId === access.user.id;
+  const needsDecision = (item) => !CLOSED.has(item.status) && VERIFY.has(item.status);
+  const visible = all.filter((item) => organisationOversight || isMine(item) || reports.has(item.assignee) || (siteOversight && me?.site && (item.site === me.site || item.assigneePerson?.site === me.site)));
   const requested = ["mine","team","oversight"].includes(params?.view) ? params.view : "mine";
   const view = requested === "oversight" && !organisationOversight && !siteOversight ? "mine" : requested;
   const moduleFilter = String(params?.module || "all");
@@ -117,11 +191,11 @@ export default async function TasksPage({ searchParams }) {
   const dueSoonLimit = new Date();
   dueSoonLimit.setUTCDate(dueSoonLimit.getUTCDate() + 14);
   const dueSoonDate = dueSoonLimit.toISOString().slice(0,10);
-  const baseScope = visible.filter((item) => view === "mine" ? item.assignee === myPersonId || item.verifier === myPersonId : view === "team" ? item.assignee === myPersonId || item.verifier === myPersonId || reports.has(item.assignee) : true);
+  const baseScope = visible.filter((item) => view === "mine" ? isMine(item) : view === "team" ? isMine(item) || reports.has(item.assignee) : true);
   const scoped = baseScope.filter((item) => {
     const isOpen = !CLOSED.has(item.status);
     const isDueSoon = Boolean(isOpen && item.due && item.due >= today && item.due <= dueSoonDate);
-    const isVerification = VERIFY.has(item.status) || item.verifier === myPersonId;
+    const isVerification = needsDecision(item);
     if (moduleFilter !== "all" && item.source !== moduleFilter) return false;
     if (stateFilter === "open" && !isOpen) return false;
     if (stateFilter === "overdue" && !item.overdue) return false;
@@ -133,10 +207,11 @@ export default async function TasksPage({ searchParams }) {
   const open = scoped.filter((item)=>!CLOSED.has(item.status));
   const overdue = open.filter((item)=>item.overdue);
   const dueSoon = open.filter((item)=>item.due && item.due >= today && item.due <= dueSoonDate);
-  const verification = open.filter((item)=>VERIFY.has(item.status) || item.verifier === myPersonId);
+  const verification = open.filter((item)=>needsDecision(item));
   const moduleOptions = [...new Map(baseScope.map((item)=>[item.source,item.module])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const workspaceCards = [
     ["audit","Internal Audit","AUD","/portal/internal-audits"],
+    ["inspection","Workplace Inspections","WPI","/portal/health-safety/workplace-inspections"],
     ["rca","CAPA-8D","8D","/portal/rca"],
     ["capa","Gap Assessment / CAPA","CAPA","/portal/history"],
     ["risk","Risk Management","RISK","/portal/health-safety/management-board"],
@@ -148,7 +223,7 @@ export default async function TasksPage({ searchParams }) {
     ["maintenance","Assets & PPM","PPM","/portal/company/assets"],
   ].map(([source,label,code,href]) => {
     const records = baseScope.filter((item)=>item.source===source && !CLOSED.has(item.status));
-    return { source,label,code,href,open:records.length,overdue:records.filter((item)=>item.overdue).length,decisions:records.filter((item)=>VERIFY.has(item.status) || item.verifier===myPersonId).length };
+    return { source,label,code,href,unavailable:(sources.sourceErrors || []).some((error)=>error.module===source),open:records.length,overdue:records.filter((item)=>item.overdue).length,decisions:records.filter((item)=>needsDecision(item)).length };
   });
 
   return <main className="taskPage"><style>{`
@@ -158,8 +233,9 @@ export default async function TasksPage({ searchParams }) {
     <header className="taskTop"><div><small>CONNECTED ASSURANCE - CONTROLLED ACCOUNTABILITY</small><h1>My Tasks &amp; Approvals</h1><p>One controlled view of work assigned to you, approvals requiring your decision, due dates and escalations across RPG Excellence.</p></div>{(organisationOversight || siteOversight) ? <Link href="/portal/tasks?view=oversight">Management Oversight</Link> : null}</header>
     <nav className="taskViews"><Link className={view==="mine"?"active":""} href="/portal/tasks?view=mine">My work</Link><Link className={view==="team"?"active":""} href="/portal/tasks?view=team">My team</Link>{(organisationOversight||siteOversight)?<Link className={view==="oversight"?"active":""} href="/portal/tasks?view=oversight">Management oversight</Link>:null}</nav>
     <form className="taskFilters" method="get"><input type="hidden" name="view" value={view}/><select name="module" defaultValue={moduleFilter}><option value="all">All connected modules</option>{moduleOptions.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><select name="status" defaultValue={stateFilter}><option value="all">All statuses</option><option value="open">Open only</option><option value="overdue">Overdue</option><option value="due_soon">Due in 14 days</option><option value="verification">Decision / verification</option></select><input name="q" defaultValue={params?.q||""} placeholder="Search task, module, site or owner"/><button type="submit">Apply filters</button></form>
+    {(sources.sourceErrors || []).length ? <div className="taskNotice" role="alert"><b>Some task sources could not be loaded</b>Counts are incomplete for {[...new Set(sources.sourceErrors.map((item)=>item.label))].join(", ")}. Do not treat missing tasks as zero outstanding work.</div> : null}
     <section className="taskMetrics"><div className="taskMetric"><span>OPEN RESPONSIBILITIES</span><strong>{open.length}</strong></div><div className="taskMetric red"><span>OVERDUE</span><strong>{overdue.length}</strong></div><div className="taskMetric amber"><span>DUE IN 14 DAYS</span><strong>{dueSoon.length}</strong></div><div className="taskMetric blue"><span>DECISIONS / VERIFICATION</span><strong>{verification.length}</strong></div></section>
-    <section className="workspaceSection"><div className="workspaceTitle"><h2>Connected workspaces</h2><span>Select a card to filter outstanding responsibilities</span></div><div className="workspaceGrid">{workspaceCards.map((card)=><Link className={`workspaceCard ${moduleFilter===card.source?"active":""}`} href={`/portal/tasks?view=${view}&module=${card.source}&status=open`} key={card.source}><b className="workspaceCode">{card.code}</b><div><strong>{card.label}</strong><div className="workspaceStats"><span><b>{card.open}</b> outstanding</span><span className="danger"><b>{card.overdue}</b> overdue</span><span className="decision"><b>{card.decisions}</b> decisions</span></div></div></Link>)}</div></section>
+    <section className="workspaceSection"><div className="workspaceTitle"><h2>Connected workspaces</h2><span>Counts follow the selected work view. Select a card to filter outstanding responsibilities.</span></div><div className="workspaceGrid">{workspaceCards.map((card)=><Link className={`workspaceCard ${moduleFilter===card.source?"active":""}`} href={`/portal/tasks?view=${view}&module=${card.source}&status=open`} key={card.source}><b className="workspaceCode">{card.code}</b><div><strong>{card.label}</strong><div className="workspaceStats">{card.unavailable ? <span className="danger">Data incomplete</span> : null}<span><b>{card.open}</b> outstanding</span><span className="danger"><b>{card.overdue}</b> overdue</span><span className="decision"><b>{card.decisions}</b> decisions</span></div></div></Link>)}</div></section>
     <div className="taskNotice"><b>Identity-controlled decisions</b>Assignments may be managed by authorised leaders, but completion, approval and verification must be recorded by the signed-in person - not on another user's behalf.</div>
     <section className="taskPanel">{scoped.length?<><div className="taskHead"><span>Task / source</span><span>Assigned person</span><span>Due</span><span>Status</span><span>Record</span></div>{scoped.map((item)=><Link className="taskRow" href={item.href} key={item.id}><div><strong>{item.title}</strong><small>{item.module}{item.site?` - ${item.site}`:""}</small></div><div><strong>{item.assigneePerson?`${item.assigneePerson.first_name} ${item.assigneePerson.last_name}`:item.ownerName||"Not assigned"}</strong><small>{item.assigneePerson?.position||"Company responsibility"}</small></div><div><strong>{date(item.due)}</strong><small>{item.overdue?"Escalation required":"Controlled target"}</small></div><div><span className={`taskStatus ${item.overdue?"overdue":""}`}>{item.overdue?"Overdue":words(item.status)}</span></div><b className="taskOpen">Open &gt;</b></Link>)}</>:<div className="taskEmpty"><strong>No assigned tasks in this view.</strong><br/>New assignments will appear when a Company User is selected in a connected module.</div>}</section>
   </div></main>;
