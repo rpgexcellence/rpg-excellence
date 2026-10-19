@@ -13,11 +13,14 @@ export default function WorkplaceInspectionProgrammeForm({
   action,
   programme = null,
   sites = [],
+  zones = [],
   people = [],
   templates = [],
   profileFields = [],
 }) {
   const [state, formAction, pending] = useActionState(action, null);
+  const [siteId, setSiteId] = useState(programme?.administration_location_id || "");
+  const [zoneId, setZoneId] = useState(programme?.zone_id || "");
   const [profile, setProfile] = useState(() => programme?.area_profile || {});
 
   const selectedCount = useMemo(
@@ -506,7 +509,8 @@ export default function WorkplaceInspectionProgrammeForm({
               <select
                 name="administration_location_id"
                 required
-                defaultValue={programme?.administration_location_id || ""}
+                value={siteId}
+                onChange={e => {setSiteId(e.target.value);setZoneId("");}}
               >
                 <option value="">Select current site</option>
                 {sites.map((site) => (
@@ -521,6 +525,14 @@ export default function WorkplaceInspectionProgrammeForm({
               </small>
             </label>
 
+            <label className="wpiField">
+              <span>Controlled zone</span>
+              <select name="zone_id" value={zoneId} onChange={e=>setZoneId(e.target.value)}>
+                <option value="">Site-wide / zone not assigned</option>
+                {zones.filter(z=>z.site_id===siteId).map(z=><option key={z.id} value={z.id}>{z.reference} · {z.name}</option>)}
+              </select>
+              <small>Future inspections inherit this zone. Existing inspections keep their recorded zone.</small>
+            </label>
             <label className="wpiField">
               <span>Area or department</span>
               <input
