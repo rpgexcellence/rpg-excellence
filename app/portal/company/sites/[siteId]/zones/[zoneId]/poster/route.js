@@ -19,7 +19,8 @@ export async function GET(request,{params}) {
  const sources=sourceIds.length?unwrap(await admin.from('hs_risk_assessments').select('id,status,version').eq('organization_id',zone.organization_id).eq('administration_location_id',siteId).in('id',sourceIds)):[];
  if(signsNeedReview(zone,sources,siteToday(site.timezone)))return new Response('Review and confirm the safety signs and current assessment links before generating a new poster.',{status:409});
  let url;try{url=zoneUrl(zone.public_token);}catch(e){return new Response(e.message,{status:409});}
- const size=new URL(request.url).searchParams.get('size')||'A4';
+ const posterQuery=new URL(request.url).searchParams;
+ const size=posterQuery.get('size')||'A4';
  if(!['A4','A3'].includes(size))return new Response('Choose A4 or A3.',{status:400});
  const pdf=await PDFDocument.create();pdf.setTitle(`${clean(zone.reference)} - ${clean(zone.name)}`);pdf.setAuthor('RPG Excellence');
  const regular=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -110,5 +111,5 @@ export async function GET(request,{params}) {
   if(size==='A3')page.scale(Math.SQRT2,Math.SQRT2);
  }
  const bytes=await pdf.save();const filename=clean(zone.reference).replace(/[^A-Za-z0-9_-]/g,'_')||'zone';
- return new Response(Buffer.from(bytes),{headers:{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="RPG-${filename}-rev${zone.poster_revision||1}-${size}-poster.pdf"`,'Cache-Control':'private, no-store'}});
+ return new Response(Buffer.from(bytes),{headers:{'Content-Type':'application/pdf','Content-Disposition':`${posterQuery.get('inline')==='1'?'inline':'attachment'}; filename="RPG-${filename}-rev${zone.poster_revision||1}-${size}-poster.pdf"`,'Cache-Control':'private, no-store'}});
 }
