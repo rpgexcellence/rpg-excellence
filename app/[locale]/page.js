@@ -16,6 +16,8 @@ const standards = [
   ["ISO 45001", "Occupational Health & Safety", "iso-45001", "orange", "Manage hazards, worker participation and occupational health and safety risk."],
   ["ISO 22301", "Business Continuity", "iso-22301", "purple", "Build resilient operations through impact analysis, continuity plans and exercising."],
   ["ISO 27001", "Information Security", "iso-27001", "teal", "Assess information-security risk, controls, governance and the Statement of Applicability."],
+  ["ISO/IEC 17025", "Testing and Calibration Laboratories", "contact", "blue", "Enquire about support for testing and calibration laboratories."],
+  ["ISO/IEC 17024", "Certification of Persons", "insights/iso-17024-readiness", "purple", "Explore the certification of persons readiness assessment."],
 ];
 const customerJourney = [
   ["01", "Start", "Create your workspace and select the standards, sites and priorities relevant to your organisation."],
@@ -71,7 +73,21 @@ export default async function Home({ params }) {
       <div className="homeHeroCopy"><div className="homeEyebrow">AUDIT&nbsp;&nbsp; | &nbsp;&nbsp;IMPROVE&nbsp;&nbsp; | &nbsp;&nbsp;SUSTAIN</div><h1>Audit with evidence.<br /><span>Improve with confidence.</span></h1><p>One controlled platform for ISO audits, findings, CAPA-8D and effectiveness verification.</p><div className="homeCtas"><TrackedLink href="/portal" event="assessment_cta_clicked" eventParams={{location:"homepage_hero"}} className="homePrimaryCta">Start free assessment <span>→</span></TrackedLink><a href="#customer-journey" className="homeSecondaryCta"><span className="playIcon">▶</span> See how it works</a><TrackedLink href="/portal/login?mode=create" event="account_creation_clicked" eventParams={{location:"homepage_hero"}} className="homeAccountCta">Create free account <span>→</span></TrackedLink></div><div className="homeTrust"><span>✓ Get started in minutes</span><span>✓ No credit card required</span><span>✓ 14-day subscription trial</span></div></div>
       <ProductDashboard />
     </section>
-    <section className="standardStrip"><div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>{standards.map(([code, name, slug]) => <Link href={`/${locale}/${slug}`} className="standardStripItem" key={code}><span className="globeIcon">◎</span><div><strong>{code}</strong><small>{name}</small></div></Link>)}</section>
+    <section className="standardStrip standardStripExpanded" aria-label="Supported standards">
+      <style>{`
+        .newHome .standardStrip.standardStripExpanded{grid-template-columns:repeat(4,minmax(0,1fr));gap:22px 28px;padding-top:22px;padding-bottom:24px}
+        .newHome .standardStripExpanded .standardStripLabel{grid-column:1/-1}
+        .newHome .standardStripExpanded .standardStripItem{min-width:0;align-self:start}
+        .newHome .standardStripExpanded .standardStripItem>div{min-width:0}
+        .newHome .standardStripExpanded .standardStripItem strong{font-size:16px;line-height:1.35}
+        .newHome .standardStripExpanded .standardStripItem small{font-size:13px;line-height:1.45}
+        .newHome .standardStripExpanded .globeIcon{flex-shrink:0}
+        @media(max-width:1100px){.newHome .standardStrip.standardStripExpanded{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:440px){.newHome .standardStrip.standardStripExpanded{grid-template-columns:1fr;gap:18px}}
+      `}</style>
+      <div className="standardStripLabel">BUILT FOR GLOBAL STANDARDS</div>
+      {standards.map(([code, name, slug, , description]) => <Link href={`/${locale}/${slug}`} className="standardStripItem" key={code} title={description}><span className="globeIcon" aria-hidden="true">◎</span><div><strong>{code}</strong><small>{name}</small></div></Link>)}
+    </section>
     <section className="customerJourney" id="customer-journey">
       <header><span>YOUR RPG EXCELLENCE JOURNEY</span><h2>From first assessment to verified assurance.</h2><p>Begin with the work you need today. Each stage creates controlled information that supports the next.</p></header>
       <CustomerJourneyCards stages={customerJourney} />
