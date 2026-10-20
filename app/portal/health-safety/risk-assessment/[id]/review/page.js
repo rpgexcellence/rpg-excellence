@@ -1,3 +1,5 @@
+import {hazardPPEFailures} from '../../../../../../lib/ppe-engine.mjs';
+import PPERequirements from '../../../../../../components/PPERequirements';
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -13,16 +15,17 @@ const label = (value) => String(value || "draft").replaceAll("_", " ").replace(/
 const openActionStatuses = ["open", "accepted", "in_progress", "evidence_submitted", "verification", "partly_effective", "not_effective"];
 
 async function getControlledRecord(supabase, organizationId, assessmentId) {
-  const [assessmentResult, hazardsResult, actionsResult] = await Promise.all([
+  const [assessmentResult, hazardsResult, actionsResult, zoneLinksResult] = await Promise.all([
     supabase.from("hs_risk_assessments").select("*").eq("id", assessmentId).eq("organization_id", organizationId).maybeSingle(),
     supabase.from("hs_risk_hazards").select("*").eq("assessment_id", assessmentId).eq("organization_id", organizationId).order("display_order"),
     supabase.from("hs_risk_actions").select("*").eq("assessment_id", assessmentId).eq("organization_id", organizationId),
+    supabase.from("organization_zone_assessments").select("zone_id").eq("assessment_id",assessmentId),
   ]);
-  if (assessmentResult.error || hazardsResult.error || actionsResult.error) throw new Error(assessmentResult.error?.message || hazardsResult.error?.message || actionsResult.error?.message);
-  return { assessment: assessmentResult.data, hazards: hazardsResult.data || [], actions: actionsResult.data || [] };
+  if (assessmentResult.error || hazardsResult.error || actionsResult.error || zoneLinksResult.error) throw new Error(assessmentResult.error?.message || hazardsResult.error?.message || actionsResult.error?.message || zoneLinksResult.error?.message);
+  return { assessment: assessmentResult.data, hazards: hazardsResult.data || [], actions: actionsResult.data || [],zoneIds:(zoneLinksResult.data||[]).map(link=>link.zone_id) };
 }
 
-function validateForApproval(assessment, hazards, actions, requireReviewControls = true) {
+function validateForApproval(assessment, hazards, actions, requireReviewControls = true,zoneIds=null) {
   const failures = [];
   if (!assessment.task_description || !assessment.assessor_name || !assessment.assessment_date) failures.push("Assessment context, assessor and assessment date must be complete.");
   if (requireReviewControls && !assessment.review_date) failures.push("A planned review date must be set at the approval gate.");
@@ -34,6 +37,7 @@ function validateForApproval(assessment, hazards, actions, requireReviewControls
   if (elevated.some((hazard) => !hazard.risk_decision || !hazard.acceptance_authority)) failures.push("Every elevated residual risk requires a controlled decision and named authority.");
   if (elevated.some((hazard) => !actions.some((action) => action.hazard_id === hazard.id && !["cancelled"].includes(action.status)))) failures.push("Every elevated residual risk requires a linked accountable action.");
   if (hazards.some((hazard) => hazard.risk_decision === "accept" && (!hazard.acceptance_rationale || !hazard.acceptance_authority))) failures.push("Formal acceptance requires a documented rationale and named authority.");
+  failures.push(...hazardPPEFailures(hazards,zoneIds));
   return [...new Set(failures)];
 }
 
@@ -45,7 +49,7 @@ async function submitForReview(formData) {
   const id = String(formData.get("assessment_id") || "");
   const record = await getControlledRecord(supabase, organization.id, id);
   if (!record.assessment) throw new Error("Risk assessment could not be accessed.");
-  const failures = validateForApproval(record.assessment, record.hazards, record.actions, false);
+  const failures = validateForApproval(record.assessment, record.hazards, record.actions, false,record.zoneIds);
   if (failures.length) throw new Error(failures.join(" "));
   const { error } = await supabase.from("hs_risk_assessments").update({ status: "in_review", submitted_at: new Date().toISOString(), submitted_by: user.id }).eq("id", id).eq("organization_id", organization.id);
   if (error) throw new Error(error.message);
@@ -76,7 +80,7 @@ async function recordReviewDecision(formData) {
   if (decision === "approved") {
     if (!reviewDate) throw new Error("Set the planned review date before approving the assessment.");
     if (!reviewFrequency) throw new Error("Select a review frequency or event-based review.");
-    const failures = validateForApproval({ ...record.assessment, review_date: reviewDate }, record.hazards, record.actions, true);
+    const failures = validateForApproval({ ...record.assessment, review_date: reviewDate }, record.hazards, record.actions, true,record.zoneIds);
     if (failures.length) throw new Error(failures.join(" "));
   }
   const update = decision === "approved"
@@ -114,7 +118,7 @@ export default async function ReviewApprovalPage({ params }) {
   if (peopleResult.error) throw new Error(peopleResult.error.message);
   if (!record.assessment) notFound();
   const { assessment, hazards, actions } = record;
-  const failures = validateForApproval(assessment, hazards, actions, !["draft", "changes_required", "in_review"].includes(assessment.status));
+  const failures = validateForApproval(assessment, hazards, actions, !["draft", "changes_required", "in_review"].includes(assessment.status),record.zoneIds);
   const elevated = hazards.filter((hazard) => (hazard.residual_score || 0) >= 10);
   const overdue = actions.filter((action) => openActionStatuses.includes(action.status) && action.target_date < new Date().toISOString().slice(0, 10));
   const levels = { none: 0, view: 1, contribute: 2, review: 3, approve: 4, admin: 5, owner: 6 };
@@ -129,6 +133,7 @@ export default async function ReviewApprovalPage({ params }) {
     <header className="rrTop"><div><small>{assessment.assessment_reference} · CONTROL GATE</small><h1>Review, approval and communication</h1><p>{assessment.title}</p></div><div className="rrTopActions"><Link className="rrBack" href={"/portal/health-safety/risk-assessment/" + id}>← Assessment workspace</Link>{["approved", "communicated"].includes(assessment.status) && <a className="rrBack rrPdf" href={"/portal/health-safety/risk-assessment/" + id + "/report"} target="_blank" rel="noreferrer">▤ Controlled PDF</a>}</div></header>
     <section className="rrGate"><div className="rrStatus"><span>CURRENT STATUS</span><strong>{label(assessment.status)}</strong></div><div className="rrMetric"><span>HAZARDS</span><strong>{hazards.length}</strong></div><div className="rrMetric"><span>ELEVATED</span><strong>{elevated.length}</strong></div><div className="rrMetric"><span>OPEN ACTIONS</span><strong>{actions.filter((item) => openActionStatuses.includes(item.status)).length}</strong></div><div className="rrMetric"><span>OVERDUE</span><strong>{overdue.length}</strong></div></section>
     <section className="rrPanel"><div className="rrHead"><h2>Approval readiness</h2><p>The gate checks required context, risk decisions and accountable action.</p></div>{failures.length ? <div className="rrChecks">{failures.map((failure) => <div className="rrCheck fail" key={failure}><b>×</b><span>{failure}</span></div>)}</div> : <div className="rrReady">✓ Required assessment information is complete and ready for controlled review.</div>}</section>
+    <section className="rrPanel"><h2>PPE specifications for review</h2>{hazards.map(hazard=><div key={hazard.id}><h3>{hazard.hazard_description}</h3><PPERequirements requirements={hazard.ppe_requirements||[]}/></div>)}</section>
     {canEdit && <section className="rrPanel"><div className="rrHead"><h2>Submit for competent review</h2><p>Submission locks the assessment content while the approval decision is recorded.</p></div><form action={submitForReview}><input type="hidden" name="assessment_id" value={id}/><button className="rrButton blue" disabled={failures.length > 0}>Submit for review →</button></form></section>}
     {canApprove && assessment.status === "in_review" && <section className="rrPanel"><div className="rrHead"><h2>Record review decision</h2><p>The approver confirms suitability and sets the controlled review arrangements based on the residual-risk position and expected change.</p></div><form className="rrForm" action={recordReviewDecision}><input type="hidden" name="assessment_id" value={id}/><div className="rrField"><label htmlFor="approver_person_id">Competent approver name *</label><select id="approver_person_id" name="approver_person_id" required defaultValue=""><option value="" disabled>{peopleResult.data?.length ? "Select active company user" : "No active company users available"}</option>{(peopleResult.data || []).filter((person) => person.id !== assessment.assessor_person_id).map((person) => <option value={person.id} key={person.id}>{[person.first_name, person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select><small>Linked to Administration → People, Roles &amp; Access. The assessor is excluded to preserve independent approval.</small></div><div className="rrField"><label htmlFor="review_date">Planned review date *</label><input id="review_date" name="review_date" type="date" defaultValue={assessment.review_date || ""} required/></div><div className="rrField"><label htmlFor="review_frequency_months">Review frequency *</label><select id="review_frequency_months" name="review_frequency_months" defaultValue={assessment.review_frequency_months ? String(assessment.review_frequency_months) : ""} required><option value="" disabled>Select review arrangement</option><option value="event_based">Event-based / following significant change</option><option value="3">Every 3 months</option><option value="6">Every 6 months</option><option value="12">Every 12 months</option><option value="24">Every 24 months</option><option value="36">Every 36 months</option></select></div><div className="rrField full"><label htmlFor="approval_comment">Approval comment / changes required</label><textarea id="approval_comment" name="approval_comment"/></div><div className="rrDecisions"><button className="rrButton" name="decision" value="approved">Approve controlled assessment</button><button className="rrButton red" name="decision" value="changes_required">Return for changes</button></div></form></section>}
     {canContribute && assessment.status === "approved" && <section className="rrPanel"><div className="rrHead"><h2>Communicate the approved controls</h2><p>Brief affected people through an appropriate method and retain acknowledgement evidence where required.</p></div><form action={markCommunicated}><input type="hidden" name="assessment_id" value={id}/><button className="rrButton">Confirm communicated →</button></form></section>}
