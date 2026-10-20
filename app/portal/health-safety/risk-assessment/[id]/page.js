@@ -1,3 +1,4 @@
+import {loadAssessmentZones,saveAssessmentScope,refreshAssessmentZonePages} from '../../../../../lib/assessment-zones';
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -27,6 +28,7 @@ async function createRevision(formData) {
   if (sourceError || !source) throw new Error("The controlled assessment could not be accessed.");
   if (!revisionableStatuses.includes(source.status)) throw new Error("Only an approved or communicated assessment can create a new revision.");
 
+  const sourceScope = await loadAssessmentZones(admin,access.organization.id,sourceId);
   const { data: revision, error: revisionError } = await admin.from("hs_risk_assessments").insert({
     owner_id: source.owner_id,
     organization_id: source.organization_id,
@@ -69,9 +71,16 @@ async function createRevision(formData) {
     vulnerable_persons_considered: source.vulnerable_persons_considered,
     consultation_summary: source.consultation_summary,
     emergency_arrangements: source.emergency_arrangements,
-  }).select("id").single();
+  }).select("id,updated_at").single();
   if (revisionError) throw new Error(revisionError.message);
 
+  // Copy applicability as draft links; approval and sign review are not copied.
+  try {
+    await saveAssessmentScope(admin,access,{id:revision.id,values:{},zoneIds:sourceScope.selectedZoneIds.filter(id=>sourceScope.zones.some(zone=>zone.id===id&&zone.status!=='archived')),originalZoneIds:[],expectedUpdatedAt:revision.updated_at});
+  } catch(error) {
+    await admin.from('hs_risk_assessments').delete().eq('id',revision.id).eq('organization_id',access.organization.id);
+    throw error;
+  }
   const { data: sourceHazards, error: hazardsError } = await admin.from("hs_risk_hazards").select("*").eq("assessment_id", sourceId).eq("organization_id", access.organization.id).order("display_order");
   if (hazardsError) throw new Error(hazardsError.message);
   const hazardIdMap = new Map();
@@ -114,6 +123,7 @@ async function createRevision(formData) {
     event_summary: `Version ${Number(source.version || 1) + 1} created from controlled assessment`,
     event_data: { source_assessment_id: sourceId, source_version: source.version || 1 },
   });
+  refreshAssessmentZonePages(source.administration_location_id,revision.id);
   redirect("/portal/health-safety/risk-assessment/" + revision.id);
 }
 
@@ -222,6 +232,8 @@ export default async function RiskAssessmentWorkspacePage({ params }) {
   if (assessmentResult.error || hazardsResult.error || actionsResult.error || peopleResult.error) throw new Error(assessmentResult.error?.message || hazardsResult.error?.message || actionsResult.error?.message || peopleResult.error?.message);
   if (!assessmentResult.data) notFound();
   const assessment = assessmentResult.data;
+  const zoneScope = await loadAssessmentZones(supabase,access.organization.id,id);
+  const applicableZones = zoneScope.zones.filter(zone=>zoneScope.selectedZoneIds.includes(zone.id));
   const hazards = hazardsResult.data || [];
   const actions = actionsResult.data || [];
   const elevated = hazards.filter((item) => (item.residual_score ?? item.current_score ?? 0) >= 10).length;
@@ -247,6 +259,7 @@ export default async function RiskAssessmentWorkspacePage({ params }) {
     <header className="rawTop"><div><small>{assessment.assessment_reference} · VERSION {assessment.version}</small><h1>{assessment.title}</h1><p>{label(assessment.assessment_type)} · {assessment.site_location || assessment.area_department || "Location not set"}</p></div><div className="rawButtons"><Link className="rawButton secondary" href="/portal/health-safety/risk-assessment">← Register</Link><Link className="rawButton secondary" href="/portal/health-safety">H&amp;S Hub</Link>{["approved", "communicated", "superseded"].includes(assessment.status) && <a className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/report"} target="_blank" rel="noreferrer">▤ Controlled PDF</a>}{revisionableStatuses.includes(assessment.status) && canContribute && <form action={createRevision}><input type="hidden" name="assessment_id" value={id}/><button className="rawButton" type="submit">Create new revision</button></form>}{!locked && canContribute && <Link className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/edit"}>Edit assessment details</Link>}<Link className="rawButton" href={"/portal/health-safety/risk-assessment/" + id + "/review"}>Review &amp; approval</Link></div></header>
     <section className="rawSummary"><div className="rawContext"><strong>{assessment.task_description}</strong><small>Assessed by {assessment.assessor_name || "Not assigned"} on {formatDate(assessment.assessment_date)} · review {formatDate(assessment.review_date)}</small></div><div className="rawMetric"><span>HAZARDS</span><strong>{hazards.length}</strong></div><div className="rawMetric"><span>HIGHEST RESIDUAL</span><strong className={highest >= 10 ? "red" : ""}>{highest || "—"}</strong></div><div className="rawMetric"><span>ELEVATED</span><strong className={elevated ? "red" : ""}>{elevated}</strong></div><div className="rawMetric"><span>OPEN ACTIONS</span><strong>{openActions.length}</strong></div></section>
     <section className="rawPanel"><div className="rawHead"><div><h2>Assessment context</h2><p>Scope, people and supporting arrangements.</p></div><span className="rawPill">{label(assessment.status)}</span></div><div className="rawDetails"><div><span>AREA / DEPARTMENT</span><strong>{assessment.area_department || "—"}</strong></div><div><span>SECTION / LAB</span><strong>{assessment.section_lab || "—"}</strong></div><div><span>PEOPLE AT RISK</span><strong>{assessment.persons_at_risk?.join(", ") || "—"}</strong></div><div><span>ASSESSOR / DATE</span><strong>{assessment.assessor_name || "—"}<br/>{formatDate(assessment.assessment_date)}</strong></div><div><span>SAFE SYSTEM OF WORK</span><strong>{assessment.safe_system_reference || "—"}</strong>{ssowDownloadUrl && <a className="rawDownload" href={ssowDownloadUrl} download={assessment.ssow_document_name || true}>Download SSOW ↓</a>}</div><div><span>COSHH / SAFETY DATA</span><strong>{assessment.coshh_msds_reference || "—"}</strong>{coshhDownloadUrl && <a className="rawDownload" href={coshhDownloadUrl} download={assessment.coshh_document_name || true}>Download COSHH ↓</a>}</div><div><span>PERMIT</span><strong>{assessment.permit_required ? assessment.permit_reference : "Not required"}</strong>{permitDownloadUrl && <a className="rawDownload" href={permitDownloadUrl} download={assessment.permit_document_name || true}>Download permit ↓</a>}</div><div><span>CONSULTATION</span><strong>{assessment.consultation_summary || "—"}</strong></div></div></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Buildings &amp; zones covered</h2><p>Controlled workplace links from Administration → Site Profile.</p></div>{!locked&&canContribute&&<Link className="rawButton secondary" href={`/portal/health-safety/risk-assessment/${id}/edit`}>Edit workplace scope</Link>}</div>{applicableZones.length?<div className="rawDetails">{applicableZones.map(zone=><div key={zone.id}><span>{zoneScope.buildings.find(building=>building.id===zone.building_id)?.name||'External / no building'}</span><strong>{zone.reference} · {zone.name}</strong><small>{zone.status}</small></div>)}</div>:<p className="rawEmpty">Site-level assessment: no individual zones linked. Add applicable zones in Edit assessment details or Manage zone → Link safety records.</p>}<p>Draft and review versions remain unavailable on employee pages until approved or communicated. PPE source selection and sign review remain separate.</p></section>
     <section className="rawPanel"><div className="rawHead"><div><h2>Hazards and risk decisions</h2><p>{locked ? "This controlled version is read-only. Create a new revision to change hazards or controls." : "Evaluate initial risk, apply controls and confirm the residual position."}</p></div></div><HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} companyPeople={peopleResult.data || []} addHazardAction={addHazard} readOnly={locked || !canContribute}/></section>
     <section className="rawPanel"><div className="rawHead"><div><h2>Risk-reduction actions</h2><p>Accountable actions linked directly to identified hazards.</p></div><Link href="/portal/health-safety/actions">Action register →</Link></div>{actions.length ? <div className="rawActions">{actions.map((action) => <div className="rawAction" key={action.id}><div><strong>{action.action_required}</strong><small>{action.action_reference}</small></div><div><strong>{action.responsible_name}</strong><small>Responsible person</small></div><div><strong>{formatDate(action.target_date)}</strong><small>{label(action.priority)} priority</small></div><span className="rawPill">{label(action.status)}</span></div>)}</div> : <div className="rawEmpty">No additional risk-reduction actions have been recorded.</div>}</section>
   </div></main>;
