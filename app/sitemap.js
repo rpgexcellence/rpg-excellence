@@ -22,6 +22,7 @@ export default function sitemap() {
     "/information-security/hub-at-a-glance",
     "/as9100-hub",
     "/iso-27001",
+    "/iso-17025",
     "/iso-27001-readiness-software",
     "/security-and-trust",
     "/ai-assurance",
@@ -58,12 +59,10 @@ export default function sitemap() {
     "/insights/iso-22301-business-continuity-readiness",
     "/insights/business-continuity-implementation-module-1",
   ];
-
   const now = new Date();
-
   return locales.flatMap((locale) =>
     pages.map((page) => ({
-      url: `${base}/${locale}${page}`,
+      url: "" + base + "/" + locale + page,
       lastModified: now,
       changeFrequency: page === "" ? "weekly" : "monthly",
       priority:
