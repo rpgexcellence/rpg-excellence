@@ -1,3 +1,9 @@
+import {
+  ISO17025_CLAUSE_TITLES,
+  ISO17025_ANNEXES,
+  ISO17025_TERMS,
+  getAssessmentClauses,
+} from "../../../../lib/iso17025";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
@@ -5,15 +11,14 @@ import { createAdminClient } from "../../../../lib/supabase/admin";
 import { saveAssessmentAnswers } from "./actions";
 import FindingConclusionFields from "./FindingConclusionFields";
 import { ISO22301_DEFINITIONS } from "../../../../lib/iso22301-definitions";
-
 import {
   calculateClauseScore,
   calculateSimpleOverallScore,
   calculateWeightedOverallScore,
   calculateProgress,
 } from "./scoring";
-
 const ADVANCED_ASSESSMENT_STANDARDS = [
+  "ISO/IEC 17025:2017",
   "ISO 9001:2026",
   "ISO 9001:2015/Amd 1:2024",
   "ISO 14001:2026",
@@ -23,489 +28,297 @@ const ADVANCED_ASSESSMENT_STANDARDS = [
   "ISO/IEC 17024:2026",
   "ISO 22301:2019",
 ];
-
-const CLAUSE_NUMBERS = [
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-];
-
 const DEFAULT_CLAUSE_TITLES = {
-  "4": "Context of the Organization",
-  "5": "Leadership",
-  "6": "Planning",
-  "7": "Support",
-  "8": "Operation",
-  "9": "Performance Evaluation",
-  "10": "Improvement",
+  4: "Context of the Organization",
+  5: "Leadership",
+  6: "Planning",
+  7: "Support",
+  8: "Operation",
+  9: "Performance Evaluation",
+  10: "Improvement",
 };
-
 const CLAUSE_TITLES_BY_STANDARD = {
+  "ISO/IEC 17025:2017": ISO17025_CLAUSE_TITLES,
   "ISO/IEC 17024:2026": {
-    "4": "General Requirements",
-    "5": "Structural Requirements",
-    "6": "Resource Requirements",
-    "7": "Records and Information Requirements",
-    "8": "Certification Schemes",
-    "9": "Certification Process Requirements",
-    "10": "Management System Requirements",
+    4: "General Requirements",
+    5: "Structural Requirements",
+    6: "Resource Requirements",
+    7: "Records and Information Requirements",
+    8: "Certification Schemes",
+    9: "Certification Process Requirements",
+    10: "Management System Requirements",
   },
 };
-
 function getClauseTitle(standard, clauseNumber) {
   return (
     CLAUSE_TITLES_BY_STANDARD[standard]?.[clauseNumber] ??
     DEFAULT_CLAUSE_TITLES[clauseNumber] ??
-    `Clause ${clauseNumber}`
+    "Clause " + clauseNumber
   );
 }
-
-export default async function AssessmentPage({
-  params,
-  searchParams,
-}) {
+export default async function AssessmentPage({ params, searchParams }) {
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
-
-  const requestedClause = Array.isArray(
-    resolvedSearchParams?.clause
-  )
+  const requestedClause = Array.isArray(resolvedSearchParams?.clause)
     ? resolvedSearchParams.clause[0]
     : resolvedSearchParams?.clause;
-
-  const clause = CLAUSE_NUMBERS.includes(
-    requestedClause
-  )
-    ? requestedClause
-    : "4";
-
-  const currentClauseIndex =
-    CLAUSE_NUMBERS.indexOf(clause);
-
-  const previousClause =
-    currentClauseIndex > 0
-      ? CLAUSE_NUMBERS[
-          currentClauseIndex - 1
-        ]
-      : null;
-
-  const nextClause =
-    currentClauseIndex <
-    CLAUSE_NUMBERS.length - 1
-      ? CLAUSE_NUMBERS[
-          currentClauseIndex + 1
-        ]
-      : null;
-
-  const supabase =
-    await createClient();
-
-  const admin =
-    createAdminClient();
-
+  const supabase = await createClient();
+  const admin = createAdminClient();
   const {
     data: { user },
-  } =
-    await supabase.auth.getUser();
-
+  } = await supabase.auth.getUser();
   if (!user) {
     redirect("/portal/login");
   }
 
   // Load assessment
-  const {
-    data: assessment,
-    error: assessmentError,
-  } = await supabase
+  const { data: assessment, error: assessmentError } = await supabase
     .from("assessments")
     .select("*")
     .eq("id", id)
     .eq("owner_id", user.id)
     .single();
-
-  if (
-    assessmentError ||
-    !assessment
-  ) {
+  if (assessmentError || !assessment) {
     redirect("/portal");
   }
-
   if (assessment.workspace_type === "soa_only") {
-    redirect(`/portal/assessments/${assessment.id}/soa`);
+    redirect("/portal/assessments/" + assessment.id + "/soa");
   }
+  const CLAUSE_NUMBERS = getAssessmentClauses(assessment.standard);
+  const clause = CLAUSE_NUMBERS.includes(requestedClause) ? requestedClause : "4";
+  const currentClauseIndex = CLAUSE_NUMBERS.indexOf(clause);
+  const previousClause =
+    currentClauseIndex > 0 ? CLAUSE_NUMBERS[currentClauseIndex - 1] : null;
+  const nextClause =
+    currentClauseIndex < CLAUSE_NUMBERS.length - 1
+      ? CLAUSE_NUMBERS[currentClauseIndex + 1]
+      : null;
 
   // Load all questions
-  const {
-    data: allQuestions,
-    error: allQuestionsError,
-  } = await supabase
+  const { data: allQuestions, error: allQuestionsError } = await supabase
     .from("assessment_questions")
     .select("*")
-    .eq(
-      "standard",
-      assessment.standard
-    )
+    .eq("standard", assessment.standard)
     .eq("active", true)
     .order("display_order", {
       ascending: true,
     });
-
   if (allQuestionsError) {
-    throw new Error(
-      allQuestionsError.message
-    );
+    throw new Error(allQuestionsError.message);
   }
-
-  const questions = (
-    allQuestions ?? []
-  ).filter(
-    (question) =>
-      question.clause === clause
+  const questions = (allQuestions ?? []).filter(
+    (question) => question.clause === clause,
   );
-
   let annexGuidance = [];
   if (assessment.standard === "ISO 9001:2026") {
     const { data } = await supabase
       .from("assessment_annex_guidance")
       .select("reference,title,guidance,scored")
       .eq("standard", assessment.standard)
-      .order("display_order", { ascending: true });
+      .order("display_order", {
+        ascending: true,
+      });
     annexGuidance = data ?? [];
   }
 
   // Load formal findings and corrective actions for advanced assessments.
   let assessmentFindings = [];
   let correctiveActions = [];
-
-  if (
-    ADVANCED_ASSESSMENT_STANDARDS.includes(
-      assessment.standard
-    )
-  ) {
-    const {
-      data: findingsData,
-      error: findingsError,
-    } = await admin
+  if (ADVANCED_ASSESSMENT_STANDARDS.includes(assessment.standard)) {
+    const { data: findingsData, error: findingsError } = await admin
       .from("assessment_findings")
       .select("*")
-      .eq(
-        "assessment_id",
-        assessment.id
-      )
-      .eq(
-        "owner_id",
-        user.id
-      )
+      .eq("assessment_id", assessment.id)
+      .eq("owner_id", user.id)
       .order("created_at", {
         ascending: true,
       });
-
     if (findingsError) {
-      throw new Error(
-        findingsError.message
-      );
+      throw new Error(findingsError.message);
     }
-
-    assessmentFindings =
-      findingsData ?? [];
-
-    const findingIds =
-      assessmentFindings.map(
-        (finding) => finding.id
-      );
-
+    assessmentFindings = findingsData ?? [];
+    const findingIds = assessmentFindings.map((finding) => finding.id);
     if (findingIds.length > 0) {
-      const {
-        data: actionsData,
-        error: actionsError,
-      } = await admin
+      const { data: actionsData, error: actionsError } = await admin
         .from("corrective_actions")
         .select("*")
-        .eq(
-          "assessment_id",
-          assessment.id
-        )
-        .eq(
-          "owner_id",
-          user.id
-        )
-        .in(
-          "finding_id",
-          findingIds
-        )
+        .eq("assessment_id", assessment.id)
+        .eq("owner_id", user.id)
+        .in("finding_id", findingIds)
         .order("created_at", {
           ascending: true,
         });
-
       if (actionsError) {
-        throw new Error(
-          actionsError.message
-        );
+        throw new Error(actionsError.message);
       }
-
-      correctiveActions =
-        actionsData ?? [];
+      correctiveActions = actionsData ?? [];
     }
   }
-
-  const findingsByQuestion =
-    Object.fromEntries(
-      assessmentFindings.map(
-        (finding) => [
-          finding.question_number,
-          finding,
-        ]
-      )
-    );
-
-  const actionsByFindingId =
-    Object.fromEntries(
-      correctiveActions.map(
-        (action) => [
-          action.finding_id,
-          action,
-        ]
-      )
-    );
-
-  const allQuestionNumbers = (
-    allQuestions ?? []
-  ).map(
-    (question) =>
-      question.question_number
+  const findingsByQuestion = Object.fromEntries(
+    assessmentFindings.map((finding) => [finding.question_number, finding]),
+  );
+  const actionsByFindingId = Object.fromEntries(
+    correctiveActions.map((action) => [action.finding_id, action]),
+  );
+  const allQuestionNumbers = (allQuestions ?? []).map(
+    (question) => question.question_number,
   );
 
   // Load all saved answers
   let allSavedAnswers = [];
-
-  if (
-    allQuestionNumbers.length > 0
-  ) {
-    const {
-      data,
-      error,
-    } = await supabase
+  if (allQuestionNumbers.length > 0) {
+    const { data, error } = await supabase
       .from("assessment_answers")
       .select("*")
-      .eq(
-        "assessment_id",
-        assessment.id
-      )
+      .eq("assessment_id", assessment.id)
       .eq("owner_id", user.id)
-      .in(
-        "clause",
-        allQuestionNumbers
-      );
-
+      .in("clause", allQuestionNumbers);
     if (error) {
-      throw new Error(
-        error.message
-      );
+      throw new Error(error.message);
     }
-
-    allSavedAnswers =
-      data ?? [];
+    allSavedAnswers = data ?? [];
   }
 
   // Load active scoring profile
-  const {
-    data: scoringProfile,
-    error: scoringProfileError,
-  } = await supabase
+  const { data: scoringProfile, error: scoringProfileError } = await supabase
     .from("scoring_profiles")
-    .select(
-      "id, profile_name, version_label"
-    )
-    .eq(
-      "standard",
-      assessment.standard
-    )
+    .select("id, profile_name, version_label")
+    .eq("standard", assessment.standard)
     .eq("active", true)
     .order("created_at", {
       ascending: false,
     })
     .limit(1)
     .maybeSingle();
-
   if (scoringProfileError) {
-    throw new Error(
-      scoringProfileError.message
-    );
+    throw new Error(scoringProfileError.message);
   }
-
   let weights = {};
-
   if (scoringProfile) {
-    const {
-      data: clauseWeights,
-      error: clauseWeightsError,
-    } = await supabase
-      .from(
-        "scoring_profile_clauses"
-      )
-      .select(
-        "clause, weight"
-      )
-      .eq(
-        "scoring_profile_id",
-        scoringProfile.id
-      );
-
+    const { data: clauseWeights, error: clauseWeightsError } = await supabase
+      .from("scoring_profile_clauses")
+      .select("clause, weight")
+      .eq("scoring_profile_id", scoringProfile.id);
     if (clauseWeightsError) {
-      throw new Error(
-        clauseWeightsError.message
-      );
+      throw new Error(clauseWeightsError.message);
     }
-
-    weights =
-      Object.fromEntries(
-        (
-          clauseWeights ?? []
-        ).map((row) => [
-          row.clause,
-          Number(row.weight),
-        ])
-      );
+    weights = Object.fromEntries(
+      (clauseWeights ?? []).map((row) => [row.clause, Number(row.weight)]),
+    );
   }
 
   // Saved answer lookup
   const answersByClause = {};
-
-  for (
-    const answer of allSavedAnswers
-  ) {
-    answersByClause[
-      answer.clause
-    ] = answer;
+  for (const answer of allSavedAnswers) {
+    answersByClause[answer.clause] = answer;
   }
 
   // Progress
-  const progress =
-    calculateProgress(
-      allQuestions,
-      allSavedAnswers
-    );
+  const progress = calculateProgress(allQuestions, allSavedAnswers);
 
   // Overall weighted score
-  const hasWeightedProfile =
-    Object.keys(weights).length >
-    0;
-
-  const overallScore =
-    hasWeightedProfile
-      ? calculateWeightedOverallScore(
-          {
-            clauseNumbers:
-              CLAUSE_NUMBERS,
-            questions:
-              allQuestions,
-            answers:
-              allSavedAnswers,
-            weights,
-          }
-        )
-      : calculateSimpleOverallScore(
-          allSavedAnswers
-        );
+  const hasWeightedProfile = Object.keys(weights).length > 0;
+  const overallScore = hasWeightedProfile
+    ? calculateWeightedOverallScore({
+        clauseNumbers: CLAUSE_NUMBERS,
+        questions: allQuestions,
+        answers: allSavedAnswers,
+        weights,
+      })
+    : calculateSimpleOverallScore(allSavedAnswers);
 
   // Current clause score
-  const currentClauseScore =
-    calculateClauseScore(
-      clause,
-      allQuestions,
-      allSavedAnswers
-    );
-
-  const clauseTitle =
-    getClauseTitle(
-      assessment.standard,
-      clause
-    );
-
-  const isAdvancedAssessment =
-    ADVANCED_ASSESSMENT_STANDARDS.includes(
-      assessment.standard
-    );
-
+  const currentClauseScore = calculateClauseScore(
+    clause,
+    allQuestions,
+    allSavedAnswers,
+  );
+  const clauseTitle = getClauseTitle(assessment.standard, clause);
+  const isAdvancedAssessment = ADVANCED_ASSESSMENT_STANDARDS.includes(
+    assessment.standard,
+  );
   const isIso27001Assessment = [
     "ISO/IEC 27001:2022",
     "ISO/IEC 27001:2022/Amd 1:2024",
   ].includes(assessment.standard);
-
-  async function saveCurrentClause(
-    formData
-  ) {
+  async function saveCurrentClause(formData) {
     "use server";
 
     // Draft saves are intentionally partial. Remove unanswered score
     // controls so the action saves only responses the assessor completed.
     for (const [key, value] of formData.entries()) {
-      if (
-        key.startsWith("score_") &&
-        String(value).trim() === ""
-      ) {
+      if (key.startsWith("score_") && String(value).trim() === "") {
         formData.delete(key);
       }
     }
-
-    formData.set(
-      "next_clause",
-      clause
-    );
-
-    await saveAssessmentAnswers(
-      formData
-    );
+    formData.set("next_clause", clause);
+    await saveAssessmentAnswers(formData);
   }
 
   // Maturity
-  let maturityLevel =
-    "Not assessed";
-
+  let maturityLevel = "Not assessed";
   if (overallScore !== null) {
     if (overallScore <= 20) {
-      maturityLevel =
-        "Initial";
-    } else if (
-      overallScore <= 40
-    ) {
-      maturityLevel =
-        "Developing";
-    } else if (
-      overallScore <= 60
-    ) {
-      maturityLevel =
-        "Managed";
-    } else if (
-      overallScore <= 80
-    ) {
-      maturityLevel =
-        "Controlled";
+      maturityLevel = "Initial";
+    } else if (overallScore <= 40) {
+      maturityLevel = "Developing";
+    } else if (overallScore <= 60) {
+      maturityLevel = "Managed";
+    } else if (overallScore <= 80) {
+      maturityLevel = "Controlled";
     } else {
-      maturityLevel =
-        "Optimized";
+      maturityLevel = "Optimized";
     }
   }
-
   return (
     <main
       style={{
         minHeight: "100vh",
         background: "#f3f6f9",
         padding: "36px 20px 70px",
-        fontFamily:
-          "Arial, sans-serif",
+        fontFamily: "Arial, sans-serif",
       }}
     >
       {isIso27001Assessment && (
-        <div aria-hidden="true" style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none", userSelect: "none", opacity: .07, transform: "rotate(-10deg)", zIndex: 0 }}>
-          <div style={{ width: "720px", textAlign: "center" }}>
-            <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
-            <div style={{ color: "#1459D9", fontSize: "42px", fontWeight: 900, letterSpacing: ".14em", marginTop: "-18px" }}>ISO/IEC 27001 ASSESSMENT</div>
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            pointerEvents: "none",
+            userSelect: "none",
+            opacity: 0.07,
+            transform: "rotate(-10deg)",
+            zIndex: 0,
+          }}
+        >
+          <div
+            style={{
+              width: "720px",
+              textAlign: "center",
+            }}
+          >
+            <img
+              src="/rpg-excellence-logo.png"
+              alt=""
+              style={{
+                width: "100%",
+                height: "auto",
+              }}
+            />
+            <div
+              style={{
+                color: "#1459D9",
+                fontSize: "42px",
+                fontWeight: 900,
+                letterSpacing: ".14em",
+                marginTop: "-18px",
+              }}
+            >
+              ISO/IEC 27001 ASSESSMENT
+            </div>
           </div>
         </div>
       )}
@@ -533,8 +346,7 @@ export default async function AssessmentPage({
             marginBottom: "8px",
           }}
         >
-          {assessment.standard}{" "}
-          Assessment
+          {assessment.standard} Assessment
         </h1>
 
         <p
@@ -543,10 +355,7 @@ export default async function AssessmentPage({
             marginBottom: "24px",
           }}
         >
-          Status:{" "}
-          <strong>
-            {assessment.status}
-          </strong>
+          Status: <strong>{assessment.status}</strong>
         </p>
 
         {isAdvancedAssessment && (
@@ -560,7 +369,7 @@ export default async function AssessmentPage({
             }}
           >
             <Link
-              href={`/portal/assessments/${assessment.id}/governance`}
+              href={"/portal/assessments/" + assessment.id + "/governance"}
               style={{
                 padding: "11px 16px",
                 borderRadius: "8px",
@@ -575,7 +384,7 @@ export default async function AssessmentPage({
 
             {isIso27001Assessment && (
               <Link
-                href={`/portal/assessments/${assessment.id}/soa`}
+                href={"/portal/assessments/" + assessment.id + "/soa"}
                 style={{
                   padding: "11px 16px",
                   borderRadius: "8px",
@@ -590,7 +399,7 @@ export default async function AssessmentPage({
             )}
 
             <Link
-              href={`/portal/assessments/${assessment.id}/evidence`}
+              href={"/portal/assessments/" + assessment.id + "/evidence"}
               style={{
                 padding: "11px 16px",
                 borderRadius: "8px",
@@ -604,7 +413,7 @@ export default async function AssessmentPage({
             </Link>
 
             <Link
-              href={`/portal/assessments/${assessment.id}/findings`}
+              href={"/portal/assessments/" + assessment.id + "/findings"}
               style={{
                 padding: "11px 16px",
                 borderRadius: "8px",
@@ -614,7 +423,13 @@ export default async function AssessmentPage({
                 fontWeight: 700,
               }}
             >
-              Findings & Corrective Actions ({assessmentFindings.filter((finding) => finding.finding_type !== "conformity").length})
+              Findings & Corrective Actions (
+              {
+                assessmentFindings.filter(
+                  (finding) => finding.finding_type !== "conformity",
+                ).length
+              }
+              )
             </Link>
           </div>
         )}
@@ -632,8 +447,7 @@ export default async function AssessmentPage({
           <div
             style={{
               display: "flex",
-              justifyContent:
-                "space-between",
+              justifyContent: "space-between",
               alignItems: "center",
               gap: "20px",
               flexWrap: "wrap",
@@ -644,13 +458,11 @@ export default async function AssessmentPage({
                 style={{
                   fontSize: "12px",
                   opacity: 0.75,
-                  letterSpacing:
-                    "1px",
+                  letterSpacing: "1px",
                   marginBottom: "7px",
                 }}
               >
-                RPG WEIGHTED
-                READINESS
+                RPG WEIGHTED READINESS
               </div>
 
               <strong
@@ -658,9 +470,7 @@ export default async function AssessmentPage({
                   fontSize: "21px",
                 }}
               >
-                {
-                  assessment.standard
-                }
+                {assessment.standard}
               </strong>
 
               <p
@@ -670,14 +480,10 @@ export default async function AssessmentPage({
                 }}
               >
                 {hasWeightedProfile
-                  ? `${
-                      scoringProfile
-                        ?.profile_name
-                    } ${
-                      scoringProfile
-                        ?.version_label ??
-                      ""
-                    }`
+                  ? "" +
+                    scoringProfile?.profile_name +
+                    " " +
+                    (scoringProfile?.version_label ?? "")
                   : "Standard readiness model"}
               </p>
 
@@ -698,9 +504,7 @@ export default async function AssessmentPage({
                 fontWeight: 800,
               }}
             >
-              {overallScore !== null
-                ? `${overallScore}%`
-                : "—"}
+              {overallScore !== null ? "" + overallScore + "%" : "—"}
             </div>
           </div>
         </section>
@@ -709,8 +513,7 @@ export default async function AssessmentPage({
         <section
           style={{
             background: "#ffffff",
-            border:
-              "1px solid #dfe6ee",
+            border: "1px solid #dfe6ee",
             borderRadius: "14px",
             padding: "20px 24px",
             marginBottom: "24px",
@@ -719,8 +522,7 @@ export default async function AssessmentPage({
           <div
             style={{
               display: "flex",
-              justifyContent:
-                "space-between",
+              justifyContent: "space-between",
               alignItems: "center",
               gap: "16px",
               marginBottom: "12px",
@@ -754,9 +556,7 @@ export default async function AssessmentPage({
             <div
               style={{
                 height: "100%",
-                width: `${
-                  progress.percentage
-                }%`,
+                width: "" + progress.percentage + "%",
                 background: "#1459D9",
                 borderRadius: "999px",
               }}
@@ -771,9 +571,7 @@ export default async function AssessmentPage({
               marginBottom: 0,
             }}
           >
-            {progress.answered} of{" "}
-            {progress.total} questions
-            answered
+            {progress.answered} of {progress.total} questions answered
           </p>
         </section>
 
@@ -781,97 +579,70 @@ export default async function AssessmentPage({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(135px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))",
             gap: "12px",
             marginBottom: "24px",
           }}
         >
-          {CLAUSE_NUMBERS.map(
-            (number) => {
-              const score =
-                calculateClauseScore(
-                  number,
-                  allQuestions,
-                  allSavedAnswers
-                );
-
-              const weight =
-                weights[number];
-
-              return (
-                <a
-                  key={number}
-                  href={`/portal/assessments/${assessment.id}?clause=${number}`}
+          {CLAUSE_NUMBERS.map((number) => {
+            const score = calculateClauseScore(number, allQuestions, allSavedAnswers);
+            const weight = weights[number];
+            return (
+              <a
+                key={number}
+                href={"/portal/assessments/" + assessment.id + "?clause=" + number}
+                style={{
+                  background: clause === number ? "#1459D9" : "#ffffff",
+                  color: clause === number ? "#ffffff" : "#071A33",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  border: clause === number ? "1px solid #1459D9" : "1px solid #dfe6ee",
+                  textDecoration: "none",
+                }}
+              >
+                <div
                   style={{
-                    background:
-                      clause === number
-                        ? "#1459D9"
-                        : "#ffffff",
-                    color:
-                      clause === number
-                        ? "#ffffff"
-                        : "#071A33",
-                    borderRadius: "12px",
-                    padding: "16px",
-                    border:
-                      clause === number
-                        ? "1px solid #1459D9"
-                        : "1px solid #dfe6ee",
-                    textDecoration:
-                      "none",
+                    fontSize: "12px",
+                    opacity: 0.75,
+                    marginBottom: "7px",
                   }}
                 >
+                  CLAUSE {number}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "24px",
+                    fontWeight: 800,
+                  }}
+                >
+                  {score !== null ? "" + score + "%" : "—"}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "12px",
+                    marginTop: "6px",
+                    lineHeight: 1.35,
+                  }}
+                >
+                  {getClauseTitle(assessment.standard, number)}
+                </div>
+
+                {weight && (
                   <div
                     style={{
-                      fontSize: "12px",
-                      opacity: 0.75,
-                      marginBottom:
-                        "7px",
+                      fontSize: "10px",
+                      marginTop: "8px",
+                      opacity: 0.7,
                     }}
                   >
-                    CLAUSE {number}
+                    Weight: {weight}%
                   </div>
-
-                  <div
-                    style={{
-                      fontSize: "24px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {score !== null
-                      ? `${score}%`
-                      : "—"}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      marginTop: "6px",
-                      lineHeight: 1.35,
-                    }}
-                  >
-                    {getClauseTitle(
-                      assessment.standard,
-                      number
-                    )}
-                  </div>
-
-                  {weight && (
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        marginTop: "8px",
-                        opacity: 0.7,
-                      }}
-                    >
-                      Weight: {weight}%
-                    </div>
-                  )}
-                </a>
-              );
-            }
-          )}
+                )}
+              </a>
+            );
+          })}
         </div>
 
         {/* Current clause */}
@@ -881,11 +652,9 @@ export default async function AssessmentPage({
             borderRadius: "14px",
             padding: "22px 24px",
             marginBottom: "24px",
-            border:
-              "1px solid #dfe6ee",
+            border: "1px solid #dfe6ee",
             display: "flex",
-            justifyContent:
-              "space-between",
+            justifyContent: "space-between",
             alignItems: "center",
             gap: "20px",
             flexWrap: "wrap",
@@ -920,26 +689,72 @@ export default async function AssessmentPage({
               fontWeight: 800,
             }}
           >
-            {currentClauseScore !==
-            null
-              ? `${currentClauseScore}%`
-              : "—"}
+            {currentClauseScore !== null ? "" + currentClauseScore + "%" : "—"}
           </div>
         </div>
 
         {assessment.standard === "ISO 22301:2019" && (
-          <details style={{ background: "#f7f5ff", border: "1px solid #d9cff6", borderRadius: "12px", padding: "16px 18px", marginBottom: "20px" }}>
-            <summary style={{ cursor: "pointer", color: "#442878", fontWeight: 850 }}>
+          <details
+            style={{
+              background: "#f7f5ff",
+              border: "1px solid #d9cff6",
+              borderRadius: "12px",
+              padding: "16px 18px",
+              marginBottom: "20px",
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                color: "#442878",
+                fontWeight: 850,
+              }}
+            >
               ISO 22301 Clause 3 terms and definitions ({ISO22301_DEFINITIONS.length})
             </summary>
-            <p style={{ color: "#617087", lineHeight: 1.6 }}>
-              Use these defined meanings consistently when completing the assessment. Requirement questions begin at Clause 4 because Clause 3 contains terminology rather than auditable requirements.
+            <p
+              style={{
+                color: "#617087",
+                lineHeight: 1.6,
+              }}
+            >
+              Use these defined meanings consistently when completing the assessment.
+              Requirement questions begin at Clause 4 because Clause 3 contains
+              terminology rather than auditable requirements.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "10px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+                gap: "10px",
+              }}
+            >
               {ISO22301_DEFINITIONS.map(([reference, term, definition]) => (
-                <div key={reference} style={{ background: "white", border: "1px solid #e4def5", borderRadius: "8px", padding: "12px" }}>
-                  <strong style={{ color: "#071A33" }}>{reference} {term}</strong>
-                  <div style={{ color: "#617087", lineHeight: 1.5, marginTop: "5px" }}>{definition}</div>
+                <div
+                  key={reference}
+                  style={{
+                    background: "white",
+                    border: "1px solid #e4def5",
+                    borderRadius: "8px",
+                    padding: "12px",
+                  }}
+                >
+                  <strong
+                    style={{
+                      color: "#071A33",
+                    }}
+                  >
+                    {reference} {term}
+                  </strong>
+                  <div
+                    style={{
+                      color: "#617087",
+                      lineHeight: 1.5,
+                      marginTop: "5px",
+                    }}
+                  >
+                    {definition}
+                  </div>
                 </div>
               ))}
             </div>
@@ -947,65 +762,145 @@ export default async function AssessmentPage({
         )}
 
         {assessment.standard === "ISO 9001:2026" && annexGuidance.length > 0 && (
-          <details style={{ background: "#f7f5ff", border: "1px solid #d9cff6", borderRadius: "12px", padding: "16px 18px", marginBottom: "20px" }}>
-            <summary style={{ cursor: "pointer", color: "#442878", fontWeight: 850 }}>
+          <details
+            style={{
+              background: "#f7f5ff",
+              border: "1px solid #d9cff6",
+              borderRadius: "12px",
+              padding: "16px 18px",
+              marginBottom: "20px",
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                color: "#442878",
+                fontWeight: 850,
+              }}
+            >
               Annex A interpretation guidance — informative and not scored
             </summary>
-            <p style={{ color: "#617087", lineHeight: 1.6 }}>
-              Use this material to interpret and apply the requirements consistently. It does not create additional conformity requirements.
+            <p
+              style={{
+                color: "#617087",
+                lineHeight: 1.6,
+              }}
+            >
+              Use this material to interpret and apply the requirements consistently. It
+              does not create additional conformity requirements.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "10px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+                gap: "10px",
+              }}
+            >
               {annexGuidance.map((item) => (
-                <div key={item.reference} style={{ background: "white", border: "1px solid #e4def5", borderRadius: "8px", padding: "12px" }}>
-                  <strong style={{ color: "#071A33" }}>{item.reference} {item.title}</strong>
-                  <div style={{ color: "#617087", lineHeight: 1.5, marginTop: "5px" }}>{item.guidance}</div>
+                <div
+                  key={item.reference}
+                  style={{
+                    background: "white",
+                    border: "1px solid #e4def5",
+                    borderRadius: "8px",
+                    padding: "12px",
+                  }}
+                >
+                  <strong
+                    style={{
+                      color: "#071A33",
+                    }}
+                  >
+                    {item.reference} {item.title}
+                  </strong>
+                  <div
+                    style={{
+                      color: "#617087",
+                      lineHeight: 1.5,
+                      marginTop: "5px",
+                    }}
+                  >
+                    {item.guidance}
+                  </div>
                 </div>
               ))}
             </div>
           </details>
         )}
 
+        {assessment.standard === "ISO/IEC 17025:2017" && (
+          <details
+            style={{
+              background: "#edf7fb",
+              border: "1px solid #bad6e5",
+              borderRadius: 12,
+              padding: 18,
+              marginBottom: 20,
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                fontWeight: 850,
+              }}
+            >
+              Laboratory assessment: scope, Option A/B and interpretation guidance
+            </summary>
+            <p>
+              Record the actual methods, ranges, locations and
+              calibration/testing/sampling activities in scope. Select Option A or B in
+              clause 8.1. For any not-applicable answer, record the factual reason in
+              the assessor notes. Testing-only and sampling-only prompts may be outside
+              a calibration-only scope; calibration uncertainty and technical controls
+              remain applicable. A high score does not establish accreditation readiness
+              when significant technical gaps remain.
+            </p>
+            <p>
+              Scores and finding grades are RPG assessment tools, not ISO-prescribed
+              thresholds. Clauses 1-3 explain scope, references and terminology;
+              normative assessment covers clauses 4-8.
+            </p>
+            {ISO17025_ANNEXES.map((item) => (
+              <p key={item.reference}>
+                <strong>
+                  {item.reference}: {item.title} — informative, not scored.{" "}
+                </strong>
+                {item.guidance}
+              </p>
+            ))}
+            <details>
+              <summary>Practical terminology</summary>
+              {ISO17025_TERMS.map(([term, meaning]) => (
+                <p key={term}>
+                  <strong>{term}: </strong>
+                  {meaning}
+                </p>
+              ))}
+            </details>
+          </details>
+        )}
+
         {/* Assessment form */}
-        <form
-          action={
-            saveAssessmentAnswers
-          }
-        >
-          <input
-            type="hidden"
-            name="assessment_id"
-            value={assessment.id}
-          />
+        <form action={saveAssessmentAnswers}>
+          <input type="hidden" name="assessment_id" value={assessment.id} />
 
-          <input
-            type="hidden"
-            name="current_clause"
-            value={clause}
-          />
+          <input type="hidden" name="current_clause" value={clause} />
 
-          {nextClause && (
-            <input
-              type="hidden"
-              name="next_clause"
-              value={nextClause}
-            />
-          )}
+          {nextClause && <input type="hidden" name="next_clause" value={nextClause} />}
 
           <section
             style={{
               background: "white",
               padding: "30px",
               borderRadius: "14px",
-              boxShadow:
-                "0 10px 30px rgba(7, 26, 51, 0.06)",
+              boxShadow: "0 10px 30px rgba(7, 26, 51, 0.06)",
             }}
           >
             <div
               style={{
                 marginBottom: "28px",
                 paddingBottom: "18px",
-                borderBottom:
-                  "1px solid #e6ebf1",
+                borderBottom: "1px solid #e6ebf1",
               }}
             >
               <p
@@ -1034,9 +929,7 @@ export default async function AssessmentPage({
                   lineHeight: 1.6,
                 }}
               >
-                Complete each question
-                and record the evidence
-                supporting your
+                Complete each question and record the evidence supporting your
                 assessment.
               </p>
             </div>
@@ -1048,122 +941,149 @@ export default async function AssessmentPage({
               }}
             >
               {questions.length ? (
-                questions.map(
-                  (
-                    question,
-                    index
-                  ) => {
-                    const savedAnswer =
-                      answersByClause[
-                        question
-                          .question_number
-                      ] ?? null;
-
-                    const fieldKey =
-                      question.question_number
-                        .replaceAll(
-                          ".",
-                          "_"
-                        )
-                        .replaceAll(
-                          "-",
-                          "_"
-                        );
-
-                    const savedFinding =
-                      findingsByQuestion[
-                        question.question_number
-                      ] ?? null;
-
-                    const savedAction =
-                      savedFinding
-                        ? actionsByFindingId[
-                            savedFinding.id
-                          ] ?? null
-                        : null;
-
-                    return (
-                      <div
-                        key={question.id}
-                        style={{
-                          borderTop:
-                            index === 0
-                              ? "none"
-                              : "1px solid #e6ebf1",
-                          paddingTop:
-                            index === 0
-                              ? "0"
-                              : "26px",
-                          position: "relative",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {isIso27001Assessment && (
-                          <div aria-hidden="true" style={{ position: "absolute", right: "18px", top: "44px", width: "330px", opacity: .055, pointerEvents: "none", userSelect: "none", textAlign: "center", transform: "rotate(-7deg)" }}>
-                            <img src="/rpg-excellence-logo.png" alt="" style={{ width: "100%", height: "auto" }} />
-                            <div style={{ color: "#1459D9", fontSize: "21px", fontWeight: 900, letterSpacing: ".1em", marginTop: "-9px" }}>ISO/IEC 27001</div>
-                          </div>
-                        )}
-                        <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap",marginBottom:"10px"}}>
-                          <h3 style={{color:"#071A33",margin:0}}>
-                            Clause {question.clause_reference ?? question.question_number}
-                          </h3>
-                          {question.control_id && <span style={{padding:"5px 8px",borderRadius:"999px",background:"#edf3ff",color:"#1459D9",fontSize:"12px",fontWeight:800}}>
-                            RPG control {question.control_id}
-                          </span>}
-                        </div>
-
-                        <p
+                questions.map((question, index) => {
+                  const savedAnswer = answersByClause[question.question_number] ?? null;
+                  const fieldKey = question.question_number
+                    .replaceAll(".", "_")
+                    .replaceAll("-", "_");
+                  const savedFinding =
+                    findingsByQuestion[question.question_number] ?? null;
+                  const savedAction = savedFinding
+                    ? (actionsByFindingId[savedFinding.id] ?? null)
+                    : null;
+                  return (
+                    <div
+                      key={question.id}
+                      style={{
+                        borderTop: index === 0 ? "none" : "1px solid #e6ebf1",
+                        paddingTop: index === 0 ? "0" : "26px",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {isIso27001Assessment && (
+                        <div
+                          aria-hidden="true"
                           style={{
-                            color:
-                              "#071A33",
-                            lineHeight: 1.6,
-                            fontWeight: 600,
-                            marginBottom:
-                              "10px",
+                            position: "absolute",
+                            right: "18px",
+                            top: "44px",
+                            width: "330px",
+                            opacity: 0.055,
+                            pointerEvents: "none",
+                            userSelect: "none",
+                            textAlign: "center",
+                            transform: "rotate(-7deg)",
                           }}
                         >
-                          {
-                            question.question
-                          }
-                        </p>
-
-                        {isAdvancedAssessment ? (
-                          <details
+                          <img
+                            src="/rpg-excellence-logo.png"
+                            alt=""
                             style={{
-                              border: "1px solid #dfe6ee",
-                              borderRadius: "9px",
-                              background: "#fbfcfe",
-                              marginBottom:
-                                "18px",
-                              overflow: "hidden",
+                              width: "100%",
+                              height: "auto",
+                            }}
+                          />
+                          <div
+                            style={{
+                              color: "#1459D9",
+                              fontSize: "21px",
+                              fontWeight: 900,
+                              letterSpacing: ".1em",
+                              marginTop: "-9px",
                             }}
                           >
-                            <summary style={{ cursor: "pointer", padding: "12px 14px", color: "#071A33", fontWeight: 800, background: "#f5f8fc" }}>
-                              Assessment guidance, evidence and conformity criteria
-                            </summary>
-                            <div style={{ display: "grid", gap: "12px", padding: "12px" }}>
+                            ISO/IEC 27001
+                          </div>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          flexWrap: "wrap",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <h3
+                          style={{
+                            color: "#071A33",
+                            margin: 0,
+                          }}
+                        >
+                          Clause {question.clause_reference ?? question.question_number}
+                        </h3>
+                        {question.control_id && (
+                          <span
+                            style={{
+                              padding: "5px 8px",
+                              borderRadius: "999px",
+                              background: "#edf3ff",
+                              color: "#1459D9",
+                              fontSize: "12px",
+                              fontWeight: 800,
+                            }}
+                          >
+                            RPG control {question.control_id}
+                          </span>
+                        )}
+                      </div>
+
+                      <p
+                        style={{
+                          color: "#071A33",
+                          lineHeight: 1.6,
+                          fontWeight: 600,
+                          marginBottom: "10px",
+                        }}
+                      >
+                        {question.question}
+                      </p>
+
+                      {isAdvancedAssessment ? (
+                        <details
+                          style={{
+                            border: "1px solid #dfe6ee",
+                            borderRadius: "9px",
+                            background: "#fbfcfe",
+                            marginBottom: "18px",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <summary
+                            style={{
+                              cursor: "pointer",
+                              padding: "12px 14px",
+                              color: "#071A33",
+                              fontWeight: 800,
+                              background: "#f5f8fc",
+                            }}
+                          >
+                            Assessment guidance, evidence and conformity criteria
+                          </summary>
+                          <div
+                            style={{
+                              display: "grid",
+                              gap: "12px",
+                              padding: "12px",
+                            }}
+                          >
                             {question.requirement_summary && (
                               <div
                                 style={{
-                                  background:
-                                    "#eef4ff",
-                                  borderLeft:
-                                    "4px solid #1459D9",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#617087",
+                                  background: "#eef4ff",
+                                  borderLeft: "4px solid #1459D9",
+                                  padding: "12px 14px",
+                                  borderRadius: "6px",
+                                  color: "#617087",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
                                 <strong
                                   style={{
-                                    color:
-                                      "#071A33",
+                                    color: "#071A33",
                                   }}
                                 >
                                   Requirement summary:
@@ -1173,48 +1093,96 @@ export default async function AssessmentPage({
                             )}
 
                             {question.practical_application && (
-                              <div style={{ background: "#eefaf8", borderLeft: "4px solid #17a89b", padding: "12px 14px", borderRadius: "6px", color: "#40566f", lineHeight: 1.55, fontSize: "14px" }}>
-                                <strong style={{ color: "#071A33" }}>Practical application:</strong>{" "}{question.practical_application}
-                              </div>
-                            )}
-
-                            {question.applicability_guidance && (
-                              <div style={{ background: "#fff8e8", padding: "12px 14px", borderRadius: "8px", color: "#735c17", lineHeight: 1.55, fontSize: "14px" }}>
-                                <strong>Applicability:</strong>{" "}{question.applicability_guidance}
-                              </div>
-                            )}
-
-                            {question.documented_information_guidance && (
-                              <div style={{ background: "#f5f8fc", padding: "12px 14px", borderRadius: "8px", color: "#617087", lineHeight: 1.55, fontSize: "14px" }}>
-                                <strong style={{ color: "#071A33" }}>Documented information:</strong>{" "}{question.documented_information_guidance}
-                              </div>
-                            )}
-
-                            {question.related_requirements && (
-                              <div style={{ background: "#f7f5ff", padding: "12px 14px", borderRadius: "8px", color: "#442878", lineHeight: 1.55, fontSize: "14px" }}>
-                                <strong>Connected workflow:</strong>{" "}{question.related_requirements}
-                              </div>
-                            )}
-
-                            {question.assessor_guidance && (
                               <div
                                 style={{
-                                  background:
-                                    "#f5f8fc",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#617087",
+                                  background: "#eefaf8",
+                                  borderLeft: "4px solid #17a89b",
+                                  padding: "12px 14px",
+                                  borderRadius: "6px",
+                                  color: "#40566f",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
                                 <strong
                                   style={{
-                                    color:
-                                      "#071A33",
+                                    color: "#071A33",
+                                  }}
+                                >
+                                  Practical application:
+                                </strong>{" "}
+                                {question.practical_application}
+                              </div>
+                            )}
+
+                            {question.applicability_guidance && (
+                              <div
+                                style={{
+                                  background: "#fff8e8",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#735c17",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong>Applicability:</strong>{" "}
+                                {question.applicability_guidance}
+                              </div>
+                            )}
+
+                            {question.documented_information_guidance && (
+                              <div
+                                style={{
+                                  background: "#f5f8fc",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color: "#071A33",
+                                  }}
+                                >
+                                  Documented information:
+                                </strong>{" "}
+                                {question.documented_information_guidance}
+                              </div>
+                            )}
+
+                            {question.related_requirements && (
+                              <div
+                                style={{
+                                  background: "#f7f5ff",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#442878",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong>Connected workflow:</strong>{" "}
+                                {question.related_requirements}
+                              </div>
+                            )}
+
+                            {question.assessor_guidance && (
+                              <div
+                                style={{
+                                  background: "#f5f8fc",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#617087",
+                                  lineHeight: 1.55,
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    color: "#071A33",
                                   }}
                                 >
                                   Assessor guidance:
@@ -1226,36 +1194,28 @@ export default async function AssessmentPage({
                             {question.interview_questions && (
                               <div
                                 style={{
-                                  background:
-                                    "#f8fafc",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#617087",
+                                  background: "#f8fafc",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#617087",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
                                 <strong
                                   style={{
-                                    color:
-                                      "#071A33",
+                                    color: "#071A33",
                                   }}
                                 >
                                   Interview questions
                                 </strong>
                                 <ul
                                   style={{
-                                    margin:
-                                      "8px 0 0 18px",
+                                    margin: "8px 0 0 18px",
                                     padding: 0,
                                   }}
                                 >
-                                  {String(
-                                    question.interview_questions
-                                  )
+                                  {String(question.interview_questions)
                                     .split("|")
                                     .map((item) => item.trim())
                                     .filter(Boolean)
@@ -1263,8 +1223,7 @@ export default async function AssessmentPage({
                                       <li
                                         key={itemIndex}
                                         style={{
-                                          marginBottom:
-                                            "5px",
+                                          marginBottom: "5px",
                                         }}
                                       >
                                         {item}
@@ -1277,24 +1236,18 @@ export default async function AssessmentPage({
                             {question.objective_evidence && (
                               <div
                                 style={{
-                                  background:
-                                    "#f3fbf8",
-                                  borderLeft:
-                                    "4px solid #167C80",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#617087",
+                                  background: "#f3fbf8",
+                                  borderLeft: "4px solid #167C80",
+                                  padding: "12px 14px",
+                                  borderRadius: "6px",
+                                  color: "#617087",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
                                 <strong
                                   style={{
-                                    color:
-                                      "#071A33",
+                                    color: "#071A33",
                                   }}
                                 >
                                   Objective evidence to seek:
@@ -1306,21 +1259,15 @@ export default async function AssessmentPage({
                             {question.sampling_guidance && (
                               <div
                                 style={{
-                                  background:
-                                    "#fff8e8",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#735c17",
+                                  background: "#fff8e8",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#735c17",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
-                                <strong>
-                                  Sampling guidance:
-                                </strong>{" "}
+                                <strong>Sampling guidance:</strong>{" "}
                                 {question.sampling_guidance}
                               </div>
                             )}
@@ -1328,22 +1275,17 @@ export default async function AssessmentPage({
                             {question.conformity_criteria && (
                               <div
                                 style={{
-                                  background:
-                                    "#f6f8fb",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#617087",
+                                  background: "#f6f8fb",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#617087",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
                                 <strong
                                   style={{
-                                    color:
-                                      "#071A33",
+                                    color: "#071A33",
                                   }}
                                 >
                                   Conformity criteria:
@@ -1356,8 +1298,7 @@ export default async function AssessmentPage({
                               question.major_nc_guidance) && (
                               <div
                                 style={{
-                                  display:
-                                    "grid",
+                                  display: "grid",
                                   gridTemplateColumns:
                                     "repeat(auto-fit, minmax(260px, 1fr))",
                                   gap: "10px",
@@ -1366,23 +1307,15 @@ export default async function AssessmentPage({
                                 {question.minor_nc_guidance && (
                                   <div
                                     style={{
-                                      background:
-                                        "#fffaf0",
-                                      padding:
-                                        "12px 14px",
-                                      borderRadius:
-                                        "8px",
-                                      color:
-                                        "#735c17",
-                                      lineHeight:
-                                        1.55,
-                                      fontSize:
-                                        "14px",
+                                      background: "#fffaf0",
+                                      padding: "12px 14px",
+                                      borderRadius: "8px",
+                                      color: "#735c17",
+                                      lineHeight: 1.55,
+                                      fontSize: "14px",
                                     }}
                                   >
-                                    <strong>
-                                      Minor NC guidance:
-                                    </strong>{" "}
+                                    <strong>Minor NC guidance:</strong>{" "}
                                     {question.minor_nc_guidance}
                                   </div>
                                 )}
@@ -1390,23 +1323,15 @@ export default async function AssessmentPage({
                                 {question.major_nc_guidance && (
                                   <div
                                     style={{
-                                      background:
-                                        "#fff4f2",
-                                      padding:
-                                        "12px 14px",
-                                      borderRadius:
-                                        "8px",
-                                      color:
-                                        "#8a2c20",
-                                      lineHeight:
-                                        1.55,
-                                      fontSize:
-                                        "14px",
+                                      background: "#fff4f2",
+                                      padding: "12px 14px",
+                                      borderRadius: "8px",
+                                      color: "#8a2c20",
+                                      lineHeight: 1.55,
+                                      fontSize: "14px",
                                     }}
                                   >
-                                    <strong>
-                                      Major NC guidance:
-                                    </strong>{" "}
+                                    <strong>Major NC guidance:</strong>{" "}
                                     {question.major_nc_guidance}
                                   </div>
                                 )}
@@ -1416,21 +1341,15 @@ export default async function AssessmentPage({
                             {question.management_focus && (
                               <div
                                 style={{
-                                  background:
-                                    "#f7f5ff",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "8px",
-                                  color:
-                                    "#5d4a86",
+                                  background: "#f7f5ff",
+                                  padding: "12px 14px",
+                                  borderRadius: "8px",
+                                  color: "#5d4a86",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
-                                <strong>
-                                  Management focus:
-                                </strong>{" "}
+                                <strong>Management focus:</strong>{" "}
                                 {question.management_focus}
                               </div>
                             )}
@@ -1438,24 +1357,18 @@ export default async function AssessmentPage({
                             {question.transition_guidance && (
                               <div
                                 style={{
-                                  background:
-                                    "#eef8ff",
-                                  borderLeft:
-                                    "4px solid #0284c7",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#475569",
+                                  background: "#eef8ff",
+                                  borderLeft: "4px solid #0284c7",
+                                  padding: "12px 14px",
+                                  borderRadius: "6px",
+                                  color: "#475569",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
                                 <strong
                                   style={{
-                                    color:
-                                      "#071A33",
+                                    color: "#071A33",
                                   }}
                                 >
                                   Transition / amendment guidance:
@@ -1467,24 +1380,18 @@ export default async function AssessmentPage({
                             {question.maturity_guidance && (
                               <div
                                 style={{
-                                  background:
-                                    "#f0fdf4",
-                                  borderLeft:
-                                    "4px solid #16a34a",
-                                  padding:
-                                    "12px 14px",
-                                  borderRadius:
-                                    "6px",
-                                  color:
-                                    "#475569",
+                                  background: "#f0fdf4",
+                                  borderLeft: "4px solid #16a34a",
+                                  padding: "12px 14px",
+                                  borderRadius: "6px",
+                                  color: "#475569",
                                   lineHeight: 1.55,
                                   fontSize: "14px",
                                 }}
                               >
                                 <strong
                                   style={{
-                                    color:
-                                      "#071A33",
+                                    color: "#071A33",
                                   }}
                                 >
                                   Maturity guidance:
@@ -1492,207 +1399,160 @@ export default async function AssessmentPage({
                                 {question.maturity_guidance}
                               </div>
                             )}
-                            </div>
-                          </details>
-                        ) : (
-                          question.guidance && (
-                            <div
+                          </div>
+                        </details>
+                      ) : (
+                        question.guidance && (
+                          <div
+                            style={{
+                              background: "#f5f8fc",
+                              borderLeft: "4px solid #1459D9",
+                              padding: "12px 14px",
+                              borderRadius: "6px",
+                              color: "#617087",
+                              lineHeight: 1.55,
+                              marginBottom: "16px",
+                              fontSize: "14px",
+                            }}
+                          >
+                            <strong
                               style={{
-                                background:
-                                  "#f5f8fc",
-                                borderLeft:
-                                  "4px solid #1459D9",
-                                padding:
-                                  "12px 14px",
-                                borderRadius:
-                                  "6px",
-                                color:
-                                  "#617087",
-                                lineHeight: 1.55,
-                                marginBottom:
-                                  "16px",
-                                fontSize: "14px",
+                                color: "#071A33",
                               }}
                             >
-                              <strong
-                                style={{
-                                  color:
-                                    "#071A33",
-                                }}
-                              >
-                                Guidance:
-                              </strong>{" "}
-                              {question.guidance}
-                            </div>
-                          )
-                        )}
+                              Guidance:
+                            </strong>{" "}
+                            {question.guidance}
+                          </div>
+                        )
+                      )}
 
-                        <label
-                          style={{
-                            display:
-                              "block",
-                            fontWeight: 700,
-                            color:
-                              "#071A33",
-                            marginBottom:
-                              "7px",
-                          }}
-                        >
-                          Assessment score
-                        </label>
+                      <label
+                        style={{
+                          display: "block",
+                          fontWeight: 700,
+                          color: "#071A33",
+                          marginBottom: "7px",
+                        }}
+                      >
+                        Assessment score
+                      </label>
 
-                        <select
-                          name={`score_${fieldKey}`}
-                          required
-                          defaultValue={
-                            savedAnswer
-                              ?.score !==
-                              null &&
-                            savedAnswer
-                              ?.score !==
-                              undefined
-                              ? String(
-                                  savedAnswer.score
-                                )
+                      <select
+                        name={"score_" + fieldKey}
+                        required
+                        defaultValue={
+                          savedAnswer?.applicability === "not_applicable"
+                            ? "not_applicable"
+                            : savedAnswer?.score !== null &&
+                                savedAnswer?.score !== undefined
+                              ? String(savedAnswer.score)
                               : ""
-                          }
-                          style={{
-                            width: "100%",
-                            maxWidth:
-                              "360px",
-                            padding: "12px",
-                            borderRadius:
-                              "8px",
-                            border:
-                              "1px solid #d8e0ea",
-                            background:
-                              "#fff",
-                          }}
-                        >
-                          <option
-                            value=""
-                            disabled
-                          >
-                            Select score
+                        }
+                        style={{
+                          width: "100%",
+                          maxWidth: "360px",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          border: "1px solid #d8e0ea",
+                          background: "#fff",
+                        }}
+                      >
+                        <option value="" disabled>
+                          Select score
+                        </option>
+
+                        {assessment.standard === "ISO/IEC 17025:2017" && (
+                          <option value="not_applicable">
+                            Not applicable — explain the scope reason below
                           </option>
-
-                          <option value="0">
-                            0 — Not addressed
-                          </option>
-
-                          <option value="1">
-                            1 — Initial
-                          </option>
-
-                          <option value="2">
-                            2 — Partially implemented
-                          </option>
-
-                          <option value="3">
-                            3 — Implemented
-                          </option>
-
-                          <option value="4">
-                            4 — Effective
-                          </option>
-
-                          <option value="5">
-                            5 — Best practice
-                          </option>
-                        </select>
-
-                        <label
-                          style={{
-                            display:
-                              "block",
-                            fontWeight: 700,
-                            color:
-                              "#071A33",
-                            marginTop:
-                              "18px",
-                            marginBottom:
-                              "7px",
-                          }}
-                        >
-                          {isAdvancedAssessment
-                            ? "Objective evidence / assessor notes"
-                            : "Evidence / notes"}
-                        </label>
-
-                        <textarea
-                          name={`evidence_${fieldKey}`}
-                          placeholder={
-                            isAdvancedAssessment
-                              ? "Record sampled documents, records, interviews, observations, data, references and any identified gaps..."
-                              : "Describe supporting evidence, documents, records, observations or gaps..."
-                          }
-                          rows="4"
-                          defaultValue={
-                            savedAnswer
-                              ?.evidence ??
-                            ""
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "12px",
-                            borderRadius:
-                              "8px",
-                            border:
-                              "1px solid #d8e0ea",
-                            resize:
-                              "vertical",
-                            boxSizing:
-                              "border-box",
-                          }}
-                        />
-
-                        {isAdvancedAssessment && (
-                          <FindingConclusionFields
-                            fieldKey={fieldKey}
-                            savedFinding={savedFinding}
-                            savedAction={savedAction}
-                            savedEvidence={
-                              savedAnswer
-                                ?.evidence ??
-                              ""
-                            }
-                          />
                         )}
 
-                        <button
-                          type="submit"
-                          formAction={saveCurrentClause}
-                          formNoValidate
-                          style={{
-                            marginTop: "14px",
-                            padding: "10px 15px",
-                            borderRadius: "8px",
-                            border: "1px solid #1459D9",
-                            background: "#ffffff",
-                            color: "#1459D9",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Save this question
-                        </button>
-                      </div>
-                    );
-                  }
-                )
+                        <option value="0">0 — Not addressed</option>
+
+                        <option value="1">1 — Initial</option>
+
+                        <option value="2">2 — Partially implemented</option>
+
+                        <option value="3">3 — Implemented</option>
+
+                        <option value="4">4 — Effective</option>
+
+                        <option value="5">5 — Best practice</option>
+                      </select>
+
+                      <label
+                        style={{
+                          display: "block",
+                          fontWeight: 700,
+                          color: "#071A33",
+                          marginTop: "18px",
+                          marginBottom: "7px",
+                        }}
+                      >
+                        {isAdvancedAssessment
+                          ? "Objective evidence / assessor notes"
+                          : "Evidence / notes"}
+                      </label>
+
+                      <textarea
+                        name={"evidence_" + fieldKey}
+                        placeholder={
+                          isAdvancedAssessment
+                            ? "Record sampled documents, records, interviews, observations, data, references and any identified gaps..."
+                            : "Describe supporting evidence, documents, records, observations or gaps..."
+                        }
+                        rows="4"
+                        defaultValue={savedAnswer?.evidence ?? ""}
+                        style={{
+                          width: "100%",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          border: "1px solid #d8e0ea",
+                          resize: "vertical",
+                          boxSizing: "border-box",
+                        }}
+                      />
+
+                      {isAdvancedAssessment && (
+                        <FindingConclusionFields
+                          fieldKey={fieldKey}
+                          savedFinding={savedFinding}
+                          savedAction={savedAction}
+                          savedEvidence={savedAnswer?.evidence ?? ""}
+                        />
+                      )}
+
+                      <button
+                        type="submit"
+                        formAction={saveCurrentClause}
+                        formNoValidate
+                        style={{
+                          marginTop: "14px",
+                          padding: "10px 15px",
+                          borderRadius: "8px",
+                          border: "1px solid #1459D9",
+                          background: "#ffffff",
+                          color: "#1459D9",
+                          fontWeight: 800,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Save this question
+                      </button>
+                    </div>
+                  );
+                })
               ) : (
                 <div
                   style={{
                     padding: "20px",
-                    background:
-                      "#fff8e8",
+                    background: "#fff8e8",
                     borderRadius: "8px",
                     color: "#735c17",
                   }}
                 >
-                  No questions are
-                  currently configured
-                  for Clause {clause}.
+                  No questions are currently configured for Clause {clause}.
                 </div>
               )}
             </div>
@@ -1702,11 +1562,9 @@ export default async function AssessmentPage({
               style={{
                 marginTop: "32px",
                 paddingTop: "22px",
-                borderTop:
-                  "1px solid #e6ebf1",
+                borderTop: "1px solid #e6ebf1",
                 display: "flex",
-                justifyContent:
-                  "space-between",
+                justifyContent: "space-between",
                 gap: "12px",
                 flexWrap: "wrap",
               }}
@@ -1721,16 +1579,11 @@ export default async function AssessmentPage({
                 <a
                   href="/portal"
                   style={{
-                    padding:
-                      "12px 18px",
-                    borderRadius:
-                      "8px",
-                    border:
-                      "1px solid #d8e0ea",
-                    color:
-                      "#071A33",
-                    textDecoration:
-                      "none",
+                    padding: "12px 18px",
+                    borderRadius: "8px",
+                    border: "1px solid #d8e0ea",
+                    color: "#071A33",
+                    textDecoration: "none",
                     fontWeight: 700,
                   }}
                 >
@@ -1739,23 +1592,22 @@ export default async function AssessmentPage({
 
                 {previousClause && (
                   <a
-                    href={`/portal/assessments/${assessment.id}?clause=${previousClause}`}
+                    href={
+                      "/portal/assessments/" +
+                      assessment.id +
+                      "?clause=" +
+                      previousClause
+                    }
                     style={{
-                      padding:
-                        "12px 18px",
-                      borderRadius:
-                        "8px",
-                      border:
-                        "1px solid #d8e0ea",
-                      color:
-                        "#071A33",
-                      textDecoration:
-                        "none",
+                      padding: "12px 18px",
+                      borderRadius: "8px",
+                      border: "1px solid #d8e0ea",
+                      color: "#071A33",
+                      textDecoration: "none",
                       fontWeight: 700,
                     }}
                   >
-                    ← Clause{" "}
-                    {previousClause}
+                    ← Clause {previousClause}
                   </a>
                 )}
               </div>
@@ -1769,59 +1621,39 @@ export default async function AssessmentPage({
               >
                 <button
                   type="submit"
-                  formAction={
-                    saveCurrentClause
-                  }
+                  formAction={saveCurrentClause}
                   formNoValidate
-                  disabled={
-                    !questions.length
-                  }
+                  disabled={!questions.length}
                   style={{
-                    padding:
-                      "12px 20px",
+                    padding: "12px 20px",
                     borderRadius: "8px",
-                    border:
-                      "1px solid #1459D9",
-                    background:
-                      "#ffffff",
-                    color:
-                      "#1459D9",
+                    border: "1px solid #1459D9",
+                    background: "#ffffff",
+                    color: "#1459D9",
                     fontWeight: 700,
-                    cursor:
-                      questions.length
-                        ? "pointer"
-                        : "not-allowed",
+                    cursor: questions.length ? "pointer" : "not-allowed",
                   }}
                 >
                   Save Answers
                 </button>
 
-              <button
-                type="submit"
-                disabled={
-                  !questions.length
-                }
-                style={{
-                  padding:
-                    "12px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background:
-                    questions.length
-                      ? "#1459D9"
-                      : "#c8d2df",
-                  color: "#ffffff",
-                  fontWeight: 700,
-                  cursor:
-                    questions.length
-                      ? "pointer"
-                      : "not-allowed",
-                }}
-              >
-                {nextClause
-                  ? `Save & Continue → Clause ${nextClause}`
-                  : "Complete Assessment →"}
-              </button>
+                <button
+                  type="submit"
+                  disabled={!questions.length}
+                  style={{
+                    padding: "12px 20px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: questions.length ? "#1459D9" : "#c8d2df",
+                    color: "#ffffff",
+                    fontWeight: 700,
+                    cursor: questions.length ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {nextClause
+                    ? "Save & Continue → Clause " + nextClause
+                    : "Complete Assessment →"}
+                </button>
               </div>
             </div>
           </section>
