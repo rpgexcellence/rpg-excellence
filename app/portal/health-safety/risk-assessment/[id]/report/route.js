@@ -1,3 +1,6 @@
+import {signDefinition} from '../../../../../../lib/safety-signs.mjs';
+import {ppeScopeText} from '../../../../../../lib/ppe-engine.mjs';
+import {createAdminClient} from '../../../../../../lib/supabase/admin';
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createClient } from "../../../../../../lib/supabase/server";
 
@@ -27,6 +30,10 @@ export async function GET(_request, { params }) {
   if (!assessment) return new Response("Risk assessment not found",{status:404});
   if (!["approved","communicated"].includes(assessment.status)) return new Response("A controlled PDF is available only after approval.",{status:409});
   const hazards = hazardsResult.data || [], actions = actionsResult.data || [];
+  const zoneIds=[...new Set(hazards.flatMap(hazard=>(hazard.ppe_requirements||[]).flatMap(item=>item.zone_ids||[])))];
+  const zoneResult=zoneIds.length?await createAdminClient().from('organization_zones').select('id,reference,name').eq('organization_id',assessment.organization_id).in('id',zoneIds):{data:[]};
+  if(zoneResult.error)return new Response(zoneResult.error.message,{status:500});
+  const zoneNames=new Map((zoneResult.data||[]).map(zone=>[zone.id,`${zone.reference} - ${zone.name}`]));
 
   const pdf = await PDFDocument.create();
   pdf.setTitle(`${clean(assessment.assessment_reference)} - ${clean(assessment.title)}`);
@@ -94,6 +101,19 @@ export async function GET(_request, { params }) {
       else textInCell(value,x,top,cellWidth,height,{bold:cellIndex===0,size:6.1}); x+=cellWidth;
     }); y-=height;
   });
+
+  if(hazards.some(hazard=>(hazard.ppe_requirements||[]).length)) {
+    ensure(190);section('Specified PPE requirements');
+    const ppeText=(value)=>{const safe=[];let line='';for(const char of clean(value)){if(regular.widthOfTextAtSize(line+char,8)>width-12){safe.push(line);line='';}line+=char;}if(line)safe.push(line);for(const line of safe){ensure(15);page.drawText(line,{x:PAGE.margin+6,y:y-10,size:8,font:regular,color:C.ink});y-=13;}};
+    for(const hazard of hazards)for(const item of hazard.ppe_requirements||[]) {
+      ensure(88);const def=signDefinition(item.code);
+      if(def){const image=await pdf.embedPng(Buffer.from(def.png,'base64'));page.drawImage(image,{x:PAGE.margin+6,y:y-42,width:35,height:35});}
+      page.drawText(clean(def?.title||item.code),{x:PAGE.margin+50,y:y-18,size:10,font:bold,color:C.navy});y-=48;
+      ppeText(`Hazard: ${hazard.hazard_description}`);ppeText(ppeScopeText(item));ppeText(`Protection specification: ${item.specification}`);ppeText(`Wearer instruction: ${item.instruction}`);
+      if(item.limitations)ppeText(`Limitations / compatibility: ${item.limitations}`);
+      ppeText(`Zone scope: ${item.zone_ids?.length?item.zone_ids.map(id=>zoneNames.get(id)||id).join('; '):'All zones linked to this assessment'}`);y-=14;
+    }
+  }
 
   section("Risk-reduction action plan");
   const actionWidths=[70,300,125,90,90,100];
