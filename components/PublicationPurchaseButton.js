@@ -5,9 +5,12 @@ import { useState } from "react";
 const VALID_PUBLICATIONS = new Set([
   "ISO9001-2026-GUIDE",
   "ISO14001-2026-GUIDE",
+  "ISO17025-2017-GUIDE",
 ]);
 
-export default function PublicationPurchaseButton({ publication }) {
+// Legacy ISO 14001 product page does not pass a publication prop.
+// Defaulting to its existing product code preserves that checkout.
+export default function PublicationPurchaseButton({ publication = "ISO14001-2026-GUIDE" }) {
   const [loading, setLoading] = useState(false);
 
   async function buy() {
