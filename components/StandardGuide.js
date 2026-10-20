@@ -529,6 +529,32 @@ export default function StandardGuide({ guide, locale }) {
               </Link>
             </div>
           )}
+          {guide.code === "ISO/IEC 17025:2017" && (
+            <div className="assessmentLinkBox">
+              <div>
+                <span>RPG EXCELLENCE DIGITAL PUBLICATION</span>
+                <strong>Decoding ISO/IEC 17025:2017 — Technical Laboratory Competence Guide</strong>
+                <p>
+                  Practical clause-by-clause guidance, worked laboratory examples,
+                  impartiality risk controls, technical evidence, templates and posters.
+                </p>
+                <small
+                  style={{
+                    display: "block",
+                    marginTop: 9,
+                    color: "#c2ddff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  52-page digital PDF · £29.99
+                </small>
+              </div>
+              <Link href={"/" + locale + "/publications/decoding-iso-17025-2017"}>
+                Buy the book →
+              </Link>
+            </div>
+          )}
           {guide.code === "ISO/IEC 27001" && (
             <div className="assessmentLinkBox soaProductBox">
               <div>
