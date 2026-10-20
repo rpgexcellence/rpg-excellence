@@ -1,3 +1,5 @@
+import {loadZonePPE} from '../../../../../../../../lib/zone-ppe';
+import {ppeScopeText} from '../../../../../../../../lib/ppe-engine.mjs';
 import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
 import QRCode from 'qrcode';
 import {readFile} from 'node:fs/promises';
@@ -15,6 +17,9 @@ export async function GET(request,{params}) {
  const zone=unwrap(await admin.from('organization_zones').select('*').eq('id',zoneId).eq('site_id',siteId).eq('organization_id',access.organization.id))[0];
  if(!zone)return new Response('Zone not found',{status:404});
  if(zone.status!=='published'||site.status!=='active')return new Response('Publish the zone at an active site before generating its poster.',{status:409});
+ const derivedPPE=await loadZonePPE(admin,zone,site);
+ if(derivedPPE.needsReview)return new Response('Assessment-derived PPE changed or needs review. Review the zone and publish a new poster revision.',{status:409});
+ const ppeRequirements=zone.ppe_source_mode==='assessment'?[...(zone.ppe_snapshot?.requirements||[])].sort((a,b)=>Number(b.scope==='zone')-Number(a.scope==='zone')):[];
  const signs=zone.safety_signs||[],sourceIds=signs.map(s=>s.assessment_id).filter(Boolean);
  const sources=sourceIds.length?unwrap(await admin.from('hs_risk_assessments').select('id,status,version').eq('organization_id',zone.organization_id).eq('administration_location_id',siteId).in('id',sourceIds)):[];
  if(signsNeedReview(zone,sources,siteToday(site.timezone)))return new Response('Review and confirm the safety signs and current assessment links before generating a new poster.',{status:409});
@@ -77,14 +82,15 @@ export async function GET(request,{params}) {
   sidebar();
  };
  const ensure=height=>{if(y-height<bottom)newPage();};
- const section=(text,title,color=navy)=>{
+ const section=(text,title,color=navy,icon=null)=>{
   if(!clean(text))return;
-  const body=lines(text,contentWidth-24,11);let index=0,part=0;
-  while(index<body.length){ensure(76);const capacity=Math.max(1,Math.floor((y-bottom-45)/15)),chunk=body.slice(index,index+capacity),height=40+chunk.length*15;
+  const body=lines(text,contentWidth-24,11),headerHeight=icon?61:40;let index=0,part=0;
+  while(index<body.length){ensure(headerHeight+36);const capacity=Math.max(1,Math.floor((y-bottom-headerHeight-5)/15)),chunk=body.slice(index,index+capacity),height=headerHeight+chunk.length*15;
    page.drawRectangle({x:left,y:y-height,width:contentWidth,height,color:color===red?rgb(1,.96,.95):pale,borderColor:border,borderWidth:.7});
    page.drawRectangle({x:left,y:y-height,width:3,height,color:color===red?red:teal});
-   draw(title+(part?' / CONTINUED':''),left+12,y-18,fit(title+(part?' / CONTINUED':''),contentWidth-24,11),bold,color);
-   let ty=y-39;for(const l of chunk){draw(l,left+12,ty,11,regular,color);ty-=15;}
+   if(icon)page.drawImage(icon,{x:left+12,y:y-49,width:34,height:34});
+   draw(title+(part?' / CONTINUED':''),left+(icon?54:12),y-23,fit(title+(part?' / CONTINUED':''),contentWidth-(icon?66:24),11),bold,color);
+   let ty=y-headerHeight+1;for(const l of chunk){draw(l,left+12,ty,11,regular,color);ty-=15;}
    y-=height+12;index+=chunk.length;part++;
   }
  };
@@ -98,16 +104,17 @@ export async function GET(request,{params}) {
   const icon=await pdf.embedPng(Buffer.from(def.png,'base64'));page.drawImage(icon,{x:left+10,y:top-67,width:56,height:56});
   let ty=top-19;for(const l of title){draw(l,left+77,ty,12,bold);ty-=15;}for(const l of scope){draw(l,left+77,ty,9.5,bold,grey);ty-=12;}ty-=4;for(const l of instruction){draw(l,left+77,ty,10.5);ty-=14;}y=top-height-12;
  }
+ for(const requirement of ppeRequirements){const def=signDefinition(requirement.code);if(!def)continue;const icon=await pdf.embedPng(Buffer.from(def.png,'base64'));const refs=[...new Set((requirement.sources||[]).map(source=>`${source.reference||'RA'} v${source.version}`))];section(`${ppeScopeText(requirement)}. Specification: ${requirement.specification}. ${requirement.instruction}${requirement.limitations?' Limitations: '+requirement.limitations:''}. Sources: ${refs.join('; ')}.`,def.title,navy,icon);}
  section(zone.key_controls,'PPE & KEY CONTROLS');
  section(zone.emergency_information,'EMERGENCY INFORMATION');
- if(!signs.length&&!zone.key_controls)section('Confirm applicable approved task controls with the area owner before starting work.','BEFORE WORK STARTS');
+ if(!signs.length&&!ppeRequirements.length&&!zone.key_controls)section('Confirm applicable approved task controls with the area owner before starting work.','BEFORE WORK STARTS');
  for(let i=0;i<pages.length;i++){
   page=pages[i];page.drawRectangle({x:0,y:0,width:W,height:95,color:navy});page.drawRectangle({x:0,y:91,width:W,height:4,color:teal});
   draw('See an issue? Report it here.',left,68,21,bold,white);
   draw('Scan the QR code to report a concern.',left,51,10,regular,white);
   draw('For immediate danger, follow site emergency procedures.',left,36,9,regular,white);
   draw(`Rev ${zone.poster_revision||1} | Issued ${new Date().toISOString().slice(0,10)} | Sheet ${i+1} of ${pages.length}`,left,16,8,bold,white);
-  const review=(signs.length?`Review by ${zone.signs_review_date}. `:'')+(pages.length>1?'Display all sheets.':'Replace outdated copies.');draw(review,307,16,fit(review,258,8,6),regular,white);
+  const review=((signs.length||ppeRequirements.length||zone.ppe_source_mode==='assessment')?`Review by ${zone.signs_review_date}. `:'')+(pages.length>1?'Display all sheets.':'Replace outdated copies.');draw(review,307,16,fit(review,258,8,6),regular,white);
   if(size==='A3')page.scale(Math.SQRT2,Math.SQRT2);
  }
  const bytes=await pdf.save();const filename=clean(zone.reference).replace(/[^A-Za-z0-9_-]/g,'_')||'zone';
