@@ -66,12 +66,21 @@ export async function GET(request,{params}) {
   page.drawRectangle({x:0,y:H-7,width:W,height:7,color:yellow});
   const headerBottom=first?654:683,headerHeight=H-7-headerBottom;
   page.drawRectangle({x:0,y:headerBottom,width:W,height:headerHeight,color:navy});
-  if(photo&&first){const pw=290,ph=headerHeight;const scale=Math.max(pw/photo.width,ph/photo.height);page.drawImage(photo,{x:W-photo.width*scale,y:headerBottom,width:photo.width*scale,height:photo.height*scale});page.drawRectangle({x:0,y:headerBottom,width:W,height:headerHeight,color:navy,opacity:.72});page.drawRectangle({x:0,y:headerBottom,width:285,height:headerHeight,color:navy,opacity:.45});}
+  // Keep the entire graphic visible at its original colours on every sheet.
+  // The solid text panel is separate, so no tint or text covers the photo.
+  const textWidth=255;
+  if(photo){
+   const photoLeft=305,photoWidth=W-photoLeft;
+   const scale=Math.min(photoWidth/photo.width,headerHeight/photo.height);
+   const imageWidth=photo.width*scale,imageHeight=photo.height*scale;
+   page.drawRectangle({x:photoLeft,y:headerBottom,width:photoWidth,height:headerHeight,color:white});
+   page.drawImage(photo,{x:photoLeft+(photoWidth-imageWidth)/2,y:headerBottom+(headerHeight-imageHeight)/2,width:imageWidth,height:imageHeight});
+  }
   if(logo){page.drawRectangle({x:left,y:785,width:155,height:36,color:white});const scale=Math.min(139/logo.width,28/logo.height);page.drawImage(logo,{x:left+8,y:789,width:logo.width*scale,height:logo.height*scale});}else draw('RPG EXCELLENCE',left,797,19,bold,white);
-  draw('MY WORK AREA',405,799,12,bold,white);
-  const refSize=fit(zone.reference,535,first?57:34,10);draw(zone.reference,left,first?738:739,refSize,bold,white);
-  let nameSize=first?23:17;while(lines(zone.name,535,nameSize,bold).length>(first?2:1)&&nameSize>8)nameSize-=.5;
-  let ny=first?701:713;for(const l of lines(zone.name,535,nameSize,bold)){draw(l,left,ny,nameSize,bold,white);ny-=nameSize+4;}
+  draw('MY WORK AREA',195,799,8,bold,white);
+  const refSize=fit(zone.reference,textWidth,first?57:34,10);draw(zone.reference,left,first?738:739,refSize,bold,white);
+  let nameSize=first?23:17;while(lines(zone.name,textWidth,nameSize,bold).length>(first?2:1)&&nameSize>8)nameSize-=.5;
+  let ny=first?701:713;for(const l of lines(zone.name,textWidth,nameSize,bold)){draw(l,left,ny,nameSize,bold,white);ny-=nameSize+4;}
   page.drawRectangle({x:left,y:headerBottom+12,width:58,height:4,color:teal});
   let locationY=headerBottom-18;
   for(const l of lines(`${site.site_name}${zone.floor_level?' / '+zone.floor_level:''}`,535,9.5)){draw(l,left,locationY,9.5,regular,grey);locationY-=13;}
