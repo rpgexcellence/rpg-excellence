@@ -4,6 +4,7 @@ import PageShell from "../../../components/PageShell";
 import { locales } from "../../../lib/i18n";
 export const metadata = { title: "Digital Publications | RPG Excellence", description: "Practical independent ISO management system publications, £29.99 per PDF." };
 const books = [
+  { title: "Decoding ISO/IEC 17025:2017", subtitle: "Testing & Calibration Laboratories", desc: "Translate technical laboratory requirements into practical implementation: impartiality, competence, traceability, uncertainty, decision rules, result validity and audit evidence. Includes technical examples, templates and posters.", pages: 52, slug: "decoding-iso-17025-2017" },
   { title: "Decoding ISO 9001:2026", subtitle: "Quality Management", desc: "Understand requirements, test evidence and make stronger quality decisions. Clause-by-clause guidance, practical examples and Annex A interpretation.", pages: 33, slug: "decoding-iso-9001-2026" },
   { title: "Decoding ISO 14001:2026", subtitle: "Environmental Management", desc: "Translate environmental management requirements into practical controls, audit trails and measurable improvement. Includes seven Pocket Guides.", pages: 24, slug: "decoding-iso-14001-2026" },
 ];
