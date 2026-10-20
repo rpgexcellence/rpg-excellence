@@ -15,7 +15,7 @@ export function calculateClauseScore(
 
   const clauseScores = (answers ?? [])
     .filter((answer) =>
-      clauseQuestionNumbers.includes(
+      answer.applicability !== "not_applicable" && clauseQuestionNumbers.includes(
         answer.clause
       )
     )
@@ -45,6 +45,7 @@ export function calculateSimpleOverallScore(
   answers
 ) {
   const scores = (answers ?? [])
+    .filter(answer => answer.applicability !== "not_applicable")
     .map((answer) => answer.score)
     .filter(
       (score) =>
