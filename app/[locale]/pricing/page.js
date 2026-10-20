@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-
 import PageShell from "../../../components/PageShell";
 import SubscribeButton from "../../../components/SubscribeButton";
 import SingleAssessmentButton from "../../../components/SingleAssessmentButton";
@@ -8,93 +7,129 @@ import TrainingPurchaseButton from "../../../components/TrainingPurchaseButton";
 import Link from "next/link";
 import JsonLd from "../../../components/JsonLd";
 import { locales } from "../../../lib/i18n";
-
 export const metadata = {
   title: "RPG Excellence Pricing | Platform, Assessments and Training",
   description:
     "Choose RPG Excellence platform access, a one-off ISO assessment, a standalone Statement of Applicability or individual practitioner training.",
-  alternates: { canonical: "/en/pricing" },
+  alternates: {
+    canonical: "/en/pricing",
+  },
 };
-
 const trainingProducts = [
   {
     title: "Risk Assessment Training",
     price: "£19.99",
-    detail: "Interactive initial course with practical scenarios, final assessment and verifiable certificate.",
+    detail:
+      "Interactive initial course with practical scenarios, final assessment and verifiable certificate.",
     course: "risk-assessment-initial",
   },
   {
     title: "Risk Assessment Refresher",
     price: "£12.99",
-    detail: "Focused refresher covering risk evaluation, controls, recording and review.",
+    detail:
+      "Focused refresher covering risk evaluation, controls, recording and review.",
     course: "risk-assessment-refresher",
   },
   {
     title: "Internal Auditor Refresher",
     price: "£19.99",
-    detail: "Evidence-led audit judgement, findings, follow-up and effectiveness verification.",
+    detail:
+      "Evidence-led audit judgement, findings, follow-up and effectiveness verification.",
     course: "internal-auditor-refresher",
   },
   {
     title: "RCA & Corrective Action Practitioner",
     price: "£49.99",
-    detail: "180-minute structured RCA–8D course with downloadable workbook and certificate.",
+    detail:
+      "180-minute structured RCA–8D course with downloadable workbook and certificate.",
     course: "rca-8d-practitioner",
   },
 ];
-
 const courseListSchema = {
   "@context": "https://schema.org",
   "@type": "ItemList",
   name: "RPG Excellence online training courses",
   itemListElement: [
-    ["Workplace Risk Assessment Training", "Practical workplace risk-assessment skills.", "/en/hs-hub/training#initial-course", "19.99"],
-    ["Workplace Risk Assessment Refresher", "Scenario-led risk-assessment refresher.", "/en/hs-hub/training#refresher-course", "12.99"],
-    ["Internal Auditor Refresher Training", "Practical evidence-led internal-auditor refresher.", "/en/internal-audit-training", "19.99"],
-    ["RCA and Corrective Action Practitioner Training", "Evidence-led RCA and corrective-action training.", "/en/rca-8d-training", "49.99"],
+    [
+      "Workplace Risk Assessment Training",
+      "Practical workplace risk-assessment skills.",
+      "/en/hs-hub/training#initial-course",
+      "19.99",
+    ],
+    [
+      "Workplace Risk Assessment Refresher",
+      "Scenario-led risk-assessment refresher.",
+      "/en/hs-hub/training#refresher-course",
+      "12.99",
+    ],
+    [
+      "Internal Auditor Refresher Training",
+      "Practical evidence-led internal-auditor refresher.",
+      "/en/internal-audit-training",
+      "19.99",
+    ],
+    [
+      "RCA and Corrective Action Practitioner Training",
+      "Evidence-led RCA and corrective-action training.",
+      "/en/rca-8d-training",
+      "49.99",
+    ],
   ].map(([name, description, path, price], index) => ({
     "@type": "ListItem",
     position: index + 1,
-    url: `https://www.rpgexcellence.com${path}`,
+    url: "https://www.rpgexcellence.com" + path,
     item: {
       "@type": "Course",
       name,
       description,
-      url: `https://www.rpgexcellence.com${path}`,
-      provider: { "@id": "https://www.rpgexcellence.com/#organization" },
-      offers: { "@type": "Offer", price, priceCurrency: "GBP", availability: "https://schema.org/InStock" },
+      url: "https://www.rpgexcellence.com" + path,
+      provider: {
+        "@id": "https://www.rpgexcellence.com/#organization",
+      },
+      offers: {
+        "@type": "Offer",
+        price,
+        priceCurrency: "GBP",
+        availability: "https://schema.org/InStock",
+      },
     },
   })),
 };
-
-export default async function Pricing({
-  params,
-}) {
+export default async function Pricing({ params }) {
   const { locale } = await params;
-
   if (!locales.includes(locale)) {
     notFound();
   }
-
   return (
     <PageShell locale={locale}>
       <JsonLd data={courseListSchema} />
       <main className="simplePage" id="subscriptions">
         <div className="simpleInner">
-          <section style={{border:"1px solid #cddce8",borderRadius:12,padding:22,marginBottom:28,background:"#f7fbff"}}>
+          <section
+            style={{
+              border: "1px solid #cddce8",
+              borderRadius: 12,
+              padding: 22,
+              marginBottom: 28,
+              background: "#f7fbff",
+            }}
+          >
             <span className="kicker">DIGITAL PUBLICATIONS</span>
             <h2>Decoding ISO 14001:2026 — £29.99</h2>
-            <p>Independent practitioner reference and seven clause-linked Pocket Guides. One-off PDF purchase.</p>
-            <Link className="button" href={`/${locale}/publications/decoding-iso-14001-2026`}>View publication</Link>
+            <p>
+              Independent practitioner reference and seven clause-linked Pocket Guides.
+              One-off PDF purchase.
+            </p>
+            <Link
+              className="button"
+              href={"/" + locale + "/publications/decoding-iso-14001-2026"}
+            >
+              View publication
+            </Link>
           </section>
-          <span className="kicker">
-            PLATFORM, ONE-OFF TOOLS & TRAINING
-          </span>
+          <span className="kicker">PLATFORM, ONE-OFF TOOLS & TRAINING</span>
 
-          <h1>
-            Choose the access that matches
-            the work you need to complete.
-          </h1>
+          <h1>Choose the access that matches the work you need to complete.</h1>
 
           <p
             style={{
@@ -105,10 +140,9 @@ export default async function Pricing({
               lineHeight: 1.6,
             }}
           >
-            Use the connected assurance platform, purchase one controlled
-            assessment, or build individual competence through interactive
-            training. RPG Excellence is not VAT registered; the displayed price
-            is the amount charged.
+            Use the connected assurance platform, purchase one controlled assessment, or
+            build individual competence through interactive training. RPG Excellence is
+            not VAT registered; the displayed price is the amount charged.
           </p>
 
           <div className="pricingGrid">
@@ -117,14 +151,14 @@ export default async function Pricing({
 
               <h3>£20.99/month</h3>
 
-              <p>
-                For a small organisation starting a controlled assurance
-                workspace.
-              </p>
+              <p>For a small organisation starting a controlled assurance workspace.</p>
 
               <ul>
                 <li>One organisation workspace</li>
-                <li>Six ISO gap-analysis frameworks, including ISO 22301</li>
+                <li>
+                  Seven ISO gap-analysis frameworks, including ISO 22301 and ISO/IEC
+                  17025
+                </li>
                 <li>Business Continuity planning workspace</li>
                 <li>Health &amp; Safety risk and action control</li>
                 <li>Action ownership and effectiveness verification</li>
@@ -149,8 +183,8 @@ export default async function Pricing({
               <h3>£59/month</h3>
 
               <p>
-                For organisations managing connected audit, assurance and
-                improvement activity.
+                For organisations managing connected audit, assurance and improvement
+                activity.
               </p>
 
               <ul>
@@ -162,7 +196,9 @@ export default async function Pricing({
                 <li>Permit to Work control</li>
                 <li>Management of Change and PSSR workflow</li>
                 <li>Asset Management, ownership and planned maintenance</li>
-                <li>Risk-based Workplace Inspection programmes, fieldwork and actions</li>
+                <li>
+                  Risk-based Workplace Inspection programmes, fieldwork and actions
+                </li>
                 <li>Online and offline mobile inspection evidence capture</li>
                 <li>Statement of Applicability workspace</li>
                 <li>Priority support</li>
@@ -185,8 +221,8 @@ export default async function Pricing({
               <h3>£159/month</h3>
 
               <p>
-                For consultants and assurance professionals managing broader
-                client portfolios.
+                For consultants and assurance professionals managing broader client
+                portfolios.
               </p>
 
               <ul>
@@ -211,22 +247,41 @@ export default async function Pricing({
             </div>
           </div>
 
-          <section style={{marginTop:64}}>
+          <section
+            style={{
+              marginTop: 64,
+            }}
+          >
             <span className="kicker">RPG TRAINING ACADEMY</span>
             <h2>Individual training—no subscription required</h2>
             <p className="lead">
-              Each purchase provides personal learner access, interactive
-              exercises, a protected final assessment and a verifiable
-              certificate. The displayed price is the total course price.
+              Each purchase provides personal learner access, interactive exercises, a
+              protected final assessment and a verifiable certificate. The displayed
+              price is the total course price.
             </p>
-            <div className="pricingGrid" style={{marginTop:28}}>
+            <div
+              className="pricingGrid"
+              style={{
+                marginTop: 28,
+              }}
+            >
               {trainingProducts.map((product) => (
                 <article className="priceCard" key={product.course}>
                   <span>INDIVIDUAL COURSE</span>
                   <h3>{product.title}</h3>
-                  <h2 style={{margin:"8px 0"}}>{product.price}</h2>
+                  <h2
+                    style={{
+                      margin: "8px 0",
+                    }}
+                  >
+                    {product.price}
+                  </h2>
                   <p>{product.detail}</p>
-                  <div style={{marginTop:24}}>
+                  <div
+                    style={{
+                      marginTop: 24,
+                    }}
+                  >
                     <TrainingPurchaseButton className="button" course={product.course}>
                       Buy course
                     </TrainingPurchaseButton>
@@ -236,19 +291,72 @@ export default async function Pricing({
             </div>
           </section>
 
-          <section className="priceCard" style={{marginTop:32,maxWidth:820,marginInline:"auto",border:"2px solid #2d63eb"}}>
+          <section
+            className="priceCard"
+            style={{
+              marginTop: 32,
+              maxWidth: 820,
+              marginInline: "auto",
+              border: "2px solid #2d63eb",
+            }}
+          >
             <span>ONE-OFF ACCESS</span>
-            <h2 style={{margin:"10px 0"}}>Single ISO Gap Analysis · £129</h2>
-            <p>Complete one structured assessment without starting a subscription. Includes one organisation, one selected standard, 30 days to complete, 90 days to manage assessment-linked corrective action and continued read-only access to the retained record.</p>
-            <ul><li>One assessment against the standard selected at checkout</li><li>Executive assessment result, findings and evidence trail</li><li>Assessment-linked Management Action, CAPA or 8D treatment</li><li>90-day corrective-action and effectiveness-verification workspace</li><li>No recurring payment</li><li>Standalone CAPA-8D, Internal Audit and programme modules require a subscription</li></ul>
+            <h2
+              style={{
+                margin: "10px 0",
+              }}
+            >
+              Single ISO Gap Analysis · £129
+            </h2>
+            <p>
+              Complete one structured assessment without starting a subscription.
+              Includes one organisation, one selected standard, 30 days to complete, 90
+              days to manage assessment-linked corrective action and continued read-only
+              access to the retained record.
+            </p>
+            <ul>
+              <li>One assessment against the standard selected at checkout</li>
+              <li>Executive assessment result, findings and evidence trail</li>
+              <li>Assessment-linked Management Action, CAPA or 8D treatment</li>
+              <li>90-day corrective-action and effectiveness-verification workspace</li>
+              <li>No recurring payment</li>
+              <li>
+                Standalone CAPA-8D, Internal Audit and programme modules require a
+                subscription
+              </li>
+            </ul>
             <SingleAssessmentButton />
           </section>
 
-          <section className="priceCard" style={{marginTop:18,maxWidth:820,marginInline:"auto",border:"2px solid #0f9f8f"}}>
+          <section
+            className="priceCard"
+            style={{
+              marginTop: 18,
+              maxWidth: 820,
+              marginInline: "auto",
+              border: "2px solid #0f9f8f",
+            }}
+          >
             <span>STANDALONE ISO/IEC 27001 TOOL</span>
-            <h2 style={{margin:"10px 0"}}>Statement of Applicability · £129</h2>
-            <p>Build, review and approve a controlled Statement of Applicability without purchasing the full ISO/IEC 27001 gap assessment.</p>
-            <ul><li>All 93 ISO/IEC 27001:2022 Annex A controls</li><li>Applicability, implementation and effectiveness decisions</li><li>ISO/IEC 27002-aligned guidance and evidence prompts</li><li>Residual-risk ownership, acceptance and treatment</li><li>Dynamic executive narrative and controlled PDF</li><li>30-day completion access and retained read-only record</li></ul>
+            <h2
+              style={{
+                margin: "10px 0",
+              }}
+            >
+              Statement of Applicability · £129
+            </h2>
+            <p>
+              Build, review and approve a controlled Statement of Applicability without
+              purchasing the full ISO/IEC 27001 gap assessment.
+            </p>
+            <ul>
+              <li>All 93 ISO/IEC 27001:2022 Annex A controls</li>
+              <li>Applicability, implementation and effectiveness decisions</li>
+              <li>ISO/IEC 27002-aligned guidance and evidence prompts</li>
+              <li>Residual-risk ownership, acceptance and treatment</li>
+              <li>Dynamic executive narrative and controlled PDF</li>
+              <li>30-day completion access and retained read-only record</li>
+            </ul>
             <StandaloneSoaButton />
           </section>
 
