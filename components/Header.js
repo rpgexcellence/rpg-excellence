@@ -2,20 +2,20 @@ import Link from "next/link";
 import ISO9001ReleaseBar from "./ISO9001ReleaseBar";
 
 const ISO_AT_A_GLANCE = [
-  ["ISO 9001:2015", "Quality management — Amendment 1:2024", "iso-9001-2015", "Q15"],
-  ["ISO 9001:2026", "Quality management — 2026 edition", "iso-9001", "Q"],
-  ["ISO 14001", "Environmental management", "iso-14001", "E"],
-  ["ISO 45001", "Occupational health & safety", "iso-45001", "S"],
-  ["ISO 22301", "Business continuity", "iso-22301", "B"],
-  ["ISO 27001", "Information security", "iso-27001", "IS"],
+["ISO/IEC 17025:2017", "Testing and calibration laboratories", "iso-17025", "LAB"],
+["ISO 9001:2015", "Quality management — Amendment 1:2024", "iso-9001-2015", "Q15"],
+["ISO 9001:2026", "Quality management — 2026 edition", "iso-9001", "Q"],
+["ISO 14001", "Environmental management", "iso-14001", "E"],
+["ISO 45001", "Occupational health & safety", "iso-45001", "S"],
+["ISO 22301", "Business continuity", "iso-22301", "B"],
+["ISO 27001", "Information security", "iso-27001", "IS"],
 ];
 
 export default function Header({ locale, nav, variant = "default" }) {
-  return (
-    <>
-      <header className={`header ${variant === "home" ? "homeHeader" : ""}`}>
-        <style>{`
-          .isoAtGlance{position:relative;margin:0}
+return (
+<>
+<header className={header ${variant === "home" ? "homeHeader" : ""}}>
+<style>{          .isoAtGlance{position:relative;margin:0}
           .isoAtGlance>summary{display:flex;align-items:center;gap:6px;list-style:none;cursor:pointer;color:inherit;font:inherit;font-weight:800;white-space:nowrap}
           .isoAtGlance>summary::-webkit-details-marker{display:none}
           .isoAtGlance>summary:after{content:"⌄";font-size:12px;transition:transform .18s ease}
@@ -58,187 +58,192 @@ export default function Header({ locale, nav, variant = "default" }) {
             .isoAtGlanceMenu{left:auto;right:0;transform:translate(0,-7px)}
             .isoAtGlance:hover .isoAtGlanceMenu,.isoAtGlance:focus-within .isoAtGlanceMenu,.isoAtGlance[open] .isoAtGlanceMenu{transform:translate(0,0)}
           }
-          @media(max-width:1100px){
+          @media(min-width:1401px) and (max-width:1500px){
+            .header:not(.homeHeader) .brand,.header:not(.homeHeader) .brand img{width:220px!important}
+          }
+          @media(max-width:1400px){
+            .header .nav{display:none!important}
             .mobileNav{display:block}
             .headerActions{display:none!important}
             .header .brand{width:190px!important;height:60px!important}
             .header .brand img{width:190px!important;height:60px!important}
           }
-        `}</style>
+       }</style>
 
-        <Link
-          href={`/${locale}`}
-          className="brand"
-          aria-label="RPG Excellence home"
-          style={{
-            width: "260px",
-            height: "70px",
-            display: "flex",
-            alignItems: "center",
-            flexShrink: 0,
-            overflow: "hidden",
-            textDecoration: "none",
-          }}
+    <Link
+      href={`/${locale}`}
+      className="brand"
+      aria-label="RPG Excellence home"
+      style={{
+        width: "260px",
+        height: "70px",
+        display: "flex",
+        alignItems: "center",
+        flexShrink: 0,
+        overflow: "hidden",
+        textDecoration: "none",
+      }}
+    >
+      <img
+        src="/rpg-excellence-logo.png"
+        alt="RPG Excellence"
+        style={{
+          display: "block",
+          width: "260px",
+          maxWidth: "260px",
+          height: "70px",
+          maxHeight: "70px",
+          objectFit: "contain",
+          objectPosition: "left center",
+        }}
+      />
+    </Link>
+
+    <nav className="nav homeNav">
+      <Link href={`/${locale}/ai-tools`}>Platform &amp; Resources</Link>
+
+      <details className="isoAtGlance">
+        <summary>ISO at a Glance</summary>
+
+        <div
+          className="isoAtGlanceMenu"
+          aria-label="ISO standards at a glance"
         >
-          <img
-            src="/rpg-excellence-logo.png"
-            alt="RPG Excellence"
-            style={{
-              display: "block",
-              width: "260px",
-              maxWidth: "260px",
-              height: "70px",
-              maxHeight: "70px",
-              objectFit: "contain",
-              objectPosition: "left center",
-            }}
-          />
-        </Link>
+          <span className="isoAtGlanceTitle">SELECT A STANDARD</span>
 
-        <nav className="nav homeNav">
-          <Link href={`/${locale}/ai-tools`}>Platform &amp; Resources</Link>
+          {ISO_AT_A_GLANCE.map(([code, name, slug, icon]) => (
+            <Link href={`/${locale}/${slug}`} key={code}>
+              <i>{icon}</i>
 
-          <details className="isoAtGlance">
-            <summary>ISO at a Glance</summary>
+              <span>
+                <strong>{code}</strong>
+                <small>{name}</small>
+              </span>
 
-            <div
-              className="isoAtGlanceMenu"
-              aria-label="ISO standards at a glance"
-            >
-              <span className="isoAtGlanceTitle">SELECT A STANDARD</span>
+              <b aria-hidden="true">→</b>
+            </Link>
+          ))}
+        </div>
+      </details>
 
-              {ISO_AT_A_GLANCE.map(([code, name, slug, icon]) => (
-                <Link href={`/${locale}/${slug}`} key={code}>
-                  <i>{icon}</i>
+      <a href={`/${locale}#solutions`}>Solutions</a>
+      <Link href={`/${locale}/insights`}>Insights</Link>
+      <Link href={`/${locale}/publications`}>Publications</Link>
+      <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
+      <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
+      <Link href={`/${locale}/about`}>{nav.about}</Link>
+      <Link href={`/${locale}/contact`}>{nav.contact}</Link>
+    </nav>
 
-                  <span>
-                    <strong>{code}</strong>
-                    <small>{name}</small>
-                  </span>
+    <details className="mobileNav">
+      <summary aria-label="Open website menu">
+        <span className="mobileNavIcon" />
+      </summary>
 
-                  <b aria-hidden="true">→</b>
-                </Link>
-              ))}
-            </div>
-          </details>
+      <div
+        className="mobileNavPanel"
+        aria-label="Mobile website navigation"
+      >
+        <Link href={`/${locale}`}>Home</Link>
+        <Link href={`/${locale}/ai-tools`}>Platform &amp; Resources</Link>
 
-          <a href={`/${locale}#solutions`}>Solutions</a>
-          <Link href={`/${locale}/insights`}>Insights</Link>
-          <Link href={`/${locale}/publications`}>Publications</Link>
-          <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
-          <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
-          <Link href={`/${locale}/about`}>{nav.about}</Link>
-          <Link href={`/${locale}/contact`}>{nav.contact}</Link>
-        </nav>
+        <details className="mobileIso">
+          <summary>ISO at a Glance</summary>
 
-        <details className="mobileNav">
-          <summary aria-label="Open website menu">
-            <span className="mobileNavIcon" />
-          </summary>
-
-          <div
-            className="mobileNavPanel"
-            aria-label="Mobile website navigation"
-          >
-            <Link href={`/${locale}`}>Home</Link>
-            <Link href={`/${locale}/ai-tools`}>Platform &amp; Resources</Link>
-
-            <details className="mobileIso">
-              <summary>ISO at a Glance</summary>
-
-              <div className="mobileIsoLinks">
-                {ISO_AT_A_GLANCE.map(([code, name, slug]) => (
-                  <Link href={`/${locale}/${slug}`} key={code}>
-                    <strong>{code}</strong> · {name}
-                  </Link>
-                ))}
-              </div>
-            </details>
-
-            <a href={`/${locale}#solutions`}>Solutions</a>
-            <Link href={`/${locale}/insights`}>Insights</Link>
-            <Link href={`/${locale}/publications`}>Publications</Link>
-            <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
-            <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
-            <Link href={`/${locale}/about`}>{nav.about}</Link>
-            <Link href={`/${locale}/contact`}>{nav.contact}</Link>
-
-            <div className="mobileNavActions">
-              <a className="mobileSignIn" href="/portal/login">
-                Sign in
-              </a>
-
-              <a className="mobileStart" href="/portal">
-                Start assessment
-              </a>
-
-              <a
-                className="mobileYouTube"
-                href="https://www.youtube.com/channel/UCZsXSCzL4ebrKafO2515Sow"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Watch RPG Excellence on YouTube
-              </a>
-            </div>
+          <div className="mobileIsoLinks">
+            {ISO_AT_A_GLANCE.map(([code, name, slug]) => (
+              <Link href={`/${locale}/${slug}`} key={code}>
+                <strong>{code}</strong> · {name}
+              </Link>
+            ))}
           </div>
         </details>
 
-        <div className="headerActions">
-          <a
-            className={`headerYouTube ${
-              variant === "home" ? "headerYouTubeHome" : ""
-            }`}
-            href="https://www.youtube.com/channel/UCZsXSCzL4ebrKafO2515Sow"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Visit RPG Excellence on YouTube"
-            title="Visit RPG Excellence on YouTube"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path
-                className="youtubeBody"
-                d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z"
-              />
+        <a href={`/${locale}#solutions`}>Solutions</a>
+        <Link href={`/${locale}/insights`}>Insights</Link>
+        <Link href={`/${locale}/publications`}>Publications</Link>
+        <Link href={`/${locale}/insights#newsletter`}>Newsletter</Link>
+        <Link href={`/${locale}/pricing`}>{nav.pricing}</Link>
+        <Link href={`/${locale}/about`}>{nav.about}</Link>
+        <Link href={`/${locale}/contact`}>{nav.contact}</Link>
 
-              <path
-                className="youtubePlay"
-                d="m9.6 15.6 6.2-3.6-6.2-3.6v7.2Z"
-              />
-            </svg>
-          </a>
-
-          <a
-            href="/portal/login"
-            className={`button buttonSmall ${
-              variant === "home" ? "headerSignIn" : ""
-            }`}
-            style={
-              variant === "home"
-                ? undefined
-                : {
-                    background: "transparent",
-                    color: "#071A33",
-                    border: "1px solid #d8e0ea",
-                  }
-            }
-          >
+        <div className="mobileNavActions">
+          <a className="mobileSignIn" href="/portal/login">
             Sign in
           </a>
 
+          <a className="mobileStart" href="/portal">
+            Start assessment
+          </a>
+
           <a
-            className={`button buttonSmall ${
-              variant === "home" ? "headerPrimary" : ""
-            }`}
-            href="/portal"
-            aria-label="Start an RPG Excellence assessment"
+            className="mobileYouTube"
+            href="https://www.youtube.com/channel/UCZsXSCzL4ebrKafO2515Sow"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Start assessment →
+            Watch RPG Excellence on YouTube
           </a>
         </div>
-      </header>
+      </div>
+    </details>
 
-      <ISO9001ReleaseBar locale={locale} />
-    </>
-  );
+    <div className="headerActions">
+      <a
+        className={`headerYouTube ${
+          variant === "home" ? "headerYouTubeHome" : ""
+        }`}
+        href="https://www.youtube.com/channel/UCZsXSCzL4ebrKafO2515Sow"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Visit RPG Excellence on YouTube"
+        title="Visit RPG Excellence on YouTube"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            className="youtubeBody"
+            d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z"
+          />
+
+          <path
+            className="youtubePlay"
+            d="m9.6 15.6 6.2-3.6-6.2-3.6v7.2Z"
+          />
+        </svg>
+      </a>
+
+      <a
+        href="/portal/login"
+        className={`button buttonSmall ${
+          variant === "home" ? "headerSignIn" : ""
+        }`}
+        style={
+          variant === "home"
+            ? undefined
+            : {
+                background: "transparent",
+                color: "#071A33",
+                border: "1px solid #d8e0ea",
+              }
+        }
+      >
+        Sign in
+      </a>
+
+      <a
+        className={`button buttonSmall ${
+          variant === "home" ? "headerPrimary" : ""
+        }`}
+        href="/portal"
+        aria-label="Start an RPG Excellence assessment"
+      >
+        Start assessment →
+      </a>
+    </div>
+  </header>
+
+  <ISO9001ReleaseBar locale={locale} />
+</>
+
+);
 }
