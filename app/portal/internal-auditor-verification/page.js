@@ -2,62 +2,852 @@ import CompanyAuditorForm from "./CompanyAuditorForm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
-import { approveInitialAuditor, createAuditor, createQuarterlySelection, saveVerificationAssessment, updateAuditorStatus, uploadAuditorQualification } from "./actions";
+import {
+  approveInitialAuditor,
+  createAuditor,
+  extendAuditorScope,
+  createQuarterlySelection,
+  saveVerificationAssessment,
+  updateAuditorStatus,
+  uploadAuditorQualification,
+} from "./actions";
 import VerificationAssessmentForm from "./VerificationAssessmentForm";
-
 function statusLabel(auditor) {
-  if (auditor.verification_status === "verified" && auditor.verified_until && auditor.verified_until < new Date().toISOString().slice(0, 10)) return "expired";
+  if (
+    auditor.verification_status === "verified" &&
+    auditor.verified_until &&
+    auditor.verified_until < new Date().toISOString().slice(0, 10)
+  )
+    return "expired";
   return auditor.verification_status;
 }
-
 export default async function AuditorVerificationPage({ searchParams }) {
   const query = await searchParams;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/internal-auditor-verification");
-  const [organizationsResult, standardsResult, auditorsResult, assessmentsResult, selectionsResult, auditsResult, qualificationsResult] = await Promise.all([
-    supabase.from("organizations").select("id, name").eq("owner_id", user.id).order("name"),
-    supabase.from("internal_audit_standard_catalogue").select("id, display_name, standard_code").eq("active", true).neq("standard_code", "ISO 19011").order("display_name"),
-    supabase.from("internal_auditor_register").select("*, internal_auditor_standard_authorisations(id, authorisation_status, authorised_until, internal_audit_standard_catalogue(id, display_name))").eq("owner_id", user.id).order("full_name"),
-    supabase.from("internal_auditor_verification_assessments").select("id, assessment_reference, auditor_id, assessment_date, percentage_score, critical_zero_count, outcome, selection_type, assessor_name").eq("owner_id", user.id).order("assessment_date", { ascending: false }).limit(30),
-    supabase.from("internal_auditor_quarterly_selections").select("*, internal_auditor_register(full_name, auditor_reference), internal_audits(title, audit_reference)").eq("owner_id", user.id).order("selected_at", { ascending: false }).limit(12),
-    supabase.from("internal_audits").select("id, audit_reference, title, status").eq("owner_id", user.id).in("status", ["report_approved", "capa_monitoring", "effectiveness_review", "closed"]).order("planned_end_at", { ascending: false }).limit(100),
-    supabase.from("internal_auditor_qualifications").select("id, auditor_id, evidence_type, title, issuer, certificate_number, issue_date, expiry_date, file_name, storage_path, evidence_status, reviewed_by, created_at").eq("owner_id", user.id).order("created_at", { ascending: false }),
+  const [
+    organizationsResult,
+    standardsResult,
+    auditorsResult,
+    assessmentsResult,
+    selectionsResult,
+    auditsResult,
+    qualificationsResult,
+  ] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id, name")
+      .eq("owner_id", user.id)
+      .order("name"),
+    supabase
+      .from("internal_audit_standard_catalogue")
+      .select("id, display_name, standard_code")
+      .eq("active", true)
+      .neq("standard_code", "ISO 19011")
+      .order("display_name"),
+    supabase
+      .from("internal_auditor_register")
+      .select(
+        "*, internal_auditor_standard_authorisations(id, standard_id, authorisation_status, authorised_until, internal_audit_standard_catalogue(id, display_name))",
+      )
+      .eq("owner_id", user.id)
+      .order("full_name"),
+    supabase
+      .from("internal_auditor_verification_assessments")
+      .select(
+        "id, assessment_reference, auditor_id, assessment_date, percentage_score, critical_zero_count, outcome, selection_type, assessor_name",
+      )
+      .eq("owner_id", user.id)
+      .order("assessment_date", {
+        ascending: false,
+      })
+      .limit(30),
+    supabase
+      .from("internal_auditor_quarterly_selections")
+      .select(
+        "*, internal_auditor_register(full_name, auditor_reference), internal_audits(title, audit_reference)",
+      )
+      .eq("owner_id", user.id)
+      .order("selected_at", {
+        ascending: false,
+      })
+      .limit(12),
+    supabase
+      .from("internal_audits")
+      .select("id, audit_reference, title, status")
+      .eq("owner_id", user.id)
+      .in("status", [
+        "report_approved",
+        "capa_monitoring",
+        "effectiveness_review",
+        "closed",
+      ])
+      .order("planned_end_at", {
+        ascending: false,
+      })
+      .limit(100),
+    supabase
+      .from("internal_auditor_qualifications")
+      .select(
+        "id, auditor_id, evidence_type, title, issuer, certificate_number, issue_date, expiry_date, file_name, storage_path, evidence_status, reviewed_by, created_at",
+      )
+      .eq("owner_id", user.id)
+      .order("created_at", {
+        ascending: false,
+      }),
   ]);
-  for (const result of [organizationsResult, standardsResult, auditorsResult, assessmentsResult, selectionsResult, auditsResult, qualificationsResult]) if (result.error) throw new Error(`${result.error.message}. Run the Internal Auditor Verification SQL updates in Supabase before opening this page.`);
-  const organizations = organizationsResult.data || []; const standards = standardsResult.data || []; const auditors = auditorsResult.data || [];
-  const assessments = assessmentsResult.data || []; const selections = selectionsResult.data || []; const audits = auditsResult.data || [];
+  for (const result of [
+    organizationsResult,
+    standardsResult,
+    auditorsResult,
+    assessmentsResult,
+    selectionsResult,
+    auditsResult,
+    qualificationsResult,
+  ])
+    if (result.error)
+      throw new Error(
+        "" +
+          result.error.message +
+          ". Run the Internal Auditor Verification SQL updates in Supabase before opening this page.",
+      );
+  const organizations = organizationsResult.data || [];
+  const standards = standardsResult.data || [];
+  const auditors = auditorsResult.data || [];
+  const assessments = assessmentsResult.data || [];
+  const selections = selectionsResult.data || [];
+  const audits = auditsResult.data || [];
   const qualifications = qualificationsResult.data || [];
   const qualificationUrls = new Map();
   if (qualifications.length) {
-    const { data: signedFiles } = await supabase.storage.from("internal-audit-evidence").createSignedUrls(qualifications.map((item) => item.storage_path), 3600);
-    for (const item of signedFiles || []) if (item.path && item.signedUrl) qualificationUrls.set(item.path, item.signedUrl);
+    const { data: signedFiles } = await supabase.storage
+      .from("internal-audit-evidence")
+      .createSignedUrls(
+        qualifications.map((item) => item.storage_path),
+        3600,
+      );
+    for (const item of signedFiles || [])
+      if (item.path && item.signedUrl) qualificationUrls.set(item.path, item.signedUrl);
   }
-  const companyPeopleResult = organizations.length ? await supabase.from("organization_people")
-    .select("id,organization_id,first_name,last_name,email,position,employee_reference")
-    .in("organization_id", organizations.map(organization => organization.id)).eq("account_status", "active")
-    .order("last_name").order("first_name") : { data: [], error: null };
+  const companyPeopleResult = organizations.length
+    ? await supabase
+        .from("organization_people")
+        .select(
+          "id,organization_id,first_name,last_name,email,position,employee_reference",
+        )
+        .in(
+          "organization_id",
+          organizations.map((organization) => organization.id),
+        )
+        .eq("account_status", "active")
+        .order("last_name")
+        .order("first_name")
+    : {
+        data: [],
+        error: null,
+      };
   if (companyPeopleResult.error) throw new Error(companyPeopleResult.error.message);
   const companyPeople = companyPeopleResult.data || [];
   const activeOrganization = query?.organization || organizations[0]?.id || "";
-  const organisationAuditors = auditors.filter((auditor) => auditor.organization_id === activeOrganization);
-  const selectedQueue = selections.find((item) => item.organization_id === activeOrganization && ["selected", "notified", "in_progress"].includes(item.status));
+  const organisationAuditors = auditors.filter(
+    (auditor) => auditor.organization_id === activeOrganization,
+  );
+  const selectedQueue = selections.find(
+    (item) =>
+      item.organization_id === activeOrganization &&
+      ["selected", "notified", "in_progress"].includes(item.status),
+  );
   const selectedAuditorId = query?.selected || selectedQueue?.auditor_id || "";
-  const verified = organisationAuditors.filter((auditor) => statusLabel(auditor) === "verified").length;
-  const due = organisationAuditors.filter((auditor) => !auditor.verified_until || auditor.verified_until <= new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10)).length;
-
-  return <main className="avPage"><style>{`
-    *{box-sizing:border-box}.avPage{min-height:100vh;background:#edf3fa;color:#071b36;font-family:Arial,sans-serif}.avShell{display:grid;grid-template-columns:238px minmax(0,1fr);min-height:100vh}.avSide{position:sticky;top:0;height:100vh;padding:28px 20px;background:linear-gradient(180deg,#06264d,#071c38);color:#fff}.avBrand{display:block;margin:0 10px 34px;color:#fff;font-size:24px;font-weight:900;text-decoration:none}.avNav{display:grid;gap:7px}.avNav>a{padding:12px 14px;border-radius:9px;color:#c9d9ea;text-decoration:none;font-weight:750}.avNav>a.active,.avNav>a:hover{background:#174e86;color:#fff}.avSub{display:grid;margin:-2px 0 8px 27px;padding-left:12px;border-left:1px solid #4b7199}.avSub a{padding:7px;color:#b9cbe0;font-size:12px;text-decoration:none}.avSub a.active{color:#63e4d8}.avWork{padding:28px clamp(20px,3vw,48px) 80px}.avTop{display:flex;justify-content:space-between;gap:24px}.avTop small,.avKicker{color:#1761e8;font-weight:900;letter-spacing:.1em}.avTop h1{margin:5px 0;font-size:34px}.avTop p{margin:0;color:#647890}.avButton,.avPrimary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 17px;border:0;border-radius:10px;background:#2860e8;color:#fff;font-weight:850;text-decoration:none;cursor:pointer}.avHero{display:grid;grid-template-columns:1.3fr .7fr;gap:22px;margin:24px 0;padding:30px;border-radius:21px;background:linear-gradient(120deg,#061d3b,#0b376b);color:#fff}.avHero h2{margin:7px 0;font-size:31px}.avHero p{max-width:780px;color:#d4e2f2;line-height:1.55}.avStats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.avStat{padding:18px;border:1px solid #ffffff25;border-radius:14px;background:#ffffff0e}.avStat strong,.avStat span{display:block}.avStat strong{font-size:31px}.avStat span{color:#cbd9e9;font-size:12px}.avPanel{margin:18px 0;overflow:hidden;border:1px solid #d5e1ed;border-radius:18px;background:#fff}.avHead{display:flex;justify-content:space-between;gap:20px;padding:24px 27px;border-bottom:1px solid #e1e9f1;background:#f8faff}.avHead h2{margin:5px 0}.avHead p{margin:0;color:#647890}.avBody{padding:26px}.avGrid2,.avGrid3{display:grid;gap:14px}.avGrid2{grid-template-columns:repeat(2,minmax(0,1fr))}.avGrid3{grid-template-columns:repeat(3,minmax(0,1fr))}label{display:grid;gap:6px}label>span{font-size:13px;font-weight:800}input,select,textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid #c9d7e6;border-radius:9px;background:#fff;font:inherit}textarea{min-height:82px;resize:vertical}.avStandards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:15px 0}.avStandard{display:flex;grid-template-columns:auto 1fr;align-items:center;padding:12px;border:1px solid #d8e3ef;border-radius:10px;background:#f8faff}.avStandard input{width:auto;min-height:auto}.avRegister{display:grid;gap:10px}.avAuditor{display:grid;grid-template-columns:minmax(220px,1.1fr) 1fr .8fr auto;gap:16px;align-items:center;padding:17px;border:1px solid #dbe5ef;border-radius:13px}.avAuditor strong,.avAuditor small{display:block}.avAuditor small{margin-top:4px;color:#697c92}.avPill{display:inline-block;padding:7px 10px;border-radius:999px;background:#fff0e5;color:#a2470a;font-size:11px;font-weight:900}.avPill.verified{background:#e7f7ee;color:#087544}.avPill.suspended,.avPill.expired{background:#ffecec;color:#b3261e}.avQueue{padding:17px;border:1px solid #efc06f;border-radius:13px;background:#fff8e8}.avQueue strong{display:block}.avQueue p{margin:7px 0;color:#77540e}.avAssessment{display:grid;gap:20px}.avScoreGuide{display:flex;gap:13px;flex-wrap:wrap;padding:14px;border-radius:11px;background:#edf4ff;color:#3d5673;font-size:12px}.avCriteria{display:grid;gap:10px}.avCriteria article{display:grid;grid-template-columns:minmax(240px,1.2fr) 210px minmax(260px,1fr);gap:13px;align-items:center;padding:14px;border:1px solid #dbe5ef;border-radius:12px}.avCriteria article.critical{border-left:5px solid #e05252}.avCriterionTitle{display:flex;gap:11px;align-items:center}.avCriterionTitle>b{display:grid;width:34px;height:34px;place-items:center;border-radius:9px;background:#eaf1ff;color:#1958c8}.avCriterionTitle strong,.avCriterionTitle small{display:block}.avCriterionTitle small{margin-top:4px;color:#6a7d92}.avResult{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:18px;border-radius:14px;background:#edf3fa}.avResult.verified{background:#e9f8ef}.avResult.conditional{background:#fff7e5}.avResult.not_verified{background:#ffeded}.avResult small,.avResult strong{display:block}.avResult strong{margin-top:4px;font-size:20px}.avConfirm{display:flex;grid-template-columns:auto 1fr;gap:11px;padding:16px;border:1px solid #a9d4c0;border-radius:12px;background:#effaf4}.avConfirm input{width:auto;min-height:auto}.avNotice{margin:18px 0;padding:15px 18px;border:1px solid #9fd5b8;border-radius:12px;background:#eaf8f0;color:#075d36;font-weight:800}.avEmpty{padding:18px;color:#687b91;text-align:center}.avHistory{width:100%;border-collapse:collapse}.avHistory th,.avHistory td{padding:12px;border-bottom:1px solid #e3eaf2;text-align:left;font-size:13px}.avHistory th{color:#657990;font-size:11px;text-transform:uppercase}@media(max-width:1000px){.avShell{grid-template-columns:1fr}.avSide{position:static;height:auto}.avNav{display:none}.avHero,.avGrid3,.avCriteria article{grid-template-columns:1fr}.avStats{grid-template-columns:repeat(3,1fr)}}@media(max-width:680px){.avWork{padding:20px 13px}.avHero,.avGrid2,.avStats,.avStandards,.avResult,.avAuditor{grid-template-columns:1fr}.avTop{display:block}.avTop .avButton{margin-top:14px}.avBody{padding:18px}}
-    .avCriteria article{grid-template-columns:minmax(430px,1.6fr) 210px minmax(260px,.9fr);align-items:start;padding:18px}.avCriterionPrompt,.avEvidenceExpected{margin:12px 0 0;color:#435a73;font-size:13px;line-height:1.5}.avEvidenceExpected{margin-top:7px;padding:9px 11px;border-radius:8px;background:#f3f7fb}.avSpecificScores{display:grid;gap:5px;margin-top:11px}.avSpecificScores p{display:grid;grid-template-columns:38px 1fr;gap:9px;margin:0;padding:7px 9px;border-radius:7px;background:#f7f9fc;color:#425a74;font-size:12px;line-height:1.4}.avSpecificScores b{color:#1758c9}.avSpecificScores p:nth-child(1){background:#eaf8f0}.avSpecificScores p:nth-child(3){background:#fff0f0}.avSpecificScores p:nth-child(4){background:#fff8e8}@media(max-width:1200px){.avCriteria article{grid-template-columns:1fr 190px}.avCriterionContext{grid-column:1/-1}}@media(max-width:1000px){.avCriteria article{grid-template-columns:1fr}.avCriterionContext{grid-column:auto}}
-  `}</style><div className="avShell"><aside className="avSide"><Link className="avBrand" href="/portal">RPG Excellence</Link><nav className="avNav"><Link href="/portal">Dashboard</Link><Link href="/portal/history">Assessments</Link><Link href="/portal/internal-audits" className="active">Internal Audits</Link><div className="avSub"><Link href="/portal/internal-audits">Audit Command Centre</Link><Link href="/portal/internal-audit-programme">3-Year Audit Programme</Link><Link href="/portal/internal-audit-fmea-planning">FMEA Risk Planning</Link><Link href="/portal/internal-auditor-verification" className="active">Auditor Verification</Link></div><Link href="/portal/internal-audit-actions">Findings & Actions</Link><Link href="/portal/rca">CAPA-8D</Link><Link href="/portal/documents">Evidence</Link><Link href="/portal/reports">Reports</Link></nav></aside><section className="avWork">
-    <header className="avTop"><div><small>AUDITOR ASSURANCE</small><h1>Internal Auditor Verification</h1><p>Control competence, authorisation, surveillance and audit-team availability.</p></div><Link className="avButton" href="/portal/internal-audits">Audit Command Centre</Link></header>
-    {query?.saved === "auditor" ? <div className="avNotice">Auditor added with Pending status. Complete verification before they can conduct an audit.</div> : null}{query?.saved === "assessment" ? <div className="avNotice">Verification assessment saved. The auditor register and assignment eligibility have been updated.</div> : null}{query?.saved === "qualification" ? <div className="avNotice">Qualification evidence uploaded to the controlled auditor record.</div> : null}{query?.saved === "initial_approval" ? <div className="avNotice">Initial Lead Auditor approval recorded. The auditor is now approved within the authorised standards scope.</div> : null}
-    <section className="avHero"><div><span className="avKicker" style={{color:"#62e6db"}}>CONTROLLED COMPETENCE</span><h2>Only verified people conduct audits.</h2><p>Competence is authorised for defined standards and retained through objective assessment of completed audit work. Quarterly selection provides surveillance; the lead auditor can also initiate a manual or for-cause assessment.</p></div><div className="avStats"><div className="avStat"><strong>{organisationAuditors.length}</strong><span>Registered</span></div><div className="avStat"><strong>{verified}</strong><span>Verified & current</span></div><div className="avStat"><strong>{due}</strong><span>Due within 90 days</span></div></div></section>
-    <section className="avPanel"><div className="avHead"><div><span className="avKicker">QUARTERLY SURVEILLANCE</span><h2>Random verification selection</h2><p>Risk-prioritised first, rotational random selection thereafter.</p></div></div><div className="avBody">{selectedQueue ? <div className="avQueue"><strong>{selectedQueue.internal_auditor_register?.full_name} · {selectedQueue.quarter_key}</strong><p>{selectedQueue.selection_reason}</p><span>Due {selectedQueue.due_date}{selectedQueue.internal_audits ? ` · Sample ${selectedQueue.internal_audits.audit_reference}` : " · Select a completed audit below"}</span></div> : <form action={createQuarterlySelection} className="avGrid2"><label><span>Organisation *</span><select name="organization_id" defaultValue={activeOrganization}>{organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></label><div style={{display:"flex",alignItems:"end"}}><button className="avPrimary">Create This Quarter’s Selection</button></div></form>}</div></section>
-    <section className="avPanel"><div className="avHead"><div><span className="avKicker">AUDITOR REGISTER</span><h2>Competence and authorisation</h2><p>Register scope first; verification changes availability.</p></div></div><div className="avBody"><CompanyAuditorForm action={createAuditor} organizations={organizations} companyPeople={companyPeople} standards={standards} initialOrganization={activeOrganization} /><div style={{height:24}}/><div className="avRegister">{organisationAuditors.length ? organisationAuditors.map((auditor) => { const status = statusLabel(auditor); return <article className="avAuditor" key={auditor.id}><div><strong>{auditor.full_name}</strong><small>{auditor.auditor_reference} · {auditor.email}</small></div><div><strong>{auditor.internal_auditor_standard_authorisations?.map((item) => item.internal_audit_standard_catalogue?.display_name).filter(Boolean).join(" · ") || "No scope"}</strong><small>{auditor.job_title || "Role not recorded"}</small></div><div><span className={`avPill ${status}`}>{status === "verified" && auditor.approval_type === "initial_certification_and_experience" ? "Approved — initial" : status.replace("_", " ")}</span><small>{auditor.verified_until ? `Valid to ${auditor.verified_until}` : "Not authorised for assignment"}</small></div><form action={updateAuditorStatus}><input type="hidden" name="auditor_id" value={auditor.id}/><select name="status" defaultValue="pending"><option value="pending">Reassess</option><option value="suspended">Suspend</option><option value="unverified">Withdraw verification</option></select><button className="avButton" style={{marginTop:6}}>Apply</button></form></article>}) : <div className="avEmpty">No internal auditors registered.</div>}</div></div></section>
-    <section className="avPanel"><div className="avHead"><div><span className="avKicker">QUALIFICATION EVIDENCE</span><h2>Certificates and supporting records</h2><p>Upload auditor-course certificates or other objective evidence supporting competence and experience.</p></div></div><div className="avBody"><form action={uploadAuditorQualification}><div className="avGrid3"><label><span>Auditor *</span><select name="auditor_id" required defaultValue=""><option value="">Select auditor</option>{organisationAuditors.map((auditor) => <option key={auditor.id} value={auditor.id}>{auditor.full_name} · {auditor.auditor_reference}</option>)}</select></label><label><span>Evidence type *</span><select name="evidence_type" required defaultValue="lead_auditor_certificate"><option value="lead_auditor_certificate">Lead Auditor course certificate</option><option value="internal_auditor_certificate">Internal Auditor course certificate</option><option value="standard_specific_certificate">Standard-specific auditor certificate</option><option value="professional_qualification">Professional qualification</option><option value="experience_record">Audit experience record / log</option><option value="witnessed_audit">Witnessed-audit assessment</option><option value="cpd_record">CPD or refresher-training record</option><option value="other">Other competence evidence</option></select></label><label><span>Evidence title *</span><input name="title" required placeholder="e.g. ISO 9001 Lead Auditor course certificate" /></label><label><span>Issuer / provider</span><input name="issuer" /></label><label><span>Certificate or reference number</span><input name="certificate_number" /></label><label><span>Issue date</span><input name="issue_date" type="date" /></label><label><span>Expiry date</span><input name="expiry_date" type="date" /></label><label><span>Evidence file *</span><input name="qualification_file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" required /></label></div><div style={{marginTop:16}}><button className="avPrimary">Upload Controlled Evidence</button></div></form>{qualifications.filter((item) => organisationAuditors.some((auditor) => auditor.id === item.auditor_id)).length ? <table className="avHistory" style={{marginTop:24}}><thead><tr><th>Auditor</th><th>Evidence</th><th>Issuer/reference</th><th>Validity</th><th>Status</th><th>File</th></tr></thead><tbody>{qualifications.filter((item) => organisationAuditors.some((auditor) => auditor.id === item.auditor_id)).map((item) => {const auditor=auditors.find((entry)=>entry.id===item.auditor_id);return <tr key={item.id}><td>{auditor?.full_name}</td><td>{item.title}<br/><small>{item.evidence_type.replaceAll("_"," ")}</small></td><td>{item.issuer || "—"}<br/><small>{item.certificate_number || ""}</small></td><td>{item.issue_date || "Not recorded"} {item.expiry_date ? `to ${item.expiry_date}` : "· no expiry recorded"}</td><td><span className={`avPill ${item.evidence_status === "accepted" ? "verified" : ""}`}>{item.evidence_status}</span></td><td>{qualificationUrls.get(item.storage_path) ? <a href={qualificationUrls.get(item.storage_path)} target="_blank" rel="noreferrer">Open evidence ↗</a> : item.file_name}</td></tr>})}</tbody></table> : <div className="avEmpty" style={{marginTop:18}}>No qualification evidence uploaded.</div>}</div></section>
-    <section className="avPanel"><div className="avHead"><div><span className="avKicker">INITIAL AUTHORISATION</span><h2>Lead Auditor approval</h2><p>Approve an auditor initially from reviewed certification, training and documented experience. The approving person is selected from the active Company User directory.</p></div></div><div className="avBody"><form action={approveInitialAuditor}><div className="avGrid2"><label><span>Auditor to approve *</span><select name="auditor_id" required defaultValue=""><option value="">Select pending auditor</option>{organisationAuditors.filter((auditor) => statusLabel(auditor) !== "verified").map((auditor) => <option key={auditor.id} value={auditor.id}>{auditor.full_name} · {auditor.auditor_reference}</option>)}</select></label><label><span>Approving Lead Auditor *</span><select name="approver_person_id" required defaultValue=""><option value="">Select active Company User</option>{companyPeople.filter((person)=>person.organization_id===activeOrganization).map((person)=><option key={person.id} value={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select></label><label><span>Initial approval basis and rationale *</span><textarea name="approval_basis" required placeholder="Identify certificates and experience reviewed; explain applicable standards, sector/technical competence, audit experience and any limitations." /></label><label><span>Initial approval validity</span><select name="validity_months" defaultValue="12"><option value="6">6 months</option><option value="12">12 months</option><option value="24">24 months</option><option value="36">36 months</option></select></label></div><label className="avConfirm" style={{marginTop:16}}><input type="checkbox" name="approval_confirmation" required/><span>I confirm that I reviewed current qualification evidence, audit training and documented experience; the person is competent for the registered standards scope and any limitation is recorded in the approval rationale.</span></label><div style={{marginTop:16}}><button className="avPrimary">Approve Initial Auditor</button></div></form></div></section>
-    <section className="avPanel" id="assessment"><div className="avHead"><div><span className="avKicker">18-CONTROL ASSESSMENT</span><h2>{selectedQueue ? "Complete quarterly verification" : "Lead-auditor selected assessment"}</h2><p>Derived from the supplied Internal Audit Assessment Checklist; the result is calculated by the system.</p></div></div><div className="avBody"><VerificationAssessmentForm action={saveVerificationAssessment} auditors={organisationAuditors} audits={audits} organizationId={activeOrganization} selectedAuditorId={selectedAuditorId} quarterly={Boolean(selectedQueue && selectedQueue.auditor_id === selectedAuditorId)} /></div></section>
-    <section className="avPanel"><div className="avHead"><div><span className="avKicker">CONTROLLED HISTORY</span><h2>Verification decisions</h2></div></div><div className="avBody">{assessments.length ? <table className="avHistory"><thead><tr><th>Reference</th><th>Date</th><th>Auditor</th><th>Method</th><th>Score</th><th>Outcome</th></tr></thead><tbody>{assessments.map((assessment) => {const auditor=auditors.find((item)=>item.id===assessment.auditor_id);return <tr key={assessment.id}><td>{assessment.assessment_reference}</td><td>{assessment.assessment_date}</td><td>{auditor?.full_name || "Auditor"}</td><td>{assessment.selection_type.replaceAll("_"," ")}</td><td>{assessment.percentage_score}% · {assessment.critical_zero_count} critical zeros</td><td><span className={`avPill ${assessment.outcome}`}>{assessment.outcome.replace("_"," ")}</span></td></tr>})}</tbody></table> : <div className="avEmpty">No verification assessments recorded.</div>}</div></section>
-  </section></div></main>;
+  const verified = organisationAuditors.filter(
+    (auditor) => statusLabel(auditor) === "verified",
+  ).length;
+  const due = organisationAuditors.filter(
+    (auditor) =>
+      !auditor.verified_until ||
+      auditor.verified_until <=
+        new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
+  ).length;
+  return (
+    <main className="avPage">
+      <style>
+        {
+          "\n    *{box-sizing:border-box}.avPage{min-height:100vh;background:#edf3fa;color:#071b36;font-family:Arial,sans-serif}.avShell{display:grid;grid-template-columns:238px minmax(0,1fr);min-height:100vh}.avSide{position:sticky;top:0;height:100vh;padding:28px 20px;background:linear-gradient(180deg,#06264d,#071c38);color:#fff}.avBrand{display:block;margin:0 10px 34px;color:#fff;font-size:24px;font-weight:900;text-decoration:none}.avNav{display:grid;gap:7px}.avNav>a{padding:12px 14px;border-radius:9px;color:#c9d9ea;text-decoration:none;font-weight:750}.avNav>a.active,.avNav>a:hover{background:#174e86;color:#fff}.avSub{display:grid;margin:-2px 0 8px 27px;padding-left:12px;border-left:1px solid #4b7199}.avSub a{padding:7px;color:#b9cbe0;font-size:12px;text-decoration:none}.avSub a.active{color:#63e4d8}.avWork{padding:28px clamp(20px,3vw,48px) 80px}.avTop{display:flex;justify-content:space-between;gap:24px}.avTop small,.avKicker{color:#1761e8;font-weight:900;letter-spacing:.1em}.avTop h1{margin:5px 0;font-size:34px}.avTop p{margin:0;color:#647890}.avButton,.avPrimary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 17px;border:0;border-radius:10px;background:#2860e8;color:#fff;font-weight:850;text-decoration:none;cursor:pointer}.avHero{display:grid;grid-template-columns:1.3fr .7fr;gap:22px;margin:24px 0;padding:30px;border-radius:21px;background:linear-gradient(120deg,#061d3b,#0b376b);color:#fff}.avHero h2{margin:7px 0;font-size:31px}.avHero p{max-width:780px;color:#d4e2f2;line-height:1.55}.avStats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.avStat{padding:18px;border:1px solid #ffffff25;border-radius:14px;background:#ffffff0e}.avStat strong,.avStat span{display:block}.avStat strong{font-size:31px}.avStat span{color:#cbd9e9;font-size:12px}.avPanel{margin:18px 0;overflow:hidden;border:1px solid #d5e1ed;border-radius:18px;background:#fff}.avHead{display:flex;justify-content:space-between;gap:20px;padding:24px 27px;border-bottom:1px solid #e1e9f1;background:#f8faff}.avHead h2{margin:5px 0}.avHead p{margin:0;color:#647890}.avBody{padding:26px}.avGrid2,.avGrid3{display:grid;gap:14px}.avGrid2{grid-template-columns:repeat(2,minmax(0,1fr))}.avGrid3{grid-template-columns:repeat(3,minmax(0,1fr))}label{display:grid;gap:6px}label>span{font-size:13px;font-weight:800}input,select,textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid #c9d7e6;border-radius:9px;background:#fff;font:inherit}textarea{min-height:82px;resize:vertical}.avStandards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:15px 0}.avStandard{display:flex;grid-template-columns:auto 1fr;align-items:center;padding:12px;border:1px solid #d8e3ef;border-radius:10px;background:#f8faff}.avStandard input{width:auto;min-height:auto}.avRegister{display:grid;gap:10px}.avAuditor{display:grid;grid-template-columns:minmax(220px,1.1fr) 1fr .8fr auto;gap:16px;align-items:center;padding:17px;border:1px solid #dbe5ef;border-radius:13px}.avAuditor strong,.avAuditor small{display:block}.avAuditor small{margin-top:4px;color:#697c92}.avPill{display:inline-block;padding:7px 10px;border-radius:999px;background:#fff0e5;color:#a2470a;font-size:11px;font-weight:900}.avPill.verified{background:#e7f7ee;color:#087544}.avPill.suspended,.avPill.expired{background:#ffecec;color:#b3261e}.avQueue{padding:17px;border:1px solid #efc06f;border-radius:13px;background:#fff8e8}.avQueue strong{display:block}.avQueue p{margin:7px 0;color:#77540e}.avAssessment{display:grid;gap:20px}.avScoreGuide{display:flex;gap:13px;flex-wrap:wrap;padding:14px;border-radius:11px;background:#edf4ff;color:#3d5673;font-size:12px}.avCriteria{display:grid;gap:10px}.avCriteria article{display:grid;grid-template-columns:minmax(240px,1.2fr) 210px minmax(260px,1fr);gap:13px;align-items:center;padding:14px;border:1px solid #dbe5ef;border-radius:12px}.avCriteria article.critical{border-left:5px solid #e05252}.avCriterionTitle{display:flex;gap:11px;align-items:center}.avCriterionTitle>b{display:grid;width:34px;height:34px;place-items:center;border-radius:9px;background:#eaf1ff;color:#1958c8}.avCriterionTitle strong,.avCriterionTitle small{display:block}.avCriterionTitle small{margin-top:4px;color:#6a7d92}.avResult{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:18px;border-radius:14px;background:#edf3fa}.avResult.verified{background:#e9f8ef}.avResult.conditional{background:#fff7e5}.avResult.not_verified{background:#ffeded}.avResult small,.avResult strong{display:block}.avResult strong{margin-top:4px;font-size:20px}.avConfirm{display:flex;grid-template-columns:auto 1fr;gap:11px;padding:16px;border:1px solid #a9d4c0;border-radius:12px;background:#effaf4}.avConfirm input{width:auto;min-height:auto}.avNotice{margin:18px 0;padding:15px 18px;border:1px solid #9fd5b8;border-radius:12px;background:#eaf8f0;color:#075d36;font-weight:800}.avEmpty{padding:18px;color:#687b91;text-align:center}.avHistory{width:100%;border-collapse:collapse}.avHistory th,.avHistory td{padding:12px;border-bottom:1px solid #e3eaf2;text-align:left;font-size:13px}.avHistory th{color:#657990;font-size:11px;text-transform:uppercase}@media(max-width:1000px){.avShell{grid-template-columns:1fr}.avSide{position:static;height:auto}.avNav{display:none}.avHero,.avGrid3,.avCriteria article{grid-template-columns:1fr}.avStats{grid-template-columns:repeat(3,1fr)}}@media(max-width:680px){.avWork{padding:20px 13px}.avHero,.avGrid2,.avStats,.avStandards,.avResult,.avAuditor{grid-template-columns:1fr}.avTop{display:block}.avTop .avButton{margin-top:14px}.avBody{padding:18px}}\n    .avScopeExtension{grid-column:1/-1;scroll-margin-top:90px;padding:14px;border:1px solid #d8e3ef;border-radius:10px;background:#f8faff}.avScopeExtension summary{cursor:pointer;font-weight:800}.avScopeExtension p{font-size:13px;line-height:1.5;color:#526b85}.avAuditor{scroll-margin-top:90px}.avPage .avStandards{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}.avAuditor>div{min-width:0;overflow-wrap:anywhere}\n    .avCriteria article{grid-template-columns:minmax(430px,1.6fr) 210px minmax(260px,.9fr);align-items:start;padding:18px}.avCriterionPrompt,.avEvidenceExpected{margin:12px 0 0;color:#435a73;font-size:13px;line-height:1.5}.avEvidenceExpected{margin-top:7px;padding:9px 11px;border-radius:8px;background:#f3f7fb}.avSpecificScores{display:grid;gap:5px;margin-top:11px}.avSpecificScores p{display:grid;grid-template-columns:38px 1fr;gap:9px;margin:0;padding:7px 9px;border-radius:7px;background:#f7f9fc;color:#425a74;font-size:12px;line-height:1.4}.avSpecificScores b{color:#1758c9}.avSpecificScores p:nth-child(1){background:#eaf8f0}.avSpecificScores p:nth-child(3){background:#fff0f0}.avSpecificScores p:nth-child(4){background:#fff8e8}@media(max-width:1200px){.avCriteria article{grid-template-columns:1fr 190px}.avCriterionContext{grid-column:1/-1}}@media(max-width:1000px){.avCriteria article{grid-template-columns:1fr}.avCriterionContext{grid-column:auto}}\n  "
+        }
+      </style>
+      <div className="avShell">
+        <aside className="avSide">
+          <Link className="avBrand" href="/portal">
+            RPG Excellence
+          </Link>
+          <nav className="avNav">
+            <Link href="/portal">Dashboard</Link>
+            <Link href="/portal/history">Assessments</Link>
+            <Link href="/portal/internal-audits" className="active">
+              Internal Audits
+            </Link>
+            <div className="avSub">
+              <Link href="/portal/internal-audits">Audit Command Centre</Link>
+              <Link href="/portal/internal-audit-programme">
+                3-Year Audit Programme
+              </Link>
+              <Link href="/portal/internal-audit-fmea-planning">
+                FMEA Risk Planning
+              </Link>
+              <Link href="/portal/internal-auditor-verification" className="active">
+                Auditor Verification
+              </Link>
+            </div>
+            <Link href="/portal/internal-audit-actions">Findings & Actions</Link>
+            <Link href="/portal/rca">CAPA-8D</Link>
+            <Link href="/portal/documents">Evidence</Link>
+            <Link href="/portal/reports">Reports</Link>
+          </nav>
+        </aside>
+        <section className="avWork">
+          <header className="avTop">
+            <div>
+              <small>AUDITOR ASSURANCE</small>
+              <h1>Internal Auditor Verification</h1>
+              <p>
+                Control competence, authorisation, surveillance and audit-team
+                availability.
+              </p>
+            </div>
+            <Link className="avButton" href="/portal/internal-audits">
+              Audit Command Centre
+            </Link>
+          </header>
+          {query?.saved === "scope" ? (
+            <div className="avNotice" role="status">
+              Additional standards added to the existing auditor as Pending. Existing
+              authorisations are unchanged. Review the new technical scope and evidence,
+              then use Lead Auditor approval below.
+            </div>
+          ) : null}
+          {query?.saved === "scope_existing" ? (
+            <div className="avNotice" role="status">
+              This person is already registered and all selected standards are already
+              on their record. No duplicate was created. Check the standard statuses
+              below; pending scope still needs approval.
+            </div>
+          ) : null}
+          {query?.saved === "auditor" ? (
+            <div className="avNotice">
+              Auditor added with Pending status. Complete verification before they can
+              conduct an audit.
+            </div>
+          ) : null}
+          {query?.saved === "assessment" ? (
+            <div className="avNotice">
+              Verification assessment saved. The auditor register and assignment
+              eligibility have been updated.
+            </div>
+          ) : null}
+          {query?.saved === "qualification" ? (
+            <div className="avNotice">
+              Qualification evidence uploaded to the controlled auditor record.
+            </div>
+          ) : null}
+          {query?.saved === "initial_approval" ? (
+            <div className="avNotice">
+              Initial Lead Auditor approval recorded. The auditor is now approved within
+              the authorised standards scope.
+            </div>
+          ) : null}
+          <section className="avHero">
+            <div>
+              <span
+                className="avKicker"
+                style={{
+                  color: "#62e6db",
+                }}
+              >
+                CONTROLLED COMPETENCE
+              </span>
+              <h2>Only verified people conduct audits.</h2>
+              <p>
+                Competence is authorised for defined standards and retained through
+                objective assessment of completed audit work. Quarterly selection
+                provides surveillance; the lead auditor can also initiate a manual or
+                for-cause assessment.
+              </p>
+            </div>
+            <div className="avStats">
+              <div className="avStat">
+                <strong>{organisationAuditors.length}</strong>
+                <span>Registered</span>
+              </div>
+              <div className="avStat">
+                <strong>{verified}</strong>
+                <span>Verified & current</span>
+              </div>
+              <div className="avStat">
+                <strong>{due}</strong>
+                <span>Due within 90 days</span>
+              </div>
+            </div>
+          </section>
+          <section className="avPanel">
+            <div className="avHead">
+              <div>
+                <span className="avKicker">QUARTERLY SURVEILLANCE</span>
+                <h2>Random verification selection</h2>
+                <p>Risk-prioritised first, rotational random selection thereafter.</p>
+              </div>
+            </div>
+            <div className="avBody">
+              {selectedQueue ? (
+                <div className="avQueue">
+                  <strong>
+                    {selectedQueue.internal_auditor_register?.full_name} ·{" "}
+                    {selectedQueue.quarter_key}
+                  </strong>
+                  <p>{selectedQueue.selection_reason}</p>
+                  <span>
+                    Due {selectedQueue.due_date}
+                    {selectedQueue.internal_audits
+                      ? " · Sample " + selectedQueue.internal_audits.audit_reference
+                      : " · Select a completed audit below"}
+                  </span>
+                </div>
+              ) : (
+                <form action={createQuarterlySelection} className="avGrid2">
+                  <label>
+                    <span>Organisation *</span>
+                    <select name="organization_id" defaultValue={activeOrganization}>
+                      {organizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>
+                          {organization.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "end",
+                    }}
+                  >
+                    <button className="avPrimary">
+                      Create This Quarter’s Selection
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </section>
+          <section className="avPanel">
+            <div className="avHead">
+              <div>
+                <span className="avKicker">AUDITOR REGISTER</span>
+                <h2>Competence and authorisation</h2>
+                <p>Register scope first; verification changes availability.</p>
+              </div>
+            </div>
+            <div className="avBody">
+              <CompanyAuditorForm
+                action={createAuditor}
+                organizations={organizations}
+                companyPeople={companyPeople}
+                standards={standards}
+                initialOrganization={activeOrganization}
+              />
+              <div
+                style={{
+                  height: 24,
+                }}
+              />
+              <div className="avRegister">
+                {organisationAuditors.length ? (
+                  organisationAuditors.map((auditor) => {
+                    const status = statusLabel(auditor);
+                    return (
+                      <article
+                        className="avAuditor"
+                        id={"auditor-" + auditor.id}
+                        key={auditor.id}
+                      >
+                        <div>
+                          <strong>{auditor.full_name}</strong>
+                          <small>
+                            {auditor.auditor_reference} · {auditor.email}
+                          </small>
+                        </div>
+                        <div>
+                          <strong>
+                            {auditor.internal_auditor_standard_authorisations
+                              ?.map(
+                                (item) =>
+                                  (item.internal_audit_standard_catalogue
+                                    ?.display_name || "Standard") +
+                                  " — " +
+                                  (item.authorisation_status === "authorised" &&
+                                  item.authorised_until &&
+                                  item.authorised_until <
+                                    new Date().toISOString().slice(0, 10)
+                                    ? "expired"
+                                    : item.authorisation_status || "pending"),
+                              )
+                              .join(" · ") || "No scope"}
+                          </strong>
+                          <small>{auditor.job_title || "Role not recorded"}</small>
+                        </div>
+                        <div>
+                          <span className={"avPill " + status}>
+                            {status === "verified" &&
+                            auditor.approval_type ===
+                              "initial_certification_and_experience"
+                              ? "Approved — initial"
+                              : status.replace("_", " ")}
+                          </span>
+                          <small>
+                            {auditor.verified_until
+                              ? "Valid to " + auditor.verified_until
+                              : "Not authorised for assignment"}
+                          </small>
+                        </div>
+                        <form action={updateAuditorStatus}>
+                          <input type="hidden" name="auditor_id" value={auditor.id} />
+                          <select name="status" defaultValue="pending">
+                            <option value="pending">Reassess</option>
+                            <option value="suspended">Suspend</option>
+                            <option value="unverified">Withdraw verification</option>
+                          </select>
+                          <button
+                            className="avButton"
+                            style={{
+                              marginTop: 6,
+                            }}
+                          >
+                            Apply
+                          </button>
+                        </form>
+                        <details className="avScopeExtension">
+                          <summary>Add standards to this auditor</summary>
+                          <p>
+                            Add new scope without changing existing approval. Each
+                            additional standard starts as Pending and requires evidence
+                            review and Lead Auditor approval.
+                          </p>
+                          <form action={extendAuditorScope}>
+                            <input type="hidden" name="auditor_id" value={auditor.id} />
+                            <div className="avStandards">
+                              {standards
+                                .filter(
+                                  (standard) =>
+                                    !auditor.internal_auditor_standard_authorisations?.some(
+                                      (item) =>
+                                        item.standard_id === standard.id ||
+                                        item.internal_audit_standard_catalogue?.id ===
+                                          standard.id,
+                                    ),
+                                )
+                                .map((standard) => (
+                                  <label className="avStandard" key={standard.id}>
+                                    <input
+                                      type="checkbox"
+                                      name="standard_ids"
+                                      value={standard.id}
+                                    />
+                                    <span>{standard.display_name}</span>
+                                  </label>
+                                ))}
+                            </div>
+                            <button className="avPrimary">
+                              Add selected standards as Pending
+                            </button>
+                          </form>
+                          <p>
+                            For ISO/IEC 17025, retain evidence of the relevant
+                            laboratory methods, ranges, uncertainty, traceability and
+                            technical audit experience. Explain any limits in the
+                            approval rationale.
+                          </p>
+                        </details>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="avEmpty">No internal auditors registered.</div>
+                )}
+              </div>
+            </div>
+          </section>
+          <section className="avPanel">
+            <div className="avHead">
+              <div>
+                <span className="avKicker">QUALIFICATION EVIDENCE</span>
+                <h2>Certificates and supporting records</h2>
+                <p>
+                  Upload auditor-course certificates or other objective evidence
+                  supporting competence and experience.
+                </p>
+              </div>
+            </div>
+            <div className="avBody">
+              <form action={uploadAuditorQualification}>
+                <div className="avGrid3">
+                  <label>
+                    <span>Auditor *</span>
+                    <select name="auditor_id" required defaultValue="">
+                      <option value="">Select auditor</option>
+                      {organisationAuditors.map((auditor) => (
+                        <option key={auditor.id} value={auditor.id}>
+                          {auditor.full_name} · {auditor.auditor_reference}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Evidence type *</span>
+                    <select
+                      name="evidence_type"
+                      required
+                      defaultValue="lead_auditor_certificate"
+                    >
+                      <option value="lead_auditor_certificate">
+                        Lead Auditor course certificate
+                      </option>
+                      <option value="internal_auditor_certificate">
+                        Internal Auditor course certificate
+                      </option>
+                      <option value="standard_specific_certificate">
+                        Standard-specific auditor certificate
+                      </option>
+                      <option value="professional_qualification">
+                        Professional qualification
+                      </option>
+                      <option value="experience_record">
+                        Audit experience record / log
+                      </option>
+                      <option value="witnessed_audit">
+                        Witnessed-audit assessment
+                      </option>
+                      <option value="cpd_record">
+                        CPD or refresher-training record
+                      </option>
+                      <option value="other">Other competence evidence</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Evidence title *</span>
+                    <input
+                      name="title"
+                      required
+                      placeholder="e.g. ISO 9001 Lead Auditor course certificate"
+                    />
+                  </label>
+                  <label>
+                    <span>Issuer / provider</span>
+                    <input name="issuer" />
+                  </label>
+                  <label>
+                    <span>Certificate or reference number</span>
+                    <input name="certificate_number" />
+                  </label>
+                  <label>
+                    <span>Issue date</span>
+                    <input name="issue_date" type="date" />
+                  </label>
+                  <label>
+                    <span>Expiry date</span>
+                    <input name="expiry_date" type="date" />
+                  </label>
+                  <label>
+                    <span>Evidence file *</span>
+                    <input
+                      name="qualification_file"
+                      type="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                      required
+                    />
+                  </label>
+                </div>
+                <div
+                  style={{
+                    marginTop: 16,
+                  }}
+                >
+                  <button className="avPrimary">Upload Controlled Evidence</button>
+                </div>
+              </form>
+              {qualifications.filter((item) =>
+                organisationAuditors.some((auditor) => auditor.id === item.auditor_id),
+              ).length ? (
+                <table
+                  className="avHistory"
+                  style={{
+                    marginTop: 24,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th>Auditor</th>
+                      <th>Evidence</th>
+                      <th>Issuer/reference</th>
+                      <th>Validity</th>
+                      <th>Status</th>
+                      <th>File</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {qualifications
+                      .filter((item) =>
+                        organisationAuditors.some(
+                          (auditor) => auditor.id === item.auditor_id,
+                        ),
+                      )
+                      .map((item) => {
+                        const auditor = auditors.find(
+                          (entry) => entry.id === item.auditor_id,
+                        );
+                        return (
+                          <tr key={item.id}>
+                            <td>{auditor?.full_name}</td>
+                            <td>
+                              {item.title}
+                              <br />
+                              <small>{item.evidence_type.replaceAll("_", " ")}</small>
+                            </td>
+                            <td>
+                              {item.issuer || "—"}
+                              <br />
+                              <small>{item.certificate_number || ""}</small>
+                            </td>
+                            <td>
+                              {item.issue_date || "Not recorded"}{" "}
+                              {item.expiry_date
+                                ? "to " + item.expiry_date
+                                : "· no expiry recorded"}
+                            </td>
+                            <td>
+                              <span
+                                className={
+                                  "avPill " +
+                                  (item.evidence_status === "accepted"
+                                    ? "verified"
+                                    : "")
+                                }
+                              >
+                                {item.evidence_status}
+                              </span>
+                            </td>
+                            <td>
+                              {qualificationUrls.get(item.storage_path) ? (
+                                <a
+                                  href={qualificationUrls.get(item.storage_path)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Open evidence ↗
+                                </a>
+                              ) : (
+                                item.file_name
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              ) : (
+                <div
+                  className="avEmpty"
+                  style={{
+                    marginTop: 18,
+                  }}
+                >
+                  No qualification evidence uploaded.
+                </div>
+              )}
+            </div>
+          </section>
+          <section className="avPanel">
+            <div className="avHead">
+              <div>
+                <span className="avKicker">INITIAL AUTHORISATION</span>
+                <h2>Lead Auditor approval and scope review</h2>
+                <p>
+                  Approve an initial auditor or review an existing auditor’s pending
+                  standards from current qualification evidence, training and documented
+                  experience. Approval applies to the complete registered standards
+                  scope: identify each standard reviewed, its supporting evidence and
+                  any technical limitations in the rationale. The approving person is
+                  selected from the active Company User directory.
+                </p>
+              </div>
+            </div>
+            <div className="avBody">
+              <form action={approveInitialAuditor}>
+                <div className="avGrid2">
+                  <label>
+                    <span>Auditor to approve *</span>
+                    <select name="auditor_id" required defaultValue="">
+                      <option value="">
+                        Select auditor for initial approval or scope review
+                      </option>
+                      {organisationAuditors
+                        .filter(
+                          (auditor) =>
+                            statusLabel(auditor) !== "verified" ||
+                            auditor.internal_auditor_standard_authorisations?.some(
+                              (item) =>
+                                item.authorisation_status !== "authorised" ||
+                                !item.authorised_until ||
+                                item.authorised_until <
+                                  new Date().toISOString().slice(0, 10),
+                            ),
+                        )
+                        .map((auditor) => (
+                          <option key={auditor.id} value={auditor.id}>
+                            {auditor.full_name} · {auditor.auditor_reference}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Approving Lead Auditor *</span>
+                    <select name="approver_person_id" required defaultValue="">
+                      <option value="">Select active Company User</option>
+                      {companyPeople
+                        .filter(
+                          (person) => person.organization_id === activeOrganization,
+                        )
+                        .map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {[person.first_name, person.last_name]
+                              .filter(Boolean)
+                              .join(" ")}{" "}
+                            · {person.position || person.email}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Initial approval basis and rationale *</span>
+                    <textarea
+                      name="approval_basis"
+                      required
+                      placeholder="Identify certificates and experience reviewed; explain applicable standards, sector/technical competence, audit experience and any limitations."
+                    />
+                  </label>
+                  <label>
+                    <span>Initial approval validity</span>
+                    <select name="validity_months" defaultValue="12">
+                      <option value="6">6 months</option>
+                      <option value="12">12 months</option>
+                      <option value="24">24 months</option>
+                      <option value="36">36 months</option>
+                    </select>
+                  </label>
+                </div>
+                <label
+                  className="avConfirm"
+                  style={{
+                    marginTop: 16,
+                  }}
+                >
+                  <input type="checkbox" name="approval_confirmation" required />
+                  <span>
+                    I confirm that I reviewed current qualification evidence, audit
+                    training and documented experience; the person is competent for the
+                    registered standards scope and any limitation is recorded in the
+                    approval rationale.
+                  </span>
+                </label>
+                <div
+                  style={{
+                    marginTop: 16,
+                  }}
+                >
+                  <button className="avPrimary">Approve reviewed auditor scope</button>
+                </div>
+              </form>
+            </div>
+          </section>
+          <section className="avPanel" id="assessment">
+            <div className="avHead">
+              <div>
+                <span className="avKicker">18-CONTROL ASSESSMENT</span>
+                <h2>
+                  {selectedQueue
+                    ? "Complete quarterly verification"
+                    : "Lead-auditor selected assessment"}
+                </h2>
+                <p>
+                  Derived from the supplied Internal Audit Assessment Checklist; the
+                  result is calculated by the system.
+                </p>
+              </div>
+            </div>
+            <div className="avBody">
+              <VerificationAssessmentForm
+                action={saveVerificationAssessment}
+                auditors={organisationAuditors}
+                audits={audits}
+                organizationId={activeOrganization}
+                selectedAuditorId={selectedAuditorId}
+                quarterly={Boolean(
+                  selectedQueue && selectedQueue.auditor_id === selectedAuditorId,
+                )}
+              />
+            </div>
+          </section>
+          <section className="avPanel">
+            <div className="avHead">
+              <div>
+                <span className="avKicker">CONTROLLED HISTORY</span>
+                <h2>Verification decisions</h2>
+              </div>
+            </div>
+            <div className="avBody">
+              {assessments.length ? (
+                <table className="avHistory">
+                  <thead>
+                    <tr>
+                      <th>Reference</th>
+                      <th>Date</th>
+                      <th>Auditor</th>
+                      <th>Method</th>
+                      <th>Score</th>
+                      <th>Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assessments.map((assessment) => {
+                      const auditor = auditors.find(
+                        (item) => item.id === assessment.auditor_id,
+                      );
+                      return (
+                        <tr key={assessment.id}>
+                          <td>{assessment.assessment_reference}</td>
+                          <td>{assessment.assessment_date}</td>
+                          <td>{auditor?.full_name || "Auditor"}</td>
+                          <td>{assessment.selection_type.replaceAll("_", " ")}</td>
+                          <td>
+                            {assessment.percentage_score}% ·{" "}
+                            {assessment.critical_zero_count} critical zeros
+                          </td>
+                          <td>
+                            <span className={"avPill " + assessment.outcome}>
+                              {assessment.outcome.replace("_", " ")}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="avEmpty">No verification assessments recorded.</div>
+              )}
+            </div>
+          </section>
+        </section>
+      </div>
+    </main>
+  );
 }
