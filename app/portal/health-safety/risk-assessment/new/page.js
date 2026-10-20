@@ -1,3 +1,5 @@
+import AssessmentZoneScope from '../../../../../components/AssessmentZoneScope';
+import {loadAssessmentZones,assessmentZoneSelection,saveAssessmentScope,refreshAssessmentZonePages} from '../../../../../lib/assessment-zones';
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
@@ -53,9 +55,10 @@ async function createRiskAssessment(formData) {
   if (!assessor) throw new Error("Select an active assessor from the Company User list.");
   if (linkedPermitId && !linkedPermit) throw new Error("The selected company permit is no longer available.");
   if (permitRequired && !linkedPermit && !permitReference) throw new Error("Select a company permit or enter a manual permit reference.");
+  const scope = assessmentZoneSelection(formData);
   const assessorSnapshot = [assessor.first_name, assessor.last_name].filter(Boolean).join(" ") || assessor.email;
 
-  const { data: assessment, error } = await admin.from("hs_risk_assessments").insert({
+  const assessmentId = await saveAssessmentScope(admin,access,{zoneIds:scope.zoneIds,values:{
     owner_id: organisation.owner_id,
     organization_id: organisation.id,
     title,
@@ -83,8 +86,8 @@ async function createRiskAssessment(formData) {
     vulnerable_persons_considered: personsAtRisk.some((item) => ["Young persons", "New or expectant mothers", "Disabled persons"].includes(item)),
     consultation_summary: text("consultation_summary") || null,
     emergency_arrangements: text("emergency_arrangements") || null,
-  }).select("id").single();
-  if (error) throw new Error(error.message);
+  }});
+  const assessment = {id:assessmentId};
   const uploadedPaths = [];
   const uploadDocument = async (field, prefix, columns, label) => {
     const file = formData.get(field);
@@ -110,6 +113,7 @@ async function createRiskAssessment(formData) {
     await admin.from("hs_risk_assessments").delete().eq("id", assessment.id);
     throw uploadFailure;
   }
+  refreshAssessmentZonePages(location.id,assessment.id);
   redirect("/portal/health-safety/risk-assessment/" + assessment.id);
 }
 
@@ -126,6 +130,7 @@ export default async function NewRiskAssessmentPage() {
     admin.from("hs_permits").select("id,permit_reference,permit_type,task_description,status,valid_until").eq("organization_id", access.organization.id).not("status", "in", '(closed,cancelled)').order("updated_at", { ascending: false }),
   ]);
   if (peopleError || permitsError) throw new Error(peopleError?.message || permitsError?.message);
+  const zoneScope = await loadAssessmentZones(admin,access.organization.id);
   const today = new Date().toISOString().slice(0, 10);
 
   return <main className="nrPage"><style>{`
@@ -138,7 +143,7 @@ export default async function NewRiskAssessmentPage() {
         <div className="nrField full"><label htmlFor="title">Risk assessment title *</label><input id="title" name="title" required minLength={3} placeholder="For example: Operation of pedestal drill in Engineering Workshop"/></div>
         <div className="nrField"><label htmlFor="assessment_type">Assessment type *</label><select id="assessment_type" name="assessment_type" required>{types.map(([value,title]) => <option value={value} key={value}>{title}</option>)}</select></div>
         <div className="nrField"><label htmlFor="project_number">Project / job number</label><input id="project_number" name="project_number"/></div>
-        <div className="nrField"><label htmlFor="administration_location_id">Site / location *</label><select id="administration_location_id" name="administration_location_id" required defaultValue=""><option value="" disabled>{locations.length ? "Select controlled site" : "No active Site Profiles available"}</option>{locations.map((location) => <option value={location.id} key={location.id}>{location.label}</option>)}</select><small>Linked to <a href="/portal/company/sites">Administration → Site Profile</a>.</small></div>
+        <AssessmentZoneScope locations={locations} {...zoneScope}/>
         <div className="nrField"><label htmlFor="area_department">Area / department</label><input id="area_department" name="area_department"/></div>
         <div className="nrField"><label htmlFor="section_lab">Section / laboratory</label><input id="section_lab" name="section_lab"/></div>
         <div className="nrField full"><label htmlFor="task_description">Activity, task or workplace description *</label><textarea id="task_description" name="task_description" required placeholder="Describe normal work, foreseeable abnormal conditions, equipment, materials and boundaries."/></div>
