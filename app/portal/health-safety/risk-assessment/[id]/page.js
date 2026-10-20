@@ -1,3 +1,5 @@
+import {canonical} from '../../../../../lib/ppe-engine.mjs';
+import {readHazardPPE} from '../../../../../lib/hazard-ppe';
 import {loadAssessmentZones,saveAssessmentScope,refreshAssessmentZonePages} from '../../../../../lib/assessment-zones';
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -92,7 +94,7 @@ async function createRevision(formData) {
       people_exposed: hazard.people_exposed, harm_description: hazard.harm_description,
       existing_controls: hazard.existing_controls, current_severity: hazard.current_severity,
       current_likelihood: hazard.current_likelihood, additional_controls: hazard.additional_controls,
-      control_hierarchy: hazard.control_hierarchy, residual_severity: hazard.residual_severity,
+      control_hierarchy: hazard.control_hierarchy, ppe_requirements:hazard.ppe_requirements||[], residual_severity: hazard.residual_severity,
       residual_likelihood: hazard.residual_likelihood, risk_decision: hazard.risk_decision,
       acceptance_rationale: hazard.acceptance_rationale, acceptance_authority: hazard.acceptance_authority,
     }).select("id").single();
@@ -129,6 +131,7 @@ async function createRevision(formData) {
 
 async function addHazard(formData) {
   "use server";
+  try {
   const access = await requireOrganizationAccess(
     "risk_management",
     "contribute",
@@ -139,7 +142,7 @@ async function addHazard(formData) {
   const assessmentId = String(formData.get("assessment_id") || "");
   const { data: assessment, error: assessmentError } = await supabase.from("hs_risk_assessments").select("id,owner_id,organization_id,status").eq("id", assessmentId).eq("organization_id", organization.id).single();
   if (assessmentError || !assessment) throw new Error("Risk assessment could not be accessed.");
-  if (["approved", "communicated", "superseded", "archived"].includes(assessment.status)) throw new Error("This controlled version is locked. Create or reopen a review version before changing hazards.");
+  if (["in_review", "approved", "communicated", "superseded", "archived"].includes(assessment.status)) throw new Error("This controlled version is locked. Create or reopen a review version before changing hazards.");
 
   const text = (name) => String(formData.get(name) || "").trim();
   const number = (name) => Number(formData.get(name));
@@ -153,6 +156,7 @@ async function addHazard(formData) {
   const rationale = text("acceptance_rationale");
   const authority = text("acceptance_authority");
   const controls = formData.getAll("control_hierarchy").map(String);
+  const ppeRequirements=await readHazardPPE(supabase,organization.id,assessmentId,formData,controls);
   const exposedGroups = formData.getAll("people_exposed").map(String);
   const otherExposed = text("people_exposed_other");
   const actionRequired = text("action_required");
@@ -182,7 +186,7 @@ async function addHazard(formData) {
     people_exposed: [...exposedGroups.filter((item) => item !== "Others"), ...(exposedGroups.includes("Others") ? [`Other: ${otherExposed}`] : [])].join(", "), harm_description: text("harm_description"),
     existing_controls: text("existing_controls"), current_severity: currentSeverity,
     current_likelihood: currentLikelihood, additional_controls: text("additional_controls"),
-    control_hierarchy: controls, residual_severity: residualSeverity,
+    control_hierarchy: controls, ppe_requirements:ppeRequirements, residual_severity: residualSeverity,
     residual_likelihood: residualLikelihood, risk_decision: decision,
     acceptance_rationale: rationale || null, acceptance_authority: authority || null,
     accepted_at: decision === "accept" ? new Date().toISOString() : null,
@@ -213,6 +217,28 @@ async function addHazard(formData) {
     event_data: { hazard_id: hazard.id, current_score: currentScore, residual_score: residualScore },
   });
   revalidatePath("/portal/health-safety/risk-assessment/" + assessmentId);
+  return {success:true};
+  }catch(error){if(error.digest)throw error;return {error:error.message};}
+}
+
+async function updateHazardPPE(_state,formData) {
+ "use server";
+ try {
+  const access=await requireOrganizationAccess('risk_management','contribute','/portal/health-safety/risk-assessment');
+  const admin=createAdminClient(),id=String(formData.get('hazard_id')||''),assessmentId=String(formData.get('assessment_id')||'');
+  const {data:hazard,error}=await admin.from('hs_risk_hazards').select('id,assessment_id,control_hierarchy,ppe_requirements').eq('id',id).eq('assessment_id',assessmentId).eq('organization_id',access.organization.id).single();
+  if(error||!hazard)throw Error('Hazard not found.');
+  let expected;try{expected=JSON.parse(String(formData.get('expected_ppe')||'null'));}catch{throw Error('Reload the hazard before editing PPE.');}
+  if(canonical(expected)!==canonical(hazard.ppe_requirements||[]))throw Error('This hazard PPE changed. Reload before saving.');
+  const controls=(hazard.control_hierarchy||[]).filter(item=>item!=='PPE');if(formData.get('ppe_required')==='on')controls.push('PPE');
+  const ppe=await readHazardPPE(admin,access.organization.id,assessmentId,formData,controls);
+  const result=await admin.from('hs_risk_hazards').update({ppe_requirements:ppe,control_hierarchy:controls}).eq('id',id).eq('organization_id',access.organization.id).eq('ppe_requirements',JSON.stringify(hazard.ppe_requirements||[])).select('id');
+  if(result.error)throw Error(result.error.message);
+  if(!result.data?.length)throw Error('This hazard PPE changed. Reload before saving.');
+  await admin.from('hs_risk_events').insert({assessment_id:assessmentId,organization_id:access.organization.id,owner_id:access.organization.owner_id,actor_id:access.user.id,event_type:'ppe_updated',event_summary:'Hazard PPE requirements updated for controlled review',event_data:{hazard_id:id,ppe_requirements:ppe}});
+  revalidatePath(`/portal/health-safety/risk-assessment/${assessmentId}`);revalidatePath(`/portal/health-safety/risk-assessment/${assessmentId}/review`);
+  return {success:'PPE requirements saved. Recheck controls and residual risk before submitting for approval.'};
+ }catch(error){if(error.digest)throw error;return {error:error.message};}
 }
 
 export default async function RiskAssessmentWorkspacePage({ params }) {
@@ -260,7 +286,7 @@ export default async function RiskAssessmentWorkspacePage({ params }) {
     <section className="rawSummary"><div className="rawContext"><strong>{assessment.task_description}</strong><small>Assessed by {assessment.assessor_name || "Not assigned"} on {formatDate(assessment.assessment_date)} · review {formatDate(assessment.review_date)}</small></div><div className="rawMetric"><span>HAZARDS</span><strong>{hazards.length}</strong></div><div className="rawMetric"><span>HIGHEST RESIDUAL</span><strong className={highest >= 10 ? "red" : ""}>{highest || "—"}</strong></div><div className="rawMetric"><span>ELEVATED</span><strong className={elevated ? "red" : ""}>{elevated}</strong></div><div className="rawMetric"><span>OPEN ACTIONS</span><strong>{openActions.length}</strong></div></section>
     <section className="rawPanel"><div className="rawHead"><div><h2>Assessment context</h2><p>Scope, people and supporting arrangements.</p></div><span className="rawPill">{label(assessment.status)}</span></div><div className="rawDetails"><div><span>AREA / DEPARTMENT</span><strong>{assessment.area_department || "—"}</strong></div><div><span>SECTION / LAB</span><strong>{assessment.section_lab || "—"}</strong></div><div><span>PEOPLE AT RISK</span><strong>{assessment.persons_at_risk?.join(", ") || "—"}</strong></div><div><span>ASSESSOR / DATE</span><strong>{assessment.assessor_name || "—"}<br/>{formatDate(assessment.assessment_date)}</strong></div><div><span>SAFE SYSTEM OF WORK</span><strong>{assessment.safe_system_reference || "—"}</strong>{ssowDownloadUrl && <a className="rawDownload" href={ssowDownloadUrl} download={assessment.ssow_document_name || true}>Download SSOW ↓</a>}</div><div><span>COSHH / SAFETY DATA</span><strong>{assessment.coshh_msds_reference || "—"}</strong>{coshhDownloadUrl && <a className="rawDownload" href={coshhDownloadUrl} download={assessment.coshh_document_name || true}>Download COSHH ↓</a>}</div><div><span>PERMIT</span><strong>{assessment.permit_required ? assessment.permit_reference : "Not required"}</strong>{permitDownloadUrl && <a className="rawDownload" href={permitDownloadUrl} download={assessment.permit_document_name || true}>Download permit ↓</a>}</div><div><span>CONSULTATION</span><strong>{assessment.consultation_summary || "—"}</strong></div></div></section>
     <section className="rawPanel"><div className="rawHead"><div><h2>Buildings &amp; zones covered</h2><p>Controlled workplace links from Administration → Site Profile.</p></div>{!locked&&canContribute&&<Link className="rawButton secondary" href={`/portal/health-safety/risk-assessment/${id}/edit`}>Edit workplace scope</Link>}</div>{applicableZones.length?<div className="rawDetails">{applicableZones.map(zone=><div key={zone.id}><span>{zoneScope.buildings.find(building=>building.id===zone.building_id)?.name||'External / no building'}</span><strong>{zone.reference} · {zone.name}</strong><small>{zone.status}</small></div>)}</div>:<p className="rawEmpty">Site-level assessment: no individual zones linked. Add applicable zones in Edit assessment details or Manage zone → Link safety records.</p>}<p>Draft and review versions remain unavailable on employee pages until approved or communicated. PPE source selection and sign review remain separate.</p></section>
-    <section className="rawPanel"><div className="rawHead"><div><h2>Hazards and risk decisions</h2><p>{locked ? "This controlled version is read-only. Create a new revision to change hazards or controls." : "Evaluate initial risk, apply controls and confirm the residual position."}</p></div></div><HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} companyPeople={peopleResult.data || []} addHazardAction={addHazard} readOnly={locked || !canContribute}/></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Hazards and risk decisions</h2><p>{locked ? "This controlled version is read-only. Create a new revision to change hazards or controls." : "Evaluate initial risk, apply controls and confirm the residual position."}</p></div></div><HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} companyPeople={peopleResult.data || []} addHazardAction={addHazard} updatePPEAction={updateHazardPPE} zones={applicableZones} readOnly={locked || !canContribute}/></section>
     <section className="rawPanel"><div className="rawHead"><div><h2>Risk-reduction actions</h2><p>Accountable actions linked directly to identified hazards.</p></div><Link href="/portal/health-safety/actions">Action register →</Link></div>{actions.length ? <div className="rawActions">{actions.map((action) => <div className="rawAction" key={action.id}><div><strong>{action.action_required}</strong><small>{action.action_reference}</small></div><div><strong>{action.responsible_name}</strong><small>Responsible person</small></div><div><strong>{formatDate(action.target_date)}</strong><small>{label(action.priority)} priority</small></div><span className="rawPill">{label(action.status)}</span></div>)}</div> : <div className="rawEmpty">No additional risk-reduction actions have been recorded.</div>}</section>
   </div></main>;
 }
