@@ -78,7 +78,7 @@ const hubs = [
     tone: "capa",
     eyebrow: "PROBLEM SOLVING",
     title: "CAPA-8D Hub",
-    text: "Move from containment to evidence-based causal analysis, accountable action and independent effectiveness review.",
+    text: "Stop repeat problems. prove your action works. Move from containment to evidence-based causal analysis, accountable action and independent effectiveness review.",
     points: ["Guided D1–D8 workflow", "Cause analysis tools", "Effectiveness verification"],
     href: "/capa-8d",
     training: "£49.99 practitioner training",
