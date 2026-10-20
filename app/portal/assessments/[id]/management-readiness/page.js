@@ -1,12 +1,8 @@
+import { ISO17025_DIMENSIONS } from "../../../../../lib/iso17025";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-
 import { createClient } from "../../../../../lib/supabase/server";
-
-import {
-  saveManagementReadiness,
-} from "./actions";
-
+import { saveManagementReadiness } from "./actions";
 const ISO_14001_DIMENSIONS = [
   {
     key: "leadership",
@@ -72,7 +68,6 @@ const ISO_14001_DIMENSIONS = [
       "Assess root cause, corrective action, learning, recurrence prevention and evidence of continual improvement.",
   },
 ];
-
 const ISO_45001_DIMENSIONS = [
   {
     key: "ohs_leadership_culture",
@@ -138,8 +133,6 @@ const ISO_45001_DIMENSIONS = [
       "Assess incident investigation, root cause analysis, corrective action, effectiveness review, organisational learning, recurrence prevention and evidence of continual improvement.",
   },
 ];
-
-
 const ISO_9001_DIMENSIONS = [
   {
     key: "qms_leadership_culture",
@@ -205,7 +198,6 @@ const ISO_9001_DIMENSIONS = [
       "Assess nonconformity control, root-cause analysis, corrective action, effectiveness review, continual improvement, lessons learned and preservation of organisational knowledge.",
   },
 ];
-
 const ISO_17024_DIMENSIONS = [
   {
     key: "pcb_leadership_impartiality",
@@ -271,316 +263,211 @@ const ISO_17024_DIMENSIONS = [
       "Assess document and record control, internal audit, management review, nonconformity, root-cause analysis, corrective action, effectiveness verification and continual improvement of the person-certification management system.",
   },
 ];
-
 const ISO_22301_DIMENSIONS = [
-  { key: "bcms_leadership", name: "Leadership & Continuity Culture", order: 1, guidance: "Assess visible top-management accountability, strategic integration and whether continuity is treated as an operational capability rather than a document set." },
-  { key: "bcms_governance", name: "BCMS Governance & Accountability", order: 2, guidance: "Assess response authority, role clarity, escalation, decision rights, oversight and accountability before, during and after disruption." },
-  { key: "bcms_context_scope", name: "Context, Scope & Dependencies", order: 3, guidance: "Assess understanding of priority products and services, interested parties, legal obligations, internal and external dependencies and the defensibility of the BCMS scope." },
-  { key: "bcms_bia_risk", name: "Business Impact & Disruption Risk", order: 4, guidance: "Assess whether BIA and risk assessment produce credible, current and management-approved continuity requirements and priorities." },
-  { key: "bcms_strategy_resources", name: "Continuity Strategies & Resources", order: 5, guidance: "Assess whether selected solutions are feasible, proportionate and supported by people, facilities, technology, information, finance, suppliers and logistics." },
-  { key: "bcms_response_recovery", name: "Response, Recovery & Communications", order: 6, guidance: "Assess command structure, warning, communications, plan usability, recovery priorities and the ability to return activities to normal operation." },
-  { key: "bcms_exercise_capability", name: "Exercises & Demonstrated Capability", order: 7, guidance: "Assess whether exercises are realistic, objective-led, collectively validate all plans and drive verified improvements." },
-  { key: "bcms_performance_assurance", name: "Performance & Internal Assurance", order: 8, guidance: "Assess meaningful measures, evaluation, internal audit, management review and the reliability of readiness information presented to leaders." },
-  { key: "bcms_learning_improvement", name: "Learning & Continual Improvement", order: 9, guidance: "Assess learning from incidents and exercises, root cause, corrective action, effectiveness verification and sustained improvement of continuity capability." },
+  {
+    key: "bcms_leadership",
+    name: "Leadership & Continuity Culture",
+    order: 1,
+    guidance:
+      "Assess visible top-management accountability, strategic integration and whether continuity is treated as an operational capability rather than a document set.",
+  },
+  {
+    key: "bcms_governance",
+    name: "BCMS Governance & Accountability",
+    order: 2,
+    guidance:
+      "Assess response authority, role clarity, escalation, decision rights, oversight and accountability before, during and after disruption.",
+  },
+  {
+    key: "bcms_context_scope",
+    name: "Context, Scope & Dependencies",
+    order: 3,
+    guidance:
+      "Assess understanding of priority products and services, interested parties, legal obligations, internal and external dependencies and the defensibility of the BCMS scope.",
+  },
+  {
+    key: "bcms_bia_risk",
+    name: "Business Impact & Disruption Risk",
+    order: 4,
+    guidance:
+      "Assess whether BIA and risk assessment produce credible, current and management-approved continuity requirements and priorities.",
+  },
+  {
+    key: "bcms_strategy_resources",
+    name: "Continuity Strategies & Resources",
+    order: 5,
+    guidance:
+      "Assess whether selected solutions are feasible, proportionate and supported by people, facilities, technology, information, finance, suppliers and logistics.",
+  },
+  {
+    key: "bcms_response_recovery",
+    name: "Response, Recovery & Communications",
+    order: 6,
+    guidance:
+      "Assess command structure, warning, communications, plan usability, recovery priorities and the ability to return activities to normal operation.",
+  },
+  {
+    key: "bcms_exercise_capability",
+    name: "Exercises & Demonstrated Capability",
+    order: 7,
+    guidance:
+      "Assess whether exercises are realistic, objective-led, collectively validate all plans and drive verified improvements.",
+  },
+  {
+    key: "bcms_performance_assurance",
+    name: "Performance & Internal Assurance",
+    order: 8,
+    guidance:
+      "Assess meaningful measures, evaluation, internal audit, management review and the reliability of readiness information presented to leaders.",
+  },
+  {
+    key: "bcms_learning_improvement",
+    name: "Learning & Continual Improvement",
+    order: 9,
+    guidance:
+      "Assess learning from incidents and exercises, root cause, corrective action, effectiveness verification and sustained improvement of continuity capability.",
+  },
 ];
-
-const READINESS_RATINGS = [
-  "Not Ready",
-  "Developing",
-  "Established",
-  "Ready",
-];
-
-const CONFIDENCE_LEVELS = [
-  "Low",
-  "Medium",
-  "High",
-];
-
+const READINESS_RATINGS = ["Not Ready", "Developing", "Established", "Ready"];
+const CONFIDENCE_LEVELS = ["Low", "Medium", "High"];
 function readinessValue(rating) {
   switch (rating) {
     case "Not Ready":
       return 25;
-
     case "Developing":
       return 50;
-
     case "Established":
       return 75;
-
     case "Ready":
       return 100;
-
     default:
       return null;
   }
 }
-
-function overallReadinessLabel(
-  score
-) {
+function overallReadinessLabel(score) {
   if (score === null) {
     return "Not assessed";
   }
-
   if (score < 40) {
     return "Not Ready";
   }
-
   if (score < 65) {
     return "Developing";
   }
-
   if (score < 85) {
     return "Established";
   }
-
   return "Ready";
 }
-
-function getDimensions(
-  standard
-) {
+function getDimensions(standard) {
   switch (standard) {
     case "ISO 9001:2015/Amd 1:2024":
       return ISO_9001_DIMENSIONS;
-
     case "ISO 14001:2026":
       return ISO_14001_DIMENSIONS;
-
     case "ISO 45001:2018":
       return ISO_45001_DIMENSIONS;
-
+    case "ISO/IEC 17025:2017":
+      return ISO17025_DIMENSIONS;
     case "ISO/IEC 17024:2026":
       return ISO_17024_DIMENSIONS;
-
     case "ISO 22301:2019":
       return ISO_22301_DIMENSIONS;
-
     default:
-      throw new Error(
-        `Management readiness is not configured for ${standard}.`
-      );
+      throw new Error("Management readiness is not configured for " + standard + ".");
   }
 }
-
-function getReadinessDescription(
-  standard
-) {
+function getReadinessDescription(standard) {
   switch (standard) {
     case "ISO 9001:2015/Amd 1:2024":
       return "Management readiness is separate from clause conformity. It evaluates whether leadership, customer focus, process governance, risk and change control, operational assurance, quality performance information and organisational capability can sustain an effective quality management system.";
-
     case "ISO 14001:2026":
       return "Management readiness is separate from clause conformity. It evaluates whether leadership, governance, assurance and organisational capability can sustain an effective environmental management system.";
-
     case "ISO 45001:2018":
       return "Management readiness is separate from clause conformity. It evaluates whether leadership, worker participation, governance, risk control, operational assurance and organisational capability can sustain an effective OH&S management system.";
-
+    case "ISO/IEC 17025:2017":
+      return "Management readiness evaluates whether laboratory leadership, technical competence, methods, uncertainty, traceability, valid results, data integrity and assurance can be sustained. It supports accreditation planning; neither a percentage nor an ISO 9001 certificate establishes laboratory competence.";
     case "ISO/IEC 17024:2026":
       return "Management readiness is separate from clause conformity. It evaluates whether leadership, impartiality safeguards, scheme governance, personnel competence, examination security, certification controls and organisational capability can sustain credible certification of persons.";
-
     case "ISO 22301:2019":
       return "Management readiness is separate from clause conformity. It evaluates whether leadership, continuity governance, business-impact analysis, disruption-risk control, recovery strategies, response arrangements, exercises and organisational learning can sustain priority products and services during disruption.";
-
     default:
-      throw new Error(
-        `Management readiness is not configured for ${standard}.`
-      );
+      throw new Error("Management readiness is not configured for " + standard + ".");
   }
 }
-
-export default async function ManagementReadinessPage({
-  params,
-}) {
-  const { id } =
-    await params;
-
-  const supabase =
-    await createClient();
-
+export default async function ManagementReadinessPage({ params }) {
+  const { id } = await params;
+  const supabase = await createClient();
   const {
     data: { user },
-  } =
-    await supabase.auth.getUser();
-
+  } = await supabase.auth.getUser();
   if (!user) {
-    redirect(
-      "/portal/login"
-    );
+    redirect("/portal/login");
   }
-
-  const {
-    data: assessment,
-    error: assessmentError,
-  } = await supabase
+  const { data: assessment, error: assessmentError } = await supabase
     .from("assessments")
-    .select(
-      "id, standard, status"
-    )
-    .eq(
-      "id",
-      id
-    )
-    .eq(
-      "owner_id",
-      user.id
-    )
+    .select("id, standard, status")
+    .eq("id", id)
+    .eq("owner_id", user.id)
     .single();
-
-  if (
-    assessmentError ||
-    !assessment
-  ) {
-    redirect(
-      "/portal"
-    );
+  if (assessmentError || !assessment) {
+    redirect("/portal");
   }
-
-  const dimensions =
-    getDimensions(
-      assessment.standard
-    );
-
-  const {
-    data: readinessData,
-    error: readinessError,
-  } = await supabase
-    .from(
-      "management_readiness"
-    )
+  const dimensions = getDimensions(assessment.standard);
+  const { data: readinessData, error: readinessError } = await supabase
+    .from("management_readiness")
     .select("*")
-    .eq(
-      "assessment_id",
-      assessment.id
-    )
-    .eq(
-      "owner_id",
-      user.id
-    )
-    .order(
-      "display_order",
-      {
-        ascending: true,
-      }
-    );
-
+    .eq("assessment_id", assessment.id)
+    .eq("owner_id", user.id)
+    .order("display_order", {
+      ascending: true,
+    });
   if (readinessError) {
-    throw new Error(
-      readinessError.message
-    );
+    throw new Error(readinessError.message);
   }
-
-  const readinessRows =
-    readinessData ?? [];
-
-  const readinessByKey =
-    Object.fromEntries(
-      readinessRows.map(
-        (row) => [
-          row.dimension_key,
-          row,
-        ]
-      )
-    );
-
-  const scoredValues =
-    dimensions
-      .map(
-        (dimension) =>
-          readinessValue(
-            readinessByKey[
-              dimension.key
-            ]?.readiness_rating
-          )
-      )
-      .filter(
-        (value) =>
-          value !== null
-      );
-
+  const readinessRows = readinessData ?? [];
+  const readinessByKey = Object.fromEntries(
+    readinessRows.map((row) => [row.dimension_key, row]),
+  );
+  const scoredValues = dimensions
+    .map((dimension) => readinessValue(readinessByKey[dimension.key]?.readiness_rating))
+    .filter((value) => value !== null);
   const overallScore =
     scoredValues.length > 0
       ? Math.round(
-          scoredValues.reduce(
-            (
-              total,
-              value
-            ) =>
-              total + value,
-            0
-          ) /
-            scoredValues.length
+          scoredValues.reduce((total, value) => total + value, 0) / scoredValues.length,
         )
       : null;
-
-  const completedDimensions =
-    dimensions.filter(
-      (dimension) =>
-        Boolean(
-          readinessByKey[
-            dimension.key
-          ]?.readiness_rating
-        )
-    ).length;
-
-  const isReadinessComplete =
-    completedDimensions ===
-    dimensions.length;
-
-  const displayedOverallScore =
-    isReadinessComplete
-      ? overallScore
-      : null;
-
-  const overallLabel =
-    isReadinessComplete
-      ? overallReadinessLabel(
-          overallScore
-        )
-      : "Not assessed";
-
-  const highConfidenceCount =
-    dimensions.filter(
-      (dimension) =>
-        readinessByKey[
-          dimension.key
-        ]?.evidence_confidence ===
-        "High"
-    ).length;
-
-  const openManagementActions =
-    dimensions.filter(
-      (dimension) => {
-        const row =
-          readinessByKey[
-            dimension.key
-          ];
-
-        return Boolean(
-          row?.management_action
-        );
-      }
-    ).length;
-
+  const completedDimensions = dimensions.filter((dimension) =>
+    Boolean(readinessByKey[dimension.key]?.readiness_rating),
+  ).length;
+  const isReadinessComplete = completedDimensions === dimensions.length;
+  const displayedOverallScore = isReadinessComplete ? overallScore : null;
+  const overallLabel = isReadinessComplete
+    ? overallReadinessLabel(overallScore)
+    : "Not assessed";
+  const highConfidenceCount = dimensions.filter(
+    (dimension) => readinessByKey[dimension.key]?.evidence_confidence === "High",
+  ).length;
+  const openManagementActions = dimensions.filter((dimension) => {
+    const row = readinessByKey[dimension.key];
+    return Boolean(row?.management_action);
+  }).length;
   const inputStyle = {
     width: "100%",
     padding: "12px",
     borderRadius: "8px",
-    border:
-      "1px solid #d8e0ea",
+    border: "1px solid #d8e0ea",
     background: "#ffffff",
     boxSizing: "border-box",
   };
-
   return (
     <main
       style={{
         minHeight: "100vh",
         background: "#f3f6f9",
         padding: "40px",
-        fontFamily:
-          "Arial, sans-serif",
+        fontFamily: "Arial, sans-serif",
       }}
     >
       <div
@@ -592,11 +479,9 @@ export default async function ManagementReadinessPage({
         <div
           style={{
             display: "flex",
-            justifyContent:
-              "space-between",
+            justifyContent: "space-between",
             gap: "20px",
-            alignItems:
-              "flex-start",
+            alignItems: "flex-start",
             flexWrap: "wrap",
             marginBottom: "24px",
           }}
@@ -607,8 +492,7 @@ export default async function ManagementReadinessPage({
                 color: "#1459D9",
                 fontWeight: 800,
                 fontSize: "12px",
-                letterSpacing:
-                  "0.8px",
+                letterSpacing: "0.8px",
                 marginBottom: "8px",
               }}
             >
@@ -621,8 +505,7 @@ export default async function ManagementReadinessPage({
                 margin: 0,
               }}
             >
-              Management Readiness
-              Assessment
+              Management Readiness Assessment
             </h1>
 
             <p
@@ -631,8 +514,7 @@ export default async function ManagementReadinessPage({
                 marginBottom: 0,
               }}
             >
-              {assessment.standard}{" "}
-              Assessment
+              {assessment.standard} Assessment
             </p>
           </div>
 
@@ -644,20 +526,14 @@ export default async function ManagementReadinessPage({
             }}
           >
             <Link
-              href={`/portal/assessments/${assessment.id}/summary`}
+              href={"/portal/assessments/" + assessment.id + "/summary"}
               style={{
-                padding:
-                  "11px 16px",
-                borderRadius:
-                  "8px",
-                border:
-                  "1px solid #d8e0ea",
-                background:
-                  "#ffffff",
-                color:
-                  "#071A33",
-                textDecoration:
-                  "none",
+                padding: "11px 16px",
+                borderRadius: "8px",
+                border: "1px solid #d8e0ea",
+                background: "#ffffff",
+                color: "#071A33",
+                textDecoration: "none",
                 fontWeight: 700,
               }}
             >
@@ -665,60 +541,48 @@ export default async function ManagementReadinessPage({
             </Link>
 
             <Link
-              href={`/portal/assessments/${assessment.id}/readiness`}
+              href={"/portal/assessments/" + assessment.id + "/readiness"}
               style={{
-                padding:
-                  "11px 16px",
-                borderRadius:
-                  "8px",
-                background:
-                  "#071A33",
-                color:
-                  "#ffffff",
-                textDecoration:
-                  "none",
+                padding: "11px 16px",
+                borderRadius: "8px",
+                background: "#071A33",
+                color: "#ffffff",
+                textDecoration: "none",
                 fontWeight: 700,
               }}
             >
-              Certification Readiness
+              {assessment.standard === "ISO/IEC 17025:2017"
+                ? "Accreditation Readiness Planning"
+                : "Certification Readiness"}
             </Link>
           </div>
         </div>
 
         <section
           style={{
-            background:
-              "#071A33",
-            color:
-              "#ffffff",
-            borderRadius:
-              "16px",
+            background: "#071A33",
+            color: "#ffffff",
+            borderRadius: "16px",
             padding: "28px",
-            marginBottom:
-              "22px",
+            marginBottom: "22px",
           }}
         >
           <div
             style={{
               display: "flex",
-              justifyContent:
-                "space-between",
+              justifyContent: "space-between",
               gap: "20px",
-              alignItems:
-                "center",
-              flexWrap:
-                "wrap",
+              alignItems: "center",
+              flexWrap: "wrap",
             }}
           >
             <div>
               <div
                 style={{
                   fontSize: "12px",
-                  letterSpacing:
-                    "1px",
+                  letterSpacing: "1px",
                   opacity: 0.75,
-                  marginBottom:
-                    "8px",
+                  marginBottom: "8px",
                 }}
               >
                 MANAGEMENT READINESS
@@ -738,9 +602,7 @@ export default async function ManagementReadinessPage({
                   opacity: 0.75,
                 }}
               >
-                {completedDimensions} of{" "}
-                {dimensions.length} dimensions
-                assessed
+                {completedDimensions} of {dimensions.length} dimensions assessed
               </p>
             </div>
 
@@ -750,9 +612,7 @@ export default async function ManagementReadinessPage({
                 fontWeight: 800,
               }}
             >
-              {displayedOverallScore !== null
-                ? `${displayedOverallScore}%`
-                : "—"}
+              {displayedOverallScore !== null ? "" + displayedOverallScore + "%" : "—"}
             </div>
           </div>
         </section>
@@ -760,105 +620,64 @@ export default async function ManagementReadinessPage({
         <section
           style={{
             display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(190px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
             gap: "14px",
-            marginBottom:
-              "24px",
+            marginBottom: "24px",
           }}
         >
           {[
-            [
-              "DIMENSIONS ASSESSED",
-              `${completedDimensions}/${dimensions.length}`,
-            ],
-            [
-              "HIGH CONFIDENCE",
-              highConfidenceCount,
-            ],
-            [
-              "MANAGEMENT ACTIONS",
-              openManagementActions,
-            ],
-          ].map(
-            ([label, value]) => (
+            ["DIMENSIONS ASSESSED", "" + completedDimensions + "/" + dimensions.length],
+            ["HIGH CONFIDENCE", highConfidenceCount],
+            ["MANAGEMENT ACTIONS", openManagementActions],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              style={{
+                background: "#ffffff",
+                border: "1px solid #dfe6ee",
+                borderRadius: "12px",
+                padding: "18px",
+              }}
+            >
               <div
-                key={label}
                 style={{
-                  background:
-                    "#ffffff",
-                  border:
-                    "1px solid #dfe6ee",
-                  borderRadius:
-                    "12px",
-                  padding:
-                    "18px",
+                  color: "#617087",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  marginBottom: "7px",
                 }}
               >
-                <div
-                  style={{
-                    color:
-                      "#617087",
-                    fontSize:
-                      "11px",
-                    fontWeight:
-                      800,
-                    marginBottom:
-                      "7px",
-                  }}
-                >
-                  {label}
-                </div>
-
-                <strong
-                  style={{
-                    color:
-                      "#071A33",
-                    fontSize:
-                      "28px",
-                  }}
-                >
-                  {value}
-                </strong>
+                {label}
               </div>
-            )
-          )}
+
+              <strong
+                style={{
+                  color: "#071A33",
+                  fontSize: "28px",
+                }}
+              >
+                {value}
+              </strong>
+            </div>
+          ))}
         </section>
 
         <div
           style={{
-            background:
-              "#eef4ff",
-            border:
-              "1px solid #d6e4ff",
-            color:
-              "#405574",
-            borderRadius:
-              "10px",
-            padding:
-              "16px 18px",
+            background: "#eef4ff",
+            border: "1px solid #d6e4ff",
+            color: "#405574",
+            borderRadius: "10px",
+            padding: "16px 18px",
             lineHeight: 1.55,
-            marginBottom:
-              "24px",
+            marginBottom: "24px",
           }}
         >
-          {getReadinessDescription(
-            assessment.standard
-          )}
+          {getReadinessDescription(assessment.standard)}
         </div>
 
-        <form
-          action={
-            saveManagementReadiness
-          }
-        >
-          <input
-            type="hidden"
-            name="assessment_id"
-            value={
-              assessment.id
-            }
-          />
+        <form action={saveManagementReadiness}>
+          <input type="hidden" name="assessment_id" value={assessment.id} />
 
           <div
             style={{
@@ -866,332 +685,215 @@ export default async function ManagementReadinessPage({
               gap: "18px",
             }}
           >
-            {dimensions.map(
-              (dimension) => {
-                const saved =
-                  readinessByKey[
-                    dimension.key
-                  ] ?? null;
-
-                return (
-                  <section
-                    key={
-                      dimension.key
-                    }
+            {dimensions.map((dimension) => {
+              const saved = readinessByKey[dimension.key] ?? null;
+              return (
+                <section
+                  key={dimension.key}
+                  style={{
+                    background: "#ffffff",
+                    border: "1px solid #dfe6ee",
+                    borderRadius: "14px",
+                    padding: "22px",
+                  }}
+                >
+                  <div
                     style={{
-                      background:
-                        "#ffffff",
-                      border:
-                        "1px solid #dfe6ee",
-                      borderRadius:
-                        "14px",
-                      padding:
-                        "22px",
+                      marginBottom: "16px",
                     }}
                   >
                     <div
                       style={{
-                        marginBottom:
-                          "16px",
+                        color: "#1459D9",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        marginBottom: "5px",
                       }}
                     >
-                      <div
-                        style={{
-                          color:
-                            "#1459D9",
-                          fontSize:
-                            "11px",
-                          fontWeight:
-                            800,
-                          marginBottom:
-                            "5px",
-                        }}
-                      >
-                        DIMENSION{" "}
-                        {dimension.order}
-                      </div>
-
-                      <h2
-                        style={{
-                          color:
-                            "#071A33",
-                          margin:
-                            "0 0 6px",
-                        }}
-                      >
-                        {
-                          dimension.name
-                        }
-                      </h2>
-
-                      <p
-                        style={{
-                          color:
-                            "#617087",
-                          margin: 0,
-                          lineHeight:
-                            1.55,
-                          maxWidth:
-                            "820px",
-                        }}
-                      >
-                        {
-                          dimension.guidance
-                        }
-                      </p>
+                      DIMENSION {dimension.order}
                     </div>
 
-                    <input
-                      type="hidden"
-                      name={`dimension_name_${dimension.key}`}
-                      value={
-                        dimension.name
-                      }
+                    <h2
+                      style={{
+                        color: "#071A33",
+                        margin: "0 0 6px",
+                      }}
+                    >
+                      {dimension.name}
+                    </h2>
+
+                    <p
+                      style={{
+                        color: "#617087",
+                        margin: 0,
+                        lineHeight: 1.55,
+                        maxWidth: "820px",
+                      }}
+                    >
+                      {dimension.guidance}
+                    </p>
+                  </div>
+
+                  <input
+                    type="hidden"
+                    name={"dimension_name_" + dimension.key}
+                    value={dimension.name}
+                  />
+
+                  <input
+                    type="hidden"
+                    name={"display_order_" + dimension.key}
+                    value={dimension.order}
+                  />
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                      gap: "12px",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <div>
+                      <label
+                        style={{
+                          display: "block",
+                          color: "#071A33",
+                          fontWeight: 700,
+                          marginBottom: "7px",
+                        }}
+                      >
+                        Readiness rating
+                      </label>
+
+                      <select
+                        name={"readiness_rating_" + dimension.key}
+                        defaultValue={saved?.readiness_rating ?? ""}
+                        style={inputStyle}
+                      >
+                        <option value="">Not assessed</option>
+
+                        {READINESS_RATINGS.map((rating) => (
+                          <option key={rating} value={rating}>
+                            {rating}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        style={{
+                          display: "block",
+                          color: "#071A33",
+                          fontWeight: 700,
+                          marginBottom: "7px",
+                        }}
+                      >
+                        Evidence confidence
+                      </label>
+
+                      <select
+                        name={"evidence_confidence_" + dimension.key}
+                        defaultValue={saved?.evidence_confidence ?? ""}
+                        style={inputStyle}
+                      >
+                        <option value="">Select confidence</option>
+
+                        {CONFIDENCE_LEVELS.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: "12px",
+                    }}
+                  >
+                    <textarea
+                      name={"objective_evidence_" + dimension.key}
+                      rows="3"
+                      defaultValue={saved?.objective_evidence ?? ""}
+                      placeholder="Objective evidence supporting this management-readiness conclusion..."
+                      style={inputStyle}
                     />
 
-                    <input
-                      type="hidden"
-                      name={`display_order_${dimension.key}`}
-                      value={
-                        dimension.order
-                      }
+                    <textarea
+                      name={"assessor_commentary_" + dimension.key}
+                      rows="3"
+                      defaultValue={saved?.assessor_commentary ?? ""}
+                      placeholder="Assessor commentary / management-readiness rationale..."
+                      style={inputStyle}
+                    />
+
+                    <textarea
+                      name={"management_concern_" + dimension.key}
+                      rows="2"
+                      defaultValue={saved?.management_concern ?? ""}
+                      placeholder="Management concern / issue requiring attention..."
+                      style={inputStyle}
+                    />
+
+                    <textarea
+                      name={"management_action_" + dimension.key}
+                      rows="3"
+                      defaultValue={saved?.management_action ?? ""}
+                      placeholder="Management action required..."
+                      style={inputStyle}
                     />
 
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(240px, 1fr))",
-                        gap: "12px",
-                        marginBottom:
-                          "12px",
-                      }}
-                    >
-                      <div>
-                        <label
-                          style={{
-                            display:
-                              "block",
-                            color:
-                              "#071A33",
-                            fontWeight:
-                              700,
-                            marginBottom:
-                              "7px",
-                          }}
-                        >
-                          Readiness rating
-                        </label>
-
-                        <select
-                          name={`readiness_rating_${dimension.key}`}
-                          defaultValue={
-                            saved?.readiness_rating ??
-                            ""
-                          }
-                          style={
-                            inputStyle
-                          }
-                        >
-                          <option value="">
-                            Not assessed
-                          </option>
-
-                          {READINESS_RATINGS.map(
-                            (rating) => (
-                              <option
-                                key={
-                                  rating
-                                }
-                                value={
-                                  rating
-                                }
-                              >
-                                {
-                                  rating
-                                }
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label
-                          style={{
-                            display:
-                              "block",
-                            color:
-                              "#071A33",
-                            fontWeight:
-                              700,
-                            marginBottom:
-                              "7px",
-                          }}
-                        >
-                          Evidence confidence
-                        </label>
-
-                        <select
-                          name={`evidence_confidence_${dimension.key}`}
-                          defaultValue={
-                            saved?.evidence_confidence ??
-                            ""
-                          }
-                          style={
-                            inputStyle
-                          }
-                        >
-                          <option value="">
-                            Select confidence
-                          </option>
-
-                          {CONFIDENCE_LEVELS.map(
-                            (level) => (
-                              <option
-                                key={
-                                  level
-                                }
-                                value={
-                                  level
-                                }
-                              >
-                                {
-                                  level
-                                }
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                         gap: "12px",
                       }}
                     >
-                      <textarea
-                        name={`objective_evidence_${dimension.key}`}
-                        rows="3"
-                        defaultValue={
-                          saved?.objective_evidence ??
-                          ""
-                        }
-                        placeholder="Objective evidence supporting this management-readiness conclusion..."
-                        style={
-                          inputStyle
-                        }
+                      <input
+                        name={"action_owner_" + dimension.key}
+                        type="text"
+                        defaultValue={saved?.action_owner ?? ""}
+                        placeholder="Management action owner"
+                        style={inputStyle}
                       />
 
-                      <textarea
-                        name={`assessor_commentary_${dimension.key}`}
-                        rows="3"
-                        defaultValue={
-                          saved?.assessor_commentary ??
-                          ""
-                        }
-                        placeholder="Assessor commentary / management-readiness rationale..."
-                        style={
-                          inputStyle
-                        }
+                      <input
+                        name={"target_date_" + dimension.key}
+                        type="date"
+                        defaultValue={saved?.target_date ?? ""}
+                        style={inputStyle}
                       />
-
-                      <textarea
-                        name={`management_concern_${dimension.key}`}
-                        rows="2"
-                        defaultValue={
-                          saved?.management_concern ??
-                          ""
-                        }
-                        placeholder="Management concern / issue requiring attention..."
-                        style={
-                          inputStyle
-                        }
-                      />
-
-                      <textarea
-                        name={`management_action_${dimension.key}`}
-                        rows="3"
-                        defaultValue={
-                          saved?.management_action ??
-                          ""
-                        }
-                        placeholder="Management action required..."
-                        style={
-                          inputStyle
-                        }
-                      />
-
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fit, minmax(220px, 1fr))",
-                          gap: "12px",
-                        }}
-                      >
-                        <input
-                          name={`action_owner_${dimension.key}`}
-                          type="text"
-                          defaultValue={
-                            saved?.action_owner ??
-                            ""
-                          }
-                          placeholder="Management action owner"
-                          style={
-                            inputStyle
-                          }
-                        />
-
-                        <input
-                          name={`target_date_${dimension.key}`}
-                          type="date"
-                          defaultValue={
-                            saved?.target_date ??
-                            ""
-                          }
-                          style={
-                            inputStyle
-                          }
-                        />
-                      </div>
                     </div>
-                  </section>
-                );
-              }
-            )}
+                  </div>
+                </section>
+              );
+            })}
           </div>
 
           <div
             style={{
               display: "flex",
-              justifyContent:
-                "space-between",
+              justifyContent: "space-between",
               gap: "12px",
               flexWrap: "wrap",
-              marginTop:
-                "24px",
+              marginTop: "24px",
             }}
           >
             <Link
-              href={`/portal/assessments/${assessment.id}/summary`}
+              href={"/portal/assessments/" + assessment.id + "/summary"}
               style={{
-                padding:
-                  "12px 18px",
-                borderRadius:
-                  "8px",
-                border:
-                  "1px solid #d8e0ea",
-                color:
-                  "#071A33",
-                background:
-                  "#ffffff",
-                textDecoration:
-                  "none",
-                fontWeight:
-                  700,
+                padding: "12px 18px",
+                borderRadius: "8px",
+                border: "1px solid #d8e0ea",
+                color: "#071A33",
+                background: "#ffffff",
+                textDecoration: "none",
+                fontWeight: 700,
               }}
             >
               Cancel
@@ -1200,24 +902,16 @@ export default async function ManagementReadinessPage({
             <button
               type="submit"
               style={{
-                padding:
-                  "12px 20px",
-                borderRadius:
-                  "8px",
-                border:
-                  "none",
-                background:
-                  "#1459D9",
-                color:
-                  "#ffffff",
-                fontWeight:
-                  700,
-                cursor:
-                  "pointer",
+                padding: "12px 20px",
+                borderRadius: "8px",
+                border: "none",
+                background: "#1459D9",
+                color: "#ffffff",
+                fontWeight: 700,
+                cursor: "pointer",
               }}
             >
-              Save Management
-              Readiness
+              Save Management Readiness
             </button>
           </div>
         </form>
