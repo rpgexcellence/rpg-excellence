@@ -1,55 +1,415 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageShell from "../../../components/PageShell";
+import StandardGuide from "../../../components/StandardGuide";
 import { locales } from "../../../lib/i18n";
-import { ISO17025_CLAUSE_TITLES, ISO17025_GROUPS, ISO17025_REQUIREMENTS, ISO17025_ANNEXES, ISO17025_TERMS } from "../../../lib/iso17025";
-import styles from "./laboratory-guide.module.css";
-
 export const metadata = {
-title: "ISO/IEC 17025:2017 at a Glance | Laboratory Gap Analysis & Internal Audit | RPG Excellence",
-description: "Practical ISO/IEC 17025:2017 guidance for testing and calibration laboratories: competence, uncertainty, traceability, valid results, gap analysis and evidence-based internal audit.",
-alternates: { canonical: "/en/iso-17025" },
+  title: "ISO/IEC 17025:2017 at a Glance | RPG Excellence",
+  description:
+    "Practical laboratory guidance for ISO/IEC 17025:2017: competence, calibration, testing, uncertainty, traceability, valid results, gap analysis and internal audit, with official UKAS resources.",
+  alternates: {
+    canonical: "/en/iso-17025",
+  },
 };
-const assessmentHref = "/portal?standard=ISO%2FIEC%2017025%3A2017#new-assessment";
-const trails = [
-{ title:"Follow a calibration result", clauses:"6.2–6.5 · 7.1–7.2 · 7.4–7.8 · 7.11", steps:"Enquiry and agreed capability → identified item → authorised technician → controlled method, environment and reference → original readings and uncertainty → technical review → issued certificate.", challenge:"Recalculate a certificate value from raw readings, correction factors and the measurement model. Check the exact reference, conditions and authority valid on the job date." },
-{ title:"Investigate an out-of-tolerance reference", clauses:"6.4.9 · 7.7.3 · 7.10 · 8.7", steps:"Detect and quarantine → establish the last defensible valid state → identify affected jobs → assess technical significance → decide notification or recall where necessary → authorise restart → verify corrective action.", challenge:"An instrument repair does not resolve the validity of earlier certificates. Require a supported impact conclusion, including uncertainty, drift, affected ranges and customer use where relevant." },
-{ title:"Release a new or changed method", clauses:"6.2 · 6.4–6.5 · 7.2 · 7.6–7.7 · 7.11", steps:"Define intended use → select or develop the method → demonstrate performance → evaluate uncertainty → verify data flows → authorise personnel → monitor performance after release.", challenge:"A purchased procedure or software package does not demonstrate capability in this laboratory. Examine actual staff, equipment, range points, calculations and conditions." },
-];
-const warnings = [
-["Calibration is not a pass/fail decision", "A measured value with uncertainty is different from a conformity statement. Where conformity is requested, clarify the specification and applicable decision rule before doing the work."],
-["An internal calibration still needs uncertainty", "Clause 7.6.2 includes calibration of the laboratory's own equipment. An internal customer does not remove the need for valid methods, suitable references and technical records."],
-["Traceability belongs to the result", "Follow the reference chain and its uncertainty contributions. A calibration label, supplier name or accreditation logo alone is insufficient evidence."],
-["A score cannot establish accreditation", "Use the RPG score to prioritise work. Assess significant technical gaps, incomplete evidence, impartiality and actual competence before reaching a readiness conclusion."],
-];
-
+const ukasOverview =
+  "https://www.ukas.com/accreditation/standards/laboratory-accreditation/";
+const ukasPublications =
+  "https://www.ukas.com/resources/publications/laboratory-accreditation/";
+const support =
+  "Use RPG Excellence to assess the laboratory criterion, record objective evidence and assign an accountable Company User. Link a gap to a controlled Finding and proportionate CAPA-8D where needed, then retain implementation and effectiveness evidence. The platform supports preparation and internal assurance; accreditation decisions remain with the accreditation body.";
+const clauses = {
+  4: {
+    intent:
+      "Protect impartial technical judgement and the confidentiality of laboratory information.",
+    requirements: [
+      "4.1 — impartial activities, management commitment and protection from undue pressure",
+      "4.1 — ongoing identification and control of impartiality risks",
+      "4.2 — enforceable confidentiality commitments, controlled disclosure and protection of third-party sources",
+      "4.2 — confidentiality duties for employees, contractors and others acting for the laboratory",
+    ],
+    application:
+      "Review ownership, reporting lines, customer relationships, incentives and shared production resources for risks to objective results. Give staff a usable escalation route and protect confidential information through the whole job lifecycle, including external providers and customer witnessing.",
+    evidence:
+      "Impartiality reviews and decisions; conflict declarations; reporting and release authorities; confidentiality commitments; disclosure approvals; access controls; interviews and examples of decisions made under commercial pressure.",
+    questions: [
+      "What happened when a customer challenged an unwelcome result?",
+      "How are technicians protected from pressure to change technical conclusions?",
+      "Who can see customer data and how are third-party sources protected?",
+    ],
+    failures:
+      "A signed policy without working safeguards; the sales function controlling technical release; unresolved conflicts; shared access to confidential records; complaints revealing a third-party source without permission.",
+    output:
+      "Demonstrated impartiality safeguards and clear accountability for confidential information and disclosures.",
+    focus:
+      "Technical integrity, freedom to escalate and reliable information protection across internal and external relationships.",
+  },
+  5: {
+    intent:
+      "Define the laboratory's legal responsibility, management, activity range, interfaces and technical authority.",
+    requirements: [
+      "5.1–5.2 — legal responsibility and identified management with overall laboratory accountability",
+      "5.3 — documented range of activities for which conformity is claimed",
+      "5.4 — consistent control at permanent, temporary, mobile and customer locations",
+      "5.5–5.6 — structure, procedures, responsibilities, resources and authority to act",
+      "5.7 — communication and preservation of system integrity during change",
+    ],
+    application:
+      "Map the actual testing, calibration and sampling offered: methods, measurands, ranges, locations and technical interfaces. Align marketed capability, contracts and any accredited scope with what is demonstrated. Do not describe ongoing externally provided laboratory activities as the laboratory's own conforming activity range.",
+    evidence:
+      "Legal identity; organisation chart; controlled activity scope; methods/ranges and location lists; role and delegation records; stop-work authority; support-service interfaces; management communications and change reviews.",
+    questions: [
+      "Which activities and locations are inside the declared range?",
+      "Who can stop work and authorise technical resumption?",
+      "Does the service offered match the capability and any published accreditation schedule?",
+    ],
+    failures:
+      "An ambiguous legal entity; missing site or fieldwork controls; nominal technical authority; scope claims broader than demonstrated capability; organisational change that bypasses laboratory controls.",
+    output:
+      "A clear, defensible laboratory boundary with accountable management, working authorities and controlled interfaces.",
+    focus:
+      "Scope accuracy, technical accountability and preservation of competence through organisational or service changes.",
+  },
+  6: {
+    intent:
+      "Provide competent people, suitable facilities and dependable equipment backed by valid metrological references.",
+    requirements: [
+      "6.1 — available personnel, facilities, equipment, systems and support services",
+      "6.2 — documented competence criteria, selection, training, supervision, authorisation and monitoring",
+      "6.3 — suitable facilities, defined environmental requirements and relevant monitoring",
+      "6.4 — equipment fitness, acceptance, calibration, maintenance, status, checks, corrections and history",
+      "6.5 — demonstrable metrological traceability to appropriate references",
+      "6.6 — technically controlled external products and services",
+    ],
+    application:
+      "Authorise staff for specific methods, ranges and release activities using demonstrated competence. Set conditions appropriate to the method and uncertainty. Technically review reference certificates, apply current corrections, conduct required intermediate checks and investigate suspect equipment. Evaluate providers against the capability actually purchased.",
+    evidence:
+      "Competence criteria and witnessed assessments; authorisation matrix; environmental data matched to job time; equipment/firmware history; acceptance and calibration records; correction tables; intermediate-check trends; traceability chains; provider evaluation and receipt approval.",
+    questions: [
+      "Can the technician demonstrate the method and interpret a deviation?",
+      "Does the reference equipment support the required range and uncertainty?",
+      "How was a supplier's delivered certificate accepted for its intended use?",
+      "Which earlier results could be affected by an out-of-tolerance reference?",
+    ],
+    failures:
+      "Training attendance treated as competence; blanket signatory authority; an in-date label mistaken for fitness; missed environmental excursions; wrong or omitted correction factors; unsuitable provider capability; no review of previous results after a reference failure.",
+    output:
+      "Verified technical capability, controlled environmental influences and a defensible reference chain for the laboratory's work.",
+    focus:
+      "The people, equipment, facilities and traceability factors highlighted by UKAS, tested against actual methods and reported results.",
+  },
+  7: {
+    intent:
+      "Control the complete technical process so every reported result is valid, reconstructable and understandable.",
+    requirements: [
+      "7.1 — technical review of requests and contracts, including agreed decision rules where conformity is requested",
+      "7.2.1–7.2.2 — suitable methods, verified capability and validation when required",
+      "7.3–7.4 — sampling where performed and controlled handling/identification of items",
+      "7.5 — contemporaneous technical records and traceable amendments",
+      "7.6 — suitable uncertainty evaluation, including all calibration activities and in-house calibrations",
+      "7.7 — planned validity monitoring, suitable external comparisons and action on adverse results",
+      "7.8.1–7.8.2 — clear reporting, common information and authorised review/release",
+      "7.8.3–7.8.5 — activity-specific testing, calibration and sampling reporting",
+      "7.8.6–7.8.8 — conformity statements, opinions/interpretations and controlled report amendments",
+      "7.9–7.10 — complaint handling and risk-based control of nonconforming work",
+      "7.11 — validated data functions, information integrity and checked calculations/transfers",
+    ],
+    application:
+      "Follow a customer job from agreed method, range and capability through receipt, work, original readings, corrections, uncertainty and release. Witness a demanding measurement and recalculate a reported result. Use validity monitoring to inform technical decisions. On failure, consider holds, previous-result impact, notification or recall where needed and authorised restart. Validate custom spreadsheets, interfaces and relevant system changes.",
+    evidence:
+      "Contract and decision-rule agreements; method verification/validation; sampling/receipt records; raw data; equipment and environmental links; uncertainty models; control charts; PT/ILC plans and results; certificates and release records; amendment links; complaint investigations; impact assessments; data-system validation and recovery evidence.",
+    questions: [
+      "Can this certificate value be reconstructed from the original data?",
+      "Which uncertainty contributors matter for this method and range?",
+      "What changed after an adverse check or comparison result?",
+      "Was the borderline pass/fail decision made using the rule agreed with the customer?",
+      "Could an unauthorised user alter a released result or a spreadsheet formula?",
+    ],
+    failures:
+      "Methods adopted without demonstrated capability; generic uncertainty budgets; no plan for suitable external comparisons; incomplete raw data; available as-found failures hidden by as-left reporting; incorrect conformity statements; uncontrolled report replacements; failed references repaired without historical impact review.",
+    output:
+      "A complete technical evidence trail with valid results, justified uncertainty, controlled reporting and defensible decisions when work goes wrong.",
+    focus:
+      "Valid methods, relevant sampling, accurate recording/reporting, technical quality assurance and result integrity. Apply testing-only or sampling-only requirements according to the actual activity range.",
+  },
+  8: {
+    intent:
+      "Operate a management system that supports laboratory competence, impartiality and consistently valid work.",
+    requirements: [
+      "8.1.1–8.1.3 — select Option A or Option B while continuing to meet clauses 4–7",
+      "8.2–8.4 — system documentation, document control and record control",
+      "8.5–8.6 — proportionate risk/opportunity actions, improvement and customer feedback",
+      "8.7 — correction, cause/extent evaluation, action and effectiveness review",
+      "8.8 — planned internal audits, defined scope/criteria, reporting and timely follow-up",
+      "8.9 — management review with complete inputs and recorded decisions on effectiveness, improvement, resources and change",
+    ],
+    application:
+      "Under Option A, address the management requirements directly. Under Option B, demonstrate that the ISO 9001-aligned system consistently supports clauses 4–7 and fulfils the intent of 8.2–8.9. Certification is not a prerequisite to choosing Option B and is not proof of technical competence. Use technical risks, changes and previous results to plan audits and make management review decision-focused.",
+    evidence:
+      "Documented system route; laboratory-to-corporate system mapping where relevant; controlled documents and retained records; risk actions; feedback and improvement data; cause/extent analysis; effectiveness checks; audit programme, evidence and follow-up; complete management-review inputs, decisions and resourcing actions.",
+    questions: [
+      "Which route is used and how is it implemented in this laboratory?",
+      "Does internal audit witness technical work and test data rather than only review procedures?",
+      "Which recent technical trend changed a management decision?",
+      "What proves corrective action reduced recurrence rather than merely completing a task?",
+    ],
+    failures:
+      "Marking the entire management system not applicable under Option B; corporate certification treated as laboratory accreditation; audit coverage disconnected from technical risk; repeated failures closed on retraining; management minutes with no decisions or follow-through.",
+    output:
+      "An implemented system that sustains competence and result validity, supported by effective audit, review, resource decisions and verified improvement.",
+    focus:
+      "No numerical RPG score or completed checklist can replace competent assessment or override unresolved significant technical gaps.",
+  },
+};
+const enhancedGuide = {
+  label: "LABORATORY COMPETENCE AT A GLANCE",
+  facts: [
+    {
+      label: "Structure",
+      value: "Clauses 4–8",
+      points: [
+        "Five normative requirement blocks",
+        "Technical and management controls",
+        "Annexes A and B are informative",
+      ],
+    },
+    {
+      label: "Approach",
+      value: "Technical competence",
+      points: [
+        "Demonstrate staff and method capability",
+        "Control equipment and conditions",
+        "Corroborate valid results with evidence",
+      ],
+    },
+    {
+      label: "Use",
+      value: "Testing & calibration",
+      points: [
+        "Include sampling where performed",
+        "Control relevant off-site activities",
+        "Keep the activity range explicit",
+      ],
+    },
+    {
+      label: "Assurance",
+      value: "Accreditation readiness",
+      points: [
+        "Check applicable UKAS criteria",
+        "Use real technical audit trails",
+        "A platform score is not accreditation",
+      ],
+    },
+  ],
+  milestones: [
+    [
+      "Published standard",
+      "ISO/IEC 17025:2017",
+      "Use the licensed 2017 edition as the laboratory requirement baseline.",
+    ],
+    [
+      "Declared capability",
+      "Define the activity range",
+      "Identify methods, ranges, sites and testing/calibration/sampling actually performed.",
+    ],
+    [
+      "Management route",
+      "Option A or Option B",
+      "Both routes support consistent fulfilment of the technical requirements in clauses 4–7.",
+    ],
+    [
+      "UKAS preparation",
+      "Check applicable publications",
+      "Use the current UKAS laboratory publications index and the requirements relevant to the intended scope.",
+    ],
+  ],
+  themes: [
+    {
+      title: "Competent people and impartial judgement",
+      change:
+        "Reliable laboratory work needs demonstrated competence and protection from undue pressure.",
+      decision:
+        "Set method/range-specific authority, supervision, monitoring and technical escalation rights.",
+      evidence:
+        "Witnessed assessments, authorisation records, impartiality safeguards and examples of decisions under pressure.",
+      challenge:
+        "Can the assigned person demonstrate the task and recognise when the result may be invalid?",
+    },
+    {
+      title: "Equipment and measurement conditions",
+      change:
+        "An instrument's calibration status does not alone establish fitness for a particular result.",
+      decision:
+        "Set technical acceptance criteria, suitable intervals, relevant checks and environmental limits.",
+      evidence:
+        "Reference certificates, corrections, drift/check trends, maintenance and conditions recorded at the time of work.",
+      challenge:
+        "What demonstrates that the actual setup could achieve the required range and uncertainty?",
+    },
+    {
+      title: "Methods, sampling and customer commitments",
+      change:
+        "The laboratory needs suitable procedures and evidence that they work for the intended application.",
+      decision:
+        "Review capability before accepting work; verify standard methods and validate non-standard or changed use where required.",
+      evidence:
+        "Contract reviews, verification/validation data, sampling records where relevant and approved method deviations.",
+      challenge:
+        "Trace one demanding customer requirement into an achievable method, capability and reporting commitment.",
+    },
+    {
+      title: "Uncertainty and traceable results",
+      change:
+        "The reported result must be supported by an appropriate reference chain and uncertainty evaluation.",
+      decision:
+        "Assign technical ownership of measurement models, significant contributions, reference selection and correction updates.",
+      evidence:
+        "Method/range budgets, traceability links, reference competence, current corrections and independent recalculation.",
+      challenge:
+        "Can the team explain the main uncertainty contributions and trace this result to an appropriate reference?",
+    },
+    {
+      title: "Quality assurance and reporting integrity",
+      change:
+        "Monitoring and comparisons need to detect weak performance before invalid results reach customers.",
+      decision:
+        "Plan suitable validity checks and external comparisons; define reporting review, authorisation and response limits.",
+      evidence:
+        "Control charts, PT/ILC outcomes, raw data, certificate reviews, agreed decision rules and controlled amendments.",
+      challenge:
+        "What action followed a failed check or comparison, and which results were affected?",
+    },
+    {
+      title: "Scope, failure response and management decisions",
+      change:
+        "Confidence depends on a controlled activity range and effective action when technical work fails.",
+      decision:
+        "Protect scope accuracy, investigate previous-result impact and use audit/review evidence to allocate resources.",
+      evidence:
+        "Activity and accreditation scope comparisons, holds/notifications, restart authority, CAPA effectiveness and management decisions.",
+      challenge:
+        "Show how management dealt with a technical weakness beyond repairing the immediate problem.",
+    },
+  ],
+  boardQuestions: [
+    "Does our declared activity range match the methods, ranges, locations and competence we can demonstrate?",
+    "Who is authorised for each critical method and for independent technical review and release?",
+    "Can our equipment, conditions and uncertainty evaluation support the results we promise?",
+    "Are reference corrections and traceability links current and technically suitable?",
+    "What do quality-control trends and external comparisons tell us about result validity?",
+    "Could we identify all earlier results affected by a failed reference standard or incorrect calculation?",
+    "Are conformity rules, raw data, certificates and report amendments technically controlled?",
+    "Which technical issue requires a management decision now, and how will the action's effectiveness be tested?",
+  ],
+  trails: [
+    [
+      "Customer request to released result",
+      "Trace an agreed job through item identity, authorised work, method, conditions, references, raw data, uncertainty and certificate release.",
+    ],
+    [
+      "Reference standard to traceable measurement",
+      "Follow the calibration chain, uncertainty contributions, corrections, intermediate checks and equipment suitability for the measured range.",
+    ],
+    [
+      "Technical failure to controlled restart",
+      "Follow a failed check or suspect reference through containment, previous-result impact, necessary customer action, restart approval and effectiveness.",
+    ],
+    [
+      "Method change to demonstrated capability",
+      "Test verification or validation, uncertainty, staff authority, data-system checks and monitoring before and after a changed method is released.",
+    ],
+  ],
+  clauses,
+  support,
+};
+const guide = {
+  assessmentStandard: "ISO/IEC 17025:2017",
+  code: "ISO/IEC 17025:2017",
+  title: "Testing & Calibration Laboratories",
+  accent: "blue",
+  summary:
+    "Demonstrate competent laboratory work, impartial technical judgement and consistently valid results through controlled methods, traceable measurements and effective assurance.",
+  purpose:
+    "A practical framework for testing, calibration and associated sampling that connects capable people and resources with controlled technical work, reliable information and a management system that sustains confidence in results.",
+  clauses: Object.entries(clauses).map(([number, detail]) => ({
+    number,
+    title: {
+      4: "General requirements",
+      5: "Structural requirements",
+      6: "Resource requirements",
+      7: "Process requirements",
+      8: "Management system requirements",
+    }[number],
+    focus: detail.intent,
+  })),
+  enhancedGuide,
+  supplementarySections: [
+    {
+      label: "MANAGEMENT-SYSTEM OPTIONS & INTERPRETATION",
+      title: "Apply the right route without weakening technical control.",
+      description:
+        "Record the chosen system route and explain any activity-specific non-applicability. Informative annexes help interpretation and are not scored as additional requirements.",
+      cards: [
+        {
+          label: "Option A",
+          title: "Direct management controls",
+          text: "Address 8.2–8.9 through a working laboratory system: documentation, records, risk action, improvement, CAPA, audit and review.",
+        },
+        {
+          label: "Option B",
+          title: "Demonstrated ISO 9001 alignment",
+          text: "Show how the wider system supports consistent fulfilment of clauses 4–7 and the intent of 8.2–8.9. An ISO 9001 certificate alone is insufficient.",
+        },
+        {
+          label: "Annex A · informative",
+          title: "Understand the reference chain",
+          text: "Use the explanation of metrological traceability to challenge missing links, unsuitable references or uncertainty contributions. Assess the applicable requirement in 6.5.",
+        },
+        {
+          label: "Annex B · informative",
+          title: "Understand the system options",
+          text: "Use the explanation of the two routes to assess real implementation. Neither route removes the technical requirements or creates an accreditation decision.",
+        },
+      ],
+    },
+    {
+      label: "OFFICIAL UKAS RESOURCES",
+      title: "Connect preparation to the accreditation criteria.",
+      description:
+        "UKAS identifies competent staff, suitable equipment and facilities, sound technical procedures, traceability and dependable records/reporting as factors supporting reliable laboratory results. Use its current resources alongside the licensed standard. These links provide independent source guidance; they do not imply UKAS endorsement of RPG Excellence.",
+      cards: [
+        {
+          label: "Laboratory accreditation",
+          title: "UKAS overview and preparation",
+          text: "Review the laboratory competence factors, the official readiness-tool link and application information. Distinguish preparation from the accreditation decision.",
+          href: ukasOverview,
+        },
+        {
+          label: "Calibration laboratories",
+          title: "Define the offered capability",
+          text: "Use the UKAS calibration overview to consider the relevant measurement disciplines and the capability the laboratory intends to demonstrate.",
+          href: "https://www.ukas.com/accreditation/standards/laboratory-accreditation/calibration/",
+        },
+        {
+          label: "Applicable laboratory publications",
+          title: "Use the current technical guidance",
+          text: "Check LAB 5 for calibration reporting, LAB 48 for conformity decisions, M3003 for uncertainty, TPS 41 for traceability and TPS 47 for proficiency testing. Confirm applicability and current issues through the official index.",
+          href: ukasPublications,
+        },
+        {
+          label: "Accreditation decision",
+          title: "Separate recommendation from grant",
+          text: "UKAS uses an independent decision process following assessment. A recommendation, internal audit or RPG readiness percentage does not itself grant accreditation or extend its scope.",
+          href: "https://www.ukas.com/customer-area/the-decision-making-process/",
+        },
+      ],
+    },
+  ],
+};
 export default async function ISO17025Page({ params }) {
-const { locale } = await params;
-if (!locales.includes(locale)) notFound();
-return <PageShell locale={locale}><main className={styles.guide}>
-<section className={styles.hero}>
-<div><span className={styles.eyebrow}>LABORATORY COMPETENCE · 2017 EDITION</span><h1>ISO/IEC 17025<br/><em>at a glance.</em></h1><p className={styles.lead}>Confidence in a result starts long before a certificate is signed.</p><p>Understand how impartiality, competent people, suitable resources and controlled technical work come together to produce valid testing and calibration results.</p><div className={styles.actions}><Link className={styles.primary} href={assessmentHref}>Start a laboratory gap analysis →</Link><Link className={styles.secondary} href="/portal/internal-audits">Plan an internal audit →</Link></div><small>Existing portal access and assessment purchase/subscription rules apply.</small></div>
-<aside className={styles.resultCard}><span className={styles.eyebrow}>THE RESULT MUST STAND UP TO CHALLENGE</span><h2>Can you reconstruct<br/>this measurement?</h2><div className={styles.chain}>{["Agreed customer requirement", "Authorised method and technician", "Suitable equipment and conditions", "Traceable references and uncertainty", "Original data and checked calculation", "Reviewed and authorised result"].map((item,i)=><div key={item}><b>{String(i+1).padStart(2,"0")}</b><span>{item}</span></div>)}</div><p>A certificate is the output. The evidence behind it establishes confidence.</p></aside>
-</section>
-<div className={styles.facts}><div><span>Requirement structure</span><strong>Clauses 4–8</strong></div><div><span>Detailed assessment prompts</span><strong>{ISO17025_REQUIREMENTS.length}</strong></div><div><span>Management-system routes</span><strong>Option A / B</strong></div><div><span>Primary outcome</span><strong>Valid results</strong></div></div>
-<nav className={styles.jump} aria-label="Laboratory guide sections"><a href="#lab-scope">Scope</a><a href="#lab-clauses">Clause navigator</a><a href="#lab-options">Option A / B</a><a href="#lab-audit">Audit trails</a><a href="#lab-annexes">Annexes & terms</a></nav>
-<section id="lab-scope" className={styles.section}><span className={styles.eyebrow}>START WITH THE ACTUAL WORK</span><h2>Define what the laboratory does.</h2><p>Record the legal entity, locations, methods, measurands, ranges, relevant uncertainty capability and whether the laboratory performs testing, calibration, sampling, or a combination. Include customer-site and mobile work where offered.</p><div className={styles.three}><article><h3>Calibration laboratory</h3><p>Focus on reference chains, measurement models, uncertainty, environmental influences, equipment corrections, intermediate checks and certificate content. Include in-house calibration of reference equipment.</p></article><article><h3>Testing activities</h3><p>Evaluate suitable methods, verification or validation, relevant uncertainty evaluation, quality controls and test-specific reporting. Do not describe a calibration-only scope as including testing it does not perform.</p></article><article><h3>Sampling activities</h3><p>Assess sampling plans, selection, preparation, field records and reporting when the laboratory performs sampling for subsequent testing or calibration. Auditor selection of records is a different use of the word sampling.</p></article></div><p className={styles.note}>Use justified non-applicability for genuinely absent activities, not as a shortcut around a weak control. Clauses 1–3 establish scope, references and terminology; this assessment scores the applicable requirements in clauses 4–8.</p></section>
-<section id="lab-clauses" className={styles.section}><span className={styles.eyebrow}>REQUIREMENT · APPLICATION · EVIDENCE</span><h2>Navigate the laboratory requirements.</h2><p>Open a block to see the operational topics. Each topic links the clause reference to practical application, evidence to inspect and a common failure to challenge. These are original explanations; use the licensed standard as the authoritative criterion.</p>
-{Object.entries(ISO17025_CLAUSE_TITLES).map(([number,title])=>{
-const groups=ISO17025_GROUPS.filter(g=>g.reference.split(".")[0]===number);
-const requirements=ISO17025_REQUIREMENTS.filter(r=>r.clause===number);
-return <details className={styles.clause} key={number} open={number==="6"}><summary><b>{number}</b><span><strong>{title}</strong><small>{groups.length} operational topics · {requirements.length} assessment prompts</small></span><i>+</i></summary><div className={styles.clauseBody}>{groups.map(group=>{
-const related=ISO17025_REQUIREMENTS.filter(r=>r.group===group.reference);
-return <details className={styles.topic} key={group.reference}><summary><span>{group.reference} · {group.title}</span><i>+</i></summary><div className={styles.topicBody}><p className={styles.intent}>{group.intent}</p><div className={styles.two}><div><h4>Apply it in the laboratory</h4><p>{group.practical}</p><h4>Evidence to inspect</h4><p>{related.slice(0,3).map(r=>r.evidence).join(" ")}</p></div><div><h4>Challenge this weakness</h4><p>{group.pitfall}</p><h4>Expected outcome</h4><p>{group.output}</p></div></div><div className={styles.sample}><strong>Practical audit check</strong><p>{related[0].witness}</p></div><small className={styles.references}>Requirement references covered: {related.map(r=>r.reference).join(", ")}</small></div></details>;
-})}</div></details>;
-})}
-</section>
-<section id="lab-options" className={styles.section}><span className={styles.eyebrow}>CLAUSE 8.1 · CHOOSE THE ROUTE, DEMONSTRATE THE SYSTEM</span><h2>Two routes. The same need for competent work.</h2><div className={styles.two}><article className={styles.option}><span>OPTION A</span><h3>Address the management controls directly.</h3><p>Implement the laboratory management topics in 8.2–8.9: documentation, document and record control, risks and opportunities, improvement, corrective action, internal audit and management review.</p><p><strong>Evidence:</strong> a functioning laboratory system connected to technical work and actual results.</p></article><article className={styles.option}><span>OPTION B</span><h3>Demonstrate effective ISO 9001 alignment.</h3><p>Use an implemented ISO 9001-aligned system that supports consistent fulfilment of clauses 4–7 and fulfils the intent of 8.2–8.9. ISO 9001 certification is not itself a requirement for choosing this route.</p><p><strong>Evidence:</strong> the link between the wider system and laboratory competence, technical control and valid results.</p></article></div><p className={styles.note}>Neither route removes clauses 4–7. Do not mark all of clause 8 not applicable under Option B or treat an ISO 9001 certificate as proof of laboratory competence.</p></section>
-<section id="lab-audit" className={styles.section}><span className={styles.eyebrow}>INTERNAL AUDIT · FOLLOW THE TECHNICAL EVIDENCE</span><h2>Audit the work behind the result.</h2><p>Select ISO/IEC 17025:2017 in Internal Audits, then choose the laboratory processes relevant to your scope. The controlled question bank provides clause-specific prompts, evidence examples, applicability guidance and analysis points within the existing audit workflow.</p><div className={styles.trails}>{trails.map(trail=><article key={trail.title}><span>{trail.clauses}</span><h3>{trail.title}</h3><p>{trail.steps}</p><div><strong>Auditor challenge</strong><p>{trail.challenge}</p></div></article>)}</div><div className={styles.two}><article className={styles.soft}><h3>Plan representative coverage</h3><p>Use activity importance, technical risks, changes and previous findings to set scope and timing. Sample relevant methods, ranges, people, reference equipment, sites and work periods. Include abnormal work and changed methods where warranted.</p></article><article className={styles.soft}><h3>Use technical expertise</h3><p>Select auditors with the competence needed for the task and access to appropriate technical expertise. Witness work, follow raw data, challenge uncertainty and evaluate results. Record the criterion, objective evidence, extent and consequence of each finding.</p></article></div><p className={styles.note}>The platform's planning cycle and finding grades are RPG controls. ISO/IEC 17025 does not prescribe a universal annual audit frequency, this platform's numerical scoring scheme, or a particular root-cause tool.</p><div className={styles.actions}><Link className={styles.primary} href="/portal/internal-audits">Open Internal Audits →</Link><Link className={styles.outline} href="/portal/internal-audit-programme">Build programme coverage →</Link></div></section>
-<section className={styles.section}><span className={styles.eyebrow}>LABORATORY MANAGER'S CHECK</span><h2>Four distinctions that prevent weak conclusions.</h2><div className={styles.two}>{warnings.map(([title,text])=><article className={styles.warning} key={title}><h3>{title}</h3><p>{text}</p></article>)}</div></section>
-<section id="lab-annexes" className={styles.section}><span className={styles.eyebrow}>INTERPRETATION · NOT ADDITIONAL SCORED REQUIREMENTS</span><h2>Annexes and practical terminology.</h2><div className={styles.two}>{ISO17025_ANNEXES.map(item=><article className={styles.soft} key={item.reference}><h3>{item.reference} · {item.title}</h3><p>{item.guidance}</p></article>)}</div><details className={styles.terms}><summary>Open the practical terminology guide</summary><p>Plain-language explanations for implementation, rather than reproduced official definitions.</p><dl>{ISO17025_TERMS.map(([term,meaning])=><div key={term}><dt>{term}</dt><dd>{meaning}</dd></div>)}</dl></details></section>
-<section className={styles.closing}><div><span className={styles.eyebrow}>FROM GAP TO TECHNICAL ASSURANCE</span><h2>Find the weak control.<br/>Follow the effect on results.</h2><p>Use the gap analysis to plan improvement, then use internal audit to test what is implemented. Retain scope decisions, technical evidence, named responsibility and effectiveness checks.</p></div><div className={styles.actions}><Link className={styles.primary} href={assessmentHref}>Start the ISO/IEC 17025 assessment →</Link><Link className={styles.secondary} href={"/" + locale + "/contact"}>Discuss laboratory assurance →</Link></div></section>
-<p className={styles.footnote}>Independent RPG Excellence guidance based on ISO/IEC 17025:2017. This page does not reproduce or replace the licensed standard, applicable recognition conditions or an accreditation body's assessment. Completion and scores do not confer accreditation.</p>
-
-  </main></PageShell>;
+  const { locale } = await params;
+  if (!locales.includes(locale)) notFound();
+  return (
+    <PageShell locale={locale}>
+      <StandardGuide guide={guide} locale={locale} />
+    </PageShell>
+  );
 }
