@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "030",
+      title: "Decoding ISO/IEC 17025:2017: From Requirements to Reliable Laboratory Results",
+      description: "Introducing the RPG Excellence 52-page technical guide, with worked laboratory examples, risk controls, audit evidence, templates and posters.",
+      href: "decoding-iso-17025-2017-publication",
+    },
+    {
       number: "029",
       title: "When the Audit Is Almost Finished—and the Connection Drops",
       description:
