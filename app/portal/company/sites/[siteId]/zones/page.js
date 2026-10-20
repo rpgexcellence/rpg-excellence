@@ -1,3 +1,4 @@
+import {loadZonePPE} from '../../../../../../lib/zone-ppe';
 import Link from 'next/link';
 import QRCode from 'qrcode';
 import ZoneSmallForm from '../../../../../../components/ZoneSmallForm';
@@ -31,7 +32,7 @@ export default async function ZonesPage({params,searchParams}) {
   try{url=zoneUrl(selected.public_token);qr=await QRCode.toDataURL(url,{width:360,margin:4,errorCorrectionLevel:'M'});}catch(e){blockedReason=e.message;}
   if(site.status!=='active')blockedReason='Activate this site before generating its zone posters.';
   else if(selected.status!=='published')blockedReason='Save your changes and publish this zone in Manage zone to generate its poster.';
-  else if(signsNeedReview(selected,overview.get(selected.id).assessments,today))blockedReason='Review the safety signs and current assessment links in Manage zone before generating a new poster.';
+  else if(signsNeedReview(selected,overview.get(selected.id).assessments,today)||(await loadZonePPE(admin,selected,site)).needsReview)blockedReason='Review the safety signs and current assessment links in Manage zone before generating a new poster.';
   if(url&&!blockedReason)posterHref=`${root}/${selected.id}/poster`;
  }
  return <main className="zone-page zone-register"><div className="zone-shell">
