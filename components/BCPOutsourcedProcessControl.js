@@ -1,437 +1,222 @@
+// VERIFIED_BCP_OUTSOURCED_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
+
+import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import BCPModuleNavigation from "./BCPModuleNavigation";
-
- 
-
 import Link from "next/link";
-
 import { useActionState, useMemo, useState } from "react";
-
- 
-
-const steps = [
-
-  "Linked sources",
-
-  "Outsourced processes",
-
-  "Control design",
-
-  "Continuity capability",
-
-  "Performance & actions",
-
-  "Assurance register",
-
-];
-
-const arr = (v) => (Array.isArray(v) ? v : []);
-
+const steps = ["Linked sources", "Outsourced processes", "Control design", "Continuity capability", "Performance & actions", "Assurance register"];
+const arr = v => (() => {
+  if (Array.isArray(v)) {
+    return v;
+  }
+  return [];
+})();
 const uid = () => crypto.randomUUID();
-
-const split = (v) =>
-
-  String(v || "")
-
-    .split(/[,\n]+/)
-
-    .map((x) => x.trim())
-
-    .filter(Boolean);
-
-const num = (v, fallback = 0) =>
-
-  Number.isFinite(Number(v)) ? Number(v) : fallback;
-
-const yes = (v) => v === true || v === "yes";
-
-const daysUntil = (date) =>
-
-  date ? Math.ceil((new Date(date).getTime() - Date.now()) / 86400000) : null;
-
- 
-
+const split = v => String(v || "").split(/[,\n]+/).map(x => x.trim()).filter(Boolean);
+const num = (v, fallback = 0) => (() => {
+  if (Number.isFinite(Number(v))) {
+    return Number(v);
+  }
+  return fallback;
+})();
+const yes = v => v === true || v === "yes";
+const daysUntil = date => (() => {
+  if (date) {
+    return Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
+  }
+  return null;
+})();
 function engine(item) {
-
   const criticality = num(item.criticalityScore, 1);
-
-  const controls = [
-
-    item.contractControl,
-
-    item.performanceMonitoring,
-
-    item.auditAssurance,
-
-    item.alternativeSource,
-
-    item.communicationProtocol,
-
-  ].filter(yes).length;
-
-  const continuity = [
-
-    item.bcpAvailable,
-
-    item.bcpCurrent,
-
-    item.bcpTested,
-
-    item.rtoConfirmed,
-
-    item.invocationReviewed,
-
-  ].filter(yes).length;
-
+  const controls = [item.contractControl, item.performanceMonitoring, item.auditAssurance, item.alternativeSource, item.communicationProtocol].filter(yes).length;
+  const continuity = [item.bcpAvailable, item.bcpCurrent, item.bcpTested, item.rtoConfirmed, item.invocationReviewed].filter(yes).length;
   const required = num(item.requiredRtoHours);
-
   const supplier = num(item.supplierRecoveryHours);
-
-  const rtoGap = required > 0 && supplier > 0 ? supplier - required : null;
-
-  const overdue = arr(item.actions).filter(
-
-    (a) => a.status !== "closed" && daysUntil(a.dueDate) < 0,
-
-  ).length;
-
-  const open = arr(item.actions).filter((a) => a.status !== "closed").length;
-
-  const capability = Math.round(
-
-    (controls / 5) * 45 +
-
-      (continuity / 5) * 45 +
-
-      (item.performanceAcceptable === "yes" ? 10 : 0),
-
-  );
-
-  const risk = Math.min(
-
-    25,
-
-    criticality * 4 +
-
-      (5 - controls) * 2 +
-
-      (5 - continuity) * 2 +
-
-      (rtoGap > 0 ? 5 : 0) +
-
-      overdue * 2,
-
-  );
-
-  const band =
-
-    risk >= 18
-
-      ? "Critical"
-
-      : risk >= 12
-
-        ? "High"
-
-        : risk >= 7
-
-          ? "Medium"
-
-          : "Low";
-
-  const assurance =
-
-    capability >= 80 &&
-
-    !(rtoGap > 0) &&
-
-    overdue === 0 &&
-
-    item.performanceAcceptable === "yes"
-
-      ? "Effective"
-
-      : capability >= 55 && overdue === 0
-
-        ? "Partially effective"
-
-        : "Weak";
-
+  const rtoGap = (() => {
+    if (required > 0 && supplier > 0) {
+      return supplier - required;
+    }
+    return null;
+  })();
+  const overdue = arr(item.actions).filter(a => a.status !== "closed" && daysUntil(a.dueDate) < 0).length;
+  const open = arr(item.actions).filter(a => a.status !== "closed").length;
+  const capability = Math.round(controls / 5 * 45 + continuity / 5 * 45 + (() => {
+    if (item.performanceAcceptable === "yes") {
+      return 10;
+    }
+    return 0;
+  })());
+  const risk = Math.min(25, criticality * 4 + (5 - controls) * 2 + (5 - continuity) * 2 + (() => {
+    if (rtoGap > 0) {
+      return 5;
+    }
+    return 0;
+  })() + overdue * 2);
+  const band = (() => {
+    if (risk >= 18) {
+      return "Critical";
+    }
+    return (() => {
+      if (risk >= 12) {
+        return "High";
+      }
+      return (() => {
+        if (risk >= 7) {
+          return "Medium";
+        }
+        return "Low";
+      })();
+    })();
+  })();
+  const assurance = (() => {
+    if (capability >= 80 && !(rtoGap > 0) && overdue === 0 && item.performanceAcceptable === "yes") {
+      return "Effective";
+    }
+    return (() => {
+      if (capability >= 55 && overdue === 0) {
+        return "Partially effective";
+      }
+      return "Weak";
+    })();
+  })();
   return {
-
-    controls,
-
-    continuity,
-
-    capability,
-
-    rtoGap,
-
-    overdue,
-
-    open,
-
-    risk,
-
-    band,
-
-    assurance,
-
-    valid: Boolean(
-
-      item.supplierName &&
-
-      item.processDescription &&
-
-      item.processOwner &&
-
-      required > 0 &&
-
-      item.controlMethod &&
-
-      item.bcpAvailable &&
-
-      item.performanceAcceptable,
-
-    ),
-
+    "controls": controls,
+    "continuity": continuity,
+    "capability": capability,
+    "rtoGap": rtoGap,
+    "overdue": overdue,
+    "open": open,
+    "risk": risk,
+    "band": band,
+    "assurance": assurance,
+    "valid": Boolean(item.supplierName && item.processDescription && item.processOwner && required > 0 && item.controlMethod && item.bcpAvailable && item.performanceAcceptable)
   };
-
 }
-
- 
-
 const blank = (source = {}) => ({
-
-  id: uid(),
-
-  supplierId: source.supplierId || "",
-
-  supplierName: source.supplierName || "",
-
-  processDescription: source.processDescription || "",
-
-  source: source.source || "Manual",
-
-  processOwner: source.processOwner || "",
-
-  activities: arr(source.activities),
-
-  inputs: arr(source.inputs),
-
-  requiredRtoHours: num(source.requiredRtoHours),
-
-  criticalityScore: num(source.criticalityScore, 3),
-
-  codeOfConduct: "unknown",
-
-  contractControl: false,
-
-  performanceMonitoring: false,
-
-  auditAssurance: false,
-
-  alternativeSource: false,
-
-  communicationProtocol: false,
-
-  controlMethod: "",
-
-  controlEvidence: "",
-
-  performanceAcceptable: "",
-
-  performanceResult: "",
-
-  bcpAvailable: "",
-
-  bcpCurrent: false,
-
-  bcpTested: false,
-
-  rtoConfirmed: false,
-
-  supplierRecoveryHours: 0,
-
-  invocationReviewed: false,
-
-  lastInvocationDate: "",
-
-  capabilityEvidence: "",
-
-  actions: [],
-
-  reviewFrequency: "Every 6 months",
-
-  nextReviewDate: "",
-
+  "id": uid(),
+  "supplierId": source.supplierId || "",
+  "supplierName": source.supplierName || "",
+  "processDescription": source.processDescription || "",
+  "source": source.source || "Manual",
+  "processOwner": source.processOwner || "",
+  "activities": arr(source.activities),
+  "inputs": arr(source.inputs),
+  "requiredRtoHours": num(source.requiredRtoHours),
+  "criticalityScore": num(source.criticalityScore, 3),
+  "codeOfConduct": "unknown",
+  "contractControl": false,
+  "performanceMonitoring": false,
+  "auditAssurance": false,
+  "alternativeSource": false,
+  "communicationProtocol": false,
+  "controlMethod": "",
+  "controlEvidence": "",
+  "performanceAcceptable": "",
+  "performanceResult": "",
+  "bcpAvailable": "",
+  "bcpCurrent": false,
+  "bcpTested": false,
+  "rtoConfirmed": false,
+  "supplierRecoveryHours": 0,
+  "invocationReviewed": false,
+  "lastInvocationDate": "",
+  "capabilityEvidence": "",
+  "actions": [],
+  "reviewFrequency": "Every 6 months",
+  "nextReviewDate": ""
 });
-
-const normalise = (x) => ({
-
+const normalise = x => ({
   ...blank(x),
-
   ...x,
-
-  activities: arr(x?.activities),
-
-  inputs: arr(x?.inputs),
-
-  actions: arr(x?.actions),
-
+  "activities": arr(x?.activities),
+  "inputs": arr(x?.inputs),
+  "actions": arr(x?.actions)
 });
-
- 
-
 function Field({
-
   label,
-
   value,
-
   onChange,
-
   area = false,
-
   type = "text",
-
   children,
-
   ...rest
-
 }) {
-
-  return (
-
-    <label>
+  return <label>
 
       {label}
 
-      {children ||
+      {children || (() => {
+      if (area) {
+        return <textarea value={value || ""} onChange={e => onChange(e.target.value)} {...rest} />;
+      }
+      return <input type={type} value={value ?? ""} onChange={e => onChange(e.target.value)} {...rest} />;
+    })()}
 
-        (area ? (
-
-          <textarea
-
-            value={value || ""}
-
-            onChange={(e) => onChange(e.target.value)}
-
-            {...rest}
-
-          />
-
-        ) : (
-
-          <input
-
-            type={type}
-
-            value={value ?? ""}
-
-            onChange={(e) => onChange(e.target.value)}
-
-            {...rest}
-
-          />
-
-        ))}
-
-    </label>
-
-  );
-
+    </label>;
 }
-
-function Toggle({ label, value, onChange }) {
-
-  return (
-
-    <button
-
-      type="button"
-
-      className={value ? "opcToggle on" : "opcToggle"}
-
-      onClick={() => onChange(!value)}
-
-    >
-
-      {value ? "✓" : "+"} {label}
-
-    </button>
-
-  );
-
-}
-
- 
-
-function SupplierCard({
-
-  item,
-
-  records,
-
-  setRecords,
-
-  mode,
-
-  activityOptions = [],
-
-  approvedSuppliers = [],
-
-  people = [],
-
+function Toggle({
+  label,
+  value,
+  onChange
 }) {
+  return <button type="button" className={(() => {
+    if (value) {
+      return "opcToggle on";
+    }
+    return "opcToggle";
+  })()} onClick={() => onChange(!value)}>
 
-  const change = (key, value) =>
+      {(() => {
+      if (value) {
+        return "✓";
+      }
+      return "+";
+    })()} {label}
 
-    setRecords(
-
-      records.map((x) => (x.id === item.id ? { ...x, [key]: value } : x)),
-
-    );
-
+    </button>;
+}
+function SupplierCard({
+  item,
+  records,
+  setRecords,
+  mode,
+  activityOptions = [],
+  approvedSuppliers = [],
+  people = []
+}) {
+  const change = (key, value) => setRecords(records.map(x => (() => {
+    if (x.id === item.id) {
+      return {
+        ...x,
+        [key]: value
+      };
+    }
+    return x;
+  })()));
   const e = engine(item);
-
   const [action, setAction] = useState({
-
-    description: "",
-
-    owner: "",
-
-    ownerPersonId: "",
-
-    dueDate: "",
-
-    status: "open",
-
+    "description": "",
+    "owner": "",
+    "ownerPersonId": "",
+    "dueDate": "",
+    "status": "open"
   });
-
   const addAction = () => {
-
-    if (!action.description.trim() || !action.owner.trim() || !action.dueDate)
-
-      return;
-
-    change("actions", [...item.actions, { ...action, id: uid() }]);
-
+    if (!action.description.trim() || !action.owner.trim() || !action.dueDate) return;
+    change("actions", [...item.actions, {
+      ...action,
+      "id": uid()
+    }]);
     setAction({
-      description: "",
-      owner: "",
-      ownerPersonId: "",
-      dueDate: "",
-      status: "open",
+      "description": "",
+      "owner": "",
+      "ownerPersonId": "",
+      "dueDate": "",
+      "status": "open"
     });
-
   };
-
-  if (mode === "identity")
-
-    return (
-
-      <article className="opcCard">
+  if (mode === "identity") return <article className="opcCard">
 
         <header>
 
@@ -447,15 +232,7 @@ function SupplierCard({
 
           </div>
 
-          <button
-
-            type="button"
-
-            className="remove"
-
-            onClick={() => setRecords(records.filter((x) => x.id !== item.id))}
-
-          >
+          <button type="button" className="remove" onClick={() => setRecords(records.filter(x => x.id !== item.id))}>
 
             Remove
 
@@ -465,214 +242,159 @@ function SupplierCard({
 
         <div className="opcGrid">
 
-          <label style={{ gridColumn: "1 / -1" }}>
+          <label style={{
+        "gridColumn": "1 / -1"
+      }}>
 
             Select from approved suppliers
 
-            <select
-
-              value={item.supplierId || ""}
-
-              onChange={(event) => {
-
-                const selected = approvedSuppliers.find((supplier) => supplier.id === event.target.value);
-
-                setRecords(records.map((record) => record.id === item.id ? {
-
-                  ...record,
-
-                  supplierId: selected?.id || "",
-
-                  supplierName: selected?.legal_name || record.supplierName,
-
-                  processDescription: record.processDescription || selected?.supply_description || "",
-
-                  source: selected ? "Supplier Assurance Hub" : "Manual",
-
-                } : record));
-
-              }}
-
-            >
+            <select value={item.supplierId || ""} onChange={event => {
+          const selected = approvedSuppliers.find(supplier => supplier.id === event.target.value);
+          setRecords(records.map(record => (() => {
+            if (record.id === item.id) {
+              return {
+                ...record,
+                "supplierId": selected?.id || "",
+                "supplierName": selected?.legal_name || record.supplierName,
+                "processDescription": record.processDescription || selected?.supply_description || "",
+                "source": (() => {
+                  if (selected) {
+                    return "Supplier Assurance Hub";
+                  }
+                  return "Manual";
+                })()
+              };
+            }
+            return record;
+          })()));
+        }}>
 
               <option value="">Manual supplier / subcontractor</option>
 
-              {item.supplierId && !approvedSuppliers.some((supplier) => supplier.id === item.supplierId) && (
+              {item.supplierId && !approvedSuppliers.some(supplier => supplier.id === item.supplierId) && <option value={item.supplierId} disabled>Previously linked supplier is no longer approved</option>}
 
-                <option value={item.supplierId} disabled>Previously linked supplier is no longer approved</option>
-
-              )}
-
-              {approvedSuppliers.map((supplier) => (
-
-                <option key={supplier.id} value={supplier.id}>
+              {approvedSuppliers.map(supplier => <option key={supplier.id} value={supplier.id}>
 
                   {supplier.legal_name} · {supplier.supplier_reference}
 
-                </option>
-
-              ))}
+                </option>)}
 
             </select>
 
-            {item.supplierId && approvedSuppliers.some((supplier) => supplier.id === item.supplierId) && (
-
-              <Link href={`/portal/suppliers?id=${item.supplierId}`} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 8, color: "#315fe6" }}>
+            {item.supplierId && approvedSuppliers.some(supplier => supplier.id === item.supplierId) && <Link href={"/portal/suppliers?id=" + item.supplierId + ""} target="_blank" rel="noopener noreferrer" style={{
+          "display": "block",
+          "marginTop": 8,
+          "color": "#315fe6"
+        }}>
 
                 View approved Supplier Assurance record →
 
-              </Link>
+              </Link>}
 
-            )}
-
-            {!approvedSuppliers.length && <small style={{ display: "block", marginTop: 8 }}>No approved suppliers yet. You can enter a supplier manually or approve one in Supplier Assurance.</small>}
+            {!approvedSuppliers.length && <small style={{
+          "display": "block",
+          "marginTop": 8
+        }}>No approved suppliers yet. You can enter a supplier manually or approve one in Supplier Assurance.</small>}
 
           </label>
 
-          {!item.supplierId && (
-
-            <Field
-
-              label="Supplier / subcontractor *"
-
-              value={item.supplierName}
-
-              onChange={(v) => setRecords(records.map((record) => record.id === item.id ? { ...record, supplierName: v, supplierId: "", source: "Manual" } : record))}
-
-            />
-
-          )}
+          {!item.supplierId && <Field label="Supplier / subcontractor *" value={item.supplierName} onChange={v => setRecords(records.map(record => (() => {
+        if (record.id === item.id) {
+          return {
+            ...record,
+            "supplierName": v,
+            "supplierId": "",
+            "source": "Manual"
+          };
+        }
+        return record;
+      })()))} />}
 
           <label>
             Accountable process owner *
-            <select
-              value={
-                item.processOwnerPersonId ||
-                people.find(
-                  (person) =>
-                    `${person.first_name || ""} ${person.last_name || ""}`.trim() ===
-                    item.processOwner,
-                )?.id ||
-                ""
-              }
-              onChange={(event) => {
-                const person = people.find((entry) => entry.id === event.target.value);
-                setRecords(
-                  records.map((record) =>
-                    record.id === item.id
-                      ? {
-                          ...record,
-                          processOwnerPersonId: event.target.value,
-                          processOwner: person
-                            ? `${person.first_name || ""} ${person.last_name || ""}`.trim()
-                            : "",
-                        }
-                      : record,
-                  ),
-                );
-              }}
-            >
+            <select value={item.processOwnerPersonId || people.find(person => ("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim() === item.processOwner)?.id || ""} onChange={event => {
+          const person = people.find(entry => entry.id === event.target.value);
+          setRecords(records.map(record => (() => {
+            if (record.id === item.id) {
+              return {
+                ...record,
+                "processOwnerPersonId": event.target.value,
+                "processOwner": (() => {
+                  if (person) {
+                    return ("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim();
+                  }
+                  return "";
+                })()
+              };
+            }
+            return record;
+          })()));
+        }}>
               <option value="">Select active Company User</option>
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>
+              {people.map(person => <option key={person.id} value={person.id}>
                   {person.first_name} {person.last_name}
-                  {person.position ? ` · ${person.position}` : ""}
-                </option>
-              ))}
+                  {(() => {
+              if (person.position) {
+                return " \xB7 " + person.position + "";
+              }
+              return "";
+            })()}
+                </option>)}
             </select>
           </label>
 
-          <Field
+          <Field area label="Outsourced process or supply-chain input *" value={item.processDescription} onChange={v => change("processDescription", v)} />
 
-            area
-
-            label="Outsourced process or supply-chain input *"
-
-            value={item.processDescription}
-
-            onChange={(v) => change("processDescription", v)}
-
-          />
-
-          <div
-
-            className="opcActivityField"
-
-            style={{
-
-              padding: 12,
-
-              border: "1px solid #bfd0df",
-
-              borderRadius: 10,
-
-              background: "#fbfdff",
-
-            }}
-
-          >
+          <div className="opcActivityField" style={{
+        "padding": 12,
+        "border": "1px solid #bfd0df",
+        "borderRadius": 10,
+        "background": "#fbfdff"
+      }}>
 
             <b>Linked priority activities</b>
 
-            {activityOptions.length ? (
+            {(() => {
+          if (activityOptions.length) {
+            return <div className="opcToggles">
 
-              <div className="opcToggles">
+                {activityOptions.map(name => {
+                const selected = item.activities.includes(name);
+                return <button key={name} type="button" className={(() => {
+                  if (selected) {
+                    return "opcToggle on";
+                  }
+                  return "opcToggle";
+                })()} aria-pressed={selected} onClick={() => change("activities", (() => {
+                  if (selected) {
+                    return item.activities.filter(x => x !== name);
+                  }
+                  return [...new Set([...item.activities, name])];
+                })())}>
 
-                {activityOptions.map((name) => {
+                      {(() => {
+                    if (selected) {
+                      return "✓";
+                    }
+                    return "+";
+                  })()} {name}
 
-                  const selected = item.activities.includes(name);
+                    </button>;
+              })}
 
-                  return (
-
-                    <button
-
-                      key={name}
-
-                      type="button"
-
-                      className={selected ? "opcToggle on" : "opcToggle"}
-
-                      aria-pressed={selected}
-
-                      onClick={() =>
-
-                        change(
-
-                          "activities",
-
-                          selected
-
-                            ? item.activities.filter((x) => x !== name)
-
-                            : [...new Set([...item.activities, name])],
-
-                        )
-
-                      }
-
-                    >
-
-                      {selected ? "✓" : "+"} {name}
-
-                    </button>
-
-                  );
-
-                })}
-
-              </div>
-
-            ) : (
-
-              <small>
+              </div>;
+          }
+          return <small>
 
                 No priority activities are available from the selected BIAs.
 
-              </small>
+              </small>;
+        })()}
 
-            )}
-
-            <small style={{ display: "block", color: "#657b91" }}>
+            <small style={{
+          "display": "block",
+          "color": "#657b91"
+        }}>
 
               Select every BIA priority activity supported by this supplier.
 
@@ -680,57 +402,31 @@ function SupplierCard({
 
           </div>
 
-          <Field
+          <Field label="Products, services or inputs" value={item.inputs.join(", ")} onChange={v => change("inputs", split(v))} placeholder="Add one or several, separated by commas" />
 
-            label="Products, services or inputs"
-
-            value={item.inputs.join(", ")}
-
-            onChange={(v) => change("inputs", split(v))}
-
-            placeholder="Add one or several, separated by commas"
-
-          />
-
-          <Field
-
-            label="Required recovery time (hours) *"
-
-            type="number"
-
-            min="1"
-
-            value={item.requiredRtoHours}
-
-            onChange={(v) => change("requiredRtoHours", num(v))}
-
-          />
+          <Field label="Required recovery time (hours) *" type="number" min="1" value={item.requiredRtoHours} onChange={v => change("requiredRtoHours", num(v))} />
 
           <label>
 
             Continuity criticality
 
-            <select
+            <select value={item.criticalityScore} onChange={e2 => change("criticalityScore", num(e2.target.value))}>
 
-              value={item.criticalityScore}
+              {[1, 2, 3, 4, 5].map(x => <option key={x} value={x}>
 
-              onChange={(e2) =>
-
-                change("criticalityScore", num(e2.target.value))
-
+                  {x} - {(() => {
+              if (x >= 4) {
+                return "Critical";
               }
+              return (() => {
+                if (x === 3) {
+                  return "Material";
+                }
+                return "Routine";
+              })();
+            })()}
 
-            >
-
-              {[1, 2, 3, 4, 5].map((x) => (
-
-                <option key={x} value={x}>
-
-                  {x} - {x >= 4 ? "Critical" : x === 3 ? "Material" : "Routine"}
-
-                </option>
-
-              ))}
+                </option>)}
 
             </select>
 
@@ -740,13 +436,7 @@ function SupplierCard({
 
             Supplier Code of Conduct
 
-            <select
-
-              value={item.codeOfConduct}
-
-              onChange={(e2) => change("codeOfConduct", e2.target.value)}
-
-            >
+            <select value={item.codeOfConduct} onChange={e2 => change("codeOfConduct", e2.target.value)}>
 
               <option value="unknown">Not confirmed</option>
 
@@ -760,15 +450,8 @@ function SupplierCard({
 
         </div>
 
-      </article>
-
-    );
-
-  if (mode === "controls")
-
-    return (
-
-      <article className="opcCard">
+      </article>;
+  if (mode === "controls") return <article className="opcCard">
 
         <header>
 
@@ -780,9 +463,19 @@ function SupplierCard({
 
           </div>
 
-          <strong className={e.controls >= 4 ? "good" : "warn"}>
+          <strong className={(() => {
+        if (e.controls >= 4) {
+          return "good";
+        }
+        return "warn";
+      })()}>
 
-            {e.controls >= 4 ? "Controlled" : "Control gap"}
+            {(() => {
+          if (e.controls >= 4) {
+            return "Controlled";
+          }
+          return "Control gap";
+        })()}
 
           </strong>
 
@@ -790,99 +483,28 @@ function SupplierCard({
 
         <div className="opcToggles">
 
-          <Toggle
+          <Toggle label="Contract / SLA criteria" value={item.contractControl} onChange={v => change("contractControl", v)} />
 
-            label="Contract / SLA criteria"
+          <Toggle label="Performance monitoring" value={item.performanceMonitoring} onChange={v => change("performanceMonitoring", v)} />
 
-            value={item.contractControl}
+          <Toggle label="Audit / assurance" value={item.auditAssurance} onChange={v => change("auditAssurance", v)} />
 
-            onChange={(v) => change("contractControl", v)}
+          <Toggle label="Alternative source" value={item.alternativeSource} onChange={v => change("alternativeSource", v)} />
 
-          />
-
-          <Toggle
-
-            label="Performance monitoring"
-
-            value={item.performanceMonitoring}
-
-            onChange={(v) => change("performanceMonitoring", v)}
-
-          />
-
-          <Toggle
-
-            label="Audit / assurance"
-
-            value={item.auditAssurance}
-
-            onChange={(v) => change("auditAssurance", v)}
-
-          />
-
-          <Toggle
-
-            label="Alternative source"
-
-            value={item.alternativeSource}
-
-            onChange={(v) => change("alternativeSource", v)}
-
-          />
-
-          <Toggle
-
-            label="Disruption communications"
-
-            value={item.communicationProtocol}
-
-            onChange={(v) => change("communicationProtocol", v)}
-
-          />
+          <Toggle label="Disruption communications" value={item.communicationProtocol} onChange={v => change("communicationProtocol", v)} />
 
         </div>
 
         <div className="opcGrid">
 
-          <Field
+          <Field area label="Control methodology *" value={item.controlMethod} onChange={v => change("controlMethod", v)} placeholder="Contract criteria, CTQs/KPIs, calls, QBRs, audits, change control and escalation" />
 
-            area
-
-            label="Control methodology *"
-
-            value={item.controlMethod}
-
-            onChange={(v) => change("controlMethod", v)}
-
-            placeholder="Contract criteria, CTQs/KPIs, calls, QBRs, audits, change control and escalation"
-
-          />
-
-          <Field
-
-            area
-
-            label="Control evidence / references"
-
-            value={item.controlEvidence}
-
-            onChange={(v) => change("controlEvidence", v)}
-
-            placeholder="Contract, audit report, scorecard, meeting record, test or approved plan"
-
-          />
+          <Field area label="Control evidence / references" value={item.controlEvidence} onChange={v => change("controlEvidence", v)} placeholder="Contract, audit report, scorecard, meeting record, test or approved plan" />
 
         </div>
 
-      </article>
-
-    );
-
-  if (mode === "continuity")
-
-    return (
-
-      <article className="opcCard">
+      </article>;
+  if (mode === "continuity") return <article className="opcCard">
 
         <header>
 
@@ -894,21 +516,24 @@ function SupplierCard({
 
           </div>
 
-          <strong
+          <strong className={(() => {
+        if (e.rtoGap !== null && e.rtoGap <= 0) {
+          return "good";
+        }
+        return "warn";
+      })()}>
 
-            className={e.rtoGap !== null && e.rtoGap <= 0 ? "good" : "warn"}
-
-          >
-
-            {e.rtoGap === null
-
-              ? "Not tested"
-
-              : e.rtoGap <= 0
-
-                ? `${Math.abs(e.rtoGap)}h headroom`
-
-                : `${e.rtoGap}h gap`}
+            {(() => {
+          if (e.rtoGap === null) {
+            return "Not tested";
+          }
+          return (() => {
+            if (e.rtoGap <= 0) {
+              return "" + Math.abs(e.rtoGap) + "h headroom";
+            }
+            return "" + e.rtoGap + "h gap";
+          })();
+        })()}
 
           </strong>
 
@@ -920,13 +545,7 @@ function SupplierCard({
 
             BC plan available?{" "}
 
-            <select
-
-              value={item.bcpAvailable}
-
-              onChange={(x) => change("bcpAvailable", x.target.value)}
-
-            >
+            <select value={item.bcpAvailable} onChange={x => change("bcpAvailable", x.target.value)}>
 
               <option value="">Select</option>
 
@@ -938,105 +557,32 @@ function SupplierCard({
 
           </label>
 
-          <Field
-
-            label="Supplier recovery capability (hours)"
-
-            type="number"
-
-            min="0"
-
-            value={item.supplierRecoveryHours}
-
-            onChange={(v) => change("supplierRecoveryHours", num(v))}
-
-          />
+          <Field label="Supplier recovery capability (hours)" type="number" min="0" value={item.supplierRecoveryHours} onChange={v => change("supplierRecoveryHours", num(v))} />
 
         </div>
 
         <div className="opcToggles">
 
-          <Toggle
+          <Toggle label="Plan current" value={item.bcpCurrent} onChange={v => change("bcpCurrent", v)} />
 
-            label="Plan current"
+          <Toggle label="Plan exercised / tested" value={item.bcpTested} onChange={v => change("bcpTested", v)} />
 
-            value={item.bcpCurrent}
+          <Toggle label="RTO capability confirmed" value={item.rtoConfirmed} onChange={v => change("rtoConfirmed", v)} />
 
-            onChange={(v) => change("bcpCurrent", v)}
-
-          />
-
-          <Toggle
-
-            label="Plan exercised / tested"
-
-            value={item.bcpTested}
-
-            onChange={(v) => change("bcpTested", v)}
-
-          />
-
-          <Toggle
-
-            label="RTO capability confirmed"
-
-            value={item.rtoConfirmed}
-
-            onChange={(v) => change("rtoConfirmed", v)}
-
-          />
-
-          <Toggle
-
-            label="Recent invocation reviewed"
-
-            value={item.invocationReviewed}
-
-            onChange={(v) => change("invocationReviewed", v)}
-
-          />
+          <Toggle label="Recent invocation reviewed" value={item.invocationReviewed} onChange={v => change("invocationReviewed", v)} />
 
         </div>
 
         <div className="opcGrid">
 
-          <Field
+          <Field type="date" label="Last invocation / exercise date" value={item.lastInvocationDate} onChange={v => change("lastInvocationDate", v)} />
 
-            type="date"
-
-            label="Last invocation / exercise date"
-
-            value={item.lastInvocationDate}
-
-            onChange={(v) => change("lastInvocationDate", v)}
-
-          />
-
-          <Field
-
-            area
-
-            label="Capability evaluation and evidence"
-
-            value={item.capabilityEvidence}
-
-            onChange={(v) => change("capabilityEvidence", v)}
-
-            placeholder="How capability and recovery timing were verified"
-
-          />
+          <Field area label="Capability evaluation and evidence" value={item.capabilityEvidence} onChange={v => change("capabilityEvidence", v)} placeholder="How capability and recovery timing were verified" />
 
         </div>
 
-      </article>
-
-    );
-
-  if (mode === "performance")
-
-    return (
-
-      <article className="opcCard">
+      </article>;
+  if (mode === "performance") return <article className="opcCard">
 
         <header>
 
@@ -1052,17 +598,29 @@ function SupplierCard({
 
           </div>
 
-          <strong className={e.overdue ? "bad" : e.open ? "warn" : "good"}>
+          <strong className={(() => {
+        if (e.overdue) {
+          return "bad";
+        }
+        return (() => {
+          if (e.open) {
+            return "warn";
+          }
+          return "good";
+        })();
+      })()}>
 
-            {e.overdue
-
-              ? `${e.overdue} overdue`
-
-              : e.open
-
-                ? `${e.open} open`
-
-                : "No overdue actions"}
+            {(() => {
+          if (e.overdue) {
+            return "" + e.overdue + " overdue";
+          }
+          return (() => {
+            if (e.open) {
+              return "" + e.open + " open";
+            }
+            return "No overdue actions";
+          })();
+        })()}
 
           </strong>
 
@@ -1074,13 +632,7 @@ function SupplierCard({
 
             Performance acceptable?{" "}
 
-            <select
-
-              value={item.performanceAcceptable}
-
-              onChange={(x) => change("performanceAcceptable", x.target.value)}
-
-            >
+            <select value={item.performanceAcceptable} onChange={x => change("performanceAcceptable", x.target.value)}>
 
               <option value="">Select</option>
 
@@ -1092,29 +644,13 @@ function SupplierCard({
 
           </label>
 
-          <Field
-
-            area
-
-            label="Results for this review period"
-
-            value={item.performanceResult}
-
-            onChange={(v) => change("performanceResult", v)}
-
-            placeholder="KPIs, audit results, disruptions, exceptions and trends"
-
-          />
+          <Field area label="Results for this review period" value={item.performanceResult} onChange={v => change("performanceResult", v)} placeholder="KPIs, audit results, disruptions, exceptions and trends" />
 
         </div>
 
-        {item.actions.length > 0 && (
+        {item.actions.length > 0 && <div className="opcActions">
 
-          <div className="opcActions">
-
-            {item.actions.map((a) => (
-
-              <article key={a.id}>
+            {item.actions.map(a => <article key={a.id}>
 
                 <span>
 
@@ -1128,27 +664,15 @@ function SupplierCard({
 
                 </span>
 
-                <select
-
-                  value={a.status}
-
-                  onChange={(x) =>
-
-                    change(
-
-                      "actions",
-
-                      item.actions.map((z) =>
-
-                        z.id === a.id ? { ...z, status: x.target.value } : z,
-
-                      ),
-
-                    )
-
-                  }
-
-                >
+                <select value={a.status} onChange={x => change("actions", item.actions.map(z => (() => {
+          if (z.id === a.id) {
+            return {
+              ...z,
+              "status": x.target.value
+            };
+          }
+          return z;
+        })()))}>
 
                   <option value="open">Open</option>
 
@@ -1158,84 +682,52 @@ function SupplierCard({
 
                 </select>
 
-                <button
-
-                  type="button"
-
-                  onClick={() =>
-
-                    change(
-
-                      "actions",
-
-                      item.actions.filter((z) => z.id !== a.id),
-
-                    )
-
-                  }
-
-                >
+                <button type="button" onClick={() => change("actions", item.actions.filter(z => z.id !== a.id))}>
 
                   ×
 
                 </button>
 
-              </article>
+              </article>)}
 
-            ))}
-
-          </div>
-
-        )}
+          </div>}
 
         <div className="opcActionForm">
 
-          <input
+          <input placeholder="Required mitigation or improvement action" value={action.description} onChange={x => setAction({
+        ...action,
+        "description": x.target.value
+      })} />
 
-            placeholder="Required mitigation or improvement action"
-
-            value={action.description}
-
-            onChange={(x) =>
-
-              setAction({ ...action, description: x.target.value })
-
+          <select aria-label="Action owner" value={action.ownerPersonId} onChange={event => {
+        const person = people.find(entry => entry.id === event.target.value);
+        setAction({
+          ...action,
+          "ownerPersonId": event.target.value,
+          "owner": (() => {
+            if (person) {
+              return ("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim();
             }
-
-          />
-
-          <select
-            aria-label="Action owner"
-            value={action.ownerPersonId}
-            onChange={(event) => {
-              const person = people.find((entry) => entry.id === event.target.value);
-              setAction({
-                ...action,
-                ownerPersonId: event.target.value,
-                owner: person
-                  ? `${person.first_name || ""} ${person.last_name || ""}`.trim()
-                  : "",
-              });
-            }}
-          >
+            return "";
+          })()
+        });
+      }}>
             <option value="">Select action owner</option>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
+            {people.map(person => <option key={person.id} value={person.id}>
                 {person.first_name} {person.last_name}
-                {person.position ? ` · ${person.position}` : ""}
-              </option>
-            ))}
+                {(() => {
+            if (person.position) {
+              return " \xB7 " + person.position + "";
+            }
+            return "";
+          })()}
+              </option>)}
           </select>
 
-          <input
-
-            type="date"
-
-            value={action.dueDate}
-
-            onChange={(x) => setAction({ ...action, dueDate: x.target.value })}
-
-          />
+          <input type="date" value={action.dueDate} onChange={x => setAction({
+        ...action,
+        "dueDate": x.target.value
+      })} />
 
           <button type="button" onClick={addAction}>
 
@@ -1245,396 +737,177 @@ function SupplierCard({
 
         </div>
 
-      </article>
-
-    );
-
+      </article>;
   return null;
-
 }
-
- 
-
 export default function BCPOutsourcedProcessControl({
-
   action,
-
   profiles = [],
-
   contexts = [],
-
   roles = [],
-
   hazards = [],
-
   bias = [],
-
   approvedSuppliers = [],
-
   people = [],
-
   reviewerPeople = [],
-
   initial,
-
   organisationName = "",
-
-  startStep = 0,
-
+  startStep = 0
 }) {
-
   const [state, formAction, pending] = useActionState(action, null),
-
-    [step, setStep] = useState(Math.max(0, Math.min(5, num(startStep))));
-
+    [step, setStep] = useDeviceDraftState("BCPOutsourcedProcessControl_step", Math.max(0, Math.min(5, num(startStep))));
   const links = initial?.source_links || {};
-
-  const [profileIds, setProfileIds] = useState(
-
-      arr(links.siteProfiles).length
-
-        ? arr(links.siteProfiles)
-
-        : initial?.site_profile_id
-
-          ? [initial.site_profile_id]
-
-          : profiles[0]?.id
-
-            ? [profiles[0].id]
-
-            : [],
-
-    ),
-
-    [contextIds, setContextIds] = useState(
-
-      arr(links.contexts).length
-
-        ? arr(links.contexts)
-
-        : initial?.context_assessment_id
-
-          ? [initial.context_assessment_id]
-
-          : [],
-
-    ),
-
-    [roleIds, setRoleIds] = useState(
-
-      arr(links.roles).length
-
-        ? arr(links.roles)
-
-        : initial?.role_assessment_id
-
-          ? [initial.role_assessment_id]
-
-          : [],
-
-    ),
-
-    [hazardIds, setHazardIds] = useState(
-
-      arr(links.hazards).length
-
-        ? arr(links.hazards)
-
-        : initial?.hazard_assessment_id
-
-          ? [initial.hazard_assessment_id]
-
-          : [],
-
-    ),
-
-    [biaIds, setBiaIds] = useState(
-
-      arr(links.bias).length
-
-        ? arr(links.bias)
-
-        : initial?.bia_assessment_id
-
-          ? [initial.bia_assessment_id]
-
-          : bias[0]?.id
-
-            ? [bias[0].id]
-
-            : [],
-
-    );
-
-  const profileId = JSON.stringify(profileIds),
-
-    contextId = JSON.stringify(contextIds),
-
-    roleId = JSON.stringify(roleIds),
-
-    hazardId = JSON.stringify(hazardIds),
-
-    biaId = JSON.stringify(biaIds);
-
-  const [records, setRecords] = useState(
-
-    arr(initial?.supplier_controls).map(normalise),
-
-  );
-  const storedReviewer = initial?.reviewed_by || initial?.approved_by || "";
-  const [reviewerPersonId, setReviewerPersonId] = useState(
-    reviewerPeople.find(
-      (person) =>
-        person.id === storedReviewer ||
-        `${person.first_name || ""} ${person.last_name || ""}`.trim() ===
-          storedReviewer,
-    )?.id || "",
-  );
-
-  const selectedProfiles = profiles.filter((x) => profileIds.includes(x.id)),
-
-    selectedBias = bias.filter((x) => biaIds.includes(x.id)),
-
-    selectedHazards = hazards.filter((x) => hazardIds.includes(x.id));
-
-  const activityOptions = [
-
-    ...new Set(
-
-      selectedBias.flatMap((x) =>
-
-        arr(x.prioritized_activities)
-
-          .map((a) => a.name)
-
-          .filter(Boolean),
-
-      ),
-
-    ),
-
-  ];
-
-  const generated = useMemo(() => {
-
-    const map = new Map();
-
-    for (const bia of selectedBias)
-
-      for (const a of arr(bia?.prioritized_activities))
-
-        for (const dep of arr(a.dependencies))
-
-          if (
-
-            /supplier|partner|contractor|outsource|vendor|logistic|utility/i.test(
-
-              String(dep),
-
-            )
-
-          ) {
-
-            const key = String(dep).trim();
-
-            const current =
-
-              map.get(key) ||
-
-              blank({
-
-                supplierName: key,
-
-                processDescription: `External dependency supporting ${a.name}`,
-
-                source: "Module 6 BIA",
-
-                processOwner: a.owner,
-
-                requiredRtoHours: a.rtoHours,
-
-                criticalityScore:
-
-                  a.rtoHours <= 24 ? 5 : a.rtoHours <= 72 ? 4 : 3,
-
-              });
-
-            current.activities = [...new Set([...current.activities, a.name])];
-
-            current.inputs = [
-
-              ...new Set([...current.inputs, ...arr(a.products)]),
-
-            ];
-
-            current.requiredRtoHours = current.requiredRtoHours
-
-              ? Math.min(current.requiredRtoHours, num(a.rtoHours))
-
-              : num(a.rtoHours);
-
-            map.set(key, current);
-
-          }
-
-    for (const profile of selectedProfiles)
-
-      for (const p of [
-
-        ...arr(profile?.value_chain_processes),
-
-        ...arr(profile?.support_processes),
-
-      ])
-
-        if (
-
-          /supplier|outsource|contractor|partner/i.test(
-
-            `${p?.dependencyCategories} ${p?.dependencyDetails}`,
-
-          )
-
-        ) {
-
-          const text = p.dependencyDetails || `External supplier for ${p.name}`;
-
-          if (!map.has(text))
-
-            map.set(
-
-              text,
-
-              blank({
-
-                supplierName: text,
-
-                processDescription: `External input supporting ${p.name}`,
-
-                source: "Module 1 Site Profile",
-
-                processOwner: p.owner,
-
-                activities: [p.name],
-
-              }),
-
-            );
-
+  const [profileIds, setProfileIds] = useDeviceDraftState("BCPOutsourcedProcessControl_profileIds", (() => {
+      if (arr(links.siteProfiles).length) {
+        return arr(links.siteProfiles);
+      }
+      return (() => {
+        if (initial?.site_profile_id) {
+          return [initial.site_profile_id];
         }
-
+        return (() => {
+          if (profiles[0]?.id) {
+            return [profiles[0].id];
+          }
+          return [];
+        })();
+      })();
+    })()),
+    [contextIds, setContextIds] = useDeviceDraftState("BCPOutsourcedProcessControl_contextIds", (() => {
+      if (arr(links.contexts).length) {
+        return arr(links.contexts);
+      }
+      return (() => {
+        if (initial?.context_assessment_id) {
+          return [initial.context_assessment_id];
+        }
+        return [];
+      })();
+    })()),
+    [roleIds, setRoleIds] = useDeviceDraftState("BCPOutsourcedProcessControl_roleIds", (() => {
+      if (arr(links.roles).length) {
+        return arr(links.roles);
+      }
+      return (() => {
+        if (initial?.role_assessment_id) {
+          return [initial.role_assessment_id];
+        }
+        return [];
+      })();
+    })()),
+    [hazardIds, setHazardIds] = useDeviceDraftState("BCPOutsourcedProcessControl_hazardIds", (() => {
+      if (arr(links.hazards).length) {
+        return arr(links.hazards);
+      }
+      return (() => {
+        if (initial?.hazard_assessment_id) {
+          return [initial.hazard_assessment_id];
+        }
+        return [];
+      })();
+    })()),
+    [biaIds, setBiaIds] = useDeviceDraftState("BCPOutsourcedProcessControl_biaIds", (() => {
+      if (arr(links.bias).length) {
+        return arr(links.bias);
+      }
+      return (() => {
+        if (initial?.bia_assessment_id) {
+          return [initial.bia_assessment_id];
+        }
+        return (() => {
+          if (bias[0]?.id) {
+            return [bias[0].id];
+          }
+          return [];
+        })();
+      })();
+    })());
+  const profileId = JSON.stringify(profileIds),
+    contextId = JSON.stringify(contextIds),
+    roleId = JSON.stringify(roleIds),
+    hazardId = JSON.stringify(hazardIds),
+    biaId = JSON.stringify(biaIds);
+  const [records, setRecords] = useDeviceDraftState("BCPOutsourcedProcessControl_records", arr(initial?.supplier_controls).map(normalise));
+  const storedReviewer = initial?.reviewed_by || initial?.approved_by || "";
+  const [reviewerPersonId, setReviewerPersonId] = useState(reviewerPeople.find(person => person.id === storedReviewer || ("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim() === storedReviewer)?.id || "");
+  const selectedProfiles = profiles.filter(x => profileIds.includes(x.id)),
+    selectedBias = bias.filter(x => biaIds.includes(x.id)),
+    selectedHazards = hazards.filter(x => hazardIds.includes(x.id));
+  const activityOptions = [...new Set(selectedBias.flatMap(x => arr(x.prioritized_activities).map(a => a.name).filter(Boolean)))];
+  const generated = useMemo(() => {
+    const map = new Map();
+    for (const bia of selectedBias) for (const a of arr(bia?.prioritized_activities)) for (const dep of arr(a.dependencies)) if (/supplier|partner|contractor|outsource|vendor|logistic|utility/i.test(String(dep))) {
+      const key = String(dep).trim();
+      const current = map.get(key) || blank({
+        "supplierName": key,
+        "processDescription": "External dependency supporting " + a.name + "",
+        "source": "Module 6 BIA",
+        "processOwner": a.owner,
+        "requiredRtoHours": a.rtoHours,
+        "criticalityScore": (() => {
+          if (a.rtoHours <= 24) {
+            return 5;
+          }
+          return (() => {
+            if (a.rtoHours <= 72) {
+              return 4;
+            }
+            return 3;
+          })();
+        })()
+      });
+      current.activities = [...new Set([...current.activities, a.name])];
+      current.inputs = [...new Set([...current.inputs, ...arr(a.products)])];
+      current.requiredRtoHours = (() => {
+        if (current.requiredRtoHours) {
+          return Math.min(current.requiredRtoHours, num(a.rtoHours));
+        }
+        return num(a.rtoHours);
+      })();
+      map.set(key, current);
+    }
+    for (const profile of selectedProfiles) for (const p of [...arr(profile?.value_chain_processes), ...arr(profile?.support_processes)]) if (/supplier|outsource|contractor|partner/i.test("" + p?.dependencyCategories + " " + p?.dependencyDetails + "")) {
+      const text = p.dependencyDetails || "External supplier for " + p.name + "";
+      if (!map.has(text)) map.set(text, blank({
+        "supplierName": text,
+        "processDescription": "External input supporting " + p.name + "",
+        "source": "Module 1 Site Profile",
+        "processOwner": p.owner,
+        "activities": [p.name]
+      }));
+    }
     return [...map.values()];
-
   }, [profileIds, biaIds, profiles, bias]);
-
   const addGenerated = () => {
-
-    const names = new Set(records.map((x) => x.supplierName.toLowerCase()));
-
-    setRecords([
-
-      ...records,
-
-      ...generated.filter((x) => !names.has(x.supplierName.toLowerCase())),
-
-    ]);
-
+    const names = new Set(records.map(x => x.supplierName.toLowerCase()));
+    setRecords([...records, ...generated.filter(x => !names.has(x.supplierName.toLowerCase()))]);
   };
-
-  const completionChecks = [
-    Boolean(profileIds.length),
-    Boolean(biaIds.length),
-    Boolean(records.length),
-    Boolean(records.length && records.every((x) => x.controlMethod)),
-    Boolean(
-      records.length &&
-        records.every((x) => x.bcpAvailable && x.performanceAcceptable),
-    ),
-    Boolean(records.length && records.every((x) => engine(x).valid)),
-  ];
-
-  const derived = records
-
-      .map((item) => ({ item, ...engine(item) }))
-
-      .sort((a, b) => b.risk - a.risk),
-
-    completion = Math.round(
-
-      ([
-
-        profileIds.length,
-
-        biaIds.length,
-
-        records.length,
-
-        records.length && records.every((x) => x.controlMethod),
-
-        records.length &&
-
-          records.every((x) => x.bcpAvailable && x.performanceAcceptable),
-
-        records.length && records.every((x) => engine(x).valid),
-
-      ].filter(Boolean).length /
-
-        6) *
-
-        100,
-
-    );
-
-  const go = (n) => {
-
+  const completionChecks = [Boolean(profileIds.length), Boolean(biaIds.length), Boolean(records.length), Boolean(records.length && records.every(x => x.controlMethod)), Boolean(records.length && records.every(x => x.bcpAvailable && x.performanceAcceptable)), Boolean(records.length && records.every(x => engine(x).valid))];
+  const derived = records.map(item => ({
+      "item": item,
+      ...engine(item)
+    })).sort((a, b) => b.risk - a.risk),
+    completion = Math.round([profileIds.length, biaIds.length, records.length, records.length && records.every(x => x.controlMethod), records.length && records.every(x => x.bcpAvailable && x.performanceAcceptable), records.length && records.every(x => engine(x).valid)].filter(Boolean).length / 6 * 100);
+  const go = n => {
     setStep(Math.max(0, Math.min(5, n)));
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
-
+    window.scrollTo({
+      "top": 0,
+      "behavior": "smooth"
+    });
   };
-
-  return (
-
-    <form action={formAction} className="opcShell bcpCardLayout">
+  return <form action={formAction} className="opcShell bcpCardLayout">
 
       <style>{styles}</style>
 
-      {[
+      {[["assessment_id", initial?.id || ""], ["site_profile_id", profileId], ["context_assessment_id", contextId], ["role_assessment_id", roleId], ["hazard_assessment_id", hazardId], ["bia_assessment_id", biaId], ["supplier_controls", JSON.stringify(records)], ["next_step", Math.min(5, step + 1)]].map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
 
-        ["assessment_id", initial?.id || ""],
-
-        ["site_profile_id", profileId],
-
-        ["context_assessment_id", contextId],
-
-        ["role_assessment_id", roleId],
-
-        ["hazard_assessment_id", hazardId],
-
-        ["bia_assessment_id", biaId],
-
-        ["supplier_controls", JSON.stringify(records)],
-
-        ["next_step", Math.min(5, step + 1)],
-
-      ].map(([name, value]) => (
-
-        <input key={name} type="hidden" name={name} value={value} />
-
-      ))}
-
-      {state?.error && (
-
-        <div className="opcError">
+      {state?.error && <div className="opcError">
 
           <b>Cannot save Module 7</b>
 
           <span>{state.error}</span>
 
-        </div>
-
-      )}
+        </div>}
 
       <BCPModuleNavigation moduleNumber={7} title="Outsourced process control" percent={completion} steps={steps} checks={completionChecks} activeStep={step} onSelect={go}>
 
@@ -1645,13 +918,7 @@ export default function BCPOutsourcedProcessControl({
 
           <span>
 
-            {
-
-              derived.filter((x) => x.band === "Critical" || x.band === "High")
-
-                .length
-
-            }{" "}
+            {derived.filter(x => x.band === "Critical" || x.band === "High").length}{" "}
 
             high / critical risks
 
@@ -1692,113 +959,31 @@ export default function BCPOutsourcedProcessControl({
 
         <div className="opcProgress">
 
-          <i style={{ width: `${completion}%` }} />
+          <i style={{
+          "width": "" + completion + "%"
+        }} />
 
         </div>
 
-        {step === 0 && (
+        {step === 0 && <section className="opcPanel">
 
-          <section className="opcPanel">
-
-            <Intro
-
-              title="Connect all controlled sources relevant to this assessment."
-
-              text="Select one or several records from each earlier module. At least one Site Profile and one BIA are required; other links are selected according to the customer’s scope."
-
-            />
+            <Intro title="Connect all controlled sources relevant to this assessment." text="Select one or several records from each earlier module. At least one Site Profile and one BIA are required; other links are selected according to the customer’s scope." />
 
             <div className="opcGrid">
 
-              <MultiSelect
+              <MultiSelect label="Module 1 Site Profiles *" values={profileIds} set={setProfileIds} items={profiles} />
 
-                label="Module 1 Site Profiles *"
+              <MultiSelect label="Module 3 Context records" values={contextIds} set={setContextIds} items={contexts} />
 
-                values={profileIds}
+              <MultiSelect label="Module 4 Roles records" values={roleIds} set={setRoleIds} items={roles} />
 
-                set={setProfileIds}
+              <MultiSelect label="Module 5 Hazard assessments" values={hazardIds} set={setHazardIds} items={hazards} />
 
-                items={profiles}
+              <MultiSelect label="Module 6 BIAs *" values={biaIds} set={setBiaIds} items={bias} />
 
-              />
+              <Field label="Assessment title" value={initial?.assessment_title || "Outsourced Process & Supply Chain Control"} onChange={() => {}}>
 
-              <MultiSelect
-
-                label="Module 3 Context records"
-
-                values={contextIds}
-
-                set={setContextIds}
-
-                items={contexts}
-
-              />
-
-              <MultiSelect
-
-                label="Module 4 Roles records"
-
-                values={roleIds}
-
-                set={setRoleIds}
-
-                items={roles}
-
-              />
-
-              <MultiSelect
-
-                label="Module 5 Hazard assessments"
-
-                values={hazardIds}
-
-                set={setHazardIds}
-
-                items={hazards}
-
-              />
-
-              <MultiSelect
-
-                label="Module 6 BIAs *"
-
-                values={biaIds}
-
-                set={setBiaIds}
-
-                items={bias}
-
-              />
-
-              <Field
-
-                label="Assessment title"
-
-                value={
-
-                  initial?.assessment_title ||
-
-                  "Outsourced Process & Supply Chain Control"
-
-                }
-
-                onChange={() => {}}
-
-              >
-
-                <input
-
-                  name="assessment_title"
-
-                  defaultValue={
-
-                    initial?.assessment_title ||
-
-                    "Outsourced Process & Supply Chain Control"
-
-                  }
-
-                />
+                <input name="assessment_title" defaultValue={initial?.assessment_title || "Outsourced Process & Supply Chain Control"} />
 
               </Field>
 
@@ -1826,13 +1011,7 @@ export default function BCPOutsourcedProcessControl({
 
                 <b>
 
-                  {selectedHazards.reduce(
-
-                    (n, x) => n + arr(x.scenario_assessments).length,
-
-                    0,
-
-                  )}
+                  {selectedHazards.reduce((n, x) => n + arr(x.scenario_assessments).length, 0)}
 
                 </b>
 
@@ -1850,45 +1029,19 @@ export default function BCPOutsourcedProcessControl({
 
             </div>
 
-          </section>
+          </section>}
 
-        )}
+        {step === 1 && <section className="opcPanel">
 
-        {step === 1 && (
+            <Intro title="Generate continuity-critical supplier records from previous modules." text="The engine scans all selected BIAs and Site Profiles, then carries forward linked activities and the strictest applicable RTO. Customers can amend generated records or add suppliers manually." />
 
-          <section className="opcPanel">
-
-            <Intro
-
-              title="Generate continuity-critical supplier records from previous modules."
-
-              text="The engine scans all selected BIAs and Site Profiles, then carries forward linked activities and the strictest applicable RTO. Customers can amend generated records or add suppliers manually."
-
-            />
-
-            <button
-
-              className="opcGenerate"
-
-              type="button"
-
-              onClick={addGenerated}
-
-            >
+            <button className="opcGenerate" type="button" onClick={addGenerated}>
 
               ✦ Generate from linked dependencies
 
             </button>
 
-            <button
-
-              className="opcAdd"
-
-              type="button"
-
-              onClick={() => setRecords([...records, blank()])}
-
-            >
+            <button className="opcAdd" type="button" onClick={() => setRecords([...records, blank()])}>
 
               + Add supplier or subcontractor
 
@@ -1896,175 +1049,59 @@ export default function BCPOutsourcedProcessControl({
 
             <div className="opcRecords">
 
-              {records.map((x) => (
+              {records.map(x => <SupplierCard key={x.id} item={x} records={records} setRecords={setRecords} mode="identity" activityOptions={activityOptions} approvedSuppliers={approvedSuppliers} people={people} />)}
 
-                <SupplierCard
-
-                  key={x.id}
-
-                  item={x}
-
-                  records={records}
-
-                  setRecords={setRecords}
-
-                  mode="identity"
-
-                  activityOptions={activityOptions}
-
-                  approvedSuppliers={approvedSuppliers}
-
-                  people={people}
-
-                />
-
-              ))}
-
-              {!records.length && (
-
-                <div className="opcEmpty">
+              {!records.length && <div className="opcEmpty">
 
                   No controlled parties yet. Generate linked dependencies or add
 
                   one manually.
 
-                </div>
-
-              )}
+                </div>}
 
             </div>
 
-          </section>
+          </section>}
 
-        )}
+        {step === 2 && <section className="opcPanel">
 
-        {step === 2 && (
-
-          <section className="opcPanel">
-
-            <Intro
-
-              title="Define proportionate operational controls and objective evidence."
-
-              text="Establish process criteria, contract and SLA controls, monitoring, audit, contingency sourcing, communication and change escalation."
-
-            />
+            <Intro title="Define proportionate operational controls and objective evidence." text="Establish process criteria, contract and SLA controls, monitoring, audit, contingency sourcing, communication and change escalation." />
 
             <div className="opcRecords">
 
-              {records.map((x) => (
-
-                <SupplierCard
-
-                  key={x.id}
-
-                  item={x}
-
-                  records={records}
-
-                  setRecords={setRecords}
-
-                  mode="controls"
-
-                />
-
-              ))}
+              {records.map(x => <SupplierCard key={x.id} item={x} records={records} setRecords={setRecords} mode="controls" />)}
 
             </div>
 
-          </section>
+          </section>}
 
-        )}
+        {step === 3 && <section className="opcPanel">
 
-        {step === 3 && (
-
-          <section className="opcPanel">
-
-            <Intro
-
-              title="Evaluate whether supplier continuity capability meets your recovery need."
-
-              text="Compare supplier recovery capability against the shortest linked BIA RTO and retain evidence from plans, exercises, invocations and assurance activity."
-
-            />
+            <Intro title="Evaluate whether supplier continuity capability meets your recovery need." text="Compare supplier recovery capability against the shortest linked BIA RTO and retain evidence from plans, exercises, invocations and assurance activity." />
 
             <div className="opcRecords">
 
-              {records.map((x) => (
-
-                <SupplierCard
-
-                  key={x.id}
-
-                  item={x}
-
-                  records={records}
-
-                  setRecords={setRecords}
-
-                  mode="continuity"
-
-                />
-
-              ))}
+              {records.map(x => <SupplierCard key={x.id} item={x} records={records} setRecords={setRecords} mode="continuity" />)}
 
             </div>
 
-          </section>
+          </section>}
 
-        )}
+        {step === 4 && <section className="opcPanel">
 
-        {step === 4 && (
-
-          <section className="opcPanel">
-
-            <Intro
-
-              title="Record performance and convert control gaps into accountable actions."
-
-              text="The live engine combines criticality, control coverage, BC capability, RTO alignment, performance and overdue actions into one assurance rating."
-
-            />
+            <Intro title="Record performance and convert control gaps into accountable actions." text="The live engine combines criticality, control coverage, BC capability, RTO alignment, performance and overdue actions into one assurance rating." />
 
             <div className="opcRecords">
 
-              {records.map((x) => (
-
-                <SupplierCard
-
-                  key={x.id}
-
-                  item={x}
-
-                  records={records}
-
-                  setRecords={setRecords}
-
-                  mode="performance"
-
-                  people={people}
-
-                />
-
-              ))}
+              {records.map(x => <SupplierCard key={x.id} item={x} records={records} setRecords={setRecords} mode="performance" people={people} />)}
 
             </div>
 
-          </section>
+          </section>}
 
-        )}
+        {step === 5 && <section className="opcPanel">
 
-        {step === 5 && (
-
-          <section className="opcPanel">
-
-            <Intro
-
-              title="Review the controlled outsourced-process and supply-chain register."
-
-              text="Approve only when every critical relationship has defined criteria, verified continuity capability, performance evidence and controlled actions."
-
-            />
+            <Intro title="Review the controlled outsourced-process and supply-chain register." text="Approve only when every critical relationship has defined criteria, verified continuity capability, performance evidence and controlled actions." />
 
             <div className="opcSummary">
 
@@ -2080,13 +1117,7 @@ export default function BCPOutsourcedProcessControl({
 
                 <b>
 
-                  {Math.round(
-
-                    derived.reduce((n, x) => n + x.capability, 0) /
-
-                      Math.max(1, derived.length),
-
-                  )}
+                  {Math.round(derived.reduce((n, x) => n + x.capability, 0) / Math.max(1, derived.length))}
 
                   %
 
@@ -2098,7 +1129,7 @@ export default function BCPOutsourcedProcessControl({
 
               <article>
 
-                <b>{derived.filter((x) => x.rtoGap > 0).length}</b>
+                <b>{derived.filter(x => x.rtoGap > 0).length}</b>
 
                 <span>RTO gaps</span>
 
@@ -2134,9 +1165,7 @@ export default function BCPOutsourcedProcessControl({
 
               </header>
 
-              {derived.map((x) => (
-
-                <article key={x.item.id}>
+              {derived.map(x => <article key={x.item.id}>
 
                   <em className={x.band.toLowerCase()}>{x.band}</em>
 
@@ -2158,9 +1187,7 @@ export default function BCPOutsourcedProcessControl({
 
                   <span>{x.assurance}</span>
 
-                </article>
-
-              ))}
+                </article>)}
 
             </div>
 
@@ -2170,13 +1197,7 @@ export default function BCPOutsourcedProcessControl({
 
                 Review frequency
 
-                <select
-
-                  name="review_frequency"
-
-                  defaultValue={initial?.review_frequency || "Every 6 months"}
-
-                >
+                <select name="review_frequency" defaultValue={initial?.review_frequency || "Every 6 months"}>
 
                   <option>Quarterly</option>
 
@@ -2194,15 +1215,7 @@ export default function BCPOutsourcedProcessControl({
 
                 Next review date
 
-                <input
-
-                  name="next_review_date"
-
-                  type="date"
-
-                  defaultValue={initial?.next_review_date || ""}
-
-                />
+                <input name="next_review_date" type="date" defaultValue={initial?.next_review_date || ""} />
 
               </label>
 
@@ -2210,18 +1223,17 @@ export default function BCPOutsourcedProcessControl({
 
                 Competent reviewer / approver
 
-                <select
-                  name="reviewer_person_id"
-                  value={reviewerPersonId}
-                  onChange={(event) => setReviewerPersonId(event.target.value)}
-                >
+                <select name="reviewer_person_id" value={reviewerPersonId} onChange={event => setReviewerPersonId(event.target.value)}>
                   <option value="">Select active Company User</option>
-                  {reviewerPeople.map((person) => (
-                    <option key={person.id} value={person.id}>
+                  {reviewerPeople.map(person => <option key={person.id} value={person.id}>
                       {person.first_name} {person.last_name}
-                      {person.position ? ` · ${person.position}` : ""}
-                    </option>
-                  ))}
+                      {(() => {
+                  if (person.position) {
+                    return " \xB7 " + person.position + "";
+                  }
+                  return "";
+                })()}
+                    </option>)}
                 </select>
                 <small>
                   Only active Company Users with Business Continuity access are available.
@@ -2233,93 +1245,50 @@ export default function BCPOutsourcedProcessControl({
 
                 Review decision and limitations
 
-                <textarea
-
-                  name="review_comment"
-
-                  defaultValue={initial?.review_comment || ""}
-
-                />
+                <textarea name="review_comment" defaultValue={initial?.review_comment || ""} />
 
               </label>
 
             </div>
 
-          </section>
-
-        )}
+          </section>}
 
         <footer>
 
-          <button
-
-            type="button"
-
-            disabled={!step || pending}
-
-            onClick={() => go(step - 1)}
-
-          >
+          <button type="button" disabled={!step || pending} onClick={() => go(step - 1)}>
 
             ← Previous
 
           </button>
 
-          {initial?.id && (
-
-            <button
-
-              className="danger"
-
-              name="intent"
-
-              value="archive"
-
-              disabled={pending}
-
-              onClick={(e) => {
-
-                if (!window.confirm("Archive this Module 7 assessment?"))
-
-                  e.preventDefault();
-
-              }}
-
-            >
+          {initial?.id && <button className="danger" name="intent" value="archive" disabled={pending} onClick={e => {
+          if (!window.confirm("Archive this Module 7 assessment?")) e.preventDefault();
+        }}>
 
               Archive
 
-            </button>
-
-          )}
+            </button>}
 
           <span>
 
-            {pending ? "Saving…" : "Controlled progress saves to your account"}
+            {(() => {
+            if (pending) {
+              return "Saving…";
+            }
+            return "Controlled progress saves to your account";
+          })()}
 
           </span>
 
-          {step < 5 ? (
-
-            <button
-
-              className="primary"
-
-              name="intent"
-
-              value="continue"
-
-              disabled={pending}
-
-            >
+          {(() => {
+          if (step < 5) {
+            return <button className="primary" name="intent" value="continue" disabled={pending}>
 
               Save &amp; continue →
 
-            </button>
-
-          ) : (
-
-            <>
+            </button>;
+          }
+          return <>
 
               <button name="intent" value="draft" disabled={pending}>
 
@@ -2333,105 +1302,70 @@ export default function BCPOutsourcedProcessControl({
 
               </button>
 
-              <button
-
-                className="primary"
-
-                name="intent"
-
-                value="approve"
-
-                disabled={pending}
-
-              >
+              <button className="primary" name="intent" value="approve" disabled={pending}>
 
                 Approve controlled register →
 
               </button>
 
-            </>
-
-          )}
+            </>;
+        })()}
 
         </footer>
 
       </main>
 
-    </form>
-
-  );
-
+    </form>;
 }
-
-function Intro({ title, text }) {
-
-  return (
-
-    <div className="opcIntro">
+function Intro({
+  title,
+  text
+}) {
+  return <div className="opcIntro">
 
       <b>{title}</b>
 
       <p>{text}</p>
 
-    </div>
-
-  );
-
+    </div>;
 }
+function MultiSelect({
+  label,
+  values,
+  set,
+  items
+}) {
+  return <>
 
-function MultiSelect({ label, values, set, items }) {
-
-  return (
-
-    <>
-
-      <style>{`.opcMulti,.opcChoices{min-width:0;margin:0;padding:12px;border:1px solid #bfd0df;border-radius:10px;background:#fbfdff}.opcMulti legend,.opcChoices legend{padding:0 6px;color:#173b60;font-size:12px;font-weight:850}.opcMulti>label{display:flex;gap:9px;align-items:flex-start;margin-top:7px;padding:9px;border:1px solid #d7e2ec;border-radius:8px;background:#fff;cursor:pointer}.opcMulti>label.selected{border-color:#315fe6;background:#edf3ff}.opcMulti input,.opcChoices input{width:18px!important;height:18px;margin:1px 0!important;accent-color:#315fe6}.opcMulti span,.opcMulti small{display:block}.opcMulti small{margin-top:3px;color:#657b91;font-weight:500}.opcChoices>label{display:flex;gap:8px;align-items:center;margin-top:7px;padding:7px 9px;border-radius:7px;background:#fff;font-weight:700}.opcChoices>small{display:block;color:#657b91;line-height:1.4}`}</style>
+      <style>{".opcMulti,.opcChoices{min-width:0;margin:0;padding:12px;border:1px solid #bfd0df;border-radius:10px;background:#fbfdff}.opcMulti legend,.opcChoices legend{padding:0 6px;color:#173b60;font-size:12px;font-weight:850}.opcMulti>label{display:flex;gap:9px;align-items:flex-start;margin-top:7px;padding:9px;border:1px solid #d7e2ec;border-radius:8px;background:#fff;cursor:pointer}.opcMulti>label.selected{border-color:#315fe6;background:#edf3ff}.opcMulti input,.opcChoices input{width:18px!important;height:18px;margin:1px 0!important;accent-color:#315fe6}.opcMulti span,.opcMulti small{display:block}.opcMulti small{margin-top:3px;color:#657b91;font-weight:500}.opcChoices>label{display:flex;gap:8px;align-items:center;margin-top:7px;padding:7px 9px;border-radius:7px;background:#fff;font-weight:700}.opcChoices>small{display:block;color:#657b91;line-height:1.4}"}</style>
 
       <fieldset className="opcMulti">
 
         <legend>{label}</legend>
 
-        {items.length ? (
-
-          items.map((x) => {
-
+        {(() => {
+        if (items.length) {
+          return items.map(x => {
             const checked = values.includes(x.id);
+            return <label key={x.id} className={(() => {
+              if (checked) {
+                return "selected";
+              }
+              return "";
+            })()}>
 
-            return (
-
-              <label key={x.id} className={checked ? "selected" : ""}>
-
-                <input
-
-                  type="checkbox"
-
-                  checked={checked}
-
-                  onChange={(e) =>
-
-                    set(
-
-                      e.target.checked
-
-                        ? [...new Set([...values, x.id])]
-
-                        : values.filter((id) => id !== x.id),
-
-                    )
-
-                  }
-
-                />
+                <input type="checkbox" checked={checked} onChange={e => set((() => {
+                if (e.target.checked) {
+                  return [...new Set([...values, x.id])];
+                }
+                return values.filter(id => id !== x.id);
+              })())} />
 
                 <span>
 
                   <b>
 
-                    {x.assessment_title ||
-
-                      x.location_name ||
-
-                      x.assessment_reference}
+                    {x.assessment_title || x.location_name || x.assessment_reference}
 
                   </b>
 
@@ -2443,28 +1377,15 @@ function MultiSelect({ label, values, set, items }) {
 
                 </span>
 
-              </label>
-
-            );
-
-          })
-
-        ) : (
-
-          <p>No controlled records are available.</p>
-
-        )}
+              </label>;
+          });
+        }
+        return <p>No controlled records are available.</p>;
+      })()}
 
       </fieldset>
 
-    </>
-
-  );
-
+    </>;
 }
-
- 
-
-const styles = `*{box-sizing:border-box}.opcShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.opcShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.opcBrand{font-size:21px;font-weight:950}.opcBrand span{font-weight:500}.opcShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.opcShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.opcShell>aside>section strong{font-size:28px}.opcShell>aside>section span{float:right;margin-top:10px;font-size:10px}.opcShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.opcShell>aside>section i b{display:block;height:100%;background:#55e1d4}.opcShell nav{display:grid;gap:6px;margin-top:18px}.opcShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.opcShell nav button.active{background:#245d97}.opcShell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.opcLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.opcLive b{color:#55e1d4}.opcShell main{min-width:0}.opcTop{display:flex;justify-content:space-between;align-items:end}.opcTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.opcTop h1{margin:7px 0 4px;font-size:37px}.opcTop p{margin:0;color:#607890}.opcTop>b{text-transform:capitalize;color:#087c61}.opcProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.opcProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.opcPanel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.opcIntro{padding:20px;border-radius:12px;background:#eff5fa}.opcIntro b{font-size:18px}.opcIntro p{margin:7px 0 0;color:#60778e}.opcGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.opcGrid label{font-size:12px;font-weight:850}.opcGrid input,.opcGrid select,.opcGrid textarea,.opcCard input,.opcCard select,.opcCard textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.opcGrid textarea{min-height:85px}.opcGrid .wide{grid-column:1/-1}.opcSource,.opcSummary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:17px}.opcSource article,.opcSummary article{padding:15px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.opcSource b,.opcSummary b{display:block;color:#315fe6;font-size:27px}.opcSource span,.opcSummary span{color:#60778e;font-size:11px}.opcGenerate,.opcAdd{margin:16px 8px 16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.opcAdd{border:1px solid #b9cce0;background:#fff;color:#17436f}.opcRecords{display:grid;gap:12px}.opcCard{padding:18px;border:1px solid #cfdae6;border-left:5px solid #16a085;border-radius:13px}.opcCard>header{display:flex;justify-content:space-between;gap:15px;align-items:start;margin-bottom:12px}.opcCard>header div{display:grid;gap:4px}.opcCard>header span{color:#617991;font-size:11px}.opcCard>header strong{padding:7px 10px;border-radius:999px;font-size:11px}.good{background:#e1f5eb;color:#087453}.warn{background:#fff1d7;color:#925d00}.bad{background:#ffebe8;color:#b42318}.remove{padding:7px 10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.opcToggles{display:flex;gap:7px;flex-wrap:wrap;margin:13px 0}.opcToggle{padding:8px 10px;border:1px solid #c5d4e2;border-radius:999px;background:#fff;color:#526d87}.opcToggle.on{border-color:#0aa588;background:#e2f8f3;color:#08755f}.opcActions{display:grid;gap:7px;margin:14px 0}.opcActions article{display:grid;grid-template-columns:1fr 150px 35px;gap:8px;align-items:center;padding:10px;border-radius:8px;background:#f6f9fc}.opcActions span{display:grid}.opcActions small{color:#647b91}.opcActions select{margin:0}.opcActions button{border:0;background:transparent;color:#b42318;font-size:20px}.opcActionForm{display:grid;grid-template-columns:2fr 1fr 150px auto;gap:8px}.opcActionForm input{margin:0}.opcActionForm button{border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.opcRegister{margin-top:16px;border:1px solid #d2dde8;border-radius:11px;overflow:auto}.opcRegister header,.opcRegister article{min-width:950px;display:grid;grid-template-columns:85px 1.8fr 1fr repeat(4,.75fr);gap:9px;align-items:center;padding:11px}.opcRegister header{background:#0b2d56;color:#fff;font-size:10px}.opcRegister article{border-top:1px solid #e0e8ef;font-size:11px}.opcRegister article span{display:grid}.opcRegister small{color:#6e8296}.opcRegister em{padding:6px;border-radius:7px;text-align:center;font-style:normal}.opcRegister .critical,.opcRegister .high{background:#ffebe8;color:#a8281c}.opcRegister .medium{background:#fff1d7;color:#8b5700}.opcRegister .low{background:#e1f5eb;color:#087453}.opcEmpty{padding:20px;border:1px dashed #c6d5e3;border-radius:10px;color:#62788e}.opcError{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.opcShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.opcShell footer span{margin-left:auto;color:#6f8396;font-size:11px}.opcShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.opcShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.opcShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:1050px){.opcShell{grid-template-columns:80px 1fr}.opcBrand,.opcShell>aside>small,.opcShell nav span,.opcLive{display:none}.opcShell nav button{justify-content:center}.opcActionForm{grid-template-columns:1fr 1fr}}@media(max-width:720px){.opcShell{display:block}.opcShell>aside{position:static;height:auto;margin-bottom:15px}.opcShell nav{display:flex;overflow:auto}.opcGrid,.opcSource,.opcSummary,.opcActionForm{grid-template-columns:1fr}.opcTop h1{font-size:29px}.opcShell footer{flex-wrap:wrap}.opcShell footer span{display:none}}`;
-
-BCPOutsourcedProcessControl.js
+const styles = "*{box-sizing:border-box}.opcShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.opcShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.opcBrand{font-size:21px;font-weight:950}.opcBrand span{font-weight:500}.opcShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.opcShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.opcShell>aside>section strong{font-size:28px}.opcShell>aside>section span{float:right;margin-top:10px;font-size:10px}.opcShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.opcShell>aside>section i b{display:block;height:100%;background:#55e1d4}.opcShell nav{display:grid;gap:6px;margin-top:18px}.opcShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.opcShell nav button.active{background:#245d97}.opcShell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.opcLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.opcLive b{color:#55e1d4}.opcShell main{min-width:0}.opcTop{display:flex;justify-content:space-between;align-items:end}.opcTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.opcTop h1{margin:7px 0 4px;font-size:37px}.opcTop p{margin:0;color:#607890}.opcTop>b{text-transform:capitalize;color:#087c61}.opcProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.opcProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.opcPanel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.opcIntro{padding:20px;border-radius:12px;background:#eff5fa}.opcIntro b{font-size:18px}.opcIntro p{margin:7px 0 0;color:#60778e}.opcGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.opcGrid label{font-size:12px;font-weight:850}.opcGrid input,.opcGrid select,.opcGrid textarea,.opcCard input,.opcCard select,.opcCard textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.opcGrid textarea{min-height:85px}.opcGrid .wide{grid-column:1/-1}.opcSource,.opcSummary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:17px}.opcSource article,.opcSummary article{padding:15px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.opcSource b,.opcSummary b{display:block;color:#315fe6;font-size:27px}.opcSource span,.opcSummary span{color:#60778e;font-size:11px}.opcGenerate,.opcAdd{margin:16px 8px 16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.opcAdd{border:1px solid #b9cce0;background:#fff;color:#17436f}.opcRecords{display:grid;gap:12px}.opcCard{padding:18px;border:1px solid #cfdae6;border-left:5px solid #16a085;border-radius:13px}.opcCard>header{display:flex;justify-content:space-between;gap:15px;align-items:start;margin-bottom:12px}.opcCard>header div{display:grid;gap:4px}.opcCard>header span{color:#617991;font-size:11px}.opcCard>header strong{padding:7px 10px;border-radius:999px;font-size:11px}.good{background:#e1f5eb;color:#087453}.warn{background:#fff1d7;color:#925d00}.bad{background:#ffebe8;color:#b42318}.remove{padding:7px 10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.opcToggles{display:flex;gap:7px;flex-wrap:wrap;margin:13px 0}.opcToggle{padding:8px 10px;border:1px solid #c5d4e2;border-radius:999px;background:#fff;color:#526d87}.opcToggle.on{border-color:#0aa588;background:#e2f8f3;color:#08755f}.opcActions{display:grid;gap:7px;margin:14px 0}.opcActions article{display:grid;grid-template-columns:1fr 150px 35px;gap:8px;align-items:center;padding:10px;border-radius:8px;background:#f6f9fc}.opcActions span{display:grid}.opcActions small{color:#647b91}.opcActions select{margin:0}.opcActions button{border:0;background:transparent;color:#b42318;font-size:20px}.opcActionForm{display:grid;grid-template-columns:2fr 1fr 150px auto;gap:8px}.opcActionForm input{margin:0}.opcActionForm button{border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.opcRegister{margin-top:16px;border:1px solid #d2dde8;border-radius:11px;overflow:auto}.opcRegister header,.opcRegister article{min-width:950px;display:grid;grid-template-columns:85px 1.8fr 1fr repeat(4,.75fr);gap:9px;align-items:center;padding:11px}.opcRegister header{background:#0b2d56;color:#fff;font-size:10px}.opcRegister article{border-top:1px solid #e0e8ef;font-size:11px}.opcRegister article span{display:grid}.opcRegister small{color:#6e8296}.opcRegister em{padding:6px;border-radius:7px;text-align:center;font-style:normal}.opcRegister .critical,.opcRegister .high{background:#ffebe8;color:#a8281c}.opcRegister .medium{background:#fff1d7;color:#8b5700}.opcRegister .low{background:#e1f5eb;color:#087453}.opcEmpty{padding:20px;border:1px dashed #c6d5e3;border-radius:10px;color:#62788e}.opcError{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.opcShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.opcShell footer span{margin-left:auto;color:#6f8396;font-size:11px}.opcShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.opcShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.opcShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:1050px){.opcShell{grid-template-columns:80px 1fr}.opcBrand,.opcShell>aside>small,.opcShell nav span,.opcLive{display:none}.opcShell nav button{justify-content:center}.opcActionForm{grid-template-columns:1fr 1fr}}@media(max-width:720px){.opcShell{display:block}.opcShell>aside{position:static;height:auto;margin-bottom:15px}.opcShell nav{display:flex;overflow:auto}.opcGrid,.opcSource,.opcSummary,.opcActionForm{grid-template-columns:1fr}.opcTop h1{font-size:29px}.opcShell footer{flex-wrap:wrap}.opcShell footer span{display:none}}";
+BCPOutsourcedProcessControl.js;
