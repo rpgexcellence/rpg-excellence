@@ -1,205 +1,221 @@
+// VERIFIED_BCP_BIA_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
+
+import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import BCPModuleNavigation from "./BCPModuleNavigation";
-
 import { useActionState, useMemo, useState } from "react";
-
-const steps = [
-  "Linked scope",
-  "Activities",
-  "Impacts over time",
-  "Recovery objectives",
-  "Resources & dependencies",
-  "BIA register",
-];
-const horizons = [
-  { key: "h0", label: "0-4 hours", hours: 4 },
-  { key: "h1", label: "4-24 hours", hours: 24 },
-  { key: "h2", label: "1-3 days", hours: 72 },
-  { key: "h3", label: "3-7 days", hours: 168 },
-  { key: "h4", label: "1-2 weeks", hours: 336 },
-  { key: "h5", label: "Over 2 weeks", hours: 720 },
-];
-const impactTypes = [
-  "Financial",
-  "Customer / service",
-  "Legal / regulatory",
-  "Reputation",
-  "People / welfare",
-  "Operations",
-  "Environment",
-  "Information / data",
-];
-const resourceTypes = [
-  "People & competence",
-  "Premises & workspace",
-  "Technology & applications",
-  "Data & vital records",
-  "Equipment & consumables",
-  "Utilities",
-  "Suppliers & partners",
-  "Transport & logistics",
-  "Communications",
-  "Finance & insurance",
-];
-const evidenceTypes = [
-  "Document / procedure",
-  "Contract / SLA",
-  "System or asset record",
-  "Training / competence record",
-  "Supplier evidence",
-  "Exercise / test result",
-  "Inventory / resource record",
-  "Other evidence",
-];
-const arr = (v) => (Array.isArray(v) ? v : []);
+const steps = ["Linked scope", "Activities", "Impacts over time", "Recovery objectives", "Resources & dependencies", "BIA register"];
+const horizons = [{
+  "key": "h0",
+  "label": "0-4 hours",
+  "hours": 4
+}, {
+  "key": "h1",
+  "label": "4-24 hours",
+  "hours": 24
+}, {
+  "key": "h2",
+  "label": "1-3 days",
+  "hours": 72
+}, {
+  "key": "h3",
+  "label": "3-7 days",
+  "hours": 168
+}, {
+  "key": "h4",
+  "label": "1-2 weeks",
+  "hours": 336
+}, {
+  "key": "h5",
+  "label": "Over 2 weeks",
+  "hours": 720
+}];
+const impactTypes = ["Financial", "Customer / service", "Legal / regulatory", "Reputation", "People / welfare", "Operations", "Environment", "Information / data"];
+const resourceTypes = ["People & competence", "Premises & workspace", "Technology & applications", "Data & vital records", "Equipment & consumables", "Utilities", "Suppliers & partners", "Transport & logistics", "Communications", "Finance & insurance"];
+const evidenceTypes = ["Document / procedure", "Contract / SLA", "System or asset record", "Training / competence record", "Supplier evidence", "Exercise / test result", "Inventory / resource record", "Other evidence"];
+const arr = v => (() => {
+  if (Array.isArray(v)) {
+    return v;
+  }
+  return [];
+})();
 const uid = () => crypto.randomUUID();
 const clamp = (n, a, b) => Math.max(a, Math.min(b, Number(n) || a));
-const priorHours = (hours) =>
-  horizons[Math.max(0, horizons.findIndex((x) => x.hours === hours) - 1)]
-    ?.hours || 4;
-const emptyScores = () =>
-  Object.fromEntries(
-    impactTypes.map((t) => [
-      t,
-      Object.fromEntries(horizons.map((h) => [h.key, 0])),
-    ]),
-  );
+const priorHours = hours => horizons[Math.max(0, horizons.findIndex(x => x.hours === hours) - 1)]?.hours || 4;
+const emptyScores = () => Object.fromEntries(impactTypes.map(t => [t, Object.fromEntries(horizons.map(h => [h.key, 0]))]));
 const emptyActivity = (source = {}) => ({
-  id: uid(),
-  name: source.name || "",
-  description: source.description || "",
-  ownerPersonId: source.ownerPersonId || "",
-  owner: source.owner || "",
-  products: arr(source.products),
-  processType: source.processType || "Value-chain",
-  included: true,
-  impactScores: emptyScores(),
-  impactRationales: {},
-  unacceptableThreshold: 4,
-  mtpdHours: 0,
-  rtoHours: 0,
-  mbcoPercent: 30,
-  troHours: 0,
-  rpoHours: 24,
-  manualWorkaround: "",
-  workaroundDurationHours: 0,
-  remoteCapable: false,
-  workloadShift: "",
-  minimumPeople: 1,
-  requiredSkills: [],
-  resources: [],
-  dependencies: [],
-  dependencyNotApplicable: false,
-  hazards: [],
-  recoveryPriority: "",
-  assumptions: "",
-  evidence: [],
-  strategyRequirements: [],
+  "id": uid(),
+  "name": source.name || "",
+  "description": source.description || "",
+  "ownerPersonId": source.ownerPersonId || "",
+  "owner": source.owner || "",
+  "products": arr(source.products),
+  "processType": source.processType || "Value-chain",
+  "included": true,
+  "impactScores": emptyScores(),
+  "impactRationales": {},
+  "unacceptableThreshold": 4,
+  "mtpdHours": 0,
+  "rtoHours": 0,
+  "mbcoPercent": 30,
+  "troHours": 0,
+  "rpoHours": 24,
+  "manualWorkaround": "",
+  "workaroundDurationHours": 0,
+  "remoteCapable": false,
+  "workloadShift": "",
+  "minimumPeople": 1,
+  "requiredSkills": [],
+  "resources": [],
+  "dependencies": [],
+  "dependencyNotApplicable": false,
+  "hazards": [],
+  "recoveryPriority": "",
+  "assumptions": "",
+  "evidence": [],
+  "strategyRequirements": []
 });
-const normaliseEvidence = (x, index) =>
-  typeof x === "string"
-    ? {
-        id: `legacy-${index}-${x}`,
-        type: "Document / procedure",
-        reference: x,
-        description: "",
-      }
-    : {
-        id: x?.id || `evidence-${index}`,
-        type: x?.type || "Document / procedure",
-        reference: x?.reference || x?.title || "",
-        description: x?.description || "",
-      };
-const normalise = (x) => ({
+const normaliseEvidence = (x, index) => (() => {
+  if (typeof x === "string") {
+    return {
+      "id": "legacy-" + index + "-" + x + "",
+      "type": "Document / procedure",
+      "reference": x,
+      "description": ""
+    };
+  }
+  return {
+    "id": x?.id || "evidence-" + index + "",
+    "type": x?.type || "Document / procedure",
+    "reference": x?.reference || x?.title || "",
+    "description": x?.description || ""
+  };
+})();
+const normalise = x => ({
   ...emptyActivity(x),
   ...x,
-  products: arr(x?.products),
-  impactScores: { ...emptyScores(), ...(x?.impactScores || {}) },
-  impactRationales: x?.impactRationales || {},
-  requiredSkills: arr(x?.requiredSkills),
-  resources: arr(x?.resources),
-  dependencies: arr(x?.dependencies),
-  hazards: arr(x?.hazards),
-  evidence: arr(x?.evidence).map(normaliseEvidence),
-  strategyRequirements: arr(x?.strategyRequirements),
+  "products": arr(x?.products),
+  "impactScores": {
+    ...emptyScores(),
+    ...(x?.impactScores || {})
+  },
+  "impactRationales": x?.impactRationales || {},
+  "requiredSkills": arr(x?.requiredSkills),
+  "resources": arr(x?.resources),
+  "dependencies": arr(x?.dependencies),
+  "hazards": arr(x?.hazards),
+  "evidence": arr(x?.evidence).map(normaliseEvidence),
+  "strategyRequirements": arr(x?.strategyRequirements)
 });
-const maxAt = (item, key) =>
-  Math.max(
-    ...impactTypes.map((t) => Number(item.impactScores?.[t]?.[key] || 0)),
-  );
-const impactTrendIssues = (item) =>
-  impactTypes.flatMap((type) => {
-    const scores = horizons.map((h) =>
-      Number(item.impactScores?.[type]?.[h.key] || 0),
-    );
-    return horizons.slice(1).flatMap((h, index) =>
-      scores[index + 1] < scores[index]
-        ? [
-            `${type} reduces from ${scores[index]}/5 at ${horizons[index].label} to ${scores[index + 1]}/5 at ${h.label}`,
-          ]
-        : [],
-    );
-  });
+const maxAt = (item, key) => Math.max(...impactTypes.map(t => Number(item.impactScores?.[t]?.[key] || 0)));
+const impactTrendIssues = item => impactTypes.flatMap(type => {
+  const scores = horizons.map(h => Number(item.impactScores?.[type]?.[h.key] || 0));
+  return horizons.slice(1).flatMap((h, index) => (() => {
+    if (scores[index + 1] < scores[index]) {
+      return ["" + type + " reduces from " + scores[index] + "/5 at " + horizons[index].label + " to " + scores[index + 1] + "/5 at " + h.label + ""];
+    }
+    return [];
+  })());
+});
 const recoveryObjectiveIssues = (item, mtpd, rto) => {
   const issues = [];
   if (!mtpd) issues.push("Set an MTPD greater than zero");
   if (!rto) issues.push("Set an RTO greater than zero");
-  if (mtpd && rto && rto >= mtpd)
-    issues.push(`RTO ${rto}h must be shorter than MTPD ${mtpd}h`);
-  if (Number(item.mbcoPercent) <= 0)
-    issues.push("MBCO must be greater than 0%");
-  if (rto && Number(item.troHours) < rto)
-    issues.push(
-      `TRO ${Number(item.troHours) || 0}h cannot be earlier than RTO ${rto}h`,
-    );
-  if (Number(item.rpoHours) < 0)
-    issues.push("RPO cannot be negative");
+  if (mtpd && rto && rto >= mtpd) issues.push("RTO " + rto + "h must be shorter than MTPD " + mtpd + "h");
+  if (Number(item.mbcoPercent) <= 0) issues.push("MBCO must be greater than 0%");
+  if (rto && Number(item.troHours) < rto) issues.push("TRO " + (Number(item.troHours) || 0) + "h cannot be earlier than RTO " + rto + "h");
+  if (Number(item.rpoHours) < 0) issues.push("RPO cannot be negative");
   return issues;
 };
-const derive = (item) => {
+const derive = item => {
   const threshold = clamp(item.unacceptableThreshold, 3, 5);
-  const hit = horizons.find((h) => maxAt(item, h.key) >= threshold);
+  const hit = horizons.find(h => maxAt(item, h.key) >= threshold);
   const mtpd = Number(item.mtpdHours) || hit?.hours || 0;
-  const rto = Number(item.rtoHours) || (mtpd ? priorHours(mtpd) : 0);
-  const peak = Math.max(...horizons.map((h) => maxAt(item, h.key)));
-  const priority = !rto
-    ? "Unconfirmed"
-    : rto <= 4
-      ? "P1 Immediate"
-      : rto <= 24
-        ? "P2 Same day"
-        : rto <= 72
-          ? "P3 Within 3 days"
-          : rto <= 168
-            ? "P4 Within 1 week"
-            : "P5 Planned recovery";
+  const rto = Number(item.rtoHours) || (() => {
+    if (mtpd) {
+      return priorHours(mtpd);
+    }
+    return 0;
+  })();
+  const peak = Math.max(...horizons.map(h => maxAt(item, h.key)));
+  const priority = (() => {
+    if (!rto) {
+      return "Unconfirmed";
+    }
+    return (() => {
+      if (rto <= 4) {
+        return "P1 Immediate";
+      }
+      return (() => {
+        if (rto <= 24) {
+          return "P2 Same day";
+        }
+        return (() => {
+          if (rto <= 72) {
+            return "P3 Within 3 days";
+          }
+          return (() => {
+            if (rto <= 168) {
+              return "P4 Within 1 week";
+            }
+            return "P5 Planned recovery";
+          })();
+        })();
+      })();
+    })();
+  })();
   const issues = recoveryObjectiveIssues(item, mtpd, rto);
   const trendIssues = impactTrendIssues(item);
   const valid = issues.length === 0;
-  return { mtpd, rto, peak, priority, valid, issues, trendIssues };
+  return {
+    "mtpd": mtpd,
+    "rto": rto,
+    "peak": peak,
+    "priority": priority,
+    "valid": valid,
+    "issues": issues,
+    "trendIssues": trendIssues
+  };
 };
-const assuranceState = (item) => {
+const assuranceState = item => {
   const result = derive(item);
-  if (result.trendIssues.length)
-    return { complete: false, label: "Impact review", detail: result.trendIssues.join("; ") };
-  if (!result.valid)
-    return { complete: false, label: "Timing review", detail: result.issues.join("; ") };
-  if (!item.resources.length || (!item.dependencies.length && !item.dependencyNotApplicable))
-    return { complete: false, label: "Resources required", detail: "Complete resources and the dependency decision." };
-  if (!item.evidence.length && !item.assumptions)
-    return { complete: false, label: "Evidence & assumptions", detail: "Add evidence and record assumptions." };
-  if (!item.evidence.length)
-    return { complete: false, label: "Evidence required", detail: "Add at least one evidence reference." };
-  if (!item.assumptions)
-    return { complete: false, label: "Assumptions required", detail: "Record the assumptions and limitations." };
-  return { complete: true, label: "Assured", detail: "All activity assurance requirements are complete." };
+  if (result.trendIssues.length) return {
+    "complete": false,
+    "label": "Impact review",
+    "detail": result.trendIssues.join("; ")
+  };
+  if (!result.valid) return {
+    "complete": false,
+    "label": "Timing review",
+    "detail": result.issues.join("; ")
+  };
+  if (!item.resources.length || !item.dependencies.length && !item.dependencyNotApplicable) return {
+    "complete": false,
+    "label": "Resources required",
+    "detail": "Complete resources and the dependency decision."
+  };
+  if (!item.evidence.length && !item.assumptions) return {
+    "complete": false,
+    "label": "Evidence & assumptions",
+    "detail": "Add evidence and record assumptions."
+  };
+  if (!item.evidence.length) return {
+    "complete": false,
+    "label": "Evidence required",
+    "detail": "Add at least one evidence reference."
+  };
+  if (!item.assumptions) return {
+    "complete": false,
+    "label": "Assumptions required",
+    "detail": "Record the assumptions and limitations."
+  };
+  return {
+    "complete": true,
+    "label": "Assured",
+    "detail": "All activity assurance requirements are complete."
+  };
 };
-const split = (v) =>
-  String(v || "")
-    .split(/[,\n]+/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-
+const split = v => String(v || "").split(/[,\n]+/).map(x => x.trim()).filter(Boolean);
 function Field({
   label,
   value,
@@ -209,190 +225,102 @@ function Field({
   children,
   ...rest
 }) {
-  return (
-    <label>
+  return <label>
       {label}
-      {children ||
-        (area ? (
-          <textarea
-            value={value || ""}
-            onChange={(e) => onChange(e.target.value)}
-            {...rest}
-          />
-        ) : (
-          <input
-            type={type}
-            value={value ?? ""}
-            onChange={(e) => onChange(e.target.value)}
-            {...rest}
-          />
-        ))}
-    </label>
-  );
+      {children || (() => {
+      if (area) {
+        return <textarea value={value || ""} onChange={e => onChange(e.target.value)} {...rest} />;
+      }
+      return <input type={type} value={value ?? ""} onChange={e => onChange(e.target.value)} {...rest} />;
+    })()}
+    </label>;
 }
-const personName = (person) =>
-  person ? `${person.first_name} ${person.last_name}`.trim() : "";
-function PersonSelect({ item, change, people }) {
-  return (
-    <label>
+const personName = person => (() => {
+  if (person) {
+    return ("" + person.first_name + " " + person.last_name + "").trim();
+  }
+  return "";
+})();
+function PersonSelect({
+  item,
+  change,
+  people
+}) {
+  return <label>
       Accountable owner *
-      <select
-        value={item.ownerPersonId || ""}
-        onChange={(e) => {
-          const person = people.find((x) => x.id === e.target.value);
-          change({
-            ownerPersonId: e.target.value,
-            owner: personName(person),
-          });
-        }}
-      >
+      <select value={item.ownerPersonId || ""} onChange={e => {
+      const person = people.find(x => x.id === e.target.value);
+      change({
+        "ownerPersonId": e.target.value,
+        "owner": personName(person)
+      });
+    }}>
         <option value="">Select approved Company Person</option>
-        {people.map((person) => (
-          <option value={person.id} key={person.id}>
+        {people.map(person => <option value={person.id} key={person.id}>
             {personName(person)}
-            {person.position ? ` · ${person.position}` : ""}
-          </option>
-        ))}
+            {(() => {
+          if (person.position) {
+            return " \xB7 " + person.position + "";
+          }
+          return "";
+        })()}
+          </option>)}
       </select>
       <small className="biaOwnerGuide">
         Linked to an active Company People profile with Business Continuity
         access.
       </small>
-    </label>
-  );
+    </label>;
 }
-function Chips({ values, options, onChange }) {
-  return (
-    <div className="biaChips">
-      {options.map((x) => (
-        <button
-          type="button"
-          key={x}
-          className={values.includes(x) ? "selected" : ""}
-          onClick={() =>
-            onChange(
-              values.includes(x)
-                ? values.filter((v) => v !== x)
-                : [...values, x],
-            )
-          }
-        >
-          {values.includes(x) ? "✓ " : "+ "}
+function Chips({
+  values,
+  options,
+  onChange
+}) {
+  return <div className="biaChips">
+      {options.map(x => <button type="button" key={x} className={(() => {
+      if (values.includes(x)) {
+        return "selected";
+      }
+      return "";
+    })()} onClick={() => onChange((() => {
+      if (values.includes(x)) {
+        return values.filter(v => v !== x);
+      }
+      return [...values, x];
+    })())}>
+          {(() => {
+        if (values.includes(x)) {
+          return "✓ ";
+        }
+        return "+ ";
+      })()}
           {x}
-        </button>
-      ))}
-    </div>
-  );
+        </button>)}
+    </div>;
 }
 function suggestedSkills(item) {
-  const text =
-    `${item.name} ${item.description} ${arr(item.products).join(" ")} ${item.processType}`.toLowerCase();
-  const common = [
-    "Business continuity awareness",
-    "Incident communication",
-    "Prioritisation under disruption",
-    "Documented procedure knowledge",
-  ];
-  const rules = [
-    [
-      ["customer", "enquiry", "support"],
-      [
-        "Customer communication",
-        "CRM / case management",
-        "Service-level triage",
-        "Complaint handling",
-        "Product and service knowledge",
-      ],
-    ],
-    [
-      ["contract", "commercial", "quotation"],
-      [
-        "Contract review",
-        "Commercial risk assessment",
-        "Customer requirements analysis",
-        "Legal and regulatory awareness",
-        "Technical feasibility review",
-      ],
-    ],
-    [
-      ["plan", "planning", "schedule"],
-      [
-        "Operational planning",
-        "Capacity and resource planning",
-        "Work scheduling",
-        "Contingency planning",
-        "Supply-chain coordination",
-      ],
-    ],
-    [
-      ["delivery", "service", "product"],
-      [
-        "Operational delivery",
-        "Quality control",
-        "Technical competence",
-        "Customer coordination",
-        "Problem solving and escalation",
-      ],
-    ],
-    [
-      ["software", "system", "digital", "data", "technology"],
-      [
-        "Application administration",
-        "Cybersecurity awareness",
-        "Backup and data restoration",
-        "IT incident response",
-        "Vendor technical support",
-      ],
-    ],
-    [
-      ["supplier", "procurement", "purchase"],
-      [
-        "Supplier management",
-        "Alternative sourcing",
-        "Purchase authorisation",
-        "Supply risk assessment",
-        "Expediting",
-      ],
-    ],
-    [
-      ["finance", "payment", "invoice"],
-      [
-        "Financial systems access",
-        "Payment authorisation",
-        "Cash-flow prioritisation",
-        "Financial control",
-        "Fraud prevention",
-      ],
-    ],
-    [
-      ["laboratory", "test", "inspection", "engineering"],
-      [
-        "Authorised technical competence",
-        "Equipment operation",
-        "Method and specification knowledge",
-        "Measurement assurance",
-        "Technical result review",
-      ],
-    ],
-  ];
-  const matched = rules.flatMap(([terms, skills]) =>
-    terms.some((term) => text.includes(term)) ? skills : [],
-  );
-  const fallback =
-    item.processType === "Support"
-      ? [
-          "Support-service coordination",
-          "Internal customer communication",
-          "Service restoration",
-        ]
-      : [
-          "Process operation",
-          "Output verification",
-          "Operational decision-making",
-        ];
+  const text = ("" + item.name + " " + item.description + " " + arr(item.products).join(" ") + " " + item.processType + "").toLowerCase();
+  const common = ["Business continuity awareness", "Incident communication", "Prioritisation under disruption", "Documented procedure knowledge"];
+  const rules = [[["customer", "enquiry", "support"], ["Customer communication", "CRM / case management", "Service-level triage", "Complaint handling", "Product and service knowledge"]], [["contract", "commercial", "quotation"], ["Contract review", "Commercial risk assessment", "Customer requirements analysis", "Legal and regulatory awareness", "Technical feasibility review"]], [["plan", "planning", "schedule"], ["Operational planning", "Capacity and resource planning", "Work scheduling", "Contingency planning", "Supply-chain coordination"]], [["delivery", "service", "product"], ["Operational delivery", "Quality control", "Technical competence", "Customer coordination", "Problem solving and escalation"]], [["software", "system", "digital", "data", "technology"], ["Application administration", "Cybersecurity awareness", "Backup and data restoration", "IT incident response", "Vendor technical support"]], [["supplier", "procurement", "purchase"], ["Supplier management", "Alternative sourcing", "Purchase authorisation", "Supply risk assessment", "Expediting"]], [["finance", "payment", "invoice"], ["Financial systems access", "Payment authorisation", "Cash-flow prioritisation", "Financial control", "Fraud prevention"]], [["laboratory", "test", "inspection", "engineering"], ["Authorised technical competence", "Equipment operation", "Method and specification knowledge", "Measurement assurance", "Technical result review"]]];
+  const matched = rules.flatMap(([terms, skills]) => (() => {
+    if (terms.some(term => text.includes(term))) {
+      return skills;
+    }
+    return [];
+  })());
+  const fallback = (() => {
+    if (item.processType === "Support") {
+      return ["Support-service coordination", "Internal customer communication", "Service restoration"];
+    }
+    return ["Process operation", "Output verification", "Operational decision-making"];
+  })();
   return [...new Set([...matched, ...fallback, ...common])].slice(0, 12);
 }
-function SkillSelector({ item, change }) {
+function SkillSelector({
+  item,
+  change
+}) {
   const [customSkill, setCustomSkill] = useState("");
   const addCustom = () => {
     const value = customSkill.trim();
@@ -400,8 +328,7 @@ function SkillSelector({ item, change }) {
     change("requiredSkills", [...new Set([...item.requiredSkills, value])]);
     setCustomSkill("");
   };
-  return (
-    <div className="biaStructuredEditor">
+  return <div className="biaStructuredEditor">
       <div className="biaEditorHead">
         <b>Required skills / competence</b>
         <span>{item.requiredSkills.length} selected</span>
@@ -409,58 +336,41 @@ function SkillSelector({ item, change }) {
       <small>
         Select the minimum competence needed to recover this activity at MBCO.
       </small>
-      <Chips
-        values={item.requiredSkills}
-        options={[
-          ...new Set([...suggestedSkills(item), ...item.requiredSkills]),
-        ]}
-        onChange={(v) => change("requiredSkills", v)}
-      />
+      <Chips values={item.requiredSkills} options={[...new Set([...suggestedSkills(item), ...item.requiredSkills])]} onChange={v => change("requiredSkills", v)} />
       <div className="biaInlineAdd">
-        <input
-          value={customSkill}
-          onChange={(e) => setCustomSkill(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addCustom();
-            }
-          }}
-          placeholder="Add organisation-specific skill or competence"
-        />
+        <input value={customSkill} onChange={e => setCustomSkill(e.target.value)} onKeyDown={e => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addCustom();
+        }
+      }} placeholder="Add organisation-specific skill or competence" />
         <button type="button" onClick={addCustom}>
           + Add skill
         </button>
       </div>
-    </div>
-  );
+    </div>;
 }
-function EvidenceEditor({ item, change }) {
+function EvidenceEditor({
+  item,
+  change
+}) {
   const [type, setType] = useState(evidenceTypes[0]);
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
   const save = () => {
     if (!reference.trim() || !description.trim()) return;
-    change("evidence", [
-      ...item.evidence,
-      {
-        id: uid(),
-        type,
-        reference: reference.trim(),
-        description: description.trim(),
-      },
-    ]);
+    change("evidence", [...item.evidence, {
+      "id": uid(),
+      "type": type,
+      "reference": reference.trim(),
+      "description": description.trim()
+    }]);
     setType(evidenceTypes[0]);
     setReference("");
     setDescription("");
   };
-  const removeEvidence = (id) =>
-    change(
-      "evidence",
-      item.evidence.filter((x) => x.id !== id),
-    );
-  return (
-    <div className="biaStructuredEditor biaEvidenceEditor">
+  const removeEvidence = id => change("evidence", item.evidence.filter(x => x.id !== id));
+  return <div className="biaStructuredEditor biaEvidenceEditor">
       <div className="biaEditorHead">
         <b>Evidence references</b>
         <span>{item.evidence.length} saved</span>
@@ -469,97 +379,74 @@ function EvidenceEditor({ item, change }) {
         Add a traceable reference and explain what it demonstrates for this
         recovery requirement.
       </small>
-      {item.evidence.length > 0 && (
-        <div className="biaEvidenceList">
-          {item.evidence.map((entry) => (
-            <article key={entry.id}>
+      {item.evidence.length > 0 && <div className="biaEvidenceList">
+          {item.evidence.map(entry => <article key={entry.id}>
               <div>
                 <small>{entry.type}</small>
                 <b>{entry.reference}</b>
                 <p>
-                  {entry.description ||
-                    "Legacy reference — add a description by replacing this entry."}
+                  {entry.description || "Legacy reference — add a description by replacing this entry."}
                 </p>
               </div>
               <button type="button" onClick={() => removeEvidence(entry.id)}>
                 Remove
               </button>
-            </article>
-          ))}
-        </div>
-      )}
+            </article>)}
+        </div>}
       <div className="biaEvidenceForm">
         <label>
           Evidence type
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            {evidenceTypes.map((x) => (
-              <option key={x}>{x}</option>
-            ))}
+          <select value={type} onChange={e => setType(e.target.value)}>
+            {evidenceTypes.map(x => <option key={x}>{x}</option>)}
           </select>
         </label>
         <label>
           Reference / title *
-          <input
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-            placeholder="e.g. BC exercise report EX-2026-04"
-          />
+          <input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. BC exercise report EX-2026-04" />
         </label>
         <label className="wide">
           What does this evidence demonstrate? *
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe availability, capacity, recovery capability, test result or assurance provided."
-          />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe availability, capacity, recovery capability, test result or assurance provided." />
         </label>
-        <button
-          type="button"
-          disabled={!reference.trim() || !description.trim()}
-          onClick={save}
-        >
+        <button type="button" disabled={!reference.trim() || !description.trim()} onClick={save}>
           Save evidence reference
         </button>
       </div>
-    </div>
-  );
+    </div>;
 }
-function ImpactEditor({ item, change }) {
+function ImpactEditor({
+  item,
+  change
+}) {
   const setScore = (type, key, value) => {
     const selected = Number(value);
-    const selectedIndex = horizons.findIndex((h) => h.key === key);
-    const current = { ...(item.impactScores[type] || {}), [key]: selected };
-    horizons.slice(selectedIndex + 1).forEach((h) => {
+    const selectedIndex = horizons.findIndex(h => h.key === key);
+    const current = {
+      ...(item.impactScores[type] || {}),
+      [key]: selected
+    };
+    horizons.slice(selectedIndex + 1).forEach(h => {
       if (Number(current[h.key] || 0) < selected) current[h.key] = selected;
     });
     change("impactScores", {
       ...item.impactScores,
-      [type]: current,
+      [type]: current
     });
   };
-  return (
-    <div className="biaImpactWrap">
+  return <div className="biaImpactWrap">
       <table className="biaImpact">
         <thead>
           <tr>
             <th>Impact type</th>
-            {horizons.map((h) => (
-              <th key={h.key}>{h.label}</th>
-            ))}
+            {horizons.map(h => <th key={h.key}>{h.label}</th>)}
             <th>Rationale</th>
           </tr>
         </thead>
         <tbody>
-          {impactTypes.map((type) => (
-            <tr key={type}>
+          {impactTypes.map(type => <tr key={type}>
               <th>{type}</th>
-              {horizons.map((h) => (
-                <td key={h.key}>
-                  <select
-                    aria-label={`${type} at ${h.label}`}
-                    value={item.impactScores?.[type]?.[h.key] || 0}
-                    onChange={(e) => setScore(type, h.key, e.target.value)}
-                  >
+              {horizons.map(h => <td key={h.key}>
+                  <select aria-label={"" + type + " at " + h.label + ""} value={item.impactScores?.[type]?.[h.key] || 0} onChange={e => setScore(type, h.key, e.target.value)}>
                     <option value="0">N/A</option>
                     <option value="1">1 Minimal</option>
                     <option value="2">2 Minor</option>
@@ -567,26 +454,17 @@ function ImpactEditor({ item, change }) {
                     <option value="4">4 Major</option>
                     <option value="5">5 Severe</option>
                   </select>
-                </td>
-              ))}
+                </td>)}
               <td>
-                <input
-                  value={item.impactRationales?.[type] || ""}
-                  onChange={(e) =>
-                    change("impactRationales", {
-                      ...item.impactRationales,
-                      [type]: e.target.value,
-                    })
-                  }
-                  placeholder="Evidence / consequence"
-                />
+                <input value={item.impactRationales?.[type] || ""} onChange={e => change("impactRationales", {
+              ...item.impactRationales,
+              [type]: e.target.value
+            })} placeholder="Evidence / consequence" />
               </td>
-            </tr>
-          ))}
+            </tr>)}
         </tbody>
       </table>
-    </div>
-  );
+    </div>;
 }
 function ActivityCard({
   item,
@@ -595,27 +473,33 @@ function ActivityCard({
   hazards = [],
   sourceDependencies = [],
   people = [],
-  mode,
+  mode
 }) {
-  const change = (key, value) =>
-    setActivities(
-      activities.map((x) =>
-        x.id === item.id
-          ? { ...x, ...(typeof key === "object" ? key : { [key]: value }) }
-          : x,
-      ),
-    );
-  const remove = () =>
-    setActivities(activities.filter((x) => x.id !== item.id));
+  const change = (key, value) => setActivities(activities.map(x => (() => {
+    if (x.id === item.id) {
+      return {
+        ...x,
+        ...(() => {
+          if (typeof key === "object") {
+            return key;
+          }
+          return {
+            [key]: value
+          };
+        })()
+      };
+    }
+    return x;
+  })()));
+  const remove = () => setActivities(activities.filter(x => x.id !== item.id));
   const d = derive(item);
-  const applicableHazards = arr(hazards).filter(
-    (h) =>
-      arr(h.affectedProcesses).includes(item.name) ||
-      !arr(h.affectedProcesses).length,
-  );
-  if (mode === "select" && item.processType === "Site-specific")
-    return (
-      <article className={`biaActivityEdit ${item.included ? "included" : ""}`}>
+  const applicableHazards = arr(hazards).filter(h => arr(h.affectedProcesses).includes(item.name) || !arr(h.affectedProcesses).length);
+  if (mode === "select" && item.processType === "Site-specific") return <article className={"biaActivityEdit " + (() => {
+    if (item.included) {
+      return "included";
+    }
+    return "";
+  })() + ""}>
         <header>
           <div>
             <b>Define site-specific activity</b>
@@ -626,40 +510,22 @@ function ActivityCard({
           </button>
         </header>
         <div className="biaGrid">
-          <Field
-            label="Activity name *"
-            value={item.name}
-            onChange={(v) => change("name", v)}
-            placeholder="e.g. Emergency customer support"
-          />
+          <Field label="Activity name *" value={item.name} onChange={v => change("name", v)} placeholder="e.g. Emergency customer support" />
           <PersonSelect item={item} change={change} people={people} />
-          <Field
-            area
-            label="Activity description"
-            value={item.description}
-            onChange={(v) => change("description", v)}
-            placeholder="Purpose, outputs and continuity relevance"
-          />
-          <Field
-            label="Products / services supported"
-            value={item.products.join(", ")}
-            onChange={(v) => change("products", split(v))}
-            placeholder="Separate entries with commas"
-          />
+          <Field area label="Activity description" value={item.description} onChange={v => change("description", v)} placeholder="Purpose, outputs and continuity relevance" />
+          <Field label="Products / services supported" value={item.products.join(", ")} onChange={v => change("products", split(v))} placeholder="Separate entries with commas" />
         </div>
         <label className="biaCheck compact">
-          <input
-            type="checkbox"
-            checked={item.included}
-            onChange={(e) => change("included", e.target.checked)}
-          />{" "}
+          <input type="checkbox" checked={item.included} onChange={e => change("included", e.target.checked)} />{" "}
           Include this activity in the BIA
         </label>
-      </article>
-    );
-  if (mode === "select")
-    return (
-      <article className={`biaActivityPick ${item.included ? "included" : ""}`}>
+      </article>;
+  if (mode === "select") return <article className={"biaActivityPick " + (() => {
+    if (item.included) {
+      return "included";
+    }
+    return "";
+  })() + ""}>
         <div>
           <b>{item.name || "Unnamed activity"}</b>
           <span>
@@ -668,196 +534,117 @@ function ActivityCard({
           <small>
             {item.products.join(", ") || "No product/service linked"}
           </small>
-          {item.included && (
-            <PersonSelect item={item} change={change} people={people} />
-          )}
+          {item.included && <PersonSelect item={item} change={change} people={people} />}
         </div>
-        <button
-          type="button"
-          onClick={() => change("included", !item.included)}
-        >
-          {item.included ? "✓ Included" : "+ Include"}
+        <button type="button" onClick={() => change("included", !item.included)}>
+          {(() => {
+        if (item.included) {
+          return "✓ Included";
+        }
+        return "+ Include";
+      })()}
         </button>
-      </article>
-    );
+      </article>;
   if (!item.included) return null;
-  if (mode === "impact")
-    return (
-      <article className="biaRecord">
+  if (mode === "impact") return <article className="biaRecord">
         <header>
           <div>
             <b>{item.name}</b>
             <span>{item.products.join(", ") || "Supporting activity"}</span>
           </div>
-          <strong className={`score s${d.peak}`}>Peak {d.peak}/5</strong>
+          <strong className={"score s" + d.peak + ""}>Peak {d.peak}/5</strong>
         </header>
-        {d.trendIssues.length > 0 && (
-          <div className="biaTrendWarning" role="alert">
+        {d.trendIssues.length > 0 && <div className="biaTrendWarning" role="alert">
             <b>Impact pattern needs correction</b>
             <span>
               Scores must not reduce while the disruption continues without
               recovery. Correct these entries before completing the BIA.
             </span>
             <ul>
-              {d.trendIssues.map((issue) => (
-                <li key={issue}>{issue}</li>
-              ))}
+              {d.trendIssues.map(issue => <li key={issue}>{issue}</li>)}
             </ul>
-          </div>
-        )}
+          </div>}
         <ImpactEditor item={item} change={change} />
         <div className="biaGrid three">
-          <Field
-            label="Unacceptable impact threshold"
-            value={item.unacceptableThreshold}
-            onChange={(v) => change("unacceptableThreshold", Number(v))}
-          >
-            {
-              <select
-                value={item.unacceptableThreshold}
-                onChange={(e) =>
-                  change("unacceptableThreshold", Number(e.target.value))
-                }
-              >
+          <Field label="Unacceptable impact threshold" value={item.unacceptableThreshold} onChange={v => change("unacceptableThreshold", Number(v))}>
+            {<select value={item.unacceptableThreshold} onChange={e => change("unacceptableThreshold", Number(e.target.value))}>
                 <option value="3">3 Material</option>
                 <option value="4">4 Major</option>
                 <option value="5">5 Severe</option>
-              </select>
-            }
+              </select>}
           </Field>
           <div className="biaEngine">
             <small>INDICATIVE MTPD</small>
-            <b>{d.mtpd ? `${d.mtpd} hours` : "Not reached"}</b>
+            <b>{(() => {
+            if (d.mtpd) {
+              return "" + d.mtpd + " hours";
+            }
+            return "Not reached";
+          })()}</b>
             <span>
               First period where impact becomes unacceptable · management
               confirmation required
             </span>
           </div>
-          <Field
-            area
-            label="Overall assumptions and evidence"
-            value={item.assumptions}
-            onChange={(v) => change("assumptions", v)}
-          />
+          <Field area label="Overall assumptions and evidence" value={item.assumptions} onChange={v => change("assumptions", v)} />
         </div>
-      </article>
-    );
-  if (mode === "objectives")
-    return (
-      <article className="biaRecord">
+      </article>;
+  if (mode === "objectives") return <article className="biaRecord">
         <header>
           <div>
             <b>{item.name}</b>
             <span>{d.priority}</span>
           </div>
-          <strong className={d.valid ? "valid" : "invalid"}>
-            {d.valid ? "Objectives valid" : "Review timing"}
+          <strong className={(() => {
+        if (d.valid) {
+          return "valid";
+        }
+        return "invalid";
+      })()}>
+            {(() => {
+          if (d.valid) {
+            return "Objectives valid";
+          }
+          return "Review timing";
+        })()}
           </strong>
         </header>
         <div className="biaTimeline">
           <span>Disruption</span>
-          <i
-            style={{
-              width: `${Math.min(100, (d.rto / Math.max(d.mtpd, 1)) * 100)}%`,
-            }}
-          />
+          <i style={{
+        "width": "" + Math.min(100, d.rto / Math.max(d.mtpd, 1) * 100) + "%"
+      }} />
           <b>RTO {d.rto || "-"}h</b>
           <i />
           <b>MTPD {d.mtpd || "-"}h</b>
         </div>
-        {!d.valid && (
-          <div className="biaObjectiveIssues" role="alert">
+        {!d.valid && <div className="biaObjectiveIssues" role="alert">
             <b>Why this objective is not valid</b>
             <ul>
-              {d.issues.map((issue) => (
-                <li key={issue}>{issue}</li>
-              ))}
+              {d.issues.map(issue => <li key={issue}>{issue}</li>)}
             </ul>
-          </div>
-        )}
+          </div>}
         <div className="biaGrid three">
-          <Field
-            type="number"
-            label="MTPD hours *"
-            value={item.mtpdHours || d.mtpd}
-            onChange={(v) => change("mtpdHours", Number(v))}
-            min="1"
-          />
-          <Field
-            type="number"
-            label="RTO hours *"
-            value={item.rtoHours || d.rto}
-            onChange={(v) => change("rtoHours", Number(v))}
-            min="1"
-          />
-          <Field
-            type="number"
-            label="MBCO minimum capacity % *"
-            value={item.mbcoPercent}
-            onChange={(v) => change("mbcoPercent", Number(v))}
-            min="1"
-            max="100"
-          />
-          <Field
-            type="number"
-            label="TRO full recovery hours *"
-            value={item.troHours}
-            onChange={(v) => change("troHours", Number(v))}
-            min="1"
-          />
-          <Field
-            type="number"
-            label="RPO maximum data loss hours *"
-            value={item.rpoHours}
-            onChange={(v) => change("rpoHours", Number(v))}
-            min="0"
-          />
-          <Field
-            label="Recovery priority"
-            value={item.recoveryPriority || d.priority}
-            onChange={(v) => change("recoveryPriority", v)}
-          />
+          <Field type="number" label="MTPD hours *" value={item.mtpdHours || d.mtpd} onChange={v => change("mtpdHours", Number(v))} min="1" />
+          <Field type="number" label="RTO hours *" value={item.rtoHours || d.rto} onChange={v => change("rtoHours", Number(v))} min="1" />
+          <Field type="number" label="MBCO minimum capacity % *" value={item.mbcoPercent} onChange={v => change("mbcoPercent", Number(v))} min="1" max="100" />
+          <Field type="number" label="TRO full recovery hours *" value={item.troHours} onChange={v => change("troHours", Number(v))} min="1" />
+          <Field type="number" label="RPO maximum data loss hours *" value={item.rpoHours} onChange={v => change("rpoHours", Number(v))} min="0" />
+          <Field label="Recovery priority" value={item.recoveryPriority || d.priority} onChange={v => change("recoveryPriority", v)} />
         </div>
         <div className="biaGrid">
-          <Field
-            area
-            label="Minimum continuity operating arrangement"
-            value={item.manualWorkaround}
-            onChange={(v) => change("manualWorkaround", v)}
-            placeholder="Describe what must operate at the MBCO level"
-          />
-          <Field
-            type="number"
-            label="Maximum workaround duration hours"
-            value={item.workaroundDurationHours}
-            onChange={(v) => change("workaroundDurationHours", Number(v))}
-          />
-          <Field
-            label="Workload shifting / alternate location"
-            value={item.workloadShift}
-            onChange={(v) => change("workloadShift", v)}
-          />
+          <Field area label="Minimum continuity operating arrangement" value={item.manualWorkaround} onChange={v => change("manualWorkaround", v)} placeholder="Describe what must operate at the MBCO level" />
+          <Field type="number" label="Maximum workaround duration hours" value={item.workaroundDurationHours} onChange={v => change("workaroundDurationHours", Number(v))} />
+          <Field label="Workload shifting / alternate location" value={item.workloadShift} onChange={v => change("workloadShift", v)} />
           <label className="biaCheck">
-            <input
-              type="checkbox"
-              checked={item.remoteCapable}
-              onChange={(e) => change("remoteCapable", e.target.checked)}
-            />{" "}
+            <input type="checkbox" checked={item.remoteCapable} onChange={e => change("remoteCapable", e.target.checked)} />{" "}
             Activity can operate remotely
           </label>
         </div>
-      </article>
-    );
+      </article>;
   if (mode === "resources") {
-    const resourceIssues = [
-      !item.resources.length && "Select at least one required resource",
-      !item.dependencies.length &&
-        !item.dependencyNotApplicable &&
-        "Link a dependency or confirm that no critical dependency applies",
-      !item.evidence.length && "Add at least one evidence reference",
-    ].filter(Boolean);
-    return (
-      <article className="biaRecord">
+    const resourceIssues = [!item.resources.length && "Select at least one required resource", !item.dependencies.length && !item.dependencyNotApplicable && "Link a dependency or confirm that no critical dependency applies", !item.evidence.length && "Add at least one evidence reference"].filter(Boolean);
+    return <article className="biaRecord">
         <header>
           <div>
             <b>{item.name}</b>
@@ -865,99 +652,73 @@ function ActivityCard({
               {d.priority} · MBCO {item.mbcoPercent}%
             </span>
           </div>
-          <strong className={resourceIssues.length ? "invalid" : "valid"}>
-            {resourceIssues.length
-              ? `${resourceIssues.length} requirement${resourceIssues.length === 1 ? "" : "s"} missing`
-              : "Resources complete"}
+          <strong className={(() => {
+          if (resourceIssues.length) {
+            return "invalid";
+          }
+          return "valid";
+        })()}>
+            {(() => {
+            if (resourceIssues.length) {
+              return "" + resourceIssues.length + " requirement" + (() => {
+                if (resourceIssues.length === 1) {
+                  return "";
+                }
+                return "s";
+              })() + " missing";
+            }
+            return "Resources complete";
+          })()}
           </strong>
         </header>
-        {resourceIssues.length > 0 && (
-          <div className="biaObjectiveIssues" role="status">
+        {resourceIssues.length > 0 && <div className="biaObjectiveIssues" role="status">
             <b>Complete this activity</b>
             <ul>
-              {resourceIssues.map((issue) => (
-                <li key={issue}>{issue}</li>
-              ))}
+              {resourceIssues.map(issue => <li key={issue}>{issue}</li>)}
             </ul>
-          </div>
-        )}
+          </div>}
         <div className="biaPeopleSkills">
-          <Field
-            type="number"
-            label="Minimum people at MBCO"
-            value={item.minimumPeople}
-            onChange={(v) => change("minimumPeople", Number(v))}
-          />
+          <Field type="number" label="Minimum people at MBCO" value={item.minimumPeople} onChange={v => change("minimumPeople", Number(v))} />
           <SkillSelector item={item} change={change} />
         </div>
         <b className="biaLabel">Required resources</b>
-        <Chips
-          values={item.resources}
-          options={resourceTypes}
-          onChange={(v) => change("resources", v)}
-        />
+        <Chips values={item.resources} options={resourceTypes} onChange={v => change("resources", v)} />
         <b className="biaLabel">Linked Module 1 dependencies</b>
-        <Chips
-          values={item.dependencies}
-          options={[
-            ...new Set([
-              ...sourceDependencies
-                .filter(
-                  (x) => x.siteWide || arr(x.processes).includes(item.name),
-                )
-                .map((x) => x.name)
-                .filter(Boolean),
-              ...arr(item.dependencies),
-            ]),
-          ]}
-          onChange={(v) => {
-            change({
-              dependencies: v,
-              dependencyNotApplicable: v.length
-                ? false
-                : item.dependencyNotApplicable,
-            });
-          }}
-        />
+        <Chips values={item.dependencies} options={[...new Set([...sourceDependencies.filter(x => x.siteWide || arr(x.processes).includes(item.name)).map(x => x.name).filter(Boolean), ...arr(item.dependencies)])]} onChange={v => {
+        change({
+          "dependencies": v,
+          "dependencyNotApplicable": (() => {
+            if (v.length) {
+              return false;
+            }
+            return item.dependencyNotApplicable;
+          })()
+        });
+      }} />
         <label className="biaNoDependency">
-          <input
-            type="checkbox"
-            checked={Boolean(item.dependencyNotApplicable)}
-            onChange={(event) => {
-              change({
-                dependencyNotApplicable: event.target.checked,
-                dependencies: event.target.checked ? [] : item.dependencies,
-              });
-            }}
-          />
+          <input type="checkbox" checked={Boolean(item.dependencyNotApplicable)} onChange={event => {
+          change({
+            "dependencyNotApplicable": event.target.checked,
+            "dependencies": (() => {
+              if (event.target.checked) {
+                return [];
+              }
+              return item.dependencies;
+            })()
+          });
+        }} />
           No critical dependency applies to this activity
         </label>
         <b className="biaLabel">Linked Module 5 disruption scenarios</b>
-        <Chips
-          values={item.hazards}
-          options={[
-            ...new Set([
-              ...applicableHazards.map((x) => x.name).filter(Boolean),
-              ...item.hazards,
-            ]),
-          ]}
-          onChange={(v) => change("hazards", v)}
-        />
+        <Chips values={item.hazards} options={[...new Set([...applicableHazards.map(x => x.name).filter(Boolean), ...item.hazards])]} onChange={v => change("hazards", v)} />
         <div className="biaGrid">
-          <Field
-            label="Recovery strategy requirements"
-            value={item.strategyRequirements.join(", ")}
-            onChange={(v) => change("strategyRequirements", split(v))}
-            placeholder="Alternate site, cross-trained team, redundant system..."
-          />
+          <Field label="Recovery strategy requirements" value={item.strategyRequirements.join(", ")} onChange={v => change("strategyRequirements", split(v))} placeholder="Alternate site, cross-trained team, redundant system..." />
         </div>
         <EvidenceEditor item={item} change={change} />
-      </article>
-    );
+      </article>;
   }
   return null;
 }
-
 export default function BCPBusinessImpactAnalysis({
   action,
   profiles = [],
@@ -967,163 +728,103 @@ export default function BCPBusinessImpactAnalysis({
   people = [],
   initial,
   organisationName = "",
-  startStep = 0,
+  startStep = 0
 }) {
   const [formState, formAction, isPending] = useActionState(action, {
-    error: "",
+    "error": ""
   });
-  const [step, setStep] = useState(clamp(startStep, 0, 5));
-  const [profileId, setProfileId] = useState(initial?.site_profile_id || "");
-  const [contextId, setContextId] = useState(
-    initial?.context_assessment_id || "",
-  );
-  const [roleId, setRoleId] = useState(initial?.role_assessment_id || "");
-  const [hazardId, setHazardId] = useState(initial?.hazard_assessment_id || "");
-  const profile = profiles.find((x) => x.id === profileId),
-    hazard = hazards.find((x) => x.id === hazardId);
-  const storedReviewer =
-    initial?.reviewed_by || initial?.approved_by || profile?.site_leader || "";
+  const [step, setStep] = useDeviceDraftState("BCPBusinessImpactAnalysis_step", clamp(startStep, 0, 5));
+  const [profileId, setProfileId] = useDeviceDraftState("BCPBusinessImpactAnalysis_profileId", initial?.site_profile_id || "");
+  const [contextId, setContextId] = useDeviceDraftState("BCPBusinessImpactAnalysis_contextId", initial?.context_assessment_id || "");
+  const [roleId, setRoleId] = useDeviceDraftState("BCPBusinessImpactAnalysis_roleId", initial?.role_assessment_id || "");
+  const [hazardId, setHazardId] = useDeviceDraftState("BCPBusinessImpactAnalysis_hazardId", initial?.hazard_assessment_id || "");
+  const profile = profiles.find(x => x.id === profileId),
+    hazard = hazards.find(x => x.id === hazardId);
+  const storedReviewer = initial?.reviewed_by || initial?.approved_by || profile?.site_leader || "";
   const [reviewerPersonId, setReviewerPersonId] = useState(() => {
-    const storedId = people.find((person) => person.id === storedReviewer)?.id;
+    const storedId = people.find(person => person.id === storedReviewer)?.id;
     if (storedId) return storedId;
-    return (
-      people.find(
-        (person) =>
-          `${person.first_name || ""} ${person.last_name || ""}`.trim() ===
-          storedReviewer,
-      )?.id || ""
-    );
+    return people.find(person => ("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim() === storedReviewer)?.id || "";
   });
-  const reviewer = people.find((person) => person.id === reviewerPersonId);
-  const reviewerName = reviewer
-    ? `${reviewer.first_name || ""} ${reviewer.last_name || ""}`.trim()
-    : "";
-  const processSource = [
-    ...arr(profile?.value_chain_processes).map((x) => ({
-      ...x,
-      processType: "Value-chain",
-    })),
-    ...arr(profile?.support_processes).map((x) => ({
-      ...x,
-      processType: "Support",
-    })),
-  ].filter((x) => x.name);
-  const [activities, setActivities] = useState(
-    arr(initial?.activity_assessments).map(normalise),
-  );
-  const [assumptionEditorId, setAssumptionEditorId] = useState("");
-  const assumptionActivity = activities.find(
-    (item) => item.id === assumptionEditorId,
-  );
-  const updateActivityAssumptions = (id, value) =>
-    setActivities((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, assumptions: value } : item,
-      ),
-    );
+  const reviewer = people.find(person => person.id === reviewerPersonId);
+  const reviewerName = (() => {
+    if (reviewer) {
+      return ("" + (reviewer.first_name || "") + " " + (reviewer.last_name || "") + "").trim();
+    }
+    return "";
+  })();
+  const processSource = [...arr(profile?.value_chain_processes).map(x => ({
+    ...x,
+    "processType": "Value-chain"
+  })), ...arr(profile?.support_processes).map(x => ({
+    ...x,
+    "processType": "Support"
+  }))].filter(x => x.name);
+  const [activities, setActivities] = useDeviceDraftState("BCPBusinessImpactAnalysis_activities", arr(initial?.activity_assessments).map(normalise));
+  const [assumptionEditorId, setAssumptionEditorId] = useDeviceDraftState("BCPBusinessImpactAnalysis_assumptionEditorId", "");
+  const assumptionActivity = activities.find(item => item.id === assumptionEditorId);
+  const updateActivityAssumptions = (id, value) => setActivities(current => current.map(item => (() => {
+    if (item.id === id) {
+      return {
+        ...item,
+        "assumptions": value
+      };
+    }
+    return item;
+  })()));
   const sourceDependencies = arr(profile?.site_dependencies?.records);
   const hazardRecords = arr(hazard?.scenario_assessments);
-  const generate = () =>
-    setActivities(
-      processSource.map((p) => {
-        const existing = activities.find((x) => x.name === p.name);
-        if (existing) return existing;
-        const item = emptyActivity(p);
-        item.dependencies = sourceDependencies
-          .filter((d) => d.siteWide || arr(d.processes).includes(p.name))
-          .map((d) => d.name)
-          .filter(Boolean);
-        item.resources = [
-          ...new Set(
-            sourceDependencies
-              .filter((d) => d.siteWide || arr(d.processes).includes(p.name))
-              .map((d) => d.category)
-              .filter(Boolean),
-          ),
-        ];
-        item.hazards = hazardRecords
-          .filter((h) => arr(h.affectedProcesses).includes(p.name))
-          .map((h) => h.name);
-        return item;
-      }),
-    );
-  const included = activities.filter((x) => x.included),
-    derived = included
-      .map((x) => ({ item: x, ...derive(x), assurance: assuranceState(x) }))
-      .sort((a, b) => a.rto - b.rto);
-  const checks = [
-    Boolean(profileId && activities.length),
-    included.length > 0 &&
-      included.every((x) => x.name && x.owner && x.ownerPersonId),
-    included.length > 0 &&
-      included.every(
-        (x) => derive(x).peak > 0 && derive(x).trendIssues.length === 0,
-      ),
-    included.every((x) => derive(x).valid),
-    included.every(
-      (x) =>
-        x.resources.length &&
-        (x.dependencies.length || x.dependencyNotApplicable),
-    ),
-    included.length > 0 &&
-      included.every((x) => x.evidence.length && x.assumptions),
-  ];
-  const completionIssues = [
-    !checks[0] && "Select a Site Profile and generate or add activities",
-    !checks[1] &&
-      `${included.filter((x) => !x.name || !x.owner || !x.ownerPersonId).length || included.length} activities need a valid Company User owner`,
-    !checks[2] &&
-      `${included.filter((x) => derive(x).peak <= 0 || derive(x).trendIssues.length).length || included.length} activities need complete, non-decreasing impact scores`,
-    !checks[3] &&
-      `${included.filter((x) => !derive(x).valid).length} activities have invalid recovery-objective timing`,
-    !checks[4] &&
-      `${included.filter((x) => !x.resources.length || (!x.dependencies.length && !x.dependencyNotApplicable)).length} activities need resources or a dependency decision`,
-    !checks[5] &&
-      `${included.filter((x) => !x.evidence.length || !x.assumptions).length || included.length} activities need evidence and assumptions`,
-  ];
-  const completion = Math.round(
-    (checks.filter(Boolean).length / checks.length) * 100,
-  );
-  const go = (n) => {
+  const generate = () => setActivities(processSource.map(p => {
+    const existing = activities.find(x => x.name === p.name);
+    if (existing) return existing;
+    const item = emptyActivity(p);
+    item.dependencies = sourceDependencies.filter(d => d.siteWide || arr(d.processes).includes(p.name)).map(d => d.name).filter(Boolean);
+    item.resources = [...new Set(sourceDependencies.filter(d => d.siteWide || arr(d.processes).includes(p.name)).map(d => d.category).filter(Boolean))];
+    item.hazards = hazardRecords.filter(h => arr(h.affectedProcesses).includes(p.name)).map(h => h.name);
+    return item;
+  }));
+  const included = activities.filter(x => x.included),
+    derived = included.map(x => ({
+      "item": x,
+      ...derive(x),
+      "assurance": assuranceState(x)
+    })).sort((a, b) => a.rto - b.rto);
+  const checks = [Boolean(profileId && activities.length), included.length > 0 && included.every(x => x.name && x.owner && x.ownerPersonId), included.length > 0 && included.every(x => derive(x).peak > 0 && derive(x).trendIssues.length === 0), included.every(x => derive(x).valid), included.every(x => x.resources.length && (x.dependencies.length || x.dependencyNotApplicable)), included.length > 0 && included.every(x => x.evidence.length && x.assumptions)];
+  const completionIssues = [!checks[0] && "Select a Site Profile and generate or add activities", !checks[1] && "" + (included.filter(x => !x.name || !x.owner || !x.ownerPersonId).length || included.length) + " activities need a valid Company User owner", !checks[2] && "" + (included.filter(x => derive(x).peak <= 0 || derive(x).trendIssues.length).length || included.length) + " activities need complete, non-decreasing impact scores", !checks[3] && "" + included.filter(x => !derive(x).valid).length + " activities have invalid recovery-objective timing", !checks[4] && "" + included.filter(x => !x.resources.length || !x.dependencies.length && !x.dependencyNotApplicable).length + " activities need resources or a dependency decision", !checks[5] && "" + (included.filter(x => !x.evidence.length || !x.assumptions).length || included.length) + " activities need evidence and assumptions"];
+  const completion = Math.round(checks.filter(Boolean).length / checks.length * 100);
+  const go = n => {
     const target = clamp(n, 0, 5);
-    setStep(target > 0 && !profile ? 0 : target);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setStep((() => {
+      if (target > 0 && !profile) {
+        return 0;
+      }
+      return target;
+    })());
+    window.scrollTo({
+      "top": 0,
+      "behavior": "smooth"
+    });
   };
-  return (
-    <form action={formAction} className="biaShell bcpCardLayout">
+  return <form action={formAction} className="biaShell bcpCardLayout">
       <style>{styles}</style>
       <style>{activityEditStyles}</style>
       <style>{ownerStyles}</style>
       <style>{trendStyles}</style>
       <style>{registerEditStyles}</style>
-      {[
-        ["assessment_id", initial?.id || ""],
-        ["site_profile_id", profileId],
-        ["context_assessment_id", contextId],
-        ["role_assessment_id", roleId],
-        ["hazard_assessment_id", hazardId],
-        ["reviewer_person_id", reviewerPersonId],
-        ["reviewer_name", reviewerName],
-        ["activity_assessments", JSON.stringify(activities)],
-        ["next_step", Math.min(5, step + 1)],
-      ].map(([name, value]) => (
-        <input key={name} type="hidden" name={name} value={value} />
-      ))}
-      {formState?.error && (
-        <div className="biaError">
+      {[["assessment_id", initial?.id || ""], ["site_profile_id", profileId], ["context_assessment_id", contextId], ["role_assessment_id", roleId], ["hazard_assessment_id", hazardId], ["reviewer_person_id", reviewerPersonId], ["reviewer_name", reviewerName], ["activity_assessments", JSON.stringify(activities)], ["next_step", Math.min(5, step + 1)]].map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+      {formState?.error && <div className="biaError">
           <b>Cannot save Business Impact Analysis</b>
           <span>{formState.error}</span>
-        </div>
-      )}
+        </div>}
       <BCPModuleNavigation moduleNumber={6} title="Business impact analysis" percent={completion} steps={steps} checks={checks} activeStep={step} onSelect={go}>
 
           <b>LIVE ENGINE</b>
           <span>{included.length} activities in scope</span>
           <span>
-            {derived.filter((x) => x.valid).length} recovery objectives valid
+            {derived.filter(x => x.valid).length} recovery objectives valid
           </span>
           <span>
-            {derived.filter((x) => x.rto <= 24).length} same-day priorities
+            {derived.filter(x => x.rto <= 24).length} same-day priorities
           </span>
         
       </BCPModuleNavigation>
@@ -1140,10 +841,11 @@ export default function BCPBusinessImpactAnalysis({
           <b>{initial?.status?.replaceAll("_", " ") || "draft"}</b>
         </header>
         <div className="biaProgress">
-          <i style={{ width: `${completion}%` }} />
+          <i style={{
+          "width": "" + completion + "%"
+        }} />
         </div>
-        {completion < 100 && (
-          <section className="biaCompletionPanel" aria-label="Completion requirements">
+        {completion < 100 && <section className="biaCompletionPanel" aria-label="Completion requirements">
             <header>
               <div>
                 <b>Why completion is {completion}%</b>
@@ -1154,129 +856,85 @@ export default function BCPBusinessImpactAnalysis({
               </div>
             </header>
             <div>
-              {steps.map((name, index) => (
-                <button
-                  type="button"
-                  key={name}
-                  className={checks[index] ? "complete" : "incomplete"}
-                  onClick={() => go(index)}
-                >
-                  <b>{checks[index] ? "✓" : "!"} {name}</b>
+              {steps.map((name, index) => <button type="button" key={name} className={(() => {
+            if (checks[index]) {
+              return "complete";
+            }
+            return "incomplete";
+          })()} onClick={() => go(index)}>
+                  <b>{(() => {
+                if (checks[index]) {
+                  return "✓";
+                }
+                return "!";
+              })()} {name}</b>
                   <small>
-                    {checks[index] ? "Complete" : completionIssues[index]}
+                    {(() => {
+                if (checks[index]) {
+                  return "Complete";
+                }
+                return completionIssues[index];
+              })()}
                   </small>
-                </button>
-              ))}
+                </button>)}
             </div>
-          </section>
-        )}
-        {step === 0 && (
-          <section className="biaPanel">
-            <Intro
-              title="Connect the controlled source records."
-              text="The BIA inherits products, services, activities, dependencies, accountable people and disruption risks. Source versions are frozen when the BIA is approved."
-            />
+          </section>}
+        {step === 0 && <section className="biaPanel">
+            <Intro title="Connect the controlled source records." text="The BIA inherits products, services, activities, dependencies, accountable people and disruption risks. Source versions are frozen when the BIA is approved." />
             <div className="biaGrid">
               <label>
                 Module 1 Site Profile *
-                <select
-                  value={profileId}
-                  onChange={(e) => setProfileId(e.target.value)}
-                >
+                <select value={profileId} onChange={e => setProfileId(e.target.value)}>
                   <option value="">Select profile</option>
-                  {profiles.map((x) => (
-                    <option key={x.id} value={x.id}>
+                  {profiles.map(x => <option key={x.id} value={x.id}>
                       {x.location_name} · v{x.version || 1} · {x.status}
-                    </option>
-                  ))}
+                    </option>)}
                 </select>
               </label>
               <label>
                 Module 3 Context Assessment
-                <select
-                  value={contextId}
-                  onChange={(e) => setContextId(e.target.value)}
-                >
+                <select value={contextId} onChange={e => setContextId(e.target.value)}>
                   <option value="">Optional</option>
-                  {contexts
-                    .filter(
-                      (x) => !profileId || x.site_profile_id === profileId,
-                    )
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
+                  {contexts.filter(x => !profileId || x.site_profile_id === profileId).map(x => <option key={x.id} value={x.id}>
                         {x.assessment_reference} · {x.status}
-                      </option>
-                    ))}
+                      </option>)}
                 </select>
               </label>
               <label>
                 Module 4 Roles Assessment
-                <select
-                  value={roleId}
-                  onChange={(e) => setRoleId(e.target.value)}
-                >
+                <select value={roleId} onChange={e => setRoleId(e.target.value)}>
                   <option value="">Optional</option>
-                  {roles
-                    .filter(
-                      (x) => !profileId || x.site_profile_id === profileId,
-                    )
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
+                  {roles.filter(x => !profileId || x.site_profile_id === profileId).map(x => <option key={x.id} value={x.id}>
                         {x.assessment_reference} · {x.status}
-                      </option>
-                    ))}
+                      </option>)}
                 </select>
               </label>
               <label>
                 Module 5 Hazard Assessment
-                <select
-                  value={hazardId}
-                  onChange={(e) => setHazardId(e.target.value)}
-                >
+                <select value={hazardId} onChange={e => setHazardId(e.target.value)}>
                   <option value="">Optional</option>
-                  {hazards
-                    .filter(
-                      (x) => !profileId || x.site_profile_id === profileId,
-                    )
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
+                  {hazards.filter(x => !profileId || x.site_profile_id === profileId).map(x => <option key={x.id} value={x.id}>
                         {x.assessment_reference} · {x.status}
-                      </option>
-                    ))}
+                      </option>)}
                 </select>
               </label>
               <label>
                 BIA title
-                <input
-                  name="assessment_title"
-                  defaultValue={
-                    initial?.assessment_title ||
-                    `${organisationName || "Organisation"} business impact analysis`
-                  }
-                />
+                <input name="assessment_title" defaultValue={initial?.assessment_title || "" + (organisationName || "Organisation") + " business impact analysis"} />
               </label>
               <label>
                 Next review date
-                <input
-                  type="date"
-                  name="next_review_date"
-                  defaultValue={initial?.next_review_date || ""}
-                />
+                <input type="date" name="next_review_date" defaultValue={initial?.next_review_date || ""} />
               </label>
             </div>
-            {profile && (
-              <div className="biaSource">
+            {profile && <div className="biaSource">
                 <article>
                   <b>{processSource.length}</b>
                   <span>activities</span>
                 </article>
                 <article>
                   <b>
-                    {
-                      String(profile.critical_products_services || "")
-                        .split(/[,\n]+/)
-                        .filter(Boolean).length
-                    }
+                    {String(profile.critical_products_services || "").split(/[,\n]+/).filter(Boolean).length}
                   </b>
                   <span>products/services</span>
                 </article>
@@ -1288,71 +946,37 @@ export default function BCPBusinessImpactAnalysis({
                   <b>{hazardRecords.length}</b>
                   <span>hazard scenarios</span>
                 </article>
-              </div>
-            )}
-          </section>
-        )}
-        {step === 1 && (
-          <section className="biaPanel">
-            <Intro
-              title="Confirm the activities that support products and services."
-              text="Generate the scope from Module 1, then include every value-chain and supporting activity whose disruption could affect delivery."
-            />
-            <button
-              className="biaGenerate"
-              type="button"
-              onClick={generate}
-              disabled={!profile}
-            >
+              </div>}
+          </section>}
+        {step === 1 && <section className="biaPanel">
+            <Intro title="Confirm the activities that support products and services." text="Generate the scope from Module 1, then include every value-chain and supporting activity whose disruption could affect delivery." />
+            <button className="biaGenerate" type="button" onClick={generate} disabled={!profile}>
               ✦ Generate linked BIA starting points
             </button>
             <div className="biaPicks">
-              {activities.map((x) => (
-                <ActivityCard
-                  key={x.id}
-                  item={x}
-                  activities={activities}
-                  setActivities={setActivities}
-                  people={people}
-                  mode="select"
-                />
-              ))}
-              {!activities.length && (
-                <div className="biaEmpty">
+              {activities.map(x => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} people={people} mode="select" />)}
+              {!activities.length && <div className="biaEmpty">
                   <span>
-                    {profile
-                      ? "Generate the linked activities from the selected profile."
-                      : "A Module 1 Site Profile must be selected before activities can be generated."}
+                    {(() => {
+                if (profile) {
+                  return "Generate the linked activities from the selected profile.";
+                }
+                return "A Module 1 Site Profile must be selected before activities can be generated.";
+              })()}
                   </span>
-                  {!profile && (
-                    <button type="button" onClick={() => go(0)}>
+                  {!profile && <button type="button" onClick={() => go(0)}>
                       ← Select Module 1 profile
-                    </button>
-                  )}
-                </div>
-              )}
+                    </button>}
+                </div>}
             </div>
-            <button
-              type="button"
-              className="biaAdd"
-              disabled={!profile}
-              onClick={() =>
-                setActivities([
-                  ...activities,
-                  emptyActivity({ processType: "Site-specific" }),
-                ])
-              }
-            >
+            <button type="button" className="biaAdd" disabled={!profile} onClick={() => setActivities([...activities, emptyActivity({
+          "processType": "Site-specific"
+        })])}>
               + Add site-specific activity
             </button>
-          </section>
-        )}
-        {step === 2 && (
-          <section className="biaPanel">
-            <Intro
-              title="Assess how consequences grow as disruption continues."
-              text="Score each credible impact at every time horizon. The engine detects the first point at which any consequence reaches the organisation's unacceptable threshold."
-            />
+          </section>}
+        {step === 2 && <section className="biaPanel">
+            <Intro title="Assess how consequences grow as disruption continues." text="Score each credible impact at every time horizon. The engine detects the first point at which any consequence reaches the organisation's unacceptable threshold." />
             <div className="biaMtpdGuide">
               <div>
                 <small>MTPD GUIDANCE</small>
@@ -1389,26 +1013,11 @@ export default function BCPBusinessImpactAnalysis({
               <span>5 Severe</span>
             </div>
             <div className="biaRecords">
-              {included.map((x) => (
-                <ActivityCard
-                  key={x.id}
-                  item={x}
-                  activities={activities}
-                  setActivities={setActivities}
-                  mode="impact"
-                  hazards={hazardRecords}
-                  sourceDependencies={sourceDependencies}
-                />
-              ))}
+              {included.map(x => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} mode="impact" hazards={hazardRecords} sourceDependencies={sourceDependencies} />)}
             </div>
-          </section>
-        )}
-        {step === 3 && (
-          <section className="biaPanel">
-            <Intro
-              title="Set recovery objectives inside the tolerable disruption period."
-              text="RTO must be shorter than MTPD. Define the minimum acceptable operating capacity, full recovery time and maximum tolerable data loss."
-            />
+          </section>}
+        {step === 3 && <section className="biaPanel">
+            <Intro title="Set recovery objectives inside the tolerable disruption period." text="RTO must be shorter than MTPD. Define the minimum acceptable operating capacity, full recovery time and maximum tolerable data loss." />
             <div className="biaMtpdGuide biaRecoveryGuide">
               <div>
                 <small>RECOVERY OBJECTIVE GUIDANCE</small>
@@ -1460,26 +1069,11 @@ export default function BCPBusinessImpactAnalysis({
               </span>
             </div>
             <div className="biaRecords">
-              {included.map((x) => (
-                <ActivityCard
-                  key={x.id}
-                  item={x}
-                  activities={activities}
-                  setActivities={setActivities}
-                  mode="objectives"
-                  hazards={hazardRecords}
-                  sourceDependencies={sourceDependencies}
-                />
-              ))}
+              {included.map(x => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} mode="objectives" hazards={hazardRecords} sourceDependencies={sourceDependencies} />)}
             </div>
-          </section>
-        )}
-        {step === 4 && (
-          <section className="biaPanel">
-            <Intro
-              title="Define the resources and dependencies required at the recovery target."
-              text="Connect people, premises, technology, data, equipment, utilities, suppliers and interdependencies to each prioritized activity."
-            />
+          </section>}
+        {step === 4 && <section className="biaPanel">
+            <Intro title="Define the resources and dependencies required at the recovery target." text="Connect people, premises, technology, data, equipment, utilities, suppliers and interdependencies to each prioritized activity." />
             <div className="biaMtpdGuide biaResourceGuide">
               <div>
                 <small>RESOURCE &amp; DEPENDENCY GUIDANCE</small>
@@ -1519,42 +1113,27 @@ export default function BCPBusinessImpactAnalysis({
               </span>
             </div>
             <div className="biaRecords">
-              {included.map((x) => (
-                <ActivityCard
-                  key={x.id}
-                  item={x}
-                  activities={activities}
-                  setActivities={setActivities}
-                  mode="resources"
-                  hazards={hazardRecords}
-                  sourceDependencies={sourceDependencies}
-                />
-              ))}
+              {included.map(x => <ActivityCard key={x.id} item={x} activities={activities} setActivities={setActivities} mode="resources" hazards={hazardRecords} sourceDependencies={sourceDependencies} />)}
             </div>
-          </section>
-        )}
-        {step === 5 && (
-          <section className="biaPanel">
-            <Intro
-              title="Review the prioritized activity and recovery requirements register."
-              text="Approve only when impact evidence, timing logic, minimum capacity, resources and dependencies are complete and defensible."
-            />
+          </section>}
+        {step === 5 && <section className="biaPanel">
+            <Intro title="Review the prioritized activity and recovery requirements register." text="Approve only when impact evidence, timing logic, minimum capacity, resources and dependencies are complete and defensible." />
             <div className="biaSummary">
               <article>
                 <b>{included.length}</b>
                 <span>activities</span>
               </article>
               <article>
-                <b>{derived.filter((x) => x.rto <= 24).length}</b>
+                <b>{derived.filter(x => x.rto <= 24).length}</b>
                 <span>RTO ≤ 24 hours</span>
               </article>
               <article>
-                <b>{derived.filter((x) => !x.valid).length}</b>
+                <b>{derived.filter(x => !x.valid).length}</b>
                 <span>timing conflicts</span>
               </article>
               <article>
                 <b>
-                  {[...new Set(included.flatMap((x) => x.dependencies))].length}
+                  {[...new Set(included.flatMap(x => x.dependencies))].length}
                 </b>
                 <span>dependencies</span>
               </article>
@@ -1570,8 +1149,7 @@ export default function BCPBusinessImpactAnalysis({
                 <b>RPO</b>
                 <b>Assurance</b>
               </header>
-              {derived.map((x, i) => (
-                <article key={x.item.id}>
+              {derived.map((x, i) => <article key={x.item.id}>
                   <b>{i + 1}</b>
                   <span>
                     <strong>{x.item.name}</strong>
@@ -1584,19 +1162,17 @@ export default function BCPBusinessImpactAnalysis({
                   <b>{x.mtpd || "-"}h</b>
                   <b>{x.item.mbcoPercent}%</b>
                   <b>{x.item.rpoHours}h</b>
-                  <button
-                    type="button"
-                    className={`biaAssuranceStatus ${x.assurance.complete ? "ok" : "warn"}`}
-                    title={x.assurance.detail}
-                    onClick={() => setAssumptionEditorId(x.item.id)}
-                  >
+                  <button type="button" className={"biaAssuranceStatus " + (() => {
+              if (x.assurance.complete) {
+                return "ok";
+              }
+              return "warn";
+            })() + ""} title={x.assurance.detail} onClick={() => setAssumptionEditorId(x.item.id)}>
                     {x.assurance.label}
                   </button>
-                </article>
-              ))}
+                </article>)}
             </div>
-            {assumptionActivity && (
-              <section className="biaRegisterEditor" aria-label="Edit activity assumptions">
+            {assumptionActivity && <section className="biaRegisterEditor" aria-label="Edit activity assumptions">
                 <header>
                   <div>
                     <small>ACTIVITY ASSURANCE</small>
@@ -1608,29 +1184,16 @@ export default function BCPBusinessImpactAnalysis({
                 </header>
                 <label>
                   Assumptions, limitations and evidence basis *
-                  <textarea
-                    value={assumptionActivity.assumptions || ""}
-                    onChange={(event) =>
-                      updateActivityAssumptions(
-                        assumptionActivity.id,
-                        event.target.value,
-                      )
-                    }
-                    placeholder="Record the assumptions used, known limitations, operating conditions and the evidence supporting the recovery requirement."
-                  />
+                  <textarea value={assumptionActivity.assumptions || ""} onChange={event => updateActivityAssumptions(assumptionActivity.id, event.target.value)} placeholder="Record the assumptions used, known limitations, operating conditions and the evidence supporting the recovery requirement." />
                 </label>
                 <span>
                   This entry is held in the current form. Select Save draft below to retain it.
                 </span>
-              </section>
-            )}
+              </section>}
             <div className="biaGrid">
               <label>
                 Review frequency
-                <select
-                  name="review_frequency"
-                  defaultValue={initial?.review_frequency || "Every 6 months"}
-                >
+                <select name="review_frequency" defaultValue={initial?.review_frequency || "Every 6 months"}>
                   <option>Quarterly</option>
                   <option>Every 6 months</option>
                   <option>Annually</option>
@@ -1639,17 +1202,17 @@ export default function BCPBusinessImpactAnalysis({
               </label>
               <label>
                 Competent reviewer / approver *
-                <select
-                  value={reviewerPersonId}
-                  onChange={(event) => setReviewerPersonId(event.target.value)}
-                >
+                <select value={reviewerPersonId} onChange={event => setReviewerPersonId(event.target.value)}>
                   <option value="">Select from Company Users</option>
-                  {people.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {`${person.first_name || ""} ${person.last_name || ""}`.trim()}
-                      {person.position ? ` · ${person.position}` : ""}
-                    </option>
-                  ))}
+                  {people.map(person => <option key={person.id} value={person.id}>
+                      {("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim()}
+                      {(() => {
+                  if (person.position) {
+                    return " \xB7 " + person.position + "";
+                  }
+                  return "";
+                })()}
+                    </option>)}
                 </select>
                 <small>
                   Only active Company Users with Business Continuity access are available.
@@ -1657,95 +1220,60 @@ export default function BCPBusinessImpactAnalysis({
               </label>
               <label className="wide">
                 Review decision and limitations
-                <textarea
-                  name="review_comment"
-                  defaultValue={initial?.review_comment || ""}
-                />
+                <textarea name="review_comment" defaultValue={initial?.review_comment || ""} />
               </label>
             </div>
-          </section>
-        )}
+          </section>}
         <footer>
-          <button
-            type="button"
-            disabled={!step || isPending}
-            onClick={() => go(step - 1)}
-          >
+          <button type="button" disabled={!step || isPending} onClick={() => go(step - 1)}>
             ← Previous
           </button>
-          {initial?.id && (
-            <button
-              className="danger"
-              name="intent"
-              value="archive"
-              disabled={isPending}
-              onClick={(e) => {
-                if (!window.confirm("Archive this BIA?")) e.preventDefault();
-              }}
-            >
+          {initial?.id && <button className="danger" name="intent" value="archive" disabled={isPending} onClick={e => {
+          if (!window.confirm("Archive this BIA?")) e.preventDefault();
+        }}>
               Archive
-            </button>
-          )}
+            </button>}
           <span>
-            {isPending
-              ? "Saving…"
-              : "Controlled progress saves to your account"}
+            {(() => {
+            if (isPending) {
+              return "Saving…";
+            }
+            return "Controlled progress saves to your account";
+          })()}
           </span>
-          {step < 5 ? (
-            <button
-              className="primary"
-              name="intent"
-              value="continue"
-              disabled={isPending || !profile}
-            >
+          {(() => {
+          if (step < 5) {
+            return <button className="primary" name="intent" value="continue" disabled={isPending || !profile}>
               Save &amp; continue →
-            </button>
-          ) : (
-            <>
-              <button
-                name="intent"
-                value="draft"
-                disabled={isPending || !profile}
-              >
+            </button>;
+          }
+          return <>
+              <button name="intent" value="draft" disabled={isPending || !profile}>
                 Save draft
               </button>
-              <button
-                name="intent"
-                value="review"
-                disabled={isPending || !profile}
-              >
+              <button name="intent" value="review" disabled={isPending || !profile}>
                 Submit for review
               </button>
-              <button
-                className="primary"
-                name="intent"
-                value="approve"
-                disabled={isPending || !profile}
-              >
+              <button className="primary" name="intent" value="approve" disabled={isPending || !profile}>
                 Approve controlled BIA →
               </button>
-            </>
-          )}
+            </>;
+        })()}
         </footer>
       </main>
-    </form>
-  );
+    </form>;
 }
-const registerEditStyles = `.biaAssuranceStatus{width:100%;padding:7px 8px;border:0;border-radius:7px;font:inherit;cursor:pointer}.biaAssuranceStatus.ok{background:#e1f5eb;color:#087453}.biaAssuranceStatus.warn{background:#fff0d6;color:#8b5700}.biaRegisterEditor{display:grid;gap:12px;margin-top:14px;padding:17px;border:1px solid #efc57a;border-left:5px solid #e7a522;border-radius:11px;background:#fffaf0}.biaRegisterEditor>header{display:flex;align-items:center;justify-content:space-between;gap:12px}.biaRegisterEditor>header div{display:grid;gap:3px}.biaRegisterEditor>header small{color:#8b5700;font-size:10px;font-weight:950;letter-spacing:.1em}.biaRegisterEditor>header button{padding:7px 10px;border:1px solid #d0dce7;border-radius:7px;background:#fff;color:#173b60;font-weight:800}.biaRegisterEditor label{font-size:12px;font-weight:900}.biaRegisterEditor textarea{display:block;width:100%;min-height:120px;margin-top:7px;padding:12px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaRegisterEditor>span{color:#60778e;font-size:10px}`;
-
-const trendStyles = `.biaTrendWarning{display:grid;gap:6px;margin:0 0 14px;padding:13px 15px;border:1px solid #efb044;border-left:5px solid #e59a13;border-radius:9px;background:#fff7e4;color:#714900}.biaTrendWarning span{font-size:12px}.biaTrendWarning ul{margin:2px 0 0;padding-left:19px;font-size:11px}`;
-
-function Intro({ title, text }) {
-  return (
-    <div className="biaIntro">
+const registerEditStyles = ".biaAssuranceStatus{width:100%;padding:7px 8px;border:0;border-radius:7px;font:inherit;cursor:pointer}.biaAssuranceStatus.ok{background:#e1f5eb;color:#087453}.biaAssuranceStatus.warn{background:#fff0d6;color:#8b5700}.biaRegisterEditor{display:grid;gap:12px;margin-top:14px;padding:17px;border:1px solid #efc57a;border-left:5px solid #e7a522;border-radius:11px;background:#fffaf0}.biaRegisterEditor>header{display:flex;align-items:center;justify-content:space-between;gap:12px}.biaRegisterEditor>header div{display:grid;gap:3px}.biaRegisterEditor>header small{color:#8b5700;font-size:10px;font-weight:950;letter-spacing:.1em}.biaRegisterEditor>header button{padding:7px 10px;border:1px solid #d0dce7;border-radius:7px;background:#fff;color:#173b60;font-weight:800}.biaRegisterEditor label{font-size:12px;font-weight:900}.biaRegisterEditor textarea{display:block;width:100%;min-height:120px;margin-top:7px;padding:12px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaRegisterEditor>span{color:#60778e;font-size:10px}";
+const trendStyles = ".biaTrendWarning{display:grid;gap:6px;margin:0 0 14px;padding:13px 15px;border:1px solid #efb044;border-left:5px solid #e59a13;border-radius:9px;background:#fff7e4;color:#714900}.biaTrendWarning span{font-size:12px}.biaTrendWarning ul{margin:2px 0 0;padding-left:19px;font-size:11px}";
+function Intro({
+  title,
+  text
+}) {
+  return <div className="biaIntro">
       <b>{title}</b>
       <p>{text}</p>
-    </div>
-  );
+    </div>;
 }
-
-const ownerStyles = `.biaOwnerGuide{display:block;margin-top:6px;color:#60778e;font-size:10px;font-weight:600;line-height:1.35}.biaActivityPick label{margin-top:5px;color:#173b60;font-size:10px;font-weight:850}.biaActivityPick select{width:100%;margin-top:5px;padding:8px;border:1px solid #bfd0df;border-radius:7px;background:#fff;color:#173b60}.biaNoDependency{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid #cbd9e7;border-radius:8px;background:#f8fbfe;color:#31516f;font-size:11px;font-weight:850}.biaNoDependency input{width:auto!important;margin:0!important}`;
-
-const activityEditStyles = `.biaActivityEdit{padding:17px;border:1px solid #b9d5ce;border-left:5px solid #16a085;border-radius:11px;background:#f8fffd}.biaActivityEdit>header{display:flex;justify-content:space-between;gap:15px;align-items:start}.biaActivityEdit>header div{display:grid;gap:4px}.biaActivityEdit>header span{color:#60778e;font-size:11px}.biaActivityEdit .remove{padding:7px 10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaActivityEdit input,.biaActivityEdit textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaActivityEdit textarea{min-height:80px}.biaCheck.compact{padding-top:12px}.biaMtpdGuide{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:1px;margin:12px 0 14px;overflow:hidden;border-radius:11px;background:#426a96;color:#fff}.biaMtpdGuide>div{padding:15px 17px;background:#0b2d56}.biaMtpdGuide>div:first-child{background:#123d70}.biaMtpdGuide small{display:block;margin-bottom:5px;color:#55e1d4;font-weight:950;letter-spacing:.12em}.biaMtpdGuide b{display:block;font-size:13px}.biaMtpdGuide p{margin:6px 0 0;color:#dce8f5;font-size:11px;line-height:1.45}.biaGuidanceNote{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:start;margin:-3px 0 14px;padding:12px 15px;border:1px solid #bfd4e8;border-radius:9px;background:#edf5fc;color:#173b60;font-size:11px;line-height:1.45}.biaGuidanceNote b{color:#0b2d56}.biaGuidanceNote span{color:#4e6d89}.biaObjectiveIssues{margin:10px 0 0;padding:11px 14px;border:1px solid #f1b5ad;border-left:5px solid #d92d20;border-radius:8px;background:#fff3f1;color:#8f241c}.biaObjectiveIssues b{font-size:11px}.biaObjectiveIssues ul{margin:6px 0 0;padding-left:19px}.biaObjectiveIssues li{margin:3px 0;font-size:11px}.biaCompletionPanel{margin:0 0 16px;padding:16px;border:1px solid #bfd0df;border-radius:12px;background:#f8fbfe}.biaCompletionPanel>header b,.biaCompletionPanel>header span{display:block}.biaCompletionPanel>header b{font-size:15px}.biaCompletionPanel>header span{margin-top:4px;color:#60778e;font-size:11px}.biaCompletionPanel>div{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.biaCompletionPanel button{display:grid;gap:4px;min-height:67px;padding:10px;border:1px solid #cbd9e7;border-radius:8px;background:#fff;color:#173b60;text-align:left;cursor:pointer}.biaCompletionPanel button.complete{border-color:#a5d8c5;background:#eefaf5}.biaCompletionPanel button.incomplete{border-color:#efc57a;background:#fff8e9}.biaCompletionPanel button b{font-size:10px}.biaCompletionPanel button small{color:#60778e;font-size:9px;line-height:1.35}.biaPeopleSkills{display:grid;grid-template-columns:minmax(180px,.42fr) minmax(0,1.58fr);gap:14px;align-items:start}.biaPeopleSkills>label{font-size:12px;font-weight:850}.biaPeopleSkills>label input{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaStructuredEditor{margin-top:2px;padding:14px;border:1px solid #c9d9e7;border-radius:10px;background:#f7fbff}.biaEditorHead{display:flex;justify-content:space-between;gap:12px;align-items:center}.biaEditorHead>b{font-size:12px}.biaEditorHead>span{padding:5px 8px;border-radius:999px;background:#e7efff;color:#315fe6;font-size:10px;font-weight:850}.biaStructuredEditor>small{display:block;margin:5px 0 10px;color:#60778e;line-height:1.4}.biaInlineAdd{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.biaInlineAdd input,.biaEvidenceForm input,.biaEvidenceForm select,.biaEvidenceForm textarea{width:100%;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaInlineAdd button,.biaEvidenceForm>button{padding:10px 13px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaEvidenceEditor{margin-top:16px}.biaEvidenceList{display:grid;gap:8px;margin-bottom:12px}.biaEvidenceList article{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid #d2dfe9;border-left:4px solid #16a085;border-radius:8px;background:#fff}.biaEvidenceList article div{display:grid;gap:3px}.biaEvidenceList article small{color:#08775f;font-weight:850}.biaEvidenceList article p{margin:2px 0 0;color:#60778e;font-size:11px}.biaEvidenceList article button{align-self:center;padding:7px 9px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaEvidenceForm{display:grid;grid-template-columns:.7fr 1.3fr;gap:10px}.biaEvidenceForm label{font-size:11px;font-weight:850}.biaEvidenceForm label.wide{grid-column:1/-1}.biaEvidenceForm textarea{min-height:70px;margin-top:6px}.biaEvidenceForm input,.biaEvidenceForm select{margin-top:6px}.biaEvidenceForm>button{grid-column:1/-1;justify-self:start}.biaEvidenceForm>button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:900px){.biaMtpdGuide{grid-template-columns:1fr}.biaGuidanceNote,.biaPeopleSkills,.biaEvidenceForm,.biaCompletionPanel>div{grid-template-columns:1fr}.biaEvidenceForm label.wide,.biaEvidenceForm>button{grid-column:auto}}`;
-
-const styles = `*{box-sizing:border-box}.biaShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.biaShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.biaBrand{font-size:21px;font-weight:950}.biaBrand span{font-weight:500}.biaShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.biaShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.biaShell>aside>section strong{font-size:28px}.biaShell>aside>section span{float:right;margin-top:10px;font-size:10px}.biaShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.biaShell>aside>section i b{display:block;height:100%;background:#55e1d4}.biaShell nav{display:grid;gap:6px;margin-top:18px}.biaShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.biaShell nav button.active{background:#245d97}.biaShell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.biaLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.biaLive b{color:#55e1d4}.biaShell main{min-width:0}.biaTop{display:flex;justify-content:space-between;align-items:end}.biaTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.biaTop h1{margin:7px 0 4px;font-size:37px}.biaTop p{margin:0;color:#607890}.biaTop>b{text-transform:capitalize;color:#087c61}.biaProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.biaProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.biaPanel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.biaIntro{padding:20px;border-radius:12px;background:#eff5fa}.biaIntro b{font-size:18px}.biaIntro p{margin:7px 0 0;color:#60778e}.biaGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.biaGrid.three{grid-template-columns:repeat(3,1fr)}.biaGrid label{font-size:12px;font-weight:850}.biaGrid input,.biaGrid select,.biaGrid textarea,.biaRecord input,.biaRecord select{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaGrid textarea{min-height:80px}.biaGrid .wide{grid-column:1/-1}.biaSource,.biaSummary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:17px}.biaSource article,.biaSummary article{padding:15px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.biaSource b,.biaSummary b{display:block;color:#315fe6;font-size:27px}.biaSource span,.biaSummary span{color:#60778e;font-size:11px}.biaGenerate,.biaAdd{margin:16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaAdd{background:#fff;color:#17436f;border:1px solid #b9cce0}.biaPicks,.biaRecords{display:grid;gap:12px}.biaActivityPick{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:16px;border:1px solid #d2dfe9;border-radius:11px}.biaActivityPick.included{border-left:5px solid #16a085}.biaActivityPick div{display:grid;gap:4px}.biaActivityPick span,.biaActivityPick small{color:#6a8095}.biaActivityPick button{padding:9px 12px;border:1px solid #b9cce0;border-radius:8px;background:#fff;color:#315fe6;font-weight:850}.biaActivityPick.included button{background:#e7f8f4;color:#08775f}.biaEmpty{padding:20px;border:1px dashed #c6d5e3;border-radius:10px;color:#62788e}.biaScale{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;padding:12px;border-radius:9px;background:#f7f9fc}.biaScale span{font-size:11px;color:#60778e}.biaRecord{padding:18px;border:1px solid #cfdae6;border-radius:13px}.biaRecord>header{display:flex;justify-content:space-between;gap:15px;margin-bottom:13px}.biaRecord header div{display:grid;gap:4px}.biaRecord header span{color:#617991}.biaRecord header strong{align-self:center;padding:7px 10px;border-radius:999px;background:#eef4ff;color:#315fe6;font-size:11px}.biaRecord header .valid{background:#e1f5eb;color:#087453}.biaRecord header .invalid{background:#fff1d7;color:#925d00}.biaImpactWrap{overflow:auto}.biaImpact{min-width:1200px;width:100%;border-collapse:separate;border-spacing:3px}.biaImpact th{padding:8px;background:#edf3f8;text-align:left;font-size:10px}.biaImpact td{padding:3px}.biaImpact td select,.biaImpact td input{margin:0;padding:8px;font-size:10px}.biaEngine{display:grid;gap:4px;padding:13px;border-left:5px solid #f0b22e;border-radius:8px;background:#fff7df}.biaEngine small{color:#886000;font-weight:900}.biaEngine b{font-size:20px}.biaEngine span{font-size:10px;color:#6e7f8e}.biaTimeline{display:flex;align-items:center;gap:10px;padding:14px;border-radius:9px;background:#eef5ff}.biaTimeline i{height:5px;min-width:30px;flex:1;background:#315fe6;border-radius:5px}.biaRules{display:flex;align-items:center;justify-content:center;gap:13px;margin:16px 0;padding:16px;border-radius:10px;background:#0b2d56;color:#fff}.biaRules span{display:grid;text-align:center}.biaRules b{color:#55e1d4}.biaCheck{display:flex;align-items:center;gap:8px;padding-top:25px}.biaCheck input{width:auto;margin:0}.biaLabel{display:block;margin:16px 0 8px}.biaChips{display:flex;flex-wrap:wrap;gap:7px}.biaChips button{padding:7px 9px;border:1px solid #c1d2e2;border-radius:999px;background:#fff;color:#31516f;font-size:10px}.biaChips button.selected{border-color:#0aa588;background:#e2f8f3;color:#08755f}.biaRegister{margin-top:16px;border:1px solid #d2dde8;border-radius:11px;overflow:auto}.biaRegister header,.biaRegister article{min-width:950px;display:grid;grid-template-columns:55px 1.4fr 1.4fr repeat(5,.55fr);gap:9px;align-items:center;padding:11px}.biaRegister header{background:#0b2d56;color:#fff;font-size:10px}.biaRegister article{border-top:1px solid #e0e8ef;font-size:11px}.biaRegister article span{display:grid}.biaRegister small{color:#6e8296}.biaRegister em{padding:6px;border-radius:7px;text-align:center;font-style:normal}.biaRegister .ok{background:#e1f5eb;color:#087453}.biaRegister .warn{background:#fff0d6;color:#8b5700}.biaError{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.biaShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.biaShell footer span{margin-left:auto;color:#6f8396;font-size:11px}.biaShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.biaShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.biaShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:1050px){.biaShell{grid-template-columns:80px 1fr}.biaBrand,.biaShell>aside>small,.biaShell nav span,.biaLive{display:none}.biaShell nav button{justify-content:center}.biaGrid.three{grid-template-columns:1fr 1fr}}@media(max-width:720px){.biaShell{display:block}.biaShell>aside{position:static;height:auto;margin-bottom:15px}.biaShell nav{display:flex;overflow:auto}.biaGrid,.biaGrid.three,.biaSource,.biaSummary{grid-template-columns:1fr}.biaTop h1{font-size:29px}.biaShell footer,.biaRules{flex-wrap:wrap}.biaShell footer span{display:none}}`;
+const ownerStyles = ".biaOwnerGuide{display:block;margin-top:6px;color:#60778e;font-size:10px;font-weight:600;line-height:1.35}.biaActivityPick label{margin-top:5px;color:#173b60;font-size:10px;font-weight:850}.biaActivityPick select{width:100%;margin-top:5px;padding:8px;border:1px solid #bfd0df;border-radius:7px;background:#fff;color:#173b60}.biaNoDependency{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid #cbd9e7;border-radius:8px;background:#f8fbfe;color:#31516f;font-size:11px;font-weight:850}.biaNoDependency input{width:auto!important;margin:0!important}";
+const activityEditStyles = ".biaActivityEdit{padding:17px;border:1px solid #b9d5ce;border-left:5px solid #16a085;border-radius:11px;background:#f8fffd}.biaActivityEdit>header{display:flex;justify-content:space-between;gap:15px;align-items:start}.biaActivityEdit>header div{display:grid;gap:4px}.biaActivityEdit>header span{color:#60778e;font-size:11px}.biaActivityEdit .remove{padding:7px 10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaActivityEdit input,.biaActivityEdit textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaActivityEdit textarea{min-height:80px}.biaCheck.compact{padding-top:12px}.biaMtpdGuide{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:1px;margin:12px 0 14px;overflow:hidden;border-radius:11px;background:#426a96;color:#fff}.biaMtpdGuide>div{padding:15px 17px;background:#0b2d56}.biaMtpdGuide>div:first-child{background:#123d70}.biaMtpdGuide small{display:block;margin-bottom:5px;color:#55e1d4;font-weight:950;letter-spacing:.12em}.biaMtpdGuide b{display:block;font-size:13px}.biaMtpdGuide p{margin:6px 0 0;color:#dce8f5;font-size:11px;line-height:1.45}.biaGuidanceNote{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:start;margin:-3px 0 14px;padding:12px 15px;border:1px solid #bfd4e8;border-radius:9px;background:#edf5fc;color:#173b60;font-size:11px;line-height:1.45}.biaGuidanceNote b{color:#0b2d56}.biaGuidanceNote span{color:#4e6d89}.biaObjectiveIssues{margin:10px 0 0;padding:11px 14px;border:1px solid #f1b5ad;border-left:5px solid #d92d20;border-radius:8px;background:#fff3f1;color:#8f241c}.biaObjectiveIssues b{font-size:11px}.biaObjectiveIssues ul{margin:6px 0 0;padding-left:19px}.biaObjectiveIssues li{margin:3px 0;font-size:11px}.biaCompletionPanel{margin:0 0 16px;padding:16px;border:1px solid #bfd0df;border-radius:12px;background:#f8fbfe}.biaCompletionPanel>header b,.biaCompletionPanel>header span{display:block}.biaCompletionPanel>header b{font-size:15px}.biaCompletionPanel>header span{margin-top:4px;color:#60778e;font-size:11px}.biaCompletionPanel>div{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.biaCompletionPanel button{display:grid;gap:4px;min-height:67px;padding:10px;border:1px solid #cbd9e7;border-radius:8px;background:#fff;color:#173b60;text-align:left;cursor:pointer}.biaCompletionPanel button.complete{border-color:#a5d8c5;background:#eefaf5}.biaCompletionPanel button.incomplete{border-color:#efc57a;background:#fff8e9}.biaCompletionPanel button b{font-size:10px}.biaCompletionPanel button small{color:#60778e;font-size:9px;line-height:1.35}.biaPeopleSkills{display:grid;grid-template-columns:minmax(180px,.42fr) minmax(0,1.58fr);gap:14px;align-items:start}.biaPeopleSkills>label{font-size:12px;font-weight:850}.biaPeopleSkills>label input{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaStructuredEditor{margin-top:2px;padding:14px;border:1px solid #c9d9e7;border-radius:10px;background:#f7fbff}.biaEditorHead{display:flex;justify-content:space-between;gap:12px;align-items:center}.biaEditorHead>b{font-size:12px}.biaEditorHead>span{padding:5px 8px;border-radius:999px;background:#e7efff;color:#315fe6;font-size:10px;font-weight:850}.biaStructuredEditor>small{display:block;margin:5px 0 10px;color:#60778e;line-height:1.4}.biaInlineAdd{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.biaInlineAdd input,.biaEvidenceForm input,.biaEvidenceForm select,.biaEvidenceForm textarea{width:100%;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fff;color:#173b60;font:inherit}.biaInlineAdd button,.biaEvidenceForm>button{padding:10px 13px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaEvidenceEditor{margin-top:16px}.biaEvidenceList{display:grid;gap:8px;margin-bottom:12px}.biaEvidenceList article{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid #d2dfe9;border-left:4px solid #16a085;border-radius:8px;background:#fff}.biaEvidenceList article div{display:grid;gap:3px}.biaEvidenceList article small{color:#08775f;font-weight:850}.biaEvidenceList article p{margin:2px 0 0;color:#60778e;font-size:11px}.biaEvidenceList article button{align-self:center;padding:7px 9px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.biaEvidenceForm{display:grid;grid-template-columns:.7fr 1.3fr;gap:10px}.biaEvidenceForm label{font-size:11px;font-weight:850}.biaEvidenceForm label.wide{grid-column:1/-1}.biaEvidenceForm textarea{min-height:70px;margin-top:6px}.biaEvidenceForm input,.biaEvidenceForm select{margin-top:6px}.biaEvidenceForm>button{grid-column:1/-1;justify-self:start}.biaEvidenceForm>button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:900px){.biaMtpdGuide{grid-template-columns:1fr}.biaGuidanceNote,.biaPeopleSkills,.biaEvidenceForm,.biaCompletionPanel>div{grid-template-columns:1fr}.biaEvidenceForm label.wide,.biaEvidenceForm>button{grid-column:auto}}";
+const styles = "*{box-sizing:border-box}.biaShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.biaShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.biaBrand{font-size:21px;font-weight:950}.biaBrand span{font-weight:500}.biaShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.biaShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.biaShell>aside>section strong{font-size:28px}.biaShell>aside>section span{float:right;margin-top:10px;font-size:10px}.biaShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.biaShell>aside>section i b{display:block;height:100%;background:#55e1d4}.biaShell nav{display:grid;gap:6px;margin-top:18px}.biaShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.biaShell nav button.active{background:#245d97}.biaShell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.biaLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.biaLive b{color:#55e1d4}.biaShell main{min-width:0}.biaTop{display:flex;justify-content:space-between;align-items:end}.biaTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.biaTop h1{margin:7px 0 4px;font-size:37px}.biaTop p{margin:0;color:#607890}.biaTop>b{text-transform:capitalize;color:#087c61}.biaProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.biaProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.biaPanel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.biaIntro{padding:20px;border-radius:12px;background:#eff5fa}.biaIntro b{font-size:18px}.biaIntro p{margin:7px 0 0;color:#60778e}.biaGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.biaGrid.three{grid-template-columns:repeat(3,1fr)}.biaGrid label{font-size:12px;font-weight:850}.biaGrid input,.biaGrid select,.biaGrid textarea,.biaRecord input,.biaRecord select{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.biaGrid textarea{min-height:80px}.biaGrid .wide{grid-column:1/-1}.biaSource,.biaSummary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:17px}.biaSource article,.biaSummary article{padding:15px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.biaSource b,.biaSummary b{display:block;color:#315fe6;font-size:27px}.biaSource span,.biaSummary span{color:#60778e;font-size:11px}.biaGenerate,.biaAdd{margin:16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.biaAdd{background:#fff;color:#17436f;border:1px solid #b9cce0}.biaPicks,.biaRecords{display:grid;gap:12px}.biaActivityPick{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:16px;border:1px solid #d2dfe9;border-radius:11px}.biaActivityPick.included{border-left:5px solid #16a085}.biaActivityPick div{display:grid;gap:4px}.biaActivityPick span,.biaActivityPick small{color:#6a8095}.biaActivityPick button{padding:9px 12px;border:1px solid #b9cce0;border-radius:8px;background:#fff;color:#315fe6;font-weight:850}.biaActivityPick.included button{background:#e7f8f4;color:#08775f}.biaEmpty{padding:20px;border:1px dashed #c6d5e3;border-radius:10px;color:#62788e}.biaScale{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;padding:12px;border-radius:9px;background:#f7f9fc}.biaScale span{font-size:11px;color:#60778e}.biaRecord{padding:18px;border:1px solid #cfdae6;border-radius:13px}.biaRecord>header{display:flex;justify-content:space-between;gap:15px;margin-bottom:13px}.biaRecord header div{display:grid;gap:4px}.biaRecord header span{color:#617991}.biaRecord header strong{align-self:center;padding:7px 10px;border-radius:999px;background:#eef4ff;color:#315fe6;font-size:11px}.biaRecord header .valid{background:#e1f5eb;color:#087453}.biaRecord header .invalid{background:#fff1d7;color:#925d00}.biaImpactWrap{overflow:auto}.biaImpact{min-width:1200px;width:100%;border-collapse:separate;border-spacing:3px}.biaImpact th{padding:8px;background:#edf3f8;text-align:left;font-size:10px}.biaImpact td{padding:3px}.biaImpact td select,.biaImpact td input{margin:0;padding:8px;font-size:10px}.biaEngine{display:grid;gap:4px;padding:13px;border-left:5px solid #f0b22e;border-radius:8px;background:#fff7df}.biaEngine small{color:#886000;font-weight:900}.biaEngine b{font-size:20px}.biaEngine span{font-size:10px;color:#6e7f8e}.biaTimeline{display:flex;align-items:center;gap:10px;padding:14px;border-radius:9px;background:#eef5ff}.biaTimeline i{height:5px;min-width:30px;flex:1;background:#315fe6;border-radius:5px}.biaRules{display:flex;align-items:center;justify-content:center;gap:13px;margin:16px 0;padding:16px;border-radius:10px;background:#0b2d56;color:#fff}.biaRules span{display:grid;text-align:center}.biaRules b{color:#55e1d4}.biaCheck{display:flex;align-items:center;gap:8px;padding-top:25px}.biaCheck input{width:auto;margin:0}.biaLabel{display:block;margin:16px 0 8px}.biaChips{display:flex;flex-wrap:wrap;gap:7px}.biaChips button{padding:7px 9px;border:1px solid #c1d2e2;border-radius:999px;background:#fff;color:#31516f;font-size:10px}.biaChips button.selected{border-color:#0aa588;background:#e2f8f3;color:#08755f}.biaRegister{margin-top:16px;border:1px solid #d2dde8;border-radius:11px;overflow:auto}.biaRegister header,.biaRegister article{min-width:950px;display:grid;grid-template-columns:55px 1.4fr 1.4fr repeat(5,.55fr);gap:9px;align-items:center;padding:11px}.biaRegister header{background:#0b2d56;color:#fff;font-size:10px}.biaRegister article{border-top:1px solid #e0e8ef;font-size:11px}.biaRegister article span{display:grid}.biaRegister small{color:#6e8296}.biaRegister em{padding:6px;border-radius:7px;text-align:center;font-style:normal}.biaRegister .ok{background:#e1f5eb;color:#087453}.biaRegister .warn{background:#fff0d6;color:#8b5700}.biaError{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.biaShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.biaShell footer span{margin-left:auto;color:#6f8396;font-size:11px}.biaShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.biaShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.biaShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:1050px){.biaShell{grid-template-columns:80px 1fr}.biaBrand,.biaShell>aside>small,.biaShell nav span,.biaLive{display:none}.biaShell nav button{justify-content:center}.biaGrid.three{grid-template-columns:1fr 1fr}}@media(max-width:720px){.biaShell{display:block}.biaShell>aside{position:static;height:auto;margin-bottom:15px}.biaShell nav{display:flex;overflow:auto}.biaGrid,.biaGrid.three,.biaSource,.biaSummary{grid-template-columns:1fr}.biaTop h1{font-size:29px}.biaShell footer,.biaRules{flex-wrap:wrap}.biaShell footer span{display:none}}";
