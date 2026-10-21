@@ -1,140 +1,77 @@
+// VERIFIED_BCP_STRATEGY_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
+
+import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import BCPModuleNavigation from "./BCPModuleNavigation";
-
 import { useActionState, useEffect, useMemo, useState } from "react";
-
-const steps = [
-  "Linked sources",
-  "Strategy options",
-  "Resource requirements",
-  "Feasibility",
-  "Implementation",
-  "Approval register",
-];
-const strategies = [
-  ["resume", "Resume after disruption", "Wait until the effects have passed"],
-  ["repair", "Repair or rebuild", "Restore damaged infrastructure"],
-  ["manual", "Manual workaround", "Operate temporarily without normal systems"],
-  ["internal-space", "Internal alternate space", "Use another equipped area"],
-  [
-    "external-space",
-    "External alternate space",
-    "Use hotel, conference or serviced space",
-  ],
-  [
-    "recovery-provider",
-    "Recovery workplace provider",
-    "Contract a ready-to-use work environment",
-  ],
-  [
-    "transfer",
-    "Transfer to another location",
-    "Move activity to a surviving site",
-  ],
-  ["transfer-team", "Transfer activity and team", "Move both work and people"],
-  [
-    "reprioritise",
-    "Reprioritise surviving site",
-    "Suspend lower-priority work and absorb recovery",
-  ],
-  ["remote", "Remote working", "Operate from home or another remote location"],
-  [
-    "dedicated-site",
-    "Dedicated alternate site",
-    "Maintain a permanent recovery location",
-  ],
-  [
-    "external-labour",
-    "Contract labour / external service",
-    "Use third-party capacity or expertise",
-  ],
-];
-const resourceTypes = [
-  "People",
-  "Information & data",
-  "Buildings & utilities",
-  "Facilities, equipment & consumables",
-  "ICT systems",
-  "Transport & logistics",
-  "Finance",
-  "Partners & suppliers",
-  "Other",
-];
-const arr = (v) => (Array.isArray(v) ? v : []);
+const steps = ["Linked sources", "Strategy options", "Resource requirements", "Feasibility", "Implementation", "Approval register"];
+const strategies = [["resume", "Resume after disruption", "Wait until the effects have passed"], ["repair", "Repair or rebuild", "Restore damaged infrastructure"], ["manual", "Manual workaround", "Operate temporarily without normal systems"], ["internal-space", "Internal alternate space", "Use another equipped area"], ["external-space", "External alternate space", "Use hotel, conference or serviced space"], ["recovery-provider", "Recovery workplace provider", "Contract a ready-to-use work environment"], ["transfer", "Transfer to another location", "Move activity to a surviving site"], ["transfer-team", "Transfer activity and team", "Move both work and people"], ["reprioritise", "Reprioritise surviving site", "Suspend lower-priority work and absorb recovery"], ["remote", "Remote working", "Operate from home or another remote location"], ["dedicated-site", "Dedicated alternate site", "Maintain a permanent recovery location"], ["external-labour", "Contract labour / external service", "Use third-party capacity or expertise"]];
+const resourceTypes = ["People", "Information & data", "Buildings & utilities", "Facilities, equipment & consumables", "ICT systems", "Transport & logistics", "Finance", "Partners & suppliers", "Other"];
+const arr = v => (() => {
+  if (Array.isArray(v)) {
+    return v;
+  }
+  return [];
+})();
 const uid = () => crypto.randomUUID();
-const money = (v) => Number(v || 0);
-const sourceRto = (source) =>
-  Number(source?.rtoHours) || Number(source?.calculated?.rtoHours) || 0;
-const sourceMtpd = (source) =>
-  Number(source?.mtpdHours) ||
-  Number(source?.calculated?.mtpdHours) ||
-  Number(source?.calculated?.detectedMtpdHours) ||
-  0;
-
+const money = v => Number(v || 0);
+const sourceRto = source => Number(source?.rtoHours) || Number(source?.calculated?.rtoHours) || 0;
+const sourceMtpd = source => Number(source?.mtpdHours) || Number(source?.calculated?.mtpdHours) || Number(source?.calculated?.detectedMtpdHours) || 0;
 function recommend(activity) {
   const values = [];
   if (activity.remoteCapable) values.push("remote");
   if (activity.manualWorkaround) values.push("manual");
-  if (
-    arr(activity.dependencies).some((x) =>
-      /supplier|contract|external/i.test(x),
-    )
-  )
-    values.push("external-labour");
+  if (arr(activity.dependencies).some(x => /supplier|contract|external/i.test(x))) values.push("external-labour");
   if (Number(activity.rtoHours) <= 24) values.push("transfer", "reprioritise");
-  if (
-    arr(activity.resources).some((x) => /premises|building|workspace/i.test(x))
-  )
-    values.push("internal-space", "external-space");
-  if (arr(activity.resources).some((x) => /equipment|plant|facilit/i.test(x)))
-    values.push("repair");
-  return [...new Set(values.length ? values : ["resume", "manual"])];
+  if (arr(activity.resources).some(x => /premises|building|workspace/i.test(x))) values.push("internal-space", "external-space");
+  if (arr(activity.resources).some(x => /equipment|plant|facilit/i.test(x))) values.push("repair");
+  return [...new Set((() => {
+    if (values.length) {
+      return values;
+    }
+    return ["resume", "manual"];
+  })())];
 }
-
 function makeActivity(source = {}) {
   return {
-    id: source.id || uid(),
-    sourceId: source.sourceId || source.id || "",
-    name: source.name || "",
-    ownerPersonId: source.ownerPersonId || "",
-    owner: source.owner || "",
-    products: arr(source.products),
-    rtoHours: sourceRto(source),
-    mtpdHours: sourceMtpd(source),
-    troHours: Number(source.troHours) || 0,
-    rpoHours: Number(source.rpoHours) || 0,
-    mbcoPercent: Number(source.mbcoPercent) || 0,
-    remoteCapable: Boolean(source.remoteCapable),
-    manualWorkaround: source.manualWorkaround || "",
-    dependencies: arr(source.dependencies),
-    resources: arr(source.resources),
-    selectedStrategies: arr(source.selectedStrategies),
-    strategyRationale: source.strategyRationale || "",
-    solutionDescription: source.solutionDescription || "",
-    recoveryLeadHours: Number(source.recoveryLeadHours) || 0,
-    expectedCapacity: Number(source.expectedCapacity) || 0,
-    evidence: source.evidence || "",
-    risks: source.risks || "",
-    residualRisk: Math.min(
-      5,
-      Math.max(1, Number(source.residualRisk) || 1),
-    ),
-    status: source.status || "planned",
+    "id": source.id || uid(),
+    "sourceId": source.sourceId || source.id || "",
+    "name": source.name || "",
+    "ownerPersonId": source.ownerPersonId || "",
+    "owner": source.owner || "",
+    "products": arr(source.products),
+    "rtoHours": sourceRto(source),
+    "mtpdHours": sourceMtpd(source),
+    "troHours": Number(source.troHours) || 0,
+    "rpoHours": Number(source.rpoHours) || 0,
+    "mbcoPercent": Number(source.mbcoPercent) || 0,
+    "remoteCapable": Boolean(source.remoteCapable),
+    "manualWorkaround": source.manualWorkaround || "",
+    "dependencies": arr(source.dependencies),
+    "resources": arr(source.resources),
+    "selectedStrategies": arr(source.selectedStrategies),
+    "strategyRationale": source.strategyRationale || "",
+    "solutionDescription": source.solutionDescription || "",
+    "recoveryLeadHours": Number(source.recoveryLeadHours) || 0,
+    "expectedCapacity": Number(source.expectedCapacity) || 0,
+    "evidence": source.evidence || "",
+    "risks": source.risks || "",
+    "residualRisk": Math.min(5, Math.max(1, Number(source.residualRisk) || 1)),
+    "status": source.status || "planned"
   };
 }
-
 function makeResource(type) {
   return {
-    id: uid(),
-    type,
-    requirement: "",
-    quantity: "",
-    unitCost: 0,
-    recurringCost: 0,
-    leadTimeHours: 0,
-    ownerPersonId: "",
-    owner: "",
-    evidence: "",
+    "id": uid(),
+    "type": type,
+    "requirement": "",
+    "quantity": "",
+    "unitCost": 0,
+    "recurringCost": 0,
+    "leadTimeHours": 0,
+    "ownerPersonId": "",
+    "owner": "",
+    "evidence": ""
   };
 }
 function analyse(item) {
@@ -146,26 +83,17 @@ function analyse(item) {
   const timing = rto > 0 && lead > 0 && lead <= rto,
     capacityOk = capacity >= mbco && mbco > 0,
     residualRiskOk = residualRisk >= 1 && residualRisk <= 5,
-    strategyOk =
-      item.selectedStrategies.length > 0 &&
-      Boolean(item.strategyRationale && item.solutionDescription),
+    strategyOk = item.selectedStrategies.length > 0 && Boolean(item.strategyRationale && item.solutionDescription),
     evidenceOk = Boolean(String(item.evidence || "").trim()),
-    riskRationaleOk =
-      residualRisk <= 3 || Boolean(String(item.risks || "").trim());
+    riskRationaleOk = residualRisk <= 3 || Boolean(String(item.risks || "").trim());
   return {
-    timing,
-    capacityOk,
-    residualRiskOk,
-    strategyOk,
-    evidenceOk,
-    riskRationaleOk,
-    feasible:
-      timing &&
-      capacityOk &&
-      residualRiskOk &&
-      strategyOk &&
-      evidenceOk &&
-      riskRationaleOk,
+    "timing": timing,
+    "capacityOk": capacityOk,
+    "residualRiskOk": residualRiskOk,
+    "strategyOk": strategyOk,
+    "evidenceOk": evidenceOk,
+    "riskRationaleOk": riskRationaleOk,
+    "feasible": timing && capacityOk && residualRiskOk && strategyOk && evidenceOk && riskRationaleOk
   };
 }
 function Field({
@@ -177,60 +105,65 @@ function Field({
   guide = "",
   ...props
 }) {
-  const Tag = area ? "textarea" : "input";
-  return (
-    <label>
+  const Tag = (() => {
+    if (area) {
+      return "textarea";
+    }
+    return "input";
+  })();
+  return <label>
       {label}
       {guide && <small className="bssFieldGuide">{guide}</small>}
-      <Tag
-        type={area ? undefined : type}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        {...props}
-      />
-    </label>
-  );
+      <Tag type={(() => {
+      if (area) {
+        return undefined;
+      }
+      return type;
+    })()} value={value ?? ""} onChange={e => onChange(e.target.value)} {...props} />
+    </label>;
 }
-function Intro({ title, children }) {
-  return (
-    <div className="bssIntro">
+function Intro({
+  title,
+  children
+}) {
+  return <div className="bssIntro">
       <b>{title}</b>
       <p>{children}</p>
-    </div>
-  );
+    </div>;
 }
-const personName = (person) =>
-  person ? `${person.first_name} ${person.last_name}` : "";
+const personName = person => (() => {
+  if (person) {
+    return "" + person.first_name + " " + person.last_name + "";
+  }
+  return "";
+})();
 function PersonSelect({
   label,
   value,
   people,
   onChange,
-  placeholder = "Select Company Person",
+  placeholder = "Select Company Person"
 }) {
-  return (
-    <label>
+  return <label>
       {label}
-      <select
-        value={value || ""}
-        onChange={(e) => {
-          const person = people.find((x) => x.id === e.target.value);
-          onChange(e.target.value, personName(person));
-        }}
-      >
+      <select value={value || ""} onChange={e => {
+      const person = people.find(x => x.id === e.target.value);
+      onChange(e.target.value, personName(person));
+    }}>
         <option value="">{placeholder}</option>
-        {people.map((person) => (
-          <option value={person.id} key={person.id}>
+        {people.map(person => <option value={person.id} key={person.id}>
             {personName(person)}
-            {person.position ? ` · ${person.position}` : ""}
-          </option>
-        ))}
+            {(() => {
+          if (person.position) {
+            return " \xB7 " + person.position + "";
+          }
+          return "";
+        })()}
+          </option>)}
       </select>
-    </label>
-  );
+    </label>;
 }
 const riskLabels = ["", "Low", "Minor", "Moderate", "High", "Critical"];
-
 export default function BCPStrategiesSolutions({
   action,
   bias = [],
@@ -239,171 +172,106 @@ export default function BCPStrategiesSolutions({
   people = [],
   initial,
   organisationName,
-  startStep = 0,
+  startStep = 0
 }) {
   const [state, formAction, pending] = useActionState(action, {}),
-    [step, setStep] = useState(
-      Math.max(0, Math.min(5, Number(startStep) || 0)),
-    );
-  const [biaId, setBiaId] = useState(initial?.bia_assessment_id || ""),
-    [hazardId, setHazardId] = useState(initial?.hazard_assessment_id || ""),
-    [outsourcedId, setOutsourcedId] = useState(
-      initial?.outsourced_assessment_id || "",
-    );
-  const [activities, setActivities] = useState(
-    arr(initial?.strategy_assessments).map(makeActivity),
-  );
-  const [resources, setResources] = useState(
-    arr(initial?.resource_requirements).length
-      ? initial.resource_requirements
-      : resourceTypes.map(makeResource),
-  );
-  const [actions, setActions] = useState(arr(initial?.implementation_actions));
-  const [approverPersonId, setApproverPersonId] = useState(
-    initial?.approver_person_id || "",
-  );
-  const bia = bias.find((x) => x.id === biaId),
-    hazard = hazards.find((x) => x.id === hazardId),
-    supplier = outsourced.find((x) => x.id === outsourcedId);
-  const eligibleOwners = people.filter(
-    (x) => x.businessContinuityAccess || x.functions?.includes("bcp_leader"),
-  );
+    [step, setStep] = useDeviceDraftState("BCPStrategiesSolutions_step", Math.max(0, Math.min(5, Number(startStep) || 0)));
+  const [biaId, setBiaId] = useDeviceDraftState("BCPStrategiesSolutions_biaId", initial?.bia_assessment_id || ""),
+    [hazardId, setHazardId] = useDeviceDraftState("BCPStrategiesSolutions_hazardId", initial?.hazard_assessment_id || ""),
+    [outsourcedId, setOutsourcedId] = useDeviceDraftState("BCPStrategiesSolutions_outsourcedId", initial?.outsourced_assessment_id || "");
+  const [activities, setActivities] = useDeviceDraftState("BCPStrategiesSolutions_activities", arr(initial?.strategy_assessments).map(makeActivity));
+  const [resources, setResources] = useDeviceDraftState("BCPStrategiesSolutions_resources", (() => {
+    if (arr(initial?.resource_requirements).length) {
+      return initial.resource_requirements;
+    }
+    return resourceTypes.map(makeResource);
+  })());
+  const [actions, setActions] = useDeviceDraftState("BCPStrategiesSolutions_actions", arr(initial?.implementation_actions));
+  const [approverPersonId, setApproverPersonId] = useDeviceDraftState("BCPStrategiesSolutions_approverPersonId", initial?.approver_person_id || "");
+  const bia = bias.find(x => x.id === biaId),
+    hazard = hazards.find(x => x.id === hazardId),
+    supplier = outsourced.find(x => x.id === outsourcedId);
+  const eligibleOwners = people.filter(x => x.businessContinuityAccess || x.functions?.includes("bcp_leader"));
   const generate = () => {
-    const source = arr(bia?.activity_assessments).filter(
-      (x) => x.included !== false,
-    );
-    setActivities(
-      source.map((x) => {
-        const old = activities.find(
-          (a) => a.sourceId === x.id || a.name === x.name,
-        );
-        if (old)
-          return {
-            ...old,
-            ownerPersonId: old.ownerPersonId || x.ownerPersonId || "",
-            owner: old.owner || x.owner || "",
-            products: old.products.length ? old.products : arr(x.products),
-            rtoHours: sourceRto(x),
-            mtpdHours: sourceMtpd(x),
-            troHours: Number(x.troHours) || Number(x.calculated?.troHours) || old.troHours || 0,
-            rpoHours: Number(x.rpoHours) || old.rpoHours || 0,
-            mbcoPercent: Number(x.mbcoPercent) || old.mbcoPercent || 0,
-          };
-        const next = makeActivity(x);
-        const linked = arr(hazard?.scenario_assessments).filter((risk) =>
-          arr(x.hazards).includes(risk.name),
-        );
-        const maxResidual = Math.max(
-          0,
-          ...linked.map(
-            (risk) =>
-              (Number(risk.impact) || 1) *
-              Math.max(
-                1,
-                Math.ceil(
-                  (Number(risk.likelihood) || 1) *
-                    (1 - (Number(risk.controlEffectiveness) || 0) / 100),
-                ),
-              ),
-          ),
-        );
-        next.residualRisk = maxResidual
-          ? Math.min(5, Math.max(1, Math.ceil(maxResidual / 5)))
-          : 1;
-        next.selectedStrategies = recommend(x);
-        next.recoveryLeadHours = sourceRto(x);
-        next.expectedCapacity = Number(x.mbcoPercent) || 0;
-        return next;
-      }),
-    );
+    const source = arr(bia?.activity_assessments).filter(x => x.included !== false);
+    setActivities(source.map(x => {
+      const old = activities.find(a => a.sourceId === x.id || a.name === x.name);
+      if (old) return {
+        ...old,
+        "ownerPersonId": old.ownerPersonId || x.ownerPersonId || "",
+        "owner": old.owner || x.owner || "",
+        "products": (() => {
+          if (old.products.length) {
+            return old.products;
+          }
+          return arr(x.products);
+        })(),
+        "rtoHours": sourceRto(x),
+        "mtpdHours": sourceMtpd(x),
+        "troHours": Number(x.troHours) || Number(x.calculated?.troHours) || old.troHours || 0,
+        "rpoHours": Number(x.rpoHours) || old.rpoHours || 0,
+        "mbcoPercent": Number(x.mbcoPercent) || old.mbcoPercent || 0
+      };
+      const next = makeActivity(x);
+      const linked = arr(hazard?.scenario_assessments).filter(risk => arr(x.hazards).includes(risk.name));
+      const maxResidual = Math.max(0, ...linked.map(risk => (Number(risk.impact) || 1) * Math.max(1, Math.ceil((Number(risk.likelihood) || 1) * (1 - (Number(risk.controlEffectiveness) || 0) / 100)))));
+      next.residualRisk = (() => {
+        if (maxResidual) {
+          return Math.min(5, Math.max(1, Math.ceil(maxResidual / 5)));
+        }
+        return 1;
+      })();
+      next.selectedStrategies = recommend(x);
+      next.recoveryLeadHours = sourceRto(x);
+      next.expectedCapacity = Number(x.mbcoPercent) || 0;
+      return next;
+    }));
   };
   useEffect(() => {
-    if (
-      bia &&
-      arr(bia.activity_assessments).some((x) => x.included !== false)
-    )
-      generate();
+    if (bia && arr(bia.activity_assessments).some(x => x.included !== false)) generate();
   }, [biaId]);
-  const updateActivity = (id, key, value) =>
-    setActivities(
-      activities.map((x) => (x.id === id ? { ...x, [key]: value } : x)),
-    );
-  const toggleStrategy = (item, code) =>
-    updateActivity(
-      item.id,
-      "selectedStrategies",
-      item.selectedStrategies.includes(code)
-        ? item.selectedStrategies.filter((x) => x !== code)
-        : [...item.selectedStrategies, code],
-    );
-  const updateResource = (id, key, value) =>
-    setResources(
-      resources.map((x) => (x.id === id ? { ...x, [key]: value } : x)),
-    );
-  const capital = useMemo(
-    () =>
-      resources.reduce(
-        (n, x) => n + money(x.quantity || 1) * money(x.unitCost),
-        0,
-      ),
-    [resources],
-  );
-  const recurring = useMemo(
-    () => resources.reduce((n, x) => n + money(x.recurringCost), 0),
-    [resources],
-  );
-  const feasible = activities.filter((x) => analyse(x).feasible).length;
-  const checks = [
-    Boolean(biaId && activities.length),
-    activities.length > 0 &&
-      activities.every(
-        (x) => x.selectedStrategies.length && x.strategyRationale,
-      ),
-    resources.some((x) => x.requirement) &&
-      resources.filter((x) => x.requirement).every((x) => x.ownerPersonId),
-    activities.length > 0 &&
-      activities.every(
-        (x) => analyse(x).feasible,
-      ),
-    actions.length > 0 &&
-      actions.every((x) => x.action && x.ownerPersonId && x.dueDate),
-    activities.length > 0 &&
-      feasible === activities.length &&
-      Boolean(approverPersonId),
-  ];
-  const completion = Math.round(
-    (checks.filter(Boolean).length / checks.length) * 100,
-  );
-  const addAction = () =>
-    setActions([
-      ...actions,
-      {
-        id: uid(),
-        action: "",
-        ownerPersonId: "",
-        owner: "",
-        dueDate: "",
-        priority: "medium",
-        status: "open",
-      },
-    ]);
-  return (
-    <form action={formAction} className="bssShell bcpCardLayout">
+  const updateActivity = (id, key, value) => setActivities(activities.map(x => (() => {
+    if (x.id === id) {
+      return {
+        ...x,
+        [key]: value
+      };
+    }
+    return x;
+  })()));
+  const toggleStrategy = (item, code) => updateActivity(item.id, "selectedStrategies", (() => {
+    if (item.selectedStrategies.includes(code)) {
+      return item.selectedStrategies.filter(x => x !== code);
+    }
+    return [...item.selectedStrategies, code];
+  })());
+  const updateResource = (id, key, value) => setResources(resources.map(x => (() => {
+    if (x.id === id) {
+      return {
+        ...x,
+        [key]: value
+      };
+    }
+    return x;
+  })()));
+  const capital = useMemo(() => resources.reduce((n, x) => n + money(x.quantity || 1) * money(x.unitCost), 0), [resources]);
+  const recurring = useMemo(() => resources.reduce((n, x) => n + money(x.recurringCost), 0), [resources]);
+  const feasible = activities.filter(x => analyse(x).feasible).length;
+  const checks = [Boolean(biaId && activities.length), activities.length > 0 && activities.every(x => x.selectedStrategies.length && x.strategyRationale), resources.some(x => x.requirement) && resources.filter(x => x.requirement).every(x => x.ownerPersonId), activities.length > 0 && activities.every(x => analyse(x).feasible), actions.length > 0 && actions.every(x => x.action && x.ownerPersonId && x.dueDate), activities.length > 0 && feasible === activities.length && Boolean(approverPersonId)];
+  const completion = Math.round(checks.filter(Boolean).length / checks.length * 100);
+  const addAction = () => setActions([...actions, {
+    "id": uid(),
+    "action": "",
+    "ownerPersonId": "",
+    "owner": "",
+    "dueDate": "",
+    "priority": "medium",
+    "status": "open"
+  }]);
+  return <form action={formAction} className="bssShell bcpCardLayout">
       <style>{styles}</style>
       <style>{enhancementStyles}</style>
-      {[
-        ["assessment_id", state?.savedId || initial?.id || ""],
-        ["bia_assessment_id", biaId],
-        ["hazard_assessment_id", hazardId],
-        ["outsourced_assessment_id", outsourcedId],
-        ["approver_person_id", approverPersonId],
-        ["strategy_assessments", JSON.stringify(activities)],
-        ["resource_requirements", JSON.stringify(resources)],
-        ["implementation_actions", JSON.stringify(actions)],
-        ["next_step", Math.min(5, step + 1)],
-      ].map(([name, value]) => (
-        <input key={name} type="hidden" name={name} value={value} />
-      ))}
+      {[["assessment_id", state?.savedId || initial?.id || ""], ["bia_assessment_id", biaId], ["hazard_assessment_id", hazardId], ["outsourced_assessment_id", outsourcedId], ["approver_person_id", approverPersonId], ["strategy_assessments", JSON.stringify(activities)], ["resource_requirements", JSON.stringify(resources)], ["implementation_actions", JSON.stringify(actions)], ["next_step", Math.min(5, step + 1)]].map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
       <BCPModuleNavigation moduleNumber={8} title="Strategies & solutions" percent={completion} steps={steps} checks={checks} activeStep={step} onSelect={setStep}>
 
           <b>DYNAMIC ENGINE</b>
@@ -426,16 +294,25 @@ export default function BCPStrategiesSolutions({
           <b>{initial?.status || "draft"}</b>
         </header>
         <div className="bssProgress">
-          <i style={{ width: `${((step + 1) / 6) * 100}%` }} />
+          <i style={{
+          "width": "" + (step + 1) / 6 * 100 + "%"
+        }} />
         </div>
-        {state?.error && (
-          <div className={state?.savedId ? "bssNotice" : "bssError"}>
-            <b>{state?.savedId ? "Draft saved — approval needs attention" : "Cannot save Module 8"}</b>
+        {state?.error && <div className={(() => {
+        if (state?.savedId) {
+          return "bssNotice";
+        }
+        return "bssError";
+      })()}>
+            <b>{(() => {
+            if (state?.savedId) {
+              return "Draft saved — approval needs attention";
+            }
+            return "Cannot save Module 8";
+          })()}</b>
             <span>{state.error}</span>
-          </div>
-        )}
-        {step === 0 && (
-          <section className="bssPanel">
+          </div>}
+        {step === 0 && <section className="bssPanel">
             <Intro title="Connect the controlled evidence used by the strategy engine.">
               Module 8 inherits recovery objectives, disruption risks, resource
               dependencies and supplier-control information. Source versions are
@@ -444,73 +321,43 @@ export default function BCPStrategiesSolutions({
             <div className="bssGrid">
               <label>
                 Module 6 Business Impact Analysis *
-                <select
-                  value={biaId}
-                  onChange={(e) => setBiaId(e.target.value)}
-                >
+                <select value={biaId} onChange={e => setBiaId(e.target.value)}>
                   <option value="">Select controlled BIA</option>
-                  {bias.map((x) => (
-                    <option key={x.id} value={x.id}>
+                  {bias.map(x => <option key={x.id} value={x.id}>
                       {x.assessment_title} · v{x.version || 1} · {x.status}
-                    </option>
-                  ))}
+                    </option>)}
                 </select>
               </label>
               <label>
                 Module 5 Hazard Assessment
-                <select
-                  value={hazardId}
-                  onChange={(e) => setHazardId(e.target.value)}
-                >
+                <select value={hazardId} onChange={e => setHazardId(e.target.value)}>
                   <option value="">Optional</option>
-                  {hazards.map((x) => (
-                    <option key={x.id} value={x.id}>
+                  {hazards.map(x => <option key={x.id} value={x.id}>
                       {x.assessment_title} · {x.status}
-                    </option>
-                  ))}
+                    </option>)}
                 </select>
               </label>
               <label>
                 Module 7 Outsourced Process Control
-                <select
-                  value={outsourcedId}
-                  onChange={(e) => setOutsourcedId(e.target.value)}
-                >
+                <select value={outsourcedId} onChange={e => setOutsourcedId(e.target.value)}>
                   <option value="">Optional</option>
-                  {outsourced.map((x) => (
-                    <option key={x.id} value={x.id}>
+                  {outsourced.map(x => <option key={x.id} value={x.id}>
                       {x.assessment_title} · {x.status}
-                    </option>
-                  ))}
+                    </option>)}
                 </select>
               </label>
               <label>
                 Assessment title
-                <input
-                  name="assessment_title"
-                  defaultValue={
-                    initial?.assessment_title ||
-                    `${organisationName || "Organisation"} continuity strategies and solutions`
-                  }
-                />
+                <input name="assessment_title" defaultValue={initial?.assessment_title || "" + (organisationName || "Organisation") + " continuity strategies and solutions"} />
               </label>
             </div>
-            <button
-              type="button"
-              className="bssGenerate"
-              onClick={generate}
-              disabled={!bia}
-            >
+            <button type="button" className="bssGenerate" onClick={generate} disabled={!bia}>
               ✦ Generate from linked BIA
             </button>
             <div className="bssStats">
               <article>
                 <b>
-                  {
-                    arr(bia?.activity_assessments).filter(
-                      (x) => x.included !== false,
-                    ).length
-                  }
+                  {arr(bia?.activity_assessments).filter(x => x.included !== false).length}
                 </b>
                 <span>BIA activities</span>
               </article>
@@ -527,29 +374,24 @@ export default function BCPStrategiesSolutions({
                 <span>strategy records</span>
               </article>
             </div>
-          </section>
-        )}
-        {step === 1 && (
-          <section className="bssPanel">
+          </section>}
+        {step === 1 && <section className="bssPanel">
             <Intro title="Select proportionate strategies for every priority activity.">
               Recommendations respond to RTO, remote capability, workarounds,
               resources and external dependencies. Customers may select several
               options and record the decision basis.
             </Intro>
-            {!activities.length && (
-              <div className="bssError">
+            {!activities.length && <div className="bssError">
                 <b>No priority activities have been generated.</b>
                 <span>
                   Return to Linked sources, select the controlled BIA and
                   generate the linked activities.
                 </span>
-              </div>
-            )}
+              </div>}
             <div className="bssList">
-              {activities.map((item) => {
-                const rec = recommend(item);
-                return (
-                  <article className="bssCard" key={item.id}>
+              {activities.map(item => {
+            const rec = recommend(item);
+            return <article className="bssCard" key={item.id}>
                     <header>
                       <div>
                         <b>{item.name}</b>
@@ -562,70 +404,48 @@ export default function BCPStrategiesSolutions({
                       <em>{item.selectedStrategies.length} selected</em>
                     </header>
                     <div className="bssOptions">
-                      {strategies.map(([code, title, desc]) => (
-                        <button
-                          type="button"
-                          key={code}
-                          className={
-                            item.selectedStrategies.includes(code)
-                              ? "selected"
-                              : ""
-                          }
-                          onClick={() => toggleStrategy(item, code)}
-                        >
+                      {strategies.map(([code, title, desc]) => <button type="button" key={code} className={(() => {
+                  if (item.selectedStrategies.includes(code)) {
+                    return "selected";
+                  }
+                  return "";
+                })()} onClick={() => toggleStrategy(item, code)}>
                           <b>
-                            {item.selectedStrategies.includes(code) ? "✓" : "+"}{" "}
+                            {(() => {
+                      if (item.selectedStrategies.includes(code)) {
+                        return "✓";
+                      }
+                      return "+";
+                    })()}{" "}
                             {title}
                           </b>
                           <span>
                             {desc}
-                            {rec.includes(code) ? " · Engine recommended" : ""}
+                            {(() => {
+                      if (rec.includes(code)) {
+                        return " · Engine recommended";
+                      }
+                      return "";
+                    })()}
                           </span>
-                        </button>
-                      ))}
+                        </button>)}
                     </div>
                     <div className="bssGrid">
-                      <Field
-                        area
-                        label="Selection rationale *"
-                        guide="Explain why the selected strategies are proportionate to the activity's RTO, MBCO, dependencies and disruption risks. Record alternatives considered and why they were accepted or rejected."
-                        placeholder={
-                          "1. Recovery need and constraints\n2. Options considered\n3. Reason for the selected strategy"
-                        }
-                        value={item.strategyRationale}
-                        onChange={(v) =>
-                          updateActivity(item.id, "strategyRationale", v)
-                        }
-                      />
-                      <Field
-                        area
-                        label="Operational solution *"
-                        guide="Describe how the selected strategies will operate during disruption, including activation, people, locations, technology, suppliers and the return to normal operations."
-                        placeholder={
-                          "1. Activation and escalation\n2. Recovery operating arrangement\n3. Resources, dependencies and restoration"
-                        }
-                        value={item.solutionDescription}
-                        onChange={(v) =>
-                          updateActivity(item.id, "solutionDescription", v)
-                        }
-                      />
+                      <Field area label="Selection rationale *" guide="Explain why the selected strategies are proportionate to the activity's RTO, MBCO, dependencies and disruption risks. Record alternatives considered and why they were accepted or rejected." placeholder={"1. Recovery need and constraints\n2. Options considered\n3. Reason for the selected strategy"} value={item.strategyRationale} onChange={v => updateActivity(item.id, "strategyRationale", v)} />
+                      <Field area label="Operational solution *" guide="Describe how the selected strategies will operate during disruption, including activation, people, locations, technology, suppliers and the return to normal operations." placeholder={"1. Activation and escalation\n2. Recovery operating arrangement\n3. Resources, dependencies and restoration"} value={item.solutionDescription} onChange={v => updateActivity(item.id, "solutionDescription", v)} />
                     </div>
-                  </article>
-                );
-              })}
+                  </article>;
+          })}
             </div>
-          </section>
-        )}
-        {step === 2 && (
-          <section className="bssPanel">
+          </section>}
+        {step === 2 && <section className="bssPanel">
             <Intro title="Define resources and calculate the investment required.">
               Record the minimum requirement, accountable owner, lead time and
               evidence for each applicable resource category. Capital and
               recurring costs are calculated automatically.
             </Intro>
             <div className="bssResources">
-              {resources.map((r) => (
-                <article key={r.id}>
+              {resources.map(r => <article key={r.id}>
                   <header className="bssResourceHead">
                     <b>{r.type}</b>
                     <span>
@@ -634,64 +454,24 @@ export default function BCPStrategiesSolutions({
                     </span>
                   </header>
                   <div className="bssGrid three">
-                    <Field
-                      area
-                      label="Requirement"
-                      value={r.requirement}
-                      onChange={(v) => updateResource(r.id, "requirement", v)}
-                      placeholder={
-                        "1. Requirement and purpose\n2. Minimum quantity / capacity\n3. Availability or recovery arrangement"
-                      }
-                    />
-                    <Field
-                      label="Quantity"
-                      value={r.quantity}
-                      onChange={(v) => updateResource(r.id, "quantity", v)}
-                    />
-                    <Field
-                      type="number"
-                      label="Unit / capital cost (£)"
-                      value={r.unitCost}
-                      onChange={(v) => updateResource(r.id, "unitCost", v)}
-                    />
-                    <Field
-                      type="number"
-                      label="Recurring cost (£)"
-                      value={r.recurringCost}
-                      onChange={(v) => updateResource(r.id, "recurringCost", v)}
-                    />
-                    <Field
-                      type="number"
-                      label="Lead time (hours)"
-                      value={r.leadTimeHours}
-                      onChange={(v) => updateResource(r.id, "leadTimeHours", v)}
-                    />
-                    <PersonSelect
-                      label="Accountable owner *"
-                      value={r.ownerPersonId}
-                      people={eligibleOwners}
-                      onChange={(id, name) =>
-                        setResources(
-                          resources.map((x) =>
-                            x.id === r.id
-                              ? { ...x, ownerPersonId: id, owner: name }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
-                    <Field
-                      area
-                      label="Evidence / calculation basis"
-                      value={r.evidence}
-                      onChange={(v) => updateResource(r.id, "evidence", v)}
-                      placeholder={
-                        "1. Quantity × unit cost = capital cost\n2. Monthly / annual recurring cost\n3. Quote, contract, inventory or calculation reference"
-                      }
-                    />
+                    <Field area label="Requirement" value={r.requirement} onChange={v => updateResource(r.id, "requirement", v)} placeholder={"1. Requirement and purpose\n2. Minimum quantity / capacity\n3. Availability or recovery arrangement"} />
+                    <Field label="Quantity" value={r.quantity} onChange={v => updateResource(r.id, "quantity", v)} />
+                    <Field type="number" label="Unit / capital cost (£)" value={r.unitCost} onChange={v => updateResource(r.id, "unitCost", v)} />
+                    <Field type="number" label="Recurring cost (£)" value={r.recurringCost} onChange={v => updateResource(r.id, "recurringCost", v)} />
+                    <Field type="number" label="Lead time (hours)" value={r.leadTimeHours} onChange={v => updateResource(r.id, "leadTimeHours", v)} />
+                    <PersonSelect label="Accountable owner *" value={r.ownerPersonId} people={eligibleOwners} onChange={(id, name) => setResources(resources.map(x => (() => {
+                if (x.id === r.id) {
+                  return {
+                    ...x,
+                    "ownerPersonId": id,
+                    "owner": name
+                  };
+                }
+                return x;
+              })()))} />
+                    <Field area label="Evidence / calculation basis" value={r.evidence} onChange={v => updateResource(r.id, "evidence", v)} placeholder={"1. Quantity × unit cost = capital cost\n2. Monthly / annual recurring cost\n3. Quote, contract, inventory or calculation reference"} />
                   </div>
-                </article>
-              ))}
+                </article>)}
             </div>
             <div className="bssTotals">
               <span>
@@ -704,10 +484,8 @@ export default function BCPStrategiesSolutions({
                 Total <b>£{(capital + recurring).toLocaleString()}</b>
               </span>
             </div>
-          </section>
-        )}
-        {step === 3 && (
-          <section className="bssPanel">
+          </section>}
+        {step === 3 && <section className="bssPanel">
             <Intro title="Challenge whether each selected solution can meet the approved recovery need.">
               The engine compares solution lead time with RTO and expected
               capacity with MBCO. Residual risk is carried from the linked
@@ -723,13 +501,14 @@ export default function BCPStrategiesSolutions({
               <span>5 Critical</span>
             </div>
             <div className="bssList">
-              {activities.map((item) => {
-                const a = analyse(item);
-                return (
-                  <article
-                    className={`bssCard ${a.feasible ? "ok" : "gap"}`}
-                    key={item.id}
-                  >
+              {activities.map(item => {
+            const a = analyse(item);
+            return <article className={"bssCard " + (() => {
+              if (a.feasible) {
+                return "ok";
+              }
+              return "gap";
+            })() + ""} key={item.id}>
                     <header>
                       <div>
                         <b>{item.name}</b>
@@ -738,78 +517,33 @@ export default function BCPStrategiesSolutions({
                           {item.mbcoPercent}%
                         </span>
                       </div>
-                      <em>{a.feasible ? "Feasible" : "Gap identified"}</em>
+                      <em>{(() => {
+                    if (a.feasible) {
+                      return "Feasible";
+                    }
+                    return "Gap identified";
+                  })()}</em>
                     </header>
                     <div className="bssGrid three">
-                      <Field
-                        type="number"
-                        label="Solution ready within (hours) *"
-                        value={item.recoveryLeadHours}
-                        onChange={(v) =>
-                          updateActivity(item.id, "recoveryLeadHours", v)
-                        }
-                      />
-                      <Field
-                        type="number"
-                        label="Expected recovered capacity % *"
-                        value={item.expectedCapacity}
-                        onChange={(v) =>
-                          updateActivity(item.id, "expectedCapacity", v)
-                        }
-                      />
+                      <Field type="number" label="Solution ready within (hours) *" value={item.recoveryLeadHours} onChange={v => updateActivity(item.id, "recoveryLeadHours", v)} />
+                      <Field type="number" label="Expected recovered capacity % *" value={item.expectedCapacity} onChange={v => updateActivity(item.id, "expectedCapacity", v)} />
                       <label>
                         Decision status
-                        <select
-                          value={item.status}
-                          onChange={(e) =>
-                            updateActivity(item.id, "status", e.target.value)
-                          }
-                        >
+                        <select value={item.status} onChange={e => updateActivity(item.id, "status", e.target.value)}>
                           <option value="planned">Planned</option>
                           <option value="funded">Funded</option>
                           <option value="implemented">Implemented</option>
                           <option value="tested">Tested</option>
                         </select>
                       </label>
-                      <Field
-                        area
-                        label="Objective evidence *"
-                        guide="Identify verifiable evidence that the solution can achieve the stated recovery time and capacity, such as exercise results, supplier commitments, technical tests or approved plans."
-                        placeholder={
-                          "1. Evidence reviewed\n2. Result and date\n3. Document, test or contract reference"
-                        }
-                        value={item.evidence}
-                        onChange={(v) => updateActivity(item.id, "evidence", v)}
-                      />
-                      <Field
-                        area
-                        label="Assumptions / residual-risk rationale"
-                        guide="Record assumptions, dependencies, limitations and remaining exposure after the solution. Explain the selected residual-risk score and who accepts any material risk."
-                        placeholder={
-                          "1. Key assumptions and dependencies\n2. Remaining vulnerabilities\n3. Basis for risk score and acceptance"
-                        }
-                        value={item.risks}
-                        onChange={(v) => updateActivity(item.id, "risks", v)}
-                      />
+                      <Field area label="Objective evidence *" guide="Identify verifiable evidence that the solution can achieve the stated recovery time and capacity, such as exercise results, supplier commitments, technical tests or approved plans." placeholder={"1. Evidence reviewed\n2. Result and date\n3. Document, test or contract reference"} value={item.evidence} onChange={v => updateActivity(item.id, "evidence", v)} />
+                      <Field area label="Assumptions / residual-risk rationale" guide="Record assumptions, dependencies, limitations and remaining exposure after the solution. Explain the selected residual-risk score and who accepts any material risk." placeholder={"1. Key assumptions and dependencies\n2. Remaining vulnerabilities\n3. Basis for risk score and acceptance"} value={item.risks} onChange={v => updateActivity(item.id, "risks", v)} />
                       <label className="bssRiskSlider">
                         Residual risk after solution:{" "}
                         <b>
                           {item.residualRisk} · {riskLabels[item.residualRisk]}
                         </b>
-                        <input
-                          type="range"
-                          min="1"
-                          max="5"
-                          step="1"
-                          value={item.residualRisk}
-                          onChange={(e) =>
-                            updateActivity(
-                              item.id,
-                              "residualRisk",
-                              Number(e.target.value),
-                            )
-                          }
-                        />
+                        <input type="range" min="1" max="5" step="1" value={item.residualRisk} onChange={e => updateActivity(item.id, "residualRisk", Number(e.target.value))} />
                         <span>
                           <i>1 Low</i>
                           <i>2</i>
@@ -820,30 +554,77 @@ export default function BCPStrategiesSolutions({
                       </label>
                     </div>
                     <div className="bssVerdict">
-                      <span className={a.timing ? "pass" : "fail"}>
-                        {a.timing ? "✓" : "!"} RTO alignment
+                      <span className={(() => {
+                  if (a.timing) {
+                    return "pass";
+                  }
+                  return "fail";
+                })()}>
+                        {(() => {
+                    if (a.timing) {
+                      return "✓";
+                    }
+                    return "!";
+                  })()} RTO alignment
                       </span>
-                      <span className={a.capacityOk ? "pass" : "fail"}>
-                        {a.capacityOk ? "✓" : "!"} MBCO capacity
+                      <span className={(() => {
+                  if (a.capacityOk) {
+                    return "pass";
+                  }
+                  return "fail";
+                })()}>
+                        {(() => {
+                    if (a.capacityOk) {
+                      return "✓";
+                    }
+                    return "!";
+                  })()} MBCO capacity
                       </span>
-                      <span className={a.strategyOk ? "pass" : "fail"}>
-                        {a.strategyOk ? "✓" : "!"} Strategy defined
+                      <span className={(() => {
+                  if (a.strategyOk) {
+                    return "pass";
+                  }
+                  return "fail";
+                })()}>
+                        {(() => {
+                    if (a.strategyOk) {
+                      return "✓";
+                    }
+                    return "!";
+                  })()} Strategy defined
                       </span>
-                      <span className={a.evidenceOk ? "pass" : "fail"}>
-                        {a.evidenceOk ? "✓" : "!"} Objective evidence
+                      <span className={(() => {
+                  if (a.evidenceOk) {
+                    return "pass";
+                  }
+                  return "fail";
+                })()}>
+                        {(() => {
+                    if (a.evidenceOk) {
+                      return "✓";
+                    }
+                    return "!";
+                  })()} Objective evidence
                       </span>
-                      <span className={a.riskRationaleOk ? "pass" : "fail"}>
-                        {a.riskRationaleOk ? "✓" : "!"} Residual-risk rationale
+                      <span className={(() => {
+                  if (a.riskRationaleOk) {
+                    return "pass";
+                  }
+                  return "fail";
+                })()}>
+                        {(() => {
+                    if (a.riskRationaleOk) {
+                      return "✓";
+                    }
+                    return "!";
+                  })()} Residual-risk rationale
                       </span>
                     </div>
-                  </article>
-                );
-              })}
+                  </article>;
+          })}
             </div>
-          </section>
-        )}
-        {step === 4 && (
-          <section className="bssPanel">
+          </section>}
+        {step === 4 && <section className="bssPanel">
             <Intro title="Turn strategy gaps and selected solutions into accountable delivery.">
               Define implementation, procurement, validation and exercising
               actions. The action owner is linked to their controlled Company
@@ -853,59 +634,46 @@ export default function BCPStrategiesSolutions({
               + Add implementation action
             </button>
             <div className="bssActions">
-              {actions.map((a) => (
-                <article key={a.id}>
-                  <Field
-                    label="Action *"
-                    value={a.action}
-                    onChange={(v) =>
-                      setActions(
-                        actions.map((x) =>
-                          x.id === a.id ? { ...x, action: v } : x,
-                        ),
-                      )
-                    }
-                  />
-                  <PersonSelect
-                    label="Owner *"
-                    value={a.ownerPersonId}
-                    people={eligibleOwners}
-                    onChange={(id, name) =>
-                      setActions(
-                        actions.map((x) =>
-                          x.id === a.id
-                            ? { ...x, ownerPersonId: id, owner: name }
-                            : x,
-                        ),
-                      )
-                    }
-                  />
-                  <Field
-                    type="date"
-                    label="Due date *"
-                    value={a.dueDate}
-                    onChange={(v) =>
-                      setActions(
-                        actions.map((x) =>
-                          x.id === a.id ? { ...x, dueDate: v } : x,
-                        ),
-                      )
-                    }
-                  />
+              {actions.map(a => <article key={a.id}>
+                  <Field label="Action *" value={a.action} onChange={v => setActions(actions.map(x => (() => {
+              if (x.id === a.id) {
+                return {
+                  ...x,
+                  "action": v
+                };
+              }
+              return x;
+            })()))} />
+                  <PersonSelect label="Owner *" value={a.ownerPersonId} people={eligibleOwners} onChange={(id, name) => setActions(actions.map(x => (() => {
+              if (x.id === a.id) {
+                return {
+                  ...x,
+                  "ownerPersonId": id,
+                  "owner": name
+                };
+              }
+              return x;
+            })()))} />
+                  <Field type="date" label="Due date *" value={a.dueDate} onChange={v => setActions(actions.map(x => (() => {
+              if (x.id === a.id) {
+                return {
+                  ...x,
+                  "dueDate": v
+                };
+              }
+              return x;
+            })()))} />
                   <label>
                     Priority
-                    <select
-                      value={a.priority}
-                      onChange={(e) =>
-                        setActions(
-                          actions.map((x) =>
-                            x.id === a.id
-                              ? { ...x, priority: e.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    >
+                    <select value={a.priority} onChange={e => setActions(actions.map(x => (() => {
+                if (x.id === a.id) {
+                  return {
+                    ...x,
+                    "priority": e.target.value
+                  };
+                }
+                return x;
+              })()))}>
                       <option>low</option>
                       <option>medium</option>
                       <option>high</option>
@@ -914,38 +682,27 @@ export default function BCPStrategiesSolutions({
                   </label>
                   <label>
                     Status
-                    <select
-                      value={a.status}
-                      onChange={(e) =>
-                        setActions(
-                          actions.map((x) =>
-                            x.id === a.id
-                              ? { ...x, status: e.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    >
+                    <select value={a.status} onChange={e => setActions(actions.map(x => (() => {
+                if (x.id === a.id) {
+                  return {
+                    ...x,
+                    "status": e.target.value
+                  };
+                }
+                return x;
+              })()))}>
                       <option>open</option>
                       <option>in progress</option>
                       <option>closed</option>
                     </select>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActions(actions.filter((x) => x.id !== a.id))
-                    }
-                  >
+                  <button type="button" onClick={() => setActions(actions.filter(x => x.id !== a.id))}>
                     Remove
                   </button>
-                </article>
-              ))}
+                </article>)}
             </div>
-          </section>
-        )}
-        {step === 5 && (
-          <section className="bssPanel">
+          </section>}
+        {step === 5 && <section className="bssPanel">
             <Intro title="Approve the controlled strategy and solutions register.">
               Confirm traceability, feasibility, investment, ownership and
               implementation status. Select the competent approver from the
@@ -961,7 +718,7 @@ export default function BCPStrategiesSolutions({
                 <span>feasible solutions</span>
               </article>
               <article>
-                <b>{actions.filter((x) => x.status !== "closed").length}</b>
+                <b>{actions.filter(x => x.status !== "closed").length}</b>
                 <span>open actions</span>
               </article>
               <article>
@@ -977,14 +734,10 @@ export default function BCPStrategiesSolutions({
                 <b>Residual risk</b>
                 <b>Assurance</b>
               </header>
-              {activities.map((x) => (
-                <article key={x.id}>
+              {activities.map(x => <article key={x.id}>
                   <b>{x.name}</b>
                   <span>
-                    {x.selectedStrategies
-                      .map((c) => strategies.find((s) => s[0] === c)?.[1])
-                      .filter(Boolean)
-                      .join(", ")}
+                    {x.selectedStrategies.map(c => strategies.find(s => s[0] === c)?.[1]).filter(Boolean).join(", ")}
                   </span>
                   <span>
                     {x.rtoHours}h / {x.mbcoPercent}%
@@ -992,19 +745,25 @@ export default function BCPStrategiesSolutions({
                   <span>
                     {x.residualRisk} · {riskLabels[x.residualRisk]}
                   </span>
-                  <em className={analyse(x).feasible ? "pass" : "fail"}>
-                    {analyse(x).feasible ? "Aligned" : "Gap"}
+                  <em className={(() => {
+              if (analyse(x).feasible) {
+                return "pass";
+              }
+              return "fail";
+            })()}>
+                    {(() => {
+                if (analyse(x).feasible) {
+                  return "Aligned";
+                }
+                return "Gap";
+              })()}
                   </em>
-                </article>
-              ))}
+                </article>)}
             </div>
             <div className="bssGrid">
               <label>
                 Review frequency
-                <select
-                  name="review_frequency"
-                  defaultValue={initial?.review_frequency || "Every 6 months"}
-                >
+                <select name="review_frequency" defaultValue={initial?.review_frequency || "Every 6 months"}>
                   <option>Quarterly</option>
                   <option>Every 6 months</option>
                   <option>Annually</option>
@@ -1013,26 +772,10 @@ export default function BCPStrategiesSolutions({
               </label>
               <label>
                 Next review date
-                <input
-                  type="date"
-                  name="next_review_date"
-                  defaultValue={initial?.next_review_date || ""}
-                />
+                <input type="date" name="next_review_date" defaultValue={initial?.next_review_date || ""} />
               </label>
-              <PersonSelect
-                label="Competent approver · Company User *"
-                value={approverPersonId}
-                people={people}
-                onChange={(id) => setApproverPersonId(id)}
-                placeholder="Select from Company People"
-              />
-              <input
-                type="hidden"
-                name="reviewer_name"
-                value={personName(
-                  people.find((x) => x.id === approverPersonId),
-                )}
-              />
+              <PersonSelect label="Competent approver · Company User *" value={approverPersonId} people={people} onChange={id => setApproverPersonId(id)} placeholder="Select from Company People" />
+              <input type="hidden" name="reviewer_name" value={personName(people.find(x => x.id === approverPersonId))} />
               <label className="wide">
                 Decision, limitations and residual risk
                 <small className="bssFieldGuide">
@@ -1041,85 +784,56 @@ export default function BCPStrategiesSolutions({
                   including the accountable risk owner and required review or
                   escalation.
                 </small>
-                <textarea
-                  name="review_comment"
-                  placeholder={
-                    "1. Approval decision and scope\n2. Limitations, conditions and open actions\n3. Residual risks, owner and review requirements"
-                  }
-                  defaultValue={initial?.review_comment || ""}
-                />
+                <textarea name="review_comment" placeholder={"1. Approval decision and scope\n2. Limitations, conditions and open actions\n3. Residual risks, owner and review requirements"} defaultValue={initial?.review_comment || ""} />
               </label>
             </div>
-            {!people.length && (
-              <div className="bssError">
+            {!people.length && <div className="bssError">
                 <b>No active Company User is available.</b>
                 <span>
                   Add or activate the competent approver in Company People,
                   then return to this assessment.
                 </span>
-              </div>
-            )}
-          </section>
-        )}
+              </div>}
+          </section>}
         <footer>
-          <button
-            type="button"
-            disabled={!step || pending}
-            onClick={() => setStep(step - 1)}
-          >
+          <button type="button" disabled={!step || pending} onClick={() => setStep(step - 1)}>
             ← Previous
           </button>
-          {initial?.id && (
-            <button
-              className="danger"
-              name="intent"
-              value="archive"
-              disabled={pending}
-            >
+          {initial?.id && <button className="danger" name="intent" value="archive" disabled={pending}>
               Archive
-            </button>
-          )}
+            </button>}
           <span>
-            {pending ? "Saving…" : "Controlled progress saves to your account"}
+            {(() => {
+            if (pending) {
+              return "Saving…";
+            }
+            return "Controlled progress saves to your account";
+          })()}
           </span>
-          {state?.error && (
-            <strong className="bssFooterNotice" role="alert">
+          {state?.error && <strong className="bssFooterNotice" role="alert">
               {state.error}
-            </strong>
-          )}
-          {step < 5 ? (
-            <button
-              className="primary"
-              name="intent"
-              value="continue"
-              disabled={pending || !biaId || !activities.length}
-            >
+            </strong>}
+          {(() => {
+          if (step < 5) {
+            return <button className="primary" name="intent" value="continue" disabled={pending || !biaId || !activities.length}>
               Save &amp; continue →
-            </button>
-          ) : (
-            <>
+            </button>;
+          }
+          return <>
               <button name="intent" value="draft" disabled={pending}>
                 Save draft
               </button>
               <button name="intent" value="review" disabled={pending}>
                 Submit for review
               </button>
-              <button
-                className="primary"
-                name="intent"
-                value="approve"
-                disabled={pending}
-              >
+              <button className="primary" name="intent" value="approve" disabled={pending}>
                 Approve Module 8 →
               </button>
-            </>
-          )}
+            </>;
+        })()}
         </footer>
       </main>
-    </form>
-  );
+    </form>;
 }
-
-const enhancementStyles = `.bssResourceHead{display:grid;gap:7px}.bssResourceHead>b{color:#173b60}.bssResourceHead span{padding:8px 10px;border-left:4px solid #f0c300;border-radius:6px;background:#fff9d8;color:#675600;font-size:11px;font-weight:800}.bssFieldGuide{display:block;margin-top:6px;padding:8px 10px;border-left:4px solid #f0c300;border-radius:6px;background:#fff9d8;color:#675600;font-size:10px;font-weight:700;line-height:1.45}.bssRiskGuide{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0;padding:12px;border-radius:9px;background:#0b2d56;color:#fff}.bssRiskGuide b{margin-right:7px;color:#55e1d4}.bssRiskGuide span{padding:5px 8px;border-radius:999px;background:#ffffff15;font-size:10px}.bssRiskSlider{grid-column:1/-1;padding:12px;border:1px solid #c9d9e7;border-radius:9px;background:#f7fbff}.bssRiskSlider>b{float:right;color:#315fe6}.bssRiskSlider input{display:block;width:100%;margin:13px 0 7px;accent-color:#315fe6}.bssRiskSlider span{display:flex;justify-content:space-between;color:#6b7f92;font-size:9px}.bssRiskSlider i{font-style:normal}.bssFooterNotice{max-width:460px;padding:8px 10px;border-radius:7px;background:#fff4cc;color:#765b00;font-size:10px;line-height:1.35}.bssNotice{display:grid;gap:4px;margin-bottom:13px;padding:13px;border:1px solid #e4c65c;border-radius:10px;background:#fff8dc;color:#725800}`;
-
-const styles = `*{box-sizing:border-box}.bssShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.bssShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.bssBrand{font-size:21px;font-weight:950}.bssBrand span{font-weight:500}.bssShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.bssShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.bssShell>aside>section strong{font-size:28px}.bssShell>aside>section span{float:right;margin-top:10px;font-size:10px}.bssShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.bssShell>aside>section i b{display:block;height:100%;background:#55e1d4}.bssShell nav{display:grid;gap:6px;margin-top:18px}.bssShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.bssShell nav button.active{background:#245d97}.bssShell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.bssLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.bssLive b{color:#55e1d4}.bssShell main{min-width:0}.bssTop{display:flex;justify-content:space-between;align-items:end}.bssTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.bssTop h1{margin:7px 0 4px;font-size:37px}.bssTop p{margin:0;color:#607890}.bssTop>b{text-transform:capitalize;color:#087c61}.bssProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.bssProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.bssPanel{padding:24px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.bssIntro{padding:19px;border-radius:12px;background:#eff5fa}.bssIntro b{font-size:17px}.bssIntro p{margin:7px 0 0;color:#60778e;line-height:1.5}.bssGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:15px}.bssGrid.three{grid-template-columns:repeat(3,1fr)}.bssGrid label,.bssActions label{font-size:11px;font-weight:850}.bssGrid input,.bssGrid select,.bssGrid textarea,.bssActions input,.bssActions select{width:100%;margin-top:6px;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.bssGrid textarea{min-height:78px}.bssGrid .wide{grid-column:1/-1}.bssGenerate{margin:16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.bssStats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:15px}.bssStats article{padding:14px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.bssStats b{display:block;color:#315fe6;font-size:25px}.bssStats span{color:#60778e;font-size:10px}.bssList,.bssResources{display:grid;gap:13px;margin-top:16px}.bssCard,.bssResources>article{padding:17px;border:1px solid #cfdae6;border-left:5px solid #315fe6;border-radius:12px}.bssCard.ok{border-left-color:#13a488}.bssCard.gap{border-left-color:#e09b18}.bssCard>header{display:flex;justify-content:space-between;gap:14px}.bssCard header div{display:grid;gap:4px}.bssCard header span{color:#617991;font-size:11px}.bssCard header em{align-self:start;padding:6px 9px;border-radius:999px;background:#edf3ff;color:#315fe6;font-size:10px;font-style:normal}.bssOptions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.bssOptions button{display:grid;gap:4px;padding:11px;border:1px solid #c8d6e4;border-radius:9px;background:#fff;color:#244666;text-align:left}.bssOptions button.selected{border-color:#10a98e;background:#e6faf5;color:#08725f}.bssOptions span{font-size:9px;color:#6a8095}.bssResources>article>b{color:#173b60}.bssTotals{display:flex;justify-content:flex-end;gap:20px;margin-top:15px;padding:16px;border-radius:10px;background:#0b2d56;color:#fff}.bssTotals b{color:#55e1d4}.bssVerdict{display:flex;gap:8px;margin-top:13px}.bssVerdict span,.bssRegister em{padding:6px 9px;border-radius:7px;font-size:10px;font-style:normal}.pass{background:#e1f5eb;color:#087453}.fail{background:#fff0d6;color:#8b5700}.bssActions{display:grid;gap:9px}.bssActions article{display:grid;grid-template-columns:2fr 1fr .8fr .6fr .6fr auto;gap:8px;align-items:end;padding:12px;border:1px solid #d3dfe9;border-radius:10px}.bssActions button{padding:10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.bssRegister{margin-top:16px;border:1px solid #d2dde8;border-radius:11px;overflow:auto}.bssRegister header,.bssRegister article{min-width:820px;display:grid;grid-template-columns:1.2fr 2fr .7fr .7fr .6fr;gap:9px;align-items:center;padding:11px}.bssRegister header{background:#0b2d56;color:#fff;font-size:10px}.bssRegister article{border-top:1px solid #e0e8ef;font-size:11px}.bssError{display:grid;gap:4px;margin-bottom:13px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.bssShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.bssShell footer span{margin-left:auto;color:#6f8396;font-size:11px}.bssShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.bssShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.bssShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:1100px){.bssShell{grid-template-columns:80px 1fr}.bssBrand,.bssShell>aside>small,.bssShell nav span,.bssLive{display:none}.bssShell nav button{justify-content:center}.bssOptions{grid-template-columns:1fr 1fr}.bssActions article{grid-template-columns:1fr 1fr}}@media(max-width:720px){.bssShell{display:block}.bssShell>aside{position:static;height:auto;margin-bottom:15px;padding:15px}.bssShell nav{display:flex;overflow:auto}.bssGrid,.bssGrid.three,.bssStats,.bssOptions,.bssActions article{grid-template-columns:1fr}.bssTop h1{font-size:29px}.bssTotals,.bssShell footer{flex-wrap:wrap}.bssShell footer span{display:none}}`;
+const enhancementStyles = ".bssResourceHead{display:grid;gap:7px}.bssResourceHead>b{color:#173b60}.bssResourceHead span{padding:8px 10px;border-left:4px solid #f0c300;border-radius:6px;background:#fff9d8;color:#675600;font-size:11px;font-weight:800}.bssFieldGuide{display:block;margin-top:6px;padding:8px 10px;border-left:4px solid #f0c300;border-radius:6px;background:#fff9d8;color:#675600;font-size:10px;font-weight:700;line-height:1.45}.bssRiskGuide{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0;padding:12px;border-radius:9px;background:#0b2d56;color:#fff}.bssRiskGuide b{margin-right:7px;color:#55e1d4}.bssRiskGuide span{padding:5px 8px;border-radius:999px;background:#ffffff15;font-size:10px}.bssRiskSlider{grid-column:1/-1;padding:12px;border:1px solid #c9d9e7;border-radius:9px;background:#f7fbff}.bssRiskSlider>b{float:right;color:#315fe6}.bssRiskSlider input{display:block;width:100%;margin:13px 0 7px;accent-color:#315fe6}.bssRiskSlider span{display:flex;justify-content:space-between;color:#6b7f92;font-size:9px}.bssRiskSlider i{font-style:normal}.bssFooterNotice{max-width:460px;padding:8px 10px;border-radius:7px;background:#fff4cc;color:#765b00;font-size:10px;line-height:1.35}.bssNotice{display:grid;gap:4px;margin-bottom:13px;padding:13px;border:1px solid #e4c65c;border-radius:10px;background:#fff8dc;color:#725800}";
+const styles = "*{box-sizing:border-box}.bssShell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.bssShell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.bssBrand{font-size:21px;font-weight:950}.bssBrand span{font-weight:500}.bssShell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.bssShell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.bssShell>aside>section strong{font-size:28px}.bssShell>aside>section span{float:right;margin-top:10px;font-size:10px}.bssShell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.bssShell>aside>section i b{display:block;height:100%;background:#55e1d4}.bssShell nav{display:grid;gap:6px;margin-top:18px}.bssShell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.bssShell nav button.active{background:#245d97}.bssShell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.bssLive{display:grid;gap:7px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25;font-size:10px}.bssLive b{color:#55e1d4}.bssShell main{min-width:0}.bssTop{display:flex;justify-content:space-between;align-items:end}.bssTop small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.bssTop h1{margin:7px 0 4px;font-size:37px}.bssTop p{margin:0;color:#607890}.bssTop>b{text-transform:capitalize;color:#087c61}.bssProgress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.bssProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#21b5a7)}.bssPanel{padding:24px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.bssIntro{padding:19px;border-radius:12px;background:#eff5fa}.bssIntro b{font-size:17px}.bssIntro p{margin:7px 0 0;color:#60778e;line-height:1.5}.bssGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:15px}.bssGrid.three{grid-template-columns:repeat(3,1fr)}.bssGrid label,.bssActions label{font-size:11px;font-weight:850}.bssGrid input,.bssGrid select,.bssGrid textarea,.bssActions input,.bssActions select{width:100%;margin-top:6px;padding:10px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.bssGrid textarea{min-height:78px}.bssGrid .wide{grid-column:1/-1}.bssGenerate{margin:16px 0;padding:11px 14px;border:0;border-radius:8px;background:#315fe6;color:#fff;font-weight:850}.bssStats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:15px}.bssStats article{padding:14px;border:1px solid #d3dfeb;border-radius:10px;background:#f8fbfe}.bssStats b{display:block;color:#315fe6;font-size:25px}.bssStats span{color:#60778e;font-size:10px}.bssList,.bssResources{display:grid;gap:13px;margin-top:16px}.bssCard,.bssResources>article{padding:17px;border:1px solid #cfdae6;border-left:5px solid #315fe6;border-radius:12px}.bssCard.ok{border-left-color:#13a488}.bssCard.gap{border-left-color:#e09b18}.bssCard>header{display:flex;justify-content:space-between;gap:14px}.bssCard header div{display:grid;gap:4px}.bssCard header span{color:#617991;font-size:11px}.bssCard header em{align-self:start;padding:6px 9px;border-radius:999px;background:#edf3ff;color:#315fe6;font-size:10px;font-style:normal}.bssOptions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.bssOptions button{display:grid;gap:4px;padding:11px;border:1px solid #c8d6e4;border-radius:9px;background:#fff;color:#244666;text-align:left}.bssOptions button.selected{border-color:#10a98e;background:#e6faf5;color:#08725f}.bssOptions span{font-size:9px;color:#6a8095}.bssResources>article>b{color:#173b60}.bssTotals{display:flex;justify-content:flex-end;gap:20px;margin-top:15px;padding:16px;border-radius:10px;background:#0b2d56;color:#fff}.bssTotals b{color:#55e1d4}.bssVerdict{display:flex;gap:8px;margin-top:13px}.bssVerdict span,.bssRegister em{padding:6px 9px;border-radius:7px;font-size:10px;font-style:normal}.pass{background:#e1f5eb;color:#087453}.fail{background:#fff0d6;color:#8b5700}.bssActions{display:grid;gap:9px}.bssActions article{display:grid;grid-template-columns:2fr 1fr .8fr .6fr .6fr auto;gap:8px;align-items:end;padding:12px;border:1px solid #d3dfe9;border-radius:10px}.bssActions button{padding:10px;border:1px solid #efbcb5;border-radius:7px;background:#fff3f1;color:#b42318;font-weight:800}.bssRegister{margin-top:16px;border:1px solid #d2dde8;border-radius:11px;overflow:auto}.bssRegister header,.bssRegister article{min-width:820px;display:grid;grid-template-columns:1.2fr 2fr .7fr .7fr .6fr;gap:9px;align-items:center;padding:11px}.bssRegister header{background:#0b2d56;color:#fff;font-size:10px}.bssRegister article{border-top:1px solid #e0e8ef;font-size:11px}.bssError{display:grid;gap:4px;margin-bottom:13px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.bssShell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.bssShell footer span{margin-left:auto;color:#6f8396;font-size:11px}.bssShell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.bssShell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.bssShell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:1100px){.bssShell{grid-template-columns:80px 1fr}.bssBrand,.bssShell>aside>small,.bssShell nav span,.bssLive{display:none}.bssShell nav button{justify-content:center}.bssOptions{grid-template-columns:1fr 1fr}.bssActions article{grid-template-columns:1fr 1fr}}@media(max-width:720px){.bssShell{display:block}.bssShell>aside{position:static;height:auto;margin-bottom:15px;padding:15px}.bssShell nav{display:flex;overflow:auto}.bssGrid,.bssGrid.three,.bssStats,.bssOptions,.bssActions article{grid-template-columns:1fr}.bssTop h1{font-size:29px}.bssTotals,.bssShell footer{flex-wrap:wrap}.bssShell footer span{display:none}}";
