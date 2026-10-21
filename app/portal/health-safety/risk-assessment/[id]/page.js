@@ -1,6 +1,8 @@
-import {canonical} from '../../../../../lib/ppe-engine.mjs';
-import {readHazardPPE} from '../../../../../lib/hazard-ppe';
-import {loadAssessmentZones,saveAssessmentScope,refreshAssessmentZonePages} from '../../../../../lib/assessment-zones';
+// VERIFIED_RA_EDIT_DRAFT_20261021: explicit conditions and unique draft keys.
+import ControlledDeviceDrafts from "../../../../../components/ControlledDeviceDrafts";
+import { canonical } from '../../../../../lib/ppe-engine.mjs';
+import { readHazardPPE } from '../../../../../lib/hazard-ppe';
+import { loadAssessmentZones, saveAssessmentScope, refreshAssessmentZonePages } from '../../../../../lib/assessment-zones';
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -8,285 +10,469 @@ import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 import HealthSafetyRiskAssessmentEditor from "../../../../../components/HealthSafetyRiskAssessmentEditor";
-
-export const metadata = { title: "Risk Assessment Workspace | RPG Excellence" };
+export const metadata = {
+  "title": "Risk Assessment Workspace | RPG Excellence"
+};
 export const dynamic = "force-dynamic";
-
-const formatDate = (value) => value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)) : "—";
-const label = (value) => String(value || "draft").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatDate = value => (() => {
+  if (value) {
+    return new Intl.DateTimeFormat("en-GB", {
+      "day": "2-digit",
+      "month": "short",
+      "year": "numeric"
+    }).format(new Date(value));
+  }
+  return "—";
+})();
+const label = value => String(value || "draft").replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
 const lockedStatuses = ["in_review", "approved", "communicated", "superseded", "archived"];
 const revisionableStatuses = ["approved", "communicated"];
-
 async function createRevision(formData) {
   "use server";
-  const access = await requireOrganizationAccess(
-    "risk_management",
-    "contribute",
-    "/portal/health-safety/risk-assessment",
-  );
+
+  const access = await requireOrganizationAccess("risk_management", "contribute", "/portal/health-safety/risk-assessment");
   const sourceId = String(formData.get("assessment_id") || "");
   const admin = createAdminClient();
-  const { data: source, error: sourceError } = await admin.from("hs_risk_assessments").select("*").eq("id", sourceId).eq("organization_id", access.organization.id).single();
+  const {
+    data: source,
+    error: sourceError
+  } = await admin.from("hs_risk_assessments").select("*").eq("id", sourceId).eq("organization_id", access.organization.id).single();
   if (sourceError || !source) throw new Error("The controlled assessment could not be accessed.");
   if (!revisionableStatuses.includes(source.status)) throw new Error("Only an approved or communicated assessment can create a new revision.");
-
-  const sourceScope = await loadAssessmentZones(admin,access.organization.id,sourceId);
-  const { data: revision, error: revisionError } = await admin.from("hs_risk_assessments").insert({
-    owner_id: source.owner_id,
-    organization_id: source.organization_id,
-    title: source.title,
-    version: Number(source.version || 1) + 1,
-    status: "draft",
-    assessment_type: source.assessment_type,
-    site_location: source.site_location,
-    administration_location_id: source.administration_location_id,
-    area_department: source.area_department,
-    section_lab: source.section_lab,
-    project_number: source.project_number,
-    task_description: source.task_description,
-    assessor_name: source.assessor_name,
-    assessor_person_id: source.assessor_person_id,
-    assessor_user_id: access.user.id,
-    assessor_competence_basis: source.assessor_competence_basis,
-    assessment_date: new Date().toISOString().slice(0, 10),
-    review_date: null,
-    review_frequency_months: null,
-    coshh_msds_reference: source.coshh_msds_reference,
-    coshh_document_path: source.coshh_document_path,
-    coshh_document_name: source.coshh_document_name,
-    coshh_document_mime_type: source.coshh_document_mime_type,
-    coshh_document_size_bytes: source.coshh_document_size_bytes,
-    safe_system_reference: source.safe_system_reference,
-    ssow_document_path: source.ssow_document_path,
-    ssow_document_name: source.ssow_document_name,
-    ssow_document_mime_type: source.ssow_document_mime_type,
-    ssow_document_size_bytes: source.ssow_document_size_bytes,
-    permit_required: source.permit_required,
-    linked_permit_id: source.linked_permit_id,
-    permit_reference: source.permit_reference,
-    permit_document_path: source.permit_document_path,
-    permit_document_name: source.permit_document_name,
-    permit_document_mime_type: source.permit_document_mime_type,
-    permit_document_size_bytes: source.permit_document_size_bytes,
-    associated_documents: source.associated_documents,
-    persons_at_risk: source.persons_at_risk,
-    vulnerable_persons_considered: source.vulnerable_persons_considered,
-    consultation_summary: source.consultation_summary,
-    emergency_arrangements: source.emergency_arrangements,
+  const sourceScope = await loadAssessmentZones(admin, access.organization.id, sourceId);
+  const {
+    data: revision,
+    error: revisionError
+  } = await admin.from("hs_risk_assessments").insert({
+    "owner_id": source.owner_id,
+    "organization_id": source.organization_id,
+    "title": source.title,
+    "version": Number(source.version || 1) + 1,
+    "status": "draft",
+    "assessment_type": source.assessment_type,
+    "site_location": source.site_location,
+    "administration_location_id": source.administration_location_id,
+    "area_department": source.area_department,
+    "section_lab": source.section_lab,
+    "project_number": source.project_number,
+    "task_description": source.task_description,
+    "assessor_name": source.assessor_name,
+    "assessor_person_id": source.assessor_person_id,
+    "assessor_user_id": access.user.id,
+    "assessor_competence_basis": source.assessor_competence_basis,
+    "assessment_date": new Date().toISOString().slice(0, 10),
+    "review_date": null,
+    "review_frequency_months": null,
+    "coshh_msds_reference": source.coshh_msds_reference,
+    "coshh_document_path": source.coshh_document_path,
+    "coshh_document_name": source.coshh_document_name,
+    "coshh_document_mime_type": source.coshh_document_mime_type,
+    "coshh_document_size_bytes": source.coshh_document_size_bytes,
+    "safe_system_reference": source.safe_system_reference,
+    "ssow_document_path": source.ssow_document_path,
+    "ssow_document_name": source.ssow_document_name,
+    "ssow_document_mime_type": source.ssow_document_mime_type,
+    "ssow_document_size_bytes": source.ssow_document_size_bytes,
+    "permit_required": source.permit_required,
+    "linked_permit_id": source.linked_permit_id,
+    "permit_reference": source.permit_reference,
+    "permit_document_path": source.permit_document_path,
+    "permit_document_name": source.permit_document_name,
+    "permit_document_mime_type": source.permit_document_mime_type,
+    "permit_document_size_bytes": source.permit_document_size_bytes,
+    "associated_documents": source.associated_documents,
+    "persons_at_risk": source.persons_at_risk,
+    "vulnerable_persons_considered": source.vulnerable_persons_considered,
+    "consultation_summary": source.consultation_summary,
+    "emergency_arrangements": source.emergency_arrangements
   }).select("id,updated_at").single();
   if (revisionError) throw new Error(revisionError.message);
 
   // Copy applicability as draft links; approval and sign review are not copied.
   try {
-    await saveAssessmentScope(admin,access,{id:revision.id,values:{},zoneIds:sourceScope.selectedZoneIds.filter(id=>sourceScope.zones.some(zone=>zone.id===id&&zone.status!=='archived')),originalZoneIds:[],expectedUpdatedAt:revision.updated_at});
-  } catch(error) {
-    await admin.from('hs_risk_assessments').delete().eq('id',revision.id).eq('organization_id',access.organization.id);
+    await saveAssessmentScope(admin, access, {
+      "id": revision.id,
+      "values": {},
+      "zoneIds": sourceScope.selectedZoneIds.filter(id => sourceScope.zones.some(zone => zone.id === id && zone.status !== 'archived')),
+      "originalZoneIds": [],
+      "expectedUpdatedAt": revision.updated_at
+    });
+  } catch (error) {
+    await admin.from('hs_risk_assessments').delete().eq('id', revision.id).eq('organization_id', access.organization.id);
     throw error;
   }
-  const { data: sourceHazards, error: hazardsError } = await admin.from("hs_risk_hazards").select("*").eq("assessment_id", sourceId).eq("organization_id", access.organization.id).order("display_order");
+  const {
+    data: sourceHazards,
+    error: hazardsError
+  } = await admin.from("hs_risk_hazards").select("*").eq("assessment_id", sourceId).eq("organization_id", access.organization.id).order("display_order");
   if (hazardsError) throw new Error(hazardsError.message);
   const hazardIdMap = new Map();
   for (const hazard of sourceHazards || []) {
-    const { data: copied, error } = await admin.from("hs_risk_hazards").insert({
-      assessment_id: revision.id, owner_id: source.owner_id, organization_id: source.organization_id,
-      display_order: hazard.display_order, hazard_category: hazard.hazard_category,
-      hazard_type: hazard.hazard_type, hazard_description: hazard.hazard_description,
-      people_exposed: hazard.people_exposed, harm_description: hazard.harm_description,
-      existing_controls: hazard.existing_controls, current_severity: hazard.current_severity,
-      current_likelihood: hazard.current_likelihood, additional_controls: hazard.additional_controls,
-      control_hierarchy: hazard.control_hierarchy, ppe_requirements:hazard.ppe_requirements||[], residual_severity: hazard.residual_severity,
-      residual_likelihood: hazard.residual_likelihood, risk_decision: hazard.risk_decision,
-      acceptance_rationale: hazard.acceptance_rationale, acceptance_authority: hazard.acceptance_authority,
+    const {
+      data: copied,
+      error
+    } = await admin.from("hs_risk_hazards").insert({
+      "assessment_id": revision.id,
+      "owner_id": source.owner_id,
+      "organization_id": source.organization_id,
+      "display_order": hazard.display_order,
+      "hazard_category": hazard.hazard_category,
+      "hazard_type": hazard.hazard_type,
+      "hazard_description": hazard.hazard_description,
+      "people_exposed": hazard.people_exposed,
+      "harm_description": hazard.harm_description,
+      "existing_controls": hazard.existing_controls,
+      "current_severity": hazard.current_severity,
+      "current_likelihood": hazard.current_likelihood,
+      "additional_controls": hazard.additional_controls,
+      "control_hierarchy": hazard.control_hierarchy,
+      "ppe_requirements": hazard.ppe_requirements || [],
+      "residual_severity": hazard.residual_severity,
+      "residual_likelihood": hazard.residual_likelihood,
+      "risk_decision": hazard.risk_decision,
+      "acceptance_rationale": hazard.acceptance_rationale,
+      "acceptance_authority": hazard.acceptance_authority
     }).select("id").single();
     if (error) throw new Error(error.message);
     hazardIdMap.set(hazard.id, copied.id);
   }
-
-  const { data: sourceActions, error: actionsError } = await admin.from("hs_risk_actions").select("*").eq("assessment_id", sourceId).eq("organization_id", access.organization.id);
+  const {
+    data: sourceActions,
+    error: actionsError
+  } = await admin.from("hs_risk_actions").select("*").eq("assessment_id", sourceId).eq("organization_id", access.organization.id);
   if (actionsError) throw new Error(actionsError.message);
   if (sourceActions?.length) {
-    const { error } = await admin.from("hs_risk_actions").insert(sourceActions.map((action) => ({
-      assessment_id: revision.id, hazard_id: hazardIdMap.get(action.hazard_id) || null,
-      owner_id: source.owner_id, organization_id: source.organization_id,
-      action_reference: action.action_reference, action_required: action.action_required,
-      responsible_person_id: action.responsible_person_id,
-      responsible_name: action.responsible_name, responsible_email: action.responsible_email,
-      target_date: action.target_date, priority: action.priority, interim_controls: action.interim_controls,
-      status: "open",
+    const {
+      error
+    } = await admin.from("hs_risk_actions").insert(sourceActions.map(action => ({
+      "assessment_id": revision.id,
+      "hazard_id": hazardIdMap.get(action.hazard_id) || null,
+      "owner_id": source.owner_id,
+      "organization_id": source.organization_id,
+      "action_reference": action.action_reference,
+      "action_required": action.action_required,
+      "responsible_person_id": action.responsible_person_id,
+      "responsible_name": action.responsible_name,
+      "responsible_email": action.responsible_email,
+      "target_date": action.target_date,
+      "priority": action.priority,
+      "interim_controls": action.interim_controls,
+      "status": "open"
     })));
     if (error) throw new Error(error.message);
   }
-
-  const { error: supersedeError } = await admin.from("hs_risk_assessments").update({ status: "superseded" }).eq("id", sourceId).eq("organization_id", access.organization.id);
+  const {
+    error: supersedeError
+  } = await admin.from("hs_risk_assessments").update({
+    "status": "superseded"
+  }).eq("id", sourceId).eq("organization_id", access.organization.id);
   if (supersedeError) throw new Error(supersedeError.message);
   await admin.from("hs_risk_events").insert({
-    assessment_id: revision.id, owner_id: source.owner_id, organization_id: source.organization_id,
-    actor_id: access.user.id, event_type: "revision_created",
-    event_summary: `Version ${Number(source.version || 1) + 1} created from controlled assessment`,
-    event_data: { source_assessment_id: sourceId, source_version: source.version || 1 },
+    "assessment_id": revision.id,
+    "owner_id": source.owner_id,
+    "organization_id": source.organization_id,
+    "actor_id": access.user.id,
+    "event_type": "revision_created",
+    "event_summary": "Version " + (Number(source.version || 1) + 1) + " created from controlled assessment",
+    "event_data": {
+      "source_assessment_id": sourceId,
+      "source_version": source.version || 1
+    }
   });
-  refreshAssessmentZonePages(source.administration_location_id,revision.id);
+  refreshAssessmentZonePages(source.administration_location_id, revision.id);
   redirect("/portal/health-safety/risk-assessment/" + revision.id);
 }
-
 async function addHazard(formData) {
   "use server";
+
   try {
-  const access = await requireOrganizationAccess(
-    "risk_management",
-    "contribute",
-    "/portal/health-safety/risk-assessment",
-  );
-  const { user, organization } = access;
-  const supabase = createAdminClient();
-  const assessmentId = String(formData.get("assessment_id") || "");
-  const { data: assessment, error: assessmentError } = await supabase.from("hs_risk_assessments").select("id,owner_id,organization_id,status").eq("id", assessmentId).eq("organization_id", organization.id).single();
-  if (assessmentError || !assessment) throw new Error("Risk assessment could not be accessed.");
-  if (["in_review", "approved", "communicated", "superseded", "archived"].includes(assessment.status)) throw new Error("This controlled version is locked. Create or reopen a review version before changing hazards.");
-
-  const text = (name) => String(formData.get(name) || "").trim();
-  const number = (name) => Number(formData.get(name));
-  const currentSeverity = number("current_severity");
-  const currentLikelihood = number("current_likelihood");
-  const residualSeverity = number("residual_severity");
-  const residualLikelihood = number("residual_likelihood");
-  const currentScore = currentSeverity * currentLikelihood;
-  const residualScore = residualSeverity * residualLikelihood;
-  const decision = text("risk_decision");
-  const rationale = text("acceptance_rationale");
-  const authority = text("acceptance_authority");
-  const controls = formData.getAll("control_hierarchy").map(String);
-  const ppeRequirements=await readHazardPPE(supabase,organization.id,assessmentId,formData,controls);
-  const exposedGroups = formData.getAll("people_exposed").map(String);
-  const otherExposed = text("people_exposed_other");
-  const actionRequired = text("action_required");
-  const responsiblePersonId = text("responsible_person_id");
-  if (![currentSeverity, currentLikelihood, residualSeverity, residualLikelihood].every((value) => value >= 1 && value <= 5)) throw new Error("Complete all four risk-score selections.");
-  if (!exposedGroups.length) throw new Error("Select at least one group who may be harmed.");
-  if (exposedGroups.includes("Others") && !otherExposed) throw new Error("Describe the other people who may be harmed.");
-  if (residualScore > currentScore) throw new Error("Residual risk cannot exceed initial risk. Reassess the scores before saving.");
-  if (!controls.length && text("additional_controls")) throw new Error("Select the hierarchy level applied to the additional controls.");
-  if (decision === "accept" && (!rationale || !authority)) throw new Error("Formal risk acceptance requires a rationale and named authority.");
-  if (residualScore >= 10 && (!decision || !authority || !actionRequired)) throw new Error("Elevated residual risk requires a controlled decision, authority and accountable action.");
-  if (actionRequired && (!responsiblePersonId || !text("target_date"))) throw new Error("Every controlled action requires a responsible company user and target date.");
-
-  let responsiblePerson = null;
-  if (actionRequired) {
-    const { data, error } = await supabase.from("organization_people").select("id,first_name,last_name,email").eq("id", responsiblePersonId).eq("organization_id", organization.id).eq("account_status", "active").maybeSingle();
-    if (error || !data) throw new Error("Select an active responsible person from the Company User list.");
-    responsiblePerson = data;
-  }
-
-  const { count, error: countError } = await supabase.from("hs_risk_hazards").select("id", { count: "exact", head: true }).eq("assessment_id", assessmentId);
-  if (countError) throw new Error(countError.message);
-  const { data: hazard, error: hazardError } = await supabase.from("hs_risk_hazards").insert({
-    assessment_id: assessmentId, owner_id: assessment.owner_id, organization_id: assessment.organization_id,
-    display_order: (count || 0) + 1, hazard_category: text("hazard_category"),
-    hazard_type: text("hazard_type") || null, hazard_description: text("hazard_description"),
-    people_exposed: [...exposedGroups.filter((item) => item !== "Others"), ...(exposedGroups.includes("Others") ? [`Other: ${otherExposed}`] : [])].join(", "), harm_description: text("harm_description"),
-    existing_controls: text("existing_controls"), current_severity: currentSeverity,
-    current_likelihood: currentLikelihood, additional_controls: text("additional_controls"),
-    control_hierarchy: controls, ppe_requirements:ppeRequirements, residual_severity: residualSeverity,
-    residual_likelihood: residualLikelihood, risk_decision: decision,
-    acceptance_rationale: rationale || null, acceptance_authority: authority || null,
-    accepted_at: decision === "accept" ? new Date().toISOString() : null,
-  }).select("id").single();
-  if (hazardError) throw new Error(hazardError.message);
-
-  if (actionRequired) {
-    const { count: actionCount } = await supabase.from("hs_risk_actions").select("id", { count: "exact", head: true }).eq("assessment_id", assessmentId);
-    const reference = "ACT-" + String((actionCount || 0) + 1).padStart(3, "0");
-    const { error: actionError } = await supabase.from("hs_risk_actions").insert({
-      assessment_id: assessmentId, hazard_id: hazard.id, owner_id: assessment.owner_id,
-      organization_id: assessment.organization_id, action_reference: reference,
-      action_required: actionRequired, responsible_person_id: responsiblePerson.id,
-      responsible_name: [responsiblePerson.first_name, responsiblePerson.last_name].filter(Boolean).join(" ") || responsiblePerson.email,
-      responsible_email: responsiblePerson.email || null, target_date: text("target_date"),
-      priority: text("priority") || (residualScore >= 15 ? "critical" : residualScore >= 10 ? "high" : "medium"),
-      interim_controls: text("additional_controls") || null,
-    });
-    if (actionError) {
-      await supabase.from("hs_risk_hazards").delete().eq("id", hazard.id);
-      throw new Error(actionError.message);
+    const access = await requireOrganizationAccess("risk_management", "contribute", "/portal/health-safety/risk-assessment");
+    const {
+      user,
+      organization
+    } = access;
+    const supabase = createAdminClient();
+    const assessmentId = String(formData.get("assessment_id") || "");
+    const {
+      data: assessment,
+      error: assessmentError
+    } = await supabase.from("hs_risk_assessments").select("id,owner_id,organization_id,status").eq("id", assessmentId).eq("organization_id", organization.id).single();
+    if (assessmentError || !assessment) throw new Error("Risk assessment could not be accessed.");
+    if (["in_review", "approved", "communicated", "superseded", "archived"].includes(assessment.status)) throw new Error("This controlled version is locked. Create or reopen a review version before changing hazards.");
+    const text = name => String(formData.get(name) || "").trim();
+    const number = name => Number(formData.get(name));
+    const currentSeverity = number("current_severity");
+    const currentLikelihood = number("current_likelihood");
+    const residualSeverity = number("residual_severity");
+    const residualLikelihood = number("residual_likelihood");
+    const currentScore = currentSeverity * currentLikelihood;
+    const residualScore = residualSeverity * residualLikelihood;
+    const decision = text("risk_decision");
+    const rationale = text("acceptance_rationale");
+    const authority = text("acceptance_authority");
+    const controls = formData.getAll("control_hierarchy").map(String);
+    const ppeRequirements = await readHazardPPE(supabase, organization.id, assessmentId, formData, controls);
+    const exposedGroups = formData.getAll("people_exposed").map(String);
+    const otherExposed = text("people_exposed_other");
+    const actionRequired = text("action_required");
+    const responsiblePersonId = text("responsible_person_id");
+    if (![currentSeverity, currentLikelihood, residualSeverity, residualLikelihood].every(value => value >= 1 && value <= 5)) throw new Error("Complete all four risk-score selections.");
+    if (!exposedGroups.length) throw new Error("Select at least one group who may be harmed.");
+    if (exposedGroups.includes("Others") && !otherExposed) throw new Error("Describe the other people who may be harmed.");
+    if (residualScore > currentScore) throw new Error("Residual risk cannot exceed initial risk. Reassess the scores before saving.");
+    if (!controls.length && text("additional_controls")) throw new Error("Select the hierarchy level applied to the additional controls.");
+    if (decision === "accept" && (!rationale || !authority)) throw new Error("Formal risk acceptance requires a rationale and named authority.");
+    if (residualScore >= 10 && (!decision || !authority || !actionRequired)) throw new Error("Elevated residual risk requires a controlled decision, authority and accountable action.");
+    if (actionRequired && (!responsiblePersonId || !text("target_date"))) throw new Error("Every controlled action requires a responsible company user and target date.");
+    let responsiblePerson = null;
+    if (actionRequired) {
+      const {
+        data,
+        error
+      } = await supabase.from("organization_people").select("id,first_name,last_name,email").eq("id", responsiblePersonId).eq("organization_id", organization.id).eq("account_status", "active").maybeSingle();
+      if (error || !data) throw new Error("Select an active responsible person from the Company User list.");
+      responsiblePerson = data;
     }
+    const {
+      count,
+      error: countError
+    } = await supabase.from("hs_risk_hazards").select("id", {
+      "count": "exact",
+      "head": true
+    }).eq("assessment_id", assessmentId);
+    if (countError) throw new Error(countError.message);
+    const {
+      data: hazard,
+      error: hazardError
+    } = await supabase.from("hs_risk_hazards").insert({
+      "assessment_id": assessmentId,
+      "owner_id": assessment.owner_id,
+      "organization_id": assessment.organization_id,
+      "display_order": (count || 0) + 1,
+      "hazard_category": text("hazard_category"),
+      "hazard_type": text("hazard_type") || null,
+      "hazard_description": text("hazard_description"),
+      "people_exposed": [...exposedGroups.filter(item => item !== "Others"), ...(() => {
+        if (exposedGroups.includes("Others")) {
+          return ["Other: " + otherExposed + ""];
+        }
+        return [];
+      })()].join(", "),
+      "harm_description": text("harm_description"),
+      "existing_controls": text("existing_controls"),
+      "current_severity": currentSeverity,
+      "current_likelihood": currentLikelihood,
+      "additional_controls": text("additional_controls"),
+      "control_hierarchy": controls,
+      "ppe_requirements": ppeRequirements,
+      "residual_severity": residualSeverity,
+      "residual_likelihood": residualLikelihood,
+      "risk_decision": decision,
+      "acceptance_rationale": rationale || null,
+      "acceptance_authority": authority || null,
+      "accepted_at": (() => {
+        if (decision === "accept") {
+          return new Date().toISOString();
+        }
+        return null;
+      })()
+    }).select("id").single();
+    if (hazardError) throw new Error(hazardError.message);
+    if (actionRequired) {
+      const {
+        count: actionCount
+      } = await supabase.from("hs_risk_actions").select("id", {
+        "count": "exact",
+        "head": true
+      }).eq("assessment_id", assessmentId);
+      const reference = "ACT-" + String((actionCount || 0) + 1).padStart(3, "0");
+      const {
+        error: actionError
+      } = await supabase.from("hs_risk_actions").insert({
+        "assessment_id": assessmentId,
+        "hazard_id": hazard.id,
+        "owner_id": assessment.owner_id,
+        "organization_id": assessment.organization_id,
+        "action_reference": reference,
+        "action_required": actionRequired,
+        "responsible_person_id": responsiblePerson.id,
+        "responsible_name": [responsiblePerson.first_name, responsiblePerson.last_name].filter(Boolean).join(" ") || responsiblePerson.email,
+        "responsible_email": responsiblePerson.email || null,
+        "target_date": text("target_date"),
+        "priority": text("priority") || (() => {
+          if (residualScore >= 15) {
+            return "critical";
+          }
+          return (() => {
+            if (residualScore >= 10) {
+              return "high";
+            }
+            return "medium";
+          })();
+        })(),
+        "interim_controls": text("additional_controls") || null
+      });
+      if (actionError) {
+        await supabase.from("hs_risk_hazards").delete().eq("id", hazard.id);
+        throw new Error(actionError.message);
+      }
+    }
+    await supabase.from("hs_risk_events").insert({
+      "assessment_id": assessmentId,
+      "owner_id": assessment.owner_id,
+      "organization_id": assessment.organization_id,
+      "actor_id": user.id,
+      "event_type": "hazard_added",
+      "event_summary": "Hazard and risk decision recorded",
+      "event_data": {
+        "hazard_id": hazard.id,
+        "current_score": currentScore,
+        "residual_score": residualScore
+      }
+    });
+    revalidatePath("/portal/health-safety/risk-assessment/" + assessmentId);
+    return {
+      "success": true
+    };
+  } catch (error) {
+    if (error.digest) throw error;
+    return {
+      "error": error.message
+    };
   }
-  await supabase.from("hs_risk_events").insert({
-    assessment_id: assessmentId, owner_id: assessment.owner_id, organization_id: assessment.organization_id,
-    actor_id: user.id, event_type: "hazard_added",
-    event_summary: "Hazard and risk decision recorded",
-    event_data: { hazard_id: hazard.id, current_score: currentScore, residual_score: residualScore },
-  });
-  revalidatePath("/portal/health-safety/risk-assessment/" + assessmentId);
-  return {success:true};
-  }catch(error){if(error.digest)throw error;return {error:error.message};}
 }
+async function updateHazardPPE(_state, formData) {
+  "use server";
 
-async function updateHazardPPE(_state,formData) {
- "use server";
- try {
-  const access=await requireOrganizationAccess('risk_management','contribute','/portal/health-safety/risk-assessment');
-  const admin=createAdminClient(),id=String(formData.get('hazard_id')||''),assessmentId=String(formData.get('assessment_id')||'');
-  const {data:hazard,error}=await admin.from('hs_risk_hazards').select('id,assessment_id,control_hierarchy,ppe_requirements').eq('id',id).eq('assessment_id',assessmentId).eq('organization_id',access.organization.id).single();
-  if(error||!hazard)throw Error('Hazard not found.');
-  let expected;try{expected=JSON.parse(String(formData.get('expected_ppe')||'null'));}catch{throw Error('Reload the hazard before editing PPE.');}
-  if(canonical(expected)!==canonical(hazard.ppe_requirements||[]))throw Error('This hazard PPE changed. Reload before saving.');
-  const controls=(hazard.control_hierarchy||[]).filter(item=>item!=='PPE');if(formData.get('ppe_required')==='on')controls.push('PPE');
-  const ppe=await readHazardPPE(admin,access.organization.id,assessmentId,formData,controls);
-  const result=await admin.from('hs_risk_hazards').update({ppe_requirements:ppe,control_hierarchy:controls}).eq('id',id).eq('organization_id',access.organization.id).eq('ppe_requirements',JSON.stringify(hazard.ppe_requirements||[])).select('id');
-  if(result.error)throw Error(result.error.message);
-  if(!result.data?.length)throw Error('This hazard PPE changed. Reload before saving.');
-  await admin.from('hs_risk_events').insert({assessment_id:assessmentId,organization_id:access.organization.id,owner_id:access.organization.owner_id,actor_id:access.user.id,event_type:'ppe_updated',event_summary:'Hazard PPE requirements updated for controlled review',event_data:{hazard_id:id,ppe_requirements:ppe}});
-  revalidatePath(`/portal/health-safety/risk-assessment/${assessmentId}`);revalidatePath(`/portal/health-safety/risk-assessment/${assessmentId}/review`);
-  return {success:'PPE requirements saved. Recheck controls and residual risk before submitting for approval.'};
- }catch(error){if(error.digest)throw error;return {error:error.message};}
+  try {
+    const access = await requireOrganizationAccess('risk_management', 'contribute', '/portal/health-safety/risk-assessment');
+    const admin = createAdminClient(),
+      id = String(formData.get('hazard_id') || ''),
+      assessmentId = String(formData.get('assessment_id') || '');
+    const {
+      data: hazard,
+      error
+    } = await admin.from('hs_risk_hazards').select('id,assessment_id,control_hierarchy,ppe_requirements').eq('id', id).eq('assessment_id', assessmentId).eq('organization_id', access.organization.id).single();
+    if (error || !hazard) throw Error('Hazard not found.');
+    let expected;
+    try {
+      expected = JSON.parse(String(formData.get('expected_ppe') || 'null'));
+    } catch {
+      throw Error('Reload the hazard before editing PPE.');
+    }
+    if (canonical(expected) !== canonical(hazard.ppe_requirements || [])) throw Error('This hazard PPE changed. Reload before saving.');
+    const controls = (hazard.control_hierarchy || []).filter(item => item !== 'PPE');
+    if (formData.get('ppe_required') === 'on') controls.push('PPE');
+    const ppe = await readHazardPPE(admin, access.organization.id, assessmentId, formData, controls);
+    const result = await admin.from('hs_risk_hazards').update({
+      "ppe_requirements": ppe,
+      "control_hierarchy": controls
+    }).eq('id', id).eq('organization_id', access.organization.id).eq('ppe_requirements', JSON.stringify(hazard.ppe_requirements || [])).select('id');
+    if (result.error) throw Error(result.error.message);
+    if (!result.data?.length) throw Error('This hazard PPE changed. Reload before saving.');
+    await admin.from('hs_risk_events').insert({
+      "assessment_id": assessmentId,
+      "organization_id": access.organization.id,
+      "owner_id": access.organization.owner_id,
+      "actor_id": access.user.id,
+      "event_type": 'ppe_updated',
+      "event_summary": 'Hazard PPE requirements updated for controlled review',
+      "event_data": {
+        "hazard_id": id,
+        "ppe_requirements": ppe
+      }
+    });
+    revalidatePath("/portal/health-safety/risk-assessment/" + assessmentId + "");
+    revalidatePath("/portal/health-safety/risk-assessment/" + assessmentId + "/review");
+    return {
+      "success": 'PPE requirements saved. Recheck controls and residual risk before submitting for approval.'
+    };
+  } catch (error) {
+    if (error.digest) throw error;
+    return {
+      "error": error.message
+    };
+  }
 }
-
-export default async function RiskAssessmentWorkspacePage({ params }) {
-  const { id } = await params;
-  const access = await requireOrganizationAccess(
-    "risk_management",
-    "view",
-    "/portal/health-safety/risk-assessment/" + id,
-  );
+export default async function RiskAssessmentWorkspacePage({
+  params
+}) {
+  const {
+    id
+  } = await params;
+  const access = await requireOrganizationAccess("risk_management", "view", "/portal/health-safety/risk-assessment/" + id);
   const supabase = createAdminClient();
-  const [assessmentResult, hazardsResult, actionsResult, peopleResult] = await Promise.all([
-    supabase.from("hs_risk_assessments").select("*").eq("id", id).eq("organization_id", access.organization.id).maybeSingle(),
-    supabase.from("hs_risk_hazards").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("display_order"),
-    supabase.from("hs_risk_actions").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("target_date"),
-    supabase.from("organization_people").select("id,first_name,last_name,email,position").eq("organization_id", access.organization.id).eq("account_status", "active").order("last_name"),
-  ]);
+  const [assessmentResult, hazardsResult, actionsResult, peopleResult] = await Promise.all([supabase.from("hs_risk_assessments").select("*").eq("id", id).eq("organization_id", access.organization.id).maybeSingle(), supabase.from("hs_risk_hazards").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("display_order"), supabase.from("hs_risk_actions").select("*").eq("assessment_id", id).eq("organization_id", access.organization.id).order("target_date"), supabase.from("organization_people").select("id,first_name,last_name,email,position").eq("organization_id", access.organization.id).eq("account_status", "active").order("last_name")]);
   if (assessmentResult.error || hazardsResult.error || actionsResult.error || peopleResult.error) throw new Error(assessmentResult.error?.message || hazardsResult.error?.message || actionsResult.error?.message || peopleResult.error?.message);
   if (!assessmentResult.data) notFound();
   const assessment = assessmentResult.data;
-  const zoneScope = await loadAssessmentZones(supabase,access.organization.id,id);
-  const applicableZones = zoneScope.zones.filter(zone=>zoneScope.selectedZoneIds.includes(zone.id));
+  const zoneScope = await loadAssessmentZones(supabase, access.organization.id, id);
+  const applicableZones = zoneScope.zones.filter(zone => zoneScope.selectedZoneIds.includes(zone.id));
   const hazards = hazardsResult.data || [];
   const actions = actionsResult.data || [];
-  const elevated = hazards.filter((item) => (item.residual_score ?? item.current_score ?? 0) >= 10).length;
+  const elevated = hazards.filter(item => (item.residual_score ?? item.current_score ?? 0) >= 10).length;
   const highest = hazards.reduce((maximum, item) => Math.max(maximum, item.residual_score ?? item.current_score ?? 0), 0);
-  const openActions = actions.filter((item) => !["effective", "cancelled"].includes(item.status));
+  const openActions = actions.filter(item => !["effective", "cancelled"].includes(item.status));
   const locked = lockedStatuses.includes(assessment.status);
-  const levels = { none: 0, view: 1, contribute: 2, review: 3, approve: 4, admin: 5, owner: 6 };
+  const levels = {
+    "none": 0,
+    "view": 1,
+    "contribute": 2,
+    "review": 3,
+    "approve": 4,
+    "admin": 5,
+    "owner": 6
+  };
   const canContribute = (levels[access.level] || 0) >= levels.contribute;
-  const signedDocumentUrl = async (path) => {
+  const signedDocumentUrl = async path => {
     if (!path) return null;
-    const { data } = await supabase.storage.from("hs-risk-assessment-evidence").createSignedUrl(path, 3600);
+    const {
+      data
+    } = await supabase.storage.from("hs-risk-assessment-evidence").createSignedUrl(path, 3600);
     return data?.signedUrl || null;
   };
-  const [coshhDownloadUrl, ssowDownloadUrl, permitDownloadUrl] = await Promise.all([
-    signedDocumentUrl(assessment.coshh_document_path),
-    signedDocumentUrl(assessment.ssow_document_path),
-    signedDocumentUrl(assessment.permit_document_path),
-  ]);
-
-  return <main className="rawPage"><style>{`
-    *{box-sizing:border-box}.rawPage{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.rawShell{max-width:1280px;margin:auto}.rawTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.rawTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.rawTop h1{font-size:34px;margin:7px 0}.rawTop p{margin:0;color:#657b93}.rawButtons{display:flex;gap:9px;flex-wrap:wrap}.rawButton{padding:11px 15px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:850}.rawButton.secondary{background:#fff;color:#173b59;border:1px solid #cbd8e4}.rawSummary{display:grid;grid-template-columns:1.4fr repeat(4,.55fr);gap:12px;margin:23px 0}.rawContext,.rawMetric{padding:18px;border:1px solid #d7e3eb;border-radius:13px;background:#fff}.rawContext strong,.rawContext small,.rawMetric strong,.rawMetric span{display:block}.rawContext small{color:#72869a;margin-top:5px}.rawMetric span{font-size:11px;color:#657b91;font-weight:850}.rawMetric strong{font-size:27px;margin-top:7px}.rawMetric .red{color:#c6352e}.rawPanel{padding:23px;border:1px solid #d7e3eb;border-radius:16px;background:#fff;margin-top:15px}.rawHead{display:flex;justify-content:space-between;gap:15px;align-items:end;margin-bottom:17px}.rawHead h2{margin:0}.rawHead p{margin:5px 0 0;color:#6c8197}.rawPill{padding:7px 10px;border-radius:999px;background:#e7f4ff;color:#145ba9;font-size:11px;font-weight:900}.rawDetails{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.rawDetails div{padding:12px;border-radius:10px;background:#f3f7fa}.rawDetails span,.rawDetails strong{display:block}.rawDetails span{font-size:10px;color:#74889b;font-weight:850}.rawDetails strong{margin-top:5px;font-size:13px}.rawDownload{display:inline-block;margin-top:7px;color:#075fa8;font-size:12px;font-weight:900;text-decoration:none}.rawDownload:hover{text-decoration:underline}.rawActions{display:grid;gap:8px}.rawAction{display:grid;grid-template-columns:1.4fr .7fr .6fr .55fr;gap:13px;padding:14px;border:1px solid #e0e8ee;border-radius:10px}.rawAction strong,.rawAction small{display:block}.rawAction small{color:#788b9e;margin-top:4px}.rawEmpty{padding:20px;border-radius:10px;background:#f2f6f9;color:#657b91}@media(max-width:900px){.rawSummary{grid-template-columns:1fr 1fr}.rawContext{grid-column:1/-1}.rawDetails{grid-template-columns:1fr 1fr}.rawAction{grid-template-columns:1fr auto}.rawAction>:nth-child(2),.rawAction>:nth-child(3){display:none}}@media(max-width:520px){.rawSummary,.rawDetails{grid-template-columns:1fr}.rawContext{grid-column:auto}}
-  `}</style><div className="rawShell">
-    <header className="rawTop"><div><small>{assessment.assessment_reference} · VERSION {assessment.version}</small><h1>{assessment.title}</h1><p>{label(assessment.assessment_type)} · {assessment.site_location || assessment.area_department || "Location not set"}</p></div><div className="rawButtons"><Link className="rawButton secondary" href="/portal/health-safety/risk-assessment">← Register</Link><Link className="rawButton secondary" href="/portal/health-safety">H&amp;S Hub</Link>{["approved", "communicated", "superseded"].includes(assessment.status) && <a className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/report"} target="_blank" rel="noreferrer">▤ Controlled PDF</a>}{revisionableStatuses.includes(assessment.status) && canContribute && <form action={createRevision}><input type="hidden" name="assessment_id" value={id}/><button className="rawButton" type="submit">Create new revision</button></form>}{!locked && canContribute && <Link className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/edit"}>Edit assessment details</Link>}<Link className="rawButton" href={"/portal/health-safety/risk-assessment/" + id + "/review"}>Review &amp; approval</Link></div></header>
-    <section className="rawSummary"><div className="rawContext"><strong>{assessment.task_description}</strong><small>Assessed by {assessment.assessor_name || "Not assigned"} on {formatDate(assessment.assessment_date)} · review {formatDate(assessment.review_date)}</small></div><div className="rawMetric"><span>HAZARDS</span><strong>{hazards.length}</strong></div><div className="rawMetric"><span>HIGHEST RESIDUAL</span><strong className={highest >= 10 ? "red" : ""}>{highest || "—"}</strong></div><div className="rawMetric"><span>ELEVATED</span><strong className={elevated ? "red" : ""}>{elevated}</strong></div><div className="rawMetric"><span>OPEN ACTIONS</span><strong>{openActions.length}</strong></div></section>
-    <section className="rawPanel"><div className="rawHead"><div><h2>Assessment context</h2><p>Scope, people and supporting arrangements.</p></div><span className="rawPill">{label(assessment.status)}</span></div><div className="rawDetails"><div><span>AREA / DEPARTMENT</span><strong>{assessment.area_department || "—"}</strong></div><div><span>SECTION / LAB</span><strong>{assessment.section_lab || "—"}</strong></div><div><span>PEOPLE AT RISK</span><strong>{assessment.persons_at_risk?.join(", ") || "—"}</strong></div><div><span>ASSESSOR / DATE</span><strong>{assessment.assessor_name || "—"}<br/>{formatDate(assessment.assessment_date)}</strong></div><div><span>SAFE SYSTEM OF WORK</span><strong>{assessment.safe_system_reference || "—"}</strong>{ssowDownloadUrl && <a className="rawDownload" href={ssowDownloadUrl} download={assessment.ssow_document_name || true}>Download SSOW ↓</a>}</div><div><span>COSHH / SAFETY DATA</span><strong>{assessment.coshh_msds_reference || "—"}</strong>{coshhDownloadUrl && <a className="rawDownload" href={coshhDownloadUrl} download={assessment.coshh_document_name || true}>Download COSHH ↓</a>}</div><div><span>PERMIT</span><strong>{assessment.permit_required ? assessment.permit_reference : "Not required"}</strong>{permitDownloadUrl && <a className="rawDownload" href={permitDownloadUrl} download={assessment.permit_document_name || true}>Download permit ↓</a>}</div><div><span>CONSULTATION</span><strong>{assessment.consultation_summary || "—"}</strong></div></div></section>
-    <section className="rawPanel"><div className="rawHead"><div><h2>Buildings &amp; zones covered</h2><p>Controlled workplace links from Administration → Site Profile.</p></div>{!locked&&canContribute&&<Link className="rawButton secondary" href={`/portal/health-safety/risk-assessment/${id}/edit`}>Edit workplace scope</Link>}</div>{applicableZones.length?<div className="rawDetails">{applicableZones.map(zone=><div key={zone.id}><span>{zoneScope.buildings.find(building=>building.id===zone.building_id)?.name||'External / no building'}</span><strong>{zone.reference} · {zone.name}</strong><small>{zone.status}</small></div>)}</div>:<p className="rawEmpty">Site-level assessment: no individual zones linked. Add applicable zones in Edit assessment details or Manage zone → Link safety records.</p>}<p>Draft and review versions remain unavailable on employee pages until approved or communicated. PPE source selection and sign review remain separate.</p></section>
-    <section className="rawPanel"><div className="rawHead"><div><h2>Hazards and risk decisions</h2><p>{locked ? "This controlled version is read-only. Create a new revision to change hazards or controls." : "Evaluate initial risk, apply controls and confirm the residual position."}</p></div></div><HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} companyPeople={peopleResult.data || []} addHazardAction={addHazard} updatePPEAction={updateHazardPPE} zones={applicableZones} readOnly={locked || !canContribute}/></section>
-    <section className="rawPanel"><div className="rawHead"><div><h2>Risk-reduction actions</h2><p>Accountable actions linked directly to identified hazards.</p></div><Link href="/portal/health-safety/actions">Action register →</Link></div>{actions.length ? <div className="rawActions">{actions.map((action) => <div className="rawAction" key={action.id}><div><strong>{action.action_required}</strong><small>{action.action_reference}</small></div><div><strong>{action.responsible_name}</strong><small>Responsible person</small></div><div><strong>{formatDate(action.target_date)}</strong><small>{label(action.priority)} priority</small></div><span className="rawPill">{label(action.status)}</span></div>)}</div> : <div className="rawEmpty">No additional risk-reduction actions have been recorded.</div>}</section>
-  </div></main>;
+  const [coshhDownloadUrl, ssowDownloadUrl, permitDownloadUrl] = await Promise.all([signedDocumentUrl(assessment.coshh_document_path), signedDocumentUrl(assessment.ssow_document_path), signedDocumentUrl(assessment.permit_document_path)]);
+  return <ControlledDeviceDrafts userId={access.user.id} organizationId={access.organization.id} recordKey={'hs-risk:' + id} label="Risk assessment" baseline={{
+    "assessment": assessment,
+    "hazards": hazards,
+    "actions": actions,
+    "zoneScope": zoneScope
+  }}><main className="rawPage"><style>{"\n    *{box-sizing:border-box}.rawPage{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.rawShell{max-width:1280px;margin:auto}.rawTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.rawTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.rawTop h1{font-size:34px;margin:7px 0}.rawTop p{margin:0;color:#657b93}.rawButtons{display:flex;gap:9px;flex-wrap:wrap}.rawButton{padding:11px 15px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:850}.rawButton.secondary{background:#fff;color:#173b59;border:1px solid #cbd8e4}.rawSummary{display:grid;grid-template-columns:1.4fr repeat(4,.55fr);gap:12px;margin:23px 0}.rawContext,.rawMetric{padding:18px;border:1px solid #d7e3eb;border-radius:13px;background:#fff}.rawContext strong,.rawContext small,.rawMetric strong,.rawMetric span{display:block}.rawContext small{color:#72869a;margin-top:5px}.rawMetric span{font-size:11px;color:#657b91;font-weight:850}.rawMetric strong{font-size:27px;margin-top:7px}.rawMetric .red{color:#c6352e}.rawPanel{padding:23px;border:1px solid #d7e3eb;border-radius:16px;background:#fff;margin-top:15px}.rawHead{display:flex;justify-content:space-between;gap:15px;align-items:end;margin-bottom:17px}.rawHead h2{margin:0}.rawHead p{margin:5px 0 0;color:#6c8197}.rawPill{padding:7px 10px;border-radius:999px;background:#e7f4ff;color:#145ba9;font-size:11px;font-weight:900}.rawDetails{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.rawDetails div{padding:12px;border-radius:10px;background:#f3f7fa}.rawDetails span,.rawDetails strong{display:block}.rawDetails span{font-size:10px;color:#74889b;font-weight:850}.rawDetails strong{margin-top:5px;font-size:13px}.rawDownload{display:inline-block;margin-top:7px;color:#075fa8;font-size:12px;font-weight:900;text-decoration:none}.rawDownload:hover{text-decoration:underline}.rawActions{display:grid;gap:8px}.rawAction{display:grid;grid-template-columns:1.4fr .7fr .6fr .55fr;gap:13px;padding:14px;border:1px solid #e0e8ee;border-radius:10px}.rawAction strong,.rawAction small{display:block}.rawAction small{color:#788b9e;margin-top:4px}.rawEmpty{padding:20px;border-radius:10px;background:#f2f6f9;color:#657b91}@media(max-width:900px){.rawSummary{grid-template-columns:1fr 1fr}.rawContext{grid-column:1/-1}.rawDetails{grid-template-columns:1fr 1fr}.rawAction{grid-template-columns:1fr auto}.rawAction>:nth-child(2),.rawAction>:nth-child(3){display:none}}@media(max-width:520px){.rawSummary,.rawDetails{grid-template-columns:1fr}.rawContext{grid-column:auto}}\n  "}</style><div className="rawShell">
+    <header className="rawTop"><div><small>{assessment.assessment_reference} · VERSION {assessment.version}</small><h1>{assessment.title}</h1><p>{label(assessment.assessment_type)} · {assessment.site_location || assessment.area_department || "Location not set"}</p></div><div className="rawButtons"><Link className="rawButton secondary" href="/portal/health-safety/risk-assessment">← Register</Link><Link className="rawButton secondary" href="/portal/health-safety">H&amp;S Hub</Link>{["approved", "communicated", "superseded"].includes(assessment.status) && <a className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/report"} target="_blank" rel="noreferrer">▤ Controlled PDF</a>}{revisionableStatuses.includes(assessment.status) && canContribute && <form action={createRevision}><input type="hidden" name="assessment_id" value={id} /><button className="rawButton" type="submit">Create new revision</button></form>}{!locked && canContribute && <Link className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/edit"}>Edit assessment details</Link>}<Link className="rawButton" href={"/portal/health-safety/risk-assessment/" + id + "/review"}>Review &amp; approval</Link></div></header>
+    <section className="rawSummary"><div className="rawContext"><strong>{assessment.task_description}</strong><small>Assessed by {assessment.assessor_name || "Not assigned"} on {formatDate(assessment.assessment_date)} · review {formatDate(assessment.review_date)}</small></div><div className="rawMetric"><span>HAZARDS</span><strong>{hazards.length}</strong></div><div className="rawMetric"><span>HIGHEST RESIDUAL</span><strong className={(() => {
+              if (highest >= 10) {
+                return "red";
+              }
+              return "";
+            })()}>{highest || "—"}</strong></div><div className="rawMetric"><span>ELEVATED</span><strong className={(() => {
+              if (elevated) {
+                return "red";
+              }
+              return "";
+            })()}>{elevated}</strong></div><div className="rawMetric"><span>OPEN ACTIONS</span><strong>{openActions.length}</strong></div></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Assessment context</h2><p>Scope, people and supporting arrangements.</p></div><span className="rawPill">{label(assessment.status)}</span></div><div className="rawDetails"><div><span>AREA / DEPARTMENT</span><strong>{assessment.area_department || "—"}</strong></div><div><span>SECTION / LAB</span><strong>{assessment.section_lab || "—"}</strong></div><div><span>PEOPLE AT RISK</span><strong>{assessment.persons_at_risk?.join(", ") || "—"}</strong></div><div><span>ASSESSOR / DATE</span><strong>{assessment.assessor_name || "—"}<br />{formatDate(assessment.assessment_date)}</strong></div><div><span>SAFE SYSTEM OF WORK</span><strong>{assessment.safe_system_reference || "—"}</strong>{ssowDownloadUrl && <a className="rawDownload" href={ssowDownloadUrl} download={assessment.ssow_document_name || true}>Download SSOW ↓</a>}</div><div><span>COSHH / SAFETY DATA</span><strong>{assessment.coshh_msds_reference || "—"}</strong>{coshhDownloadUrl && <a className="rawDownload" href={coshhDownloadUrl} download={assessment.coshh_document_name || true}>Download COSHH ↓</a>}</div><div><span>PERMIT</span><strong>{(() => {
+                  if (assessment.permit_required) {
+                    return assessment.permit_reference;
+                  }
+                  return "Not required";
+                })()}</strong>{permitDownloadUrl && <a className="rawDownload" href={permitDownloadUrl} download={assessment.permit_document_name || true}>Download permit ↓</a>}</div><div><span>CONSULTATION</span><strong>{assessment.consultation_summary || "—"}</strong></div></div></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Buildings &amp; zones covered</h2><p>Controlled workplace links from Administration → Site Profile.</p></div>{!locked && canContribute && <Link className="rawButton secondary" href={"/portal/health-safety/risk-assessment/" + id + "/edit"}>Edit workplace scope</Link>}</div>{(() => {
+            if (applicableZones.length) {
+              return <div className="rawDetails">{applicableZones.map(zone => <div key={zone.id}><span>{zoneScope.buildings.find(building => building.id === zone.building_id)?.name || 'External / no building'}</span><strong>{zone.reference} · {zone.name}</strong><small>{zone.status}</small></div>)}</div>;
+            }
+            return <p className="rawEmpty">Site-level assessment: no individual zones linked. Add applicable zones in Edit assessment details or Manage zone → Link safety records.</p>;
+          })()}<p>Draft and review versions remain unavailable on employee pages until approved or communicated. PPE source selection and sign review remain separate.</p></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Hazards and risk decisions</h2><p>{(() => {
+                  if (locked) {
+                    return "This controlled version is read-only. Create a new revision to change hazards or controls.";
+                  }
+                  return "Evaluate initial risk, apply controls and confirm the residual position.";
+                })()}</p></div></div><HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} companyPeople={peopleResult.data || []} addHazardAction={addHazard} updatePPEAction={updateHazardPPE} zones={applicableZones} readOnly={locked || !canContribute} /></section>
+    <section className="rawPanel"><div className="rawHead"><div><h2>Risk-reduction actions</h2><p>Accountable actions linked directly to identified hazards.</p></div><Link href="/portal/health-safety/actions">Action register →</Link></div>{(() => {
+            if (actions.length) {
+              return <div className="rawActions">{actions.map(action => <div className="rawAction" key={action.id}><div><strong>{action.action_required}</strong><small>{action.action_reference}</small></div><div><strong>{action.responsible_name}</strong><small>Responsible person</small></div><div><strong>{formatDate(action.target_date)}</strong><small>{label(action.priority)} priority</small></div><span className="rawPill">{label(action.status)}</span></div>)}</div>;
+            }
+            return <div className="rawEmpty">No additional risk-reduction actions have been recorded.</div>;
+          })()}</section>
+  </div></main></ControlledDeviceDrafts>;
 }
