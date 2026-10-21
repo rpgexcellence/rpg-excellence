@@ -1,59 +1,51 @@
+// VERIFIED_SUPPLIER_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
 
+import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
-import {
-  SUPPLIER_STANDARDS,
-  SUPPLIER_TYPES,
-  applicableQuestions,
-  buildCodeOfConductSections,
-  calculateSupplierAssurance,
-} from "../lib/supplier-assurance";
-
-const tabs = [
-  "Supplier profile",
-  "Contact details",
-  "Standards & scope",
-  "Risk engine",
-  "Due diligence",
-  "Approval & monitoring",
-  "Code of Conduct",
-];
-
-const n = (value, fallback = 3) =>
-  Number.isFinite(Number(value)) ? Number(value) : fallback;
-
+import { SUPPLIER_STANDARDS, SUPPLIER_TYPES, applicableQuestions, buildCodeOfConductSections, calculateSupplierAssurance } from "../lib/supplier-assurance";
+const tabs = ["Supplier profile", "Contact details", "Standards & scope", "Risk engine", "Due diligence", "Approval & monitoring", "Code of Conduct"];
+const n = (value, fallback = 3) => (() => {
+  if (Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return fallback;
+})();
 const addMonths = (dateValue, months) => {
-  const source = dateValue ? new Date(`${dateValue}T12:00:00Z`) : new Date();
+  const source = (() => {
+    if (dateValue) {
+      return new Date("" + dateValue + "T12:00:00Z");
+    }
+    return new Date();
+  })();
   if (Number.isNaN(source.getTime())) return "";
   source.setUTCMonth(source.getUTCMonth() + Math.max(1, Number(months) || 1));
   return source.toISOString().slice(0, 10);
 };
-
 const initialData = (source = {}) => ({
-  legal_name: source.legal_name || "",
-  trading_name: source.trading_name || "",
-  registered_address: source.registered_address || "",
-  country: source.country || "United Kingdom",
-  company_number: source.company_number || "",
-  website: source.website || "",
-  primary_contact_name: source.primary_contact_name || "",
-  primary_contact_title: source.primary_contact_title || "",
-  primary_contact_email: source.primary_contact_email || "",
-  primary_contact_phone: source.primary_contact_phone || "",
-  supply_description: source.supply_description || "",
-  sites_and_scope: source.sites_and_scope || "",
-  uses_subtier_suppliers: Boolean(source.uses_subtier_suppliers),
-  criticality: source.criticality || "medium",
-  approval_scope: source.approval_scope || "",
-  approval_conditions: source.approval_conditions || "",
-  approved_by: source.approved_by || "",
-  approved_by_person_id: source.approved_by_person_id || "",
-  approval_expiry: source.approval_expiry || "",
-  next_review_date: source.next_review_date || "",
-  review_frequency_months: source.review_frequency_months || 12,
+  "legal_name": source.legal_name || "",
+  "trading_name": source.trading_name || "",
+  "registered_address": source.registered_address || "",
+  "country": source.country || "United Kingdom",
+  "company_number": source.company_number || "",
+  "website": source.website || "",
+  "primary_contact_name": source.primary_contact_name || "",
+  "primary_contact_title": source.primary_contact_title || "",
+  "primary_contact_email": source.primary_contact_email || "",
+  "primary_contact_phone": source.primary_contact_phone || "",
+  "supply_description": source.supply_description || "",
+  "sites_and_scope": source.sites_and_scope || "",
+  "uses_subtier_suppliers": Boolean(source.uses_subtier_suppliers),
+  "criticality": source.criticality || "medium",
+  "approval_scope": source.approval_scope || "",
+  "approval_conditions": source.approval_conditions || "",
+  "approved_by": source.approved_by || "",
+  "approved_by_person_id": source.approved_by_person_id || "",
+  "approval_expiry": source.approval_expiry || "",
+  "next_review_date": source.next_review_date || "",
+  "review_frequency_months": source.review_frequency_months || 12
 });
-
 function Field({
   label,
   value,
@@ -63,32 +55,30 @@ function Field({
   className = "",
   ...props
 }) {
-  return (
-    <label className={className}>
+  return <label className={className}>
       <span>{label}</span>
-      {children ||
-        (area ? (
-          <textarea
-            value={value || ""}
-            onChange={(event) => onChange(event.target.value)}
-            {...props}
-          />
-        ) : (
-          <input
-            value={value || ""}
-            onChange={(event) => onChange(event.target.value)}
-            {...props}
-          />
-        ))}
-    </label>
-  );
+      {children || (() => {
+      if (area) {
+        return <textarea value={value || ""} onChange={event => onChange(event.target.value)} {...props} />;
+      }
+      return <input value={value || ""} onChange={event => onChange(event.target.value)} {...props} />;
+    })()}
+    </label>;
 }
-
-function Pill({ tone = "blue", children }) {
-  return <span className={`saPill ${tone}`}>{children}</span>;
+function Pill({
+  tone = "blue",
+  children
+}) {
+  return <span className={"saPill " + tone + ""}>{children}</span>;
 }
-
-function Metric({ label, value, detail, tone = "blue", href, onClick }) {
+function Metric({
+  label,
+  value,
+  detail,
+  tone = "blue",
+  href,
+  onClick
+}) {
   const content = <>
       <span>{label}</span>
       <strong className={tone}>{value}</strong>
@@ -98,7 +88,6 @@ function Metric({ label, value, detail, tone = "blue", href, onClick }) {
   if (onClick) return <button type="button" className="saMetric clickable" onClick={onClick}>{content}</button>;
   return <article className="saMetric">{content}</article>;
 }
-
 export default function SupplierAssuranceWorkspace({
   organization,
   suppliers = [],
@@ -117,176 +106,209 @@ export default function SupplierAssuranceWorkspace({
   managementBoard = false,
   action,
   generateAction,
-  saved,
+  saved
 }) {
   const [state, formAction, pending] = useActionState(action, {});
-  const [step, setStep] = useState(0);
-  const [data, setData] = useState(() => initialData(initial || {}));
-  const [types, setTypes] = useState(
-    () => initial?.supplier_types || [],
-  );
-  const [standards, setStandards] = useState(
-    () => initial?.applicable_standards || ["iso9001"],
-  );
-  const [answers, setAnswers] = useState(
-    () => initial?.due_diligence_answers || {},
-  );
-  const [sites, setSites] = useState(() => supplierSites || []);
-  const [subTiers, setSubTiers] = useState(() => subTierSuppliers || []);
-  const [contacts, setContacts] = useState(() => supplierContacts || []);
+  const [step, setStep] = useDeviceDraftState("SupplierAssuranceWorkspace_step", 0);
+  const [data, setData] = useDeviceDraftState("SupplierAssuranceWorkspace_data", () => initialData(initial || {}));
+  const [types, setTypes] = useDeviceDraftState("SupplierAssuranceWorkspace_types", () => initial?.supplier_types || []);
+  const [standards, setStandards] = useDeviceDraftState("SupplierAssuranceWorkspace_standards", () => initial?.applicable_standards || ["iso9001"]);
+  const [answers, setAnswers] = useDeviceDraftState("SupplierAssuranceWorkspace_answers", () => initial?.due_diligence_answers || {});
+  const [sites, setSites] = useDeviceDraftState("SupplierAssuranceWorkspace_sites", () => supplierSites || []);
+  const [subTiers, setSubTiers] = useDeviceDraftState("SupplierAssuranceWorkspace_subTiers", () => subTierSuppliers || []);
+  const [contacts, setContacts] = useDeviceDraftState("SupplierAssuranceWorkspace_contacts", () => supplierContacts || []);
   const [selectedFiles, setSelectedFiles] = useState({});
-  const [risk, setRisk] = useState(() => ({
-    likelihood: n(initial?.risk_inputs?.likelihood),
-    consequence: n(initial?.risk_inputs?.consequence),
-    dependency: n(initial?.risk_inputs?.dependency),
-    detectability: n(initial?.risk_inputs?.detectability),
+  const [risk, setRisk] = useDeviceDraftState("SupplierAssuranceWorkspace_risk", () => ({
+    "likelihood": n(initial?.risk_inputs?.likelihood),
+    "consequence": n(initial?.risk_inputs?.consequence),
+    "dependency": n(initial?.risk_inputs?.dependency),
+    "detectability": n(initial?.risk_inputs?.detectability)
   }));
-  const [performance, setPerformance] = useState(() => ({
-    conformity: initial?.performance?.conformity ?? 100,
-    delivery: initial?.performance?.delivery ?? 100,
-    responsiveness: initial?.performance?.responsiveness ?? 100,
-    correctiveAction: initial?.performance?.correctiveAction ?? 100,
+  const [performance, setPerformance] = useDeviceDraftState("SupplierAssuranceWorkspace_performance", () => ({
+    "conformity": initial?.performance?.conformity ?? 100,
+    "delivery": initial?.performance?.delivery ?? 100,
+    "responsiveness": initial?.performance?.responsiveness ?? 100,
+    "correctiveAction": initial?.performance?.correctiveAction ?? 100
   }));
-
-  const questions = useMemo(
-    () => applicableQuestions(standards, types),
-    [standards, types],
-  );
-
-  const result = useMemo(
-    () =>
-      calculateSupplierAssurance({
-        standards,
-        types,
-        answers,
-        riskInputs: risk,
-        criticality: data.criticality,
-      }),
-    [standards, types, answers, risk, data.criticality],
-  );
-
-  const codeSections = useMemo(
-    () =>
-      buildCodeOfConductSections({
-        standards,
-        types,
-        supplierName: data.legal_name || "the Supplier",
-      }),
-    [standards, types, data.legal_name],
-  );
-
+  const questions = useMemo(() => applicableQuestions(standards, types), [standards, types]);
+  const result = useMemo(() => calculateSupplierAssurance({
+    "standards": standards,
+    "types": types,
+    "answers": answers,
+    "riskInputs": risk,
+    "criticality": data.criticality
+  }), [standards, types, answers, risk, data.criticality]);
+  const codeSections = useMemo(() => buildCodeOfConductSections({
+    "standards": standards,
+    "types": types,
+    "supplierName": data.legal_name || "the Supplier"
+  }), [standards, types, data.legal_name]);
   const active = initial || null;
-
-  const averagePerformance = Math.round(
-    Object.values(performance).reduce(
-      (sum, value) => sum + n(value, 0),
-      0,
-    ) / 4,
-  );
-
+  const averagePerformance = Math.round(Object.values(performance).reduce((sum, value) => sum + n(value, 0), 0) / 4);
   const reviewBaseDate = active?.approved_at?.slice(0, 10) || new Date().toISOString().slice(0, 10);
   const selectedReviewMonths = Math.max(1, Number(data.review_frequency_months) || result.reviewMonths);
   const recommendedReviewDate = addMonths(reviewBaseDate, result.reviewMonths);
   const reviewDeviation = selectedReviewMonths !== result.reviewMonths;
   const expiryBeforeReview = Boolean(data.approval_expiry && data.next_review_date && data.approval_expiry < data.next_review_date);
-  const gapDetails = result.gaps.map((id) => {
-    const question = questions.find((item) => item.id === id);
+  const gapDetails = result.gaps.map(id => {
+    const question = questions.find(item => item.id === id);
     const current = answers[id] || {};
-    const files = evidenceFiles.filter((file) => file.control_id === id);
-    const defaultSeverity = question?.blocker || current.response === "no" ? "High" : current.response === "partial" ? "Medium" : "Unrated";
-    return { id, question, current, files, severity: current.gap_severity || defaultSeverity };
+    const files = evidenceFiles.filter(file => file.control_id === id);
+    const defaultSeverity = (() => {
+      if (question?.blocker || current.response === "no") {
+        return "High";
+      }
+      return (() => {
+        if (current.response === "partial") {
+          return "Medium";
+        }
+        return "Unrated";
+      })();
+    })();
+    return {
+      "id": id,
+      "question": question,
+      "current": current,
+      "files": files,
+      "severity": current.gap_severity || defaultSeverity
+    };
   });
-
   useEffect(() => {
     const calculated = addMonths(reviewBaseDate, selectedReviewMonths);
-    setData((current) => current.next_review_date === calculated ? current : { ...current, next_review_date: calculated });
+    setData(current => (() => {
+      if (current.next_review_date === calculated) {
+        return current;
+      }
+      return {
+        ...current,
+        "next_review_date": calculated
+      };
+    })());
   }, [reviewBaseDate, selectedReviewMonths]);
-
-  const update = (key, value) =>
-    setData((current) => ({ ...current, [key]: value }));
-
-  const toggle = (list, setter, value) =>
-    setter(
-      list.includes(value)
-        ? list.filter((item) => item !== value)
-        : [...list, value],
-    );
-
-  const answer = (id, key, value) =>
-    setAnswers((current) => ({
-      ...current,
-      [id]: {
-        ...(current[id] || {}),
-        [key]: value,
-      },
-    }));
-
-  const openGapControl = (id) => {
+  const update = (key, value) => setData(current => ({
+    ...current,
+    [key]: value
+  }));
+  const toggle = (list, setter, value) => setter((() => {
+    if (list.includes(value)) {
+      return list.filter(item => item !== value);
+    }
+    return [...list, value];
+  })());
+  const answer = (id, key, value) => setAnswers(current => ({
+    ...current,
+    [id]: {
+      ...(current[id] || {}),
+      [key]: value
+    }
+  }));
+  const openGapControl = id => {
     setStep(4);
-    setTimeout(() => document.getElementById(`supplier-control-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+    setTimeout(() => document.getElementById("supplier-control-" + id + "")?.scrollIntoView({
+      "behavior": "smooth",
+      "block": "center"
+    }), 80);
   };
-
-  const addSite = () => setSites((current) => [
-    ...current,
-    { client_key: crypto.randomUUID(), site_name: "", address: "", scope: "", approval_status: "not_approved" },
-  ]);
-  const updateSite = (key, field, value) => setSites((current) =>
-    current.map((site) => (site.client_key === key ? { ...site, [field]: value } : site))
-  );
-  const removeSite = (key) => setSites((current) => current.filter((site) => site.client_key !== key));
-
-  const addSubTier = () => setSubTiers((current) => [
-    ...current,
-    { client_key: crypto.randomUUID(), legal_name: "", supply_scope: "", approval_status: "not_approved", certification_standard: "", certificate_number: "", certification_body: "", certificate_expiry: "", reminder_date: "" },
-  ]);
-  const updateSubTier = (key, field, value) => setSubTiers((current) =>
-    current.map((supplier) => (supplier.client_key === key ? { ...supplier, [field]: value } : supplier))
-  );
-  const removeSubTier = (key) => setSubTiers((current) => current.filter((supplier) => supplier.client_key !== key));
-  const addContact = () => setContacts((current) => [...current, { client_key: crypto.randomUUID(), first_name: "", last_name: "", business_title: "", department: "", telephone: "", mobile: "", email: "", is_primary: current.length === 0, is_active: true }]);
-  const updateContact = (key, field, value) => setContacts((current) => current.map((contact) => contact.client_key === key ? { ...contact, [field]: value } : contact));
-  const setPrimaryContact = (key) => setContacts((current) => current.map((contact) => ({ ...contact, is_primary: contact.client_key === key })));
-  const removeContact = (key) => setContacts((current) => current.filter((contact) => contact.client_key !== key));
-
-  const riskTone =
-    result.riskBand === "Critical"
-      ? "red"
-      : result.riskBand === "High"
-        ? "amber"
-        : result.riskBand === "Medium"
-          ? "blue"
-          : "green";
-
-  const statusLabel = String(
-    active?.approval_status || "draft",
-  ).replaceAll("_", " ");
-  const activeNc = active ? (supplierNcStats[active.id] || { open: 0, pending: 0, closed: 0, total: 0 }) : { open: 0, pending: 0, closed: 0, total: 0 };
-
-  return (
-    <main className="saPage">
+  const addSite = () => setSites(current => [...current, {
+    "client_key": crypto.randomUUID(),
+    "site_name": "",
+    "address": "",
+    "scope": "",
+    "approval_status": "not_approved"
+  }]);
+  const updateSite = (key, field, value) => setSites(current => current.map(site => (() => {
+    if (site.client_key === key) {
+      return {
+        ...site,
+        [field]: value
+      };
+    }
+    return site;
+  })()));
+  const removeSite = key => setSites(current => current.filter(site => site.client_key !== key));
+  const addSubTier = () => setSubTiers(current => [...current, {
+    "client_key": crypto.randomUUID(),
+    "legal_name": "",
+    "supply_scope": "",
+    "approval_status": "not_approved",
+    "certification_standard": "",
+    "certificate_number": "",
+    "certification_body": "",
+    "certificate_expiry": "",
+    "reminder_date": ""
+  }]);
+  const updateSubTier = (key, field, value) => setSubTiers(current => current.map(supplier => (() => {
+    if (supplier.client_key === key) {
+      return {
+        ...supplier,
+        [field]: value
+      };
+    }
+    return supplier;
+  })()));
+  const removeSubTier = key => setSubTiers(current => current.filter(supplier => supplier.client_key !== key));
+  const addContact = () => setContacts(current => [...current, {
+    "client_key": crypto.randomUUID(),
+    "first_name": "",
+    "last_name": "",
+    "business_title": "",
+    "department": "",
+    "telephone": "",
+    "mobile": "",
+    "email": "",
+    "is_primary": current.length === 0,
+    "is_active": true
+  }]);
+  const updateContact = (key, field, value) => setContacts(current => current.map(contact => (() => {
+    if (contact.client_key === key) {
+      return {
+        ...contact,
+        [field]: value
+      };
+    }
+    return contact;
+  })()));
+  const setPrimaryContact = key => setContacts(current => current.map(contact => ({
+    ...contact,
+    "is_primary": contact.client_key === key
+  })));
+  const removeContact = key => setContacts(current => current.filter(contact => contact.client_key !== key));
+  const riskTone = (() => {
+    if (result.riskBand === "Critical") {
+      return "red";
+    }
+    return (() => {
+      if (result.riskBand === "High") {
+        return "amber";
+      }
+      return (() => {
+        if (result.riskBand === "Medium") {
+          return "blue";
+        }
+        return "green";
+      })();
+    })();
+  })();
+  const statusLabel = String(active?.approval_status || "draft").replaceAll("_", " ");
+  const activeNc = (() => {
+    if (active) {
+      return supplierNcStats[active.id] || {
+        "open": 0,
+        "pending": 0,
+        "closed": 0,
+        "total": 0
+      };
+    }
+    return {
+      "open": 0,
+      "pending": 0,
+      "closed": 0,
+      "total": 0
+    };
+  })();
+  return <main className="saPage">
       <style>{styles}</style>
-<style>{`
-  .saPage{font-size:16px;line-height:1.5}
-  .saSide>small,.saSide nav>span,.saTop>div:first-child>small,.saSectionHead small,.saGenerate>div>small{font-size:12px}
-  .saSide nav>a,.saSide nav>a.supplier b,.saTop a,.saTabs button,.saGrid label>span,.saQuestions label>span,.saPerformance label>span,.saActions button,.saGenerate button{font-size:14px}
-  .saSide nav>a.supplier small,.saSideFoot span,.saMetric>span,.saMetric small,.saPill,.saDecision span,.saDecision small{font-size:12px}
-  .saCocPreview>header{padding:32px}
-  .saCocPreview>header>span{font-size:12px}
-  .saCocPreview h3{font-size:26px;line-height:1.25}
-  .saCocPreview>header p{font-size:15px;line-height:1.7}
-  .saCocStandards{padding:18px 24px}
-  .saCocPreview>article{gap:9px 18px;padding:20px 24px}
-  .saCocPreview>article>b{font-size:16px;line-height:1.4}
-  .saCocPreview>article>span{font-size:12px;line-height:1.4}
-  .saCocPreview>article>p{font-size:14px;line-height:1.6}
-  .saCocPreview>article>small{font-size:12px}
-  .saGenerate p,.saSectionHead p{font-size:15px}
-  .saGenerate form small{font-size:12px}
-  @media(max-width:600px){
-    .saCocPreview>header{padding:22px}
-    .saCocPreview>article{grid-template-columns:1fr;padding:18px}
-  }
-`}</style>
+    <style>{"\n  .saPage{font-size:16px;line-height:1.5}\n  .saSide>small,.saSide nav>span,.saTop>div:first-child>small,.saSectionHead small,.saGenerate>div>small{font-size:12px}\n  .saSide nav>a,.saSide nav>a.supplier b,.saTop a,.saTabs button,.saGrid label>span,.saQuestions label>span,.saPerformance label>span,.saActions button,.saGenerate button{font-size:14px}\n  .saSide nav>a.supplier small,.saSideFoot span,.saMetric>span,.saMetric small,.saPill,.saDecision span,.saDecision small{font-size:12px}\n  .saCocPreview>header{padding:32px}\n  .saCocPreview>header>span{font-size:12px}\n  .saCocPreview h3{font-size:26px;line-height:1.25}\n  .saCocPreview>header p{font-size:15px;line-height:1.7}\n  .saCocStandards{padding:18px 24px}\n  .saCocPreview>article{gap:9px 18px;padding:20px 24px}\n  .saCocPreview>article>b{font-size:16px;line-height:1.4}\n  .saCocPreview>article>span{font-size:12px;line-height:1.4}\n  .saCocPreview>article>p{font-size:14px;line-height:1.6}\n  .saCocPreview>article>small{font-size:12px}\n  .saGenerate p,.saSectionHead p{font-size:15px}\n  .saGenerate form small{font-size:12px}\n  @media(max-width:600px){\n    .saCocPreview>header{padding:22px}\n    .saCocPreview>article{grid-template-columns:1fr;padding:18px}\n  }\n"}</style>
       <div className="saShell">
         <aside className="saSide">
           <Link href="/portal" className="saBrand">
@@ -296,45 +318,41 @@ export default function SupplierAssuranceWorkspace({
           <small>SUPPLIER ASSURANCE HUB</small>
 
           <nav>
-            <Link
-              href="/portal/suppliers?view=board"
-              className={managementBoard ? "active" : ""}
-            >
+            <Link href="/portal/suppliers?view=board" className={(() => {
+            if (managementBoard) {
+              return "active";
+            }
+            return "";
+          })()}>
               Management board
             </Link>
 
-            <Link
-              href="/portal/suppliers?new=1"
-              className={!active ? "accent" : ""}
-            >
+            <Link href="/portal/suppliers?new=1" className={(() => {
+            if (!active) {
+              return "accent";
+            }
+            return "";
+          })()}>
               + New supplier
             </Link>
 
-            {active && <Link href={`/portal/suppliers/${active.id}/qbr`}>Quarterly business reviews</Link>}
+            {active && <Link href={"/portal/suppliers/" + active.id + "/qbr"}>Quarterly business reviews</Link>}
 
             <span>SUPPLIER REGISTER</span>
 
-            {suppliers.map((supplier) => (
-              <Link
-                key={supplier.id}
-                href={`/portal/suppliers?id=${supplier.id}`}
-                className={
-                  active?.id === supplier.id
-                    ? "active supplier"
-                    : "supplier"
-                }
-              >
+            {suppliers.map(supplier => <Link key={supplier.id} href={"/portal/suppliers?id=" + supplier.id + ""} className={(() => {
+            if (active?.id === supplier.id) {
+              return "active supplier";
+            }
+            return "supplier";
+          })()}>
                 <b>{supplier.legal_name}</b>
                 <small>
                   {supplier.supplier_reference} ·{" "}
-                  {String(supplier.approval_status).replaceAll(
-                    "_",
-                    " ",
-                  )}
+                  {String(supplier.approval_status).replaceAll("_", " ")}
                 </small>
                 <span className="saSupplierNc">NC: {supplierNcStats[supplier.id]?.open || 0} open · {supplierNcStats[supplier.id]?.pending || 0} pending · {supplierNcStats[supplier.id]?.closed || 0} closed</span>
-              </Link>
-            ))}
+              </Link>)}
           </nav>
 
           <div className="saSideFoot">
@@ -343,7 +361,12 @@ export default function SupplierAssuranceWorkspace({
             </strong>
             <span>
               {suppliers.length} supplier
-              {suppliers.length === 1 ? "" : "s"} under assurance
+              {(() => {
+              if (suppliers.length === 1) {
+                return "";
+              }
+              return "s";
+            })()} under assurance
             </span>
           </div>
         </aside>
@@ -353,30 +376,54 @@ export default function SupplierAssuranceWorkspace({
             <div>
               <small>INTEGRATED SUPPLIER ASSURANCE</small>
               <h1>
-                {managementBoard
-                  ? "Supplier assurance management board"
-                  : active
-                  ? active.legal_name
-                  : "Create supplier assurance record"}
+                {(() => {
+                if (managementBoard) {
+                  return "Supplier assurance management board";
+                }
+                return (() => {
+                  if (active) {
+                    return active.legal_name;
+                  }
+                  return "Create supplier assurance record";
+                })();
+              })()}
               </h1>
               <p>
-                {managementBoard
-                  ? "Portfolio risk, approval and nonconformity oversight"
-                  : active
-                  ? `${active.supplier_reference} · ${statusLabel}`
-                  : "Classify once, then let the engine apply the right controls."}
+                {(() => {
+                if (managementBoard) {
+                  return "Portfolio risk, approval and nonconformity oversight";
+                }
+                return (() => {
+                  if (active) {
+                    return "" + active.supplier_reference + " \xB7 " + statusLabel + "";
+                  }
+                  return "Classify once, then let the engine apply the right controls.";
+                })();
+              })()}
               </p>
             </div>
 
             <div>
-              {active?.approval_status === "approved" ? <Link className="audit" href={`/portal/internal-audits?supplier=${active.id}#audit-mandate`}>+ Create Supplier Audit</Link> : null}
-              {active ? <Link className="issue" href={`/portal/internal-audit-actions?raise=1&supplier=${active.id}#raise-manual-nc`}>+ Raise Supplier Issue</Link> : null}
-              {active ? <Link href={`/portal/suppliers/${active.id}/qbr`}>+ Create QBR</Link> : null}
+              {(() => {
+              if (active?.approval_status === "approved") {
+                return <Link className="audit" href={"/portal/internal-audits?supplier=" + active.id + "#audit-mandate"}>+ Create Supplier Audit</Link>;
+              }
+              return null;
+            })()}
+              {(() => {
+              if (active) {
+                return <Link className="issue" href={"/portal/internal-audit-actions?raise=1&supplier=" + active.id + "#raise-manual-nc"}>+ Raise Supplier Issue</Link>;
+              }
+              return null;
+            })()}
+              {(() => {
+              if (active) {
+                return <Link href={"/portal/suppliers/" + active.id + "/qbr"}>+ Create QBR</Link>;
+              }
+              return null;
+            })()}
               <Link href="/portal">Product dashboard</Link>
-              <Link
-                className="primary"
-                href="/portal/suppliers?new=1"
-              >
+              <Link className="primary" href="/portal/suppliers?new=1">
                 + New supplier
               </Link>
             </div>
@@ -417,64 +464,97 @@ export default function SupplierAssuranceWorkspace({
           </section>
 
           <section className="saMetrics">
-            <Metric
-              label={quarterlyReviews.length ? "Last QBR date" : "Next QBR date"}
-              value={quarterlyReviews[0]?.review_date || active?.next_review_date || "Not set"}
-              detail={quarterlyReviews.length ? `Next QBR ${quarterlyReviews[0].next_qbr_date}` : active ? "No completed QBR recorded" : "Select a supplier"}
-              href={active ? `/portal/suppliers/${active.id}/qbr${quarterlyReviews[0]?.id ? `?review=${quarterlyReviews[0].id}` : ""}` : undefined}
-            />
-            <Metric label="NCs open" value={activeNc.open} detail={active ? "Action required" : "Select a supplier"} tone="red" href={active ? `/portal/internal-audit-actions?supplier=${active.id}&status=open#all-ncs` : undefined} />
-            <Metric label="NCs pending" value={activeNc.pending} detail={active ? "CAPA or verification" : "Select a supplier"} tone="amber" href={active ? `/portal/internal-audit-actions?supplier=${active.id}&status=pending#all-ncs` : undefined} />
-            <Metric label="NCs closed" value={activeNc.closed} detail={active ? "Effectiveness verified" : "Select a supplier"} tone="green" href={active ? `/portal/internal-audit-actions?supplier=${active.id}&status=closed#all-ncs` : undefined} />
-            <Metric
-              label="High / critical"
-              value={
-                suppliers.filter((item) =>
-                  ["High", "Critical"].includes(
-                    item.risk_result?.riskBand,
-                  ),
-                ).length
+            <Metric label={(() => {
+            if (quarterlyReviews.length) {
+              return "Last QBR date";
+            }
+            return "Next QBR date";
+          })()} value={quarterlyReviews[0]?.review_date || active?.next_review_date || "Not set"} detail={(() => {
+            if (quarterlyReviews.length) {
+              return "Next QBR " + quarterlyReviews[0].next_qbr_date + "";
+            }
+            return (() => {
+              if (active) {
+                return "No completed QBR recorded";
               }
-              detail="Enhanced assurance required"
-              tone="red"
-              onClick={() => setStep(3)}
-            />
-            <Metric
-              label="Pending approval"
-              value={
-                suppliers.filter(
-                  (item) =>
-                    item.approval_status === "pending_approval",
-                ).length
-              }
-              detail="Decision required"
-              tone="amber"
-              onClick={() => setStep(5)}
-            />
-            <Metric
-              label="Codes issued"
-              value={documents.length}
-              detail={
-                active ? "For selected supplier" : "Select a supplier"
-              }
-              tone="green"
-              onClick={() => setStep(6)}
-            />
-            <Metric
-              label="Risk profile"
-              value={active ? result.riskBand : "—"}
-              detail={
-                active
-                  ? `${result.riskScore}/40 · Live supplier risk score`
-                  : "Select a supplier"
-              }
-              tone={active ? riskTone : "blue"}
-              onClick={active ? () => setStep(3) : undefined}
-            />
+              return "Select a supplier";
+            })();
+          })()} href={(() => {
+            if (active) {
+              return "/portal/suppliers/" + active.id + "/qbr" + (() => {
+                if (quarterlyReviews[0]?.id) {
+                  return "?review=" + quarterlyReviews[0].id + "";
+                }
+                return "";
+              })() + "";
+            }
+            return undefined;
+          })()} />
+            <Metric label="NCs open" value={activeNc.open} detail={(() => {
+            if (active) {
+              return "Action required";
+            }
+            return "Select a supplier";
+          })()} tone="red" href={(() => {
+            if (active) {
+              return "/portal/internal-audit-actions?supplier=" + active.id + "&status=open#all-ncs";
+            }
+            return undefined;
+          })()} />
+            <Metric label="NCs pending" value={activeNc.pending} detail={(() => {
+            if (active) {
+              return "CAPA or verification";
+            }
+            return "Select a supplier";
+          })()} tone="amber" href={(() => {
+            if (active) {
+              return "/portal/internal-audit-actions?supplier=" + active.id + "&status=pending#all-ncs";
+            }
+            return undefined;
+          })()} />
+            <Metric label="NCs closed" value={activeNc.closed} detail={(() => {
+            if (active) {
+              return "Effectiveness verified";
+            }
+            return "Select a supplier";
+          })()} tone="green" href={(() => {
+            if (active) {
+              return "/portal/internal-audit-actions?supplier=" + active.id + "&status=closed#all-ncs";
+            }
+            return undefined;
+          })()} />
+            <Metric label="High / critical" value={suppliers.filter(item => ["High", "Critical"].includes(item.risk_result?.riskBand)).length} detail="Enhanced assurance required" tone="red" onClick={() => setStep(3)} />
+            <Metric label="Pending approval" value={suppliers.filter(item => item.approval_status === "pending_approval").length} detail="Decision required" tone="amber" onClick={() => setStep(5)} />
+            <Metric label="Codes issued" value={documents.length} detail={(() => {
+            if (active) {
+              return "For selected supplier";
+            }
+            return "Select a supplier";
+          })()} tone="green" onClick={() => setStep(6)} />
+            <Metric label="Risk profile" value={(() => {
+            if (active) {
+              return result.riskBand;
+            }
+            return "—";
+          })()} detail={(() => {
+            if (active) {
+              return "" + result.riskScore + "/40 \xB7 Live supplier risk score";
+            }
+            return "Select a supplier";
+          })()} tone={(() => {
+            if (active) {
+              return riskTone;
+            }
+            return "blue";
+          })()} onClick={(() => {
+            if (active) {
+              return () => setStep(3);
+            }
+            return undefined;
+          })()} />
           </section>
 
-          {managementBoard && (
-            <section className="saBoard">
+          {managementBoard && <section className="saBoard">
               <header>
                 <div>
                   <small>CONTROLLED SUPPLIER PORTFOLIO</small>
@@ -484,155 +564,92 @@ export default function SupplierAssuranceWorkspace({
                 <Link href="/portal/suppliers?new=1">+ Add supplier</Link>
               </header>
 
-              {suppliers.length ? (
-                <div className="saBoardTable">
+              {(() => {
+            if (suppliers.length) {
+              return <div className="saBoardTable">
                   <div className="saBoardRow heading">
                     <span>Supplier</span><span>Approval</span><span>Risk profile</span><span>NC position</span><span>Next review</span><span>Action</span>
                   </div>
-                  {suppliers.map((supplier) => {
-                    const stats = supplierNcStats[supplier.id] || { open: 0, pending: 0, closed: 0 };
-                    const band = supplier.risk_result?.riskBand || "Not assessed";
-                    const score = supplier.risk_result?.riskScore;
-                    return (
-                      <div className="saBoardRow" key={supplier.id}>
+                  {suppliers.map(supplier => {
+                  const stats = supplierNcStats[supplier.id] || {
+                    "open": 0,
+                    "pending": 0,
+                    "closed": 0
+                  };
+                  const band = supplier.risk_result?.riskBand || "Not assessed";
+                  const score = supplier.risk_result?.riskScore;
+                  return <div className="saBoardRow" key={supplier.id}>
                         <span><b>{supplier.legal_name}</b><small>{supplier.supplier_reference}</small></span>
-                        <span><Pill tone={supplier.approval_status === "approved" ? "green" : supplier.approval_status === "pending_approval" ? "amber" : "blue"}>{String(supplier.approval_status || "draft").replaceAll("_", " ")}</Pill></span>
-                        <span><b>{band}</b><small>{Number.isFinite(Number(score)) ? `${score}/40` : "Complete risk engine"}</small></span>
+                        <span><Pill tone={(() => {
+                        if (supplier.approval_status === "approved") {
+                          return "green";
+                        }
+                        return (() => {
+                          if (supplier.approval_status === "pending_approval") {
+                            return "amber";
+                          }
+                          return "blue";
+                        })();
+                      })()}>{String(supplier.approval_status || "draft").replaceAll("_", " ")}</Pill></span>
+                        <span><b>{band}</b><small>{(() => {
+                          if (Number.isFinite(Number(score))) {
+                            return "" + score + "/40";
+                          }
+                          return "Complete risk engine";
+                        })()}</small></span>
                         <span><b>{stats.open} open · {stats.pending} pending</b><small>{stats.closed} closed</small></span>
                         <span><b>{supplier.next_review_date || "Not set"}</b><small>{supplier.review_frequency_months || 12}-month cycle</small></span>
-                        <span><Link href={`/portal/suppliers?id=${supplier.id}`}>Open record →</Link></span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="saBoardEmpty"><b>No suppliers yet</b><span>Create the first controlled supplier assurance record.</span></div>
-              )}
-            </section>
-          )}
+                        <span><Link href={"/portal/suppliers?id=" + supplier.id + ""}>Open record →</Link></span>
+                      </div>;
+                })}
+                </div>;
+            }
+            return <div className="saBoardEmpty"><b>No suppliers yet</b><span>Create the first controlled supplier assurance record.</span></div>;
+          })()}
+            </section>}
 
-          {!managementBoard && (saved || state?.error) && (
-            <div
-              className={
-                state?.error
-                  ? "saMessage error"
-                  : "saMessage success"
-              }
-            >
-              {state?.error ||
-                "Supplier assurance record saved successfully."}
-            </div>
-          )}
+          {!managementBoard && (saved || state?.error) && <div className={(() => {
+          if (state?.error) {
+            return "saMessage error";
+          }
+          return "saMessage success";
+        })()}>
+              {state?.error || "Supplier assurance record saved successfully."}
+            </div>}
 
           {!managementBoard && <div className="saTabs" role="tablist">
-            {tabs.map((tab, index) => (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={step === index}
-                className={step === index ? "active" : ""}
-                onClick={() => setStep(index)}
-                key={tab}
-              >
+            {tabs.map((tab, index) => <button type="button" role="tab" aria-selected={step === index} className={(() => {
+            if (step === index) {
+              return "active";
+            }
+            return "";
+          })()} onClick={() => setStep(index)} key={tab}>
                 <b>{index + 1}</b>
                 {tab}
-              </button>
-            ))}
+              </button>)}
           </div>}
 
           {!managementBoard && <form action={formAction} className="saPanel">
-            <input
-              type="hidden"
-              name="supplier_id"
-              value={active?.id || ""}
-            />
-            <input
-              type="hidden"
-              name="supplier_types"
-              value={JSON.stringify(types)}
-            />
-            <input
-              type="hidden"
-              name="applicable_standards"
-              value={JSON.stringify(standards)}
-            />
-            <input
-              type="hidden"
-              name="due_diligence_answers"
-              value={JSON.stringify(answers)}
-            />
-            <input
-              type="hidden"
-              name="risk_inputs"
-              value={JSON.stringify(risk)}
-            />
-            <input
-              type="hidden"
-              name="documents"
-              value={JSON.stringify(initial?.documents || [])}
-            />
-            <input
-              type="hidden"
-              name="performance"
-              value={JSON.stringify(performance)}
-            />
+            <input type="hidden" name="supplier_id" value={active?.id || ""} />
+            <input type="hidden" name="supplier_types" value={JSON.stringify(types)} />
+            <input type="hidden" name="applicable_standards" value={JSON.stringify(standards)} />
+            <input type="hidden" name="due_diligence_answers" value={JSON.stringify(answers)} />
+            <input type="hidden" name="risk_inputs" value={JSON.stringify(risk)} />
+            <input type="hidden" name="documents" value={JSON.stringify(initial?.documents || [])} />
+            <input type="hidden" name="performance" value={JSON.stringify(performance)} />
             <input type="hidden" name="supplier_sites" value={JSON.stringify(sites)} />
             <input type="hidden" name="subtier_suppliers" value={JSON.stringify(subTiers)} />
             <input type="hidden" name="supplier_contacts" value={JSON.stringify(contacts)} />
 
-            {step !== 0 &&
-              [
-                "legal_name",
-                "trading_name",
-                "registered_address",
-                "country",
-                "company_number",
-                "website",
-                "supply_description",
-              ].map((key) => (
-                <input
-                  key={key}
-                  type="hidden"
-                  name={key}
-                  value={data[key]}
-                />
-              ))}
+            {step !== 0 && ["legal_name", "trading_name", "registered_address", "country", "company_number", "website", "supply_description"].map(key => <input key={key} type="hidden" name={key} value={data[key]} />)}
 
-            {step !== 2 && data.uses_subtier_suppliers && (
-              <input
-                type="hidden"
-                name="uses_subtier_suppliers"
-                value="on"
-              />
-            )}
+            {step !== 2 && data.uses_subtier_suppliers && <input type="hidden" name="uses_subtier_suppliers" value="on" />}
 
-            {step !== 3 && (
-              <input
-                type="hidden"
-                name="criticality"
-                value={data.criticality}
-              />
-            )}
+            {step !== 3 && <input type="hidden" name="criticality" value={data.criticality} />}
 
-            {step !== 5 &&
-              [
-                "approval_scope",
-                "approval_conditions",
-                "approved_by_person_id",
-                "approval_expiry",
-                "next_review_date",
-                "review_frequency_months",
-              ].map((key) => (
-                <input
-                  key={key}
-                  type="hidden"
-                  name={key}
-                  value={data[key]}
-                />
-              ))}
+            {step !== 5 && ["approval_scope", "approval_conditions", "approved_by_person_id", "approval_expiry", "next_review_date", "review_frequency_months"].map(key => <input key={key} type="hidden" name={key} value={data[key]} />)}
 
-            {step === 0 && (
-              <>
+            {step === 0 && <>
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 1</small>
@@ -644,78 +661,18 @@ export default function SupplierAssuranceWorkspace({
                     </p>
                   </div>
                   <Pill>
-                    {active?.supplier_reference ||
-                      "Reference created on save"}
+                    {active?.supplier_reference || "Reference created on save"}
                   </Pill>
                 </div>
 
                 <div className="saGrid">
-                  <Field
-                    label="Legal supplier name *"
-                    name="legal_name"
-                    value={data.legal_name}
-                    onChange={(value) =>
-                      update("legal_name", value)
-                    }
-                    required
-                  />
-                  <Field
-                    label="Trading name"
-                    name="trading_name"
-                    value={data.trading_name}
-                    onChange={(value) =>
-                      update("trading_name", value)
-                    }
-                  />
-                  <Field
-                    label="Registered address *"
-                    name="registered_address"
-                    value={data.registered_address}
-                    onChange={(value) =>
-                      update("registered_address", value)
-                    }
-                    area
-                    rows="4"
-                    className="wide"
-                    required
-                  />
-                  <Field
-                    label="Country"
-                    name="country"
-                    value={data.country}
-                    onChange={(value) =>
-                      update("country", value)
-                    }
-                  />
-                  <Field
-                    label="Company / registration number"
-                    name="company_number"
-                    value={data.company_number}
-                    onChange={(value) =>
-                      update("company_number", value)
-                    }
-                  />
-                  <Field
-                    label="Website"
-                    name="website"
-                    value={data.website}
-                    onChange={(value) =>
-                      update("website", value)
-                    }
-                    type="url"
-                  />
-                  <Field
-                    label="Products, services or outsourced process supplied *"
-                    name="supply_description"
-                    value={data.supply_description}
-                    onChange={(value) =>
-                      update("supply_description", value)
-                    }
-                    area
-                    rows="4"
-                    className="wide"
-                    required
-                  />
+                  <Field label="Legal supplier name *" name="legal_name" value={data.legal_name} onChange={value => update("legal_name", value)} required />
+                  <Field label="Trading name" name="trading_name" value={data.trading_name} onChange={value => update("trading_name", value)} />
+                  <Field label="Registered address *" name="registered_address" value={data.registered_address} onChange={value => update("registered_address", value)} area rows="4" className="wide" required />
+                  <Field label="Country" name="country" value={data.country} onChange={value => update("country", value)} />
+                  <Field label="Company / registration number" name="company_number" value={data.company_number} onChange={value => update("company_number", value)} />
+                  <Field label="Website" name="website" value={data.website} onChange={value => update("website", value)} type="url" />
+                  <Field label="Products, services or outsourced process supplied *" name="supply_description" value={data.supply_description} onChange={value => update("supply_description", value)} area rows="4" className="wide" required />
                 </div>
 
                 <div className="saRegisterHead">
@@ -724,44 +681,43 @@ export default function SupplierAssuranceWorkspace({
                 </div>
                 <div className="saManagedList">
                   {sites.length === 0 && <p className="saEmpty">No sites added. Add at least the principal supply location.</p>}
-                  {sites.map((site, index) => (
-                    <article key={site.client_key}>
+                  {sites.map((site, index) => <article key={site.client_key}>
                       <header><b>Site {index + 1}</b><button type="button" onClick={() => removeSite(site.client_key)}>Remove</button></header>
                       <div className="saManagedGrid">
-                        <label><span>Site name *</span><input value={site.site_name} onChange={(event) => updateSite(site.client_key, "site_name", event.target.value)} /></label>
-                        <label><span>Approval status</span><select value={site.approval_status} onChange={(event) => updateSite(site.client_key, "approval_status", event.target.value)}><option value="approved">Approved</option><option value="conditionally_approved">Conditionally approved</option><option value="not_approved">Not approved</option><option value="pending">Pending assessment</option><option value="suspended">Suspended</option></select></label>
-                        <label className="wide"><span>Full address *</span><textarea rows="2" value={site.address} onChange={(event) => updateSite(site.client_key, "address", event.target.value)} /></label>
-                        <label className="wide"><span>Approved operational scope *</span><textarea rows="2" value={site.scope} onChange={(event) => updateSite(site.client_key, "scope", event.target.value)} /></label>
+                        <label><span>Site name *</span><input value={site.site_name} onChange={event => updateSite(site.client_key, "site_name", event.target.value)} /></label>
+                        <label><span>Approval status</span><select value={site.approval_status} onChange={event => updateSite(site.client_key, "approval_status", event.target.value)}><option value="approved">Approved</option><option value="conditionally_approved">Conditionally approved</option><option value="not_approved">Not approved</option><option value="pending">Pending assessment</option><option value="suspended">Suspended</option></select></label>
+                        <label className="wide"><span>Full address *</span><textarea rows="2" value={site.address} onChange={event => updateSite(site.client_key, "address", event.target.value)} /></label>
+                        <label className="wide"><span>Approved operational scope *</span><textarea rows="2" value={site.scope} onChange={event => updateSite(site.client_key, "scope", event.target.value)} /></label>
                       </div>
-                    </article>
-                  ))}
+                    </article>)}
                 </div>
-              </>
-            )}
+              </>}
 
-            {step === 1 && (
-              <>
-                <div className="saSectionHead"><div><small>STEP 2</small><h2>Supplier contact details</h2><p>Maintain the supplier people authorised for correspondence, issue ownership and escalation.</p></div><Pill tone="purple">{contacts.filter((contact) => contact.is_active !== false).length} active</Pill></div>
+            {step === 1 && <>
+                <div className="saSectionHead"><div><small>STEP 2</small><h2>Supplier contact details</h2><p>Maintain the supplier people authorised for correspondence, issue ownership and escalation.</p></div><Pill tone="purple">{contacts.filter(contact => contact.is_active !== false).length} active</Pill></div>
                 <div className="saRegisterHead"><div><h3>Contact register</h3><p>These contacts become available as Responsible Owner only when an NC source is Supplier issue.</p></div><button type="button" onClick={addContact}>+ Add contact</button></div>
                 <div className="saManagedList">
                   {contacts.length === 0 && <p className="saEmpty">No supplier contacts recorded. Add at least one contact before raising a supplier issue.</p>}
-                  {contacts.map((contact, index) => <article key={contact.client_key}><header><b>Contact {index + 1}{contact.is_primary ? " · Primary" : ""}</b><button type="button" onClick={() => removeContact(contact.client_key)}>Remove</button></header><div className="saManagedGrid">
-                    <label><span>First name *</span><input value={contact.first_name || ""} onChange={(event) => updateContact(contact.client_key, "first_name", event.target.value)}/></label>
-                    <label><span>Surname</span><input value={contact.last_name || ""} onChange={(event) => updateContact(contact.client_key, "last_name", event.target.value)}/></label>
-                    <label><span>Business title</span><input value={contact.business_title || ""} onChange={(event) => updateContact(contact.client_key, "business_title", event.target.value)}/></label>
-                    <label><span>Department / function</span><input value={contact.department || ""} onChange={(event) => updateContact(contact.client_key, "department", event.target.value)}/></label>
-                    <label><span>Telephone</span><input value={contact.telephone || ""} onChange={(event) => updateContact(contact.client_key, "telephone", event.target.value)}/></label>
-                    <label><span>Mobile</span><input value={contact.mobile || ""} onChange={(event) => updateContact(contact.client_key, "mobile", event.target.value)}/></label>
-                    <label className="wide"><span>Email address *</span><input type="email" value={contact.email || ""} onChange={(event) => updateContact(contact.client_key, "email", event.target.value)}/></label>
-                    <label><span><input type="radio" name="primary_supplier_contact" checked={Boolean(contact.is_primary)} onChange={() => setPrimaryContact(contact.client_key)}/> Primary contact</span></label>
-                    <label><span><input type="checkbox" checked={contact.is_active !== false} onChange={(event) => updateContact(contact.client_key, "is_active", event.target.checked)}/> Active contact</span></label>
+                  {contacts.map((contact, index) => <article key={contact.client_key}><header><b>Contact {index + 1}{(() => {
+                      if (contact.is_primary) {
+                        return " · Primary";
+                      }
+                      return "";
+                    })()}</b><button type="button" onClick={() => removeContact(contact.client_key)}>Remove</button></header><div className="saManagedGrid">
+                    <label><span>First name *</span><input value={contact.first_name || ""} onChange={event => updateContact(contact.client_key, "first_name", event.target.value)} /></label>
+                    <label><span>Surname</span><input value={contact.last_name || ""} onChange={event => updateContact(contact.client_key, "last_name", event.target.value)} /></label>
+                    <label><span>Business title</span><input value={contact.business_title || ""} onChange={event => updateContact(contact.client_key, "business_title", event.target.value)} /></label>
+                    <label><span>Department / function</span><input value={contact.department || ""} onChange={event => updateContact(contact.client_key, "department", event.target.value)} /></label>
+                    <label><span>Telephone</span><input value={contact.telephone || ""} onChange={event => updateContact(contact.client_key, "telephone", event.target.value)} /></label>
+                    <label><span>Mobile</span><input value={contact.mobile || ""} onChange={event => updateContact(contact.client_key, "mobile", event.target.value)} /></label>
+                    <label className="wide"><span>Email address *</span><input type="email" value={contact.email || ""} onChange={event => updateContact(contact.client_key, "email", event.target.value)} /></label>
+                    <label><span><input type="radio" name="primary_supplier_contact" checked={Boolean(contact.is_primary)} onChange={() => setPrimaryContact(contact.client_key)} /> Primary contact</span></label>
+                    <label><span><input type="checkbox" checked={contact.is_active !== false} onChange={event => updateContact(contact.client_key, "is_active", event.target.checked)} /> Active contact</span></label>
                   </div></article>)}
                 </div>
-              </>
-            )}
+              </>}
 
-            {step === 2 && (
-              <>
+            {step === 2 && <>
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 3</small>
@@ -781,62 +737,39 @@ export default function SupplierAssuranceWorkspace({
 
                 <h3>Supplier classification</h3>
                 <div className="saChoices">
-                  {SUPPLIER_TYPES.map(([id, label]) => (
-                    <button
-                      type="button"
-                      className={
-                        types.includes(id) ? "selected" : ""
-                      }
-                      onClick={() =>
-                        toggle(types, setTypes, id)
-                      }
-                      key={id}
-                    >
+                  {SUPPLIER_TYPES.map(([id, label]) => <button type="button" className={(() => {
+                if (types.includes(id)) {
+                  return "selected";
+                }
+                return "";
+              })()} onClick={() => toggle(types, setTypes, id)} key={id}>
                       <i>
-                        {types.includes(id) ? "✓" : "+"}
+                        {(() => {
+                    if (types.includes(id)) {
+                      return "✓";
+                    }
+                    return "+";
+                  })()}
                       </i>
                       {label}
-                    </button>
-                  ))}
+                    </button>)}
                 </div>
 
                 <h3>Applicable assurance frameworks</h3>
                 <div className="saStandardGrid">
-                  {SUPPLIER_STANDARDS.map((standard) => (
-                    <button
-                      type="button"
-                      className={
-                        standards.includes(standard.id)
-                          ? "selected"
-                          : ""
-                      }
-                      onClick={() =>
-                        toggle(
-                          standards,
-                          setStandards,
-                          standard.id,
-                        )
-                      }
-                      key={standard.id}
-                    >
+                  {SUPPLIER_STANDARDS.map(standard => <button type="button" className={(() => {
+                if (standards.includes(standard.id)) {
+                  return "selected";
+                }
+                return "";
+              })()} onClick={() => toggle(standards, setStandards, standard.id)} key={standard.id}>
                       <b>{standard.label}</b>
                       <span>{standard.name}</span>
-                    </button>
-                  ))}
+                    </button>)}
                 </div>
 
                 <label className="saCheck">
-                  <input
-                    type="checkbox"
-                    name="uses_subtier_suppliers"
-                    checked={data.uses_subtier_suppliers}
-                    onChange={(event) =>
-                      update(
-                        "uses_subtier_suppliers",
-                        event.target.checked,
-                      )
-                    }
-                  />
+                  <input type="checkbox" name="uses_subtier_suppliers" checked={data.uses_subtier_suppliers} onChange={event => update("uses_subtier_suppliers", event.target.checked)} />
                   <span>
                     <b>Sub-tier suppliers are used</b>
                     <small>
@@ -845,43 +778,37 @@ export default function SupplierAssuranceWorkspace({
                     </small>
                   </span>
                 </label>
-                {data.uses_subtier_suppliers && (
-                  <>
+                {data.uses_subtier_suppliers && <>
                     <div className="saRegisterHead">
                       <div><h3>Sub-tier supplier register</h3><p>Record controlled status, applicable certification and the manually selected renewal reminder date.</p></div>
                       <button type="button" onClick={addSubTier}>+ Add sub-tier supplier</button>
                     </div>
                     <div className="saManagedList">
                       {subTiers.length === 0 && <p className="saEmpty">No sub-tier suppliers added.</p>}
-                      {subTiers.map((supplier, index) => (
-                        <article key={supplier.client_key}>
+                      {subTiers.map((supplier, index) => <article key={supplier.client_key}>
                           <header><b>Sub-tier supplier {index + 1}</b><button type="button" onClick={() => removeSubTier(supplier.client_key)}>Remove</button></header>
                           <div className="saManagedGrid">
-                            <label><span>Legal name *</span><input value={supplier.legal_name} onChange={(event) => updateSubTier(supplier.client_key, "legal_name", event.target.value)} /></label>
-                            <label><span>Approval status</span><select value={supplier.approval_status} onChange={(event) => updateSubTier(supplier.client_key, "approval_status", event.target.value)}><option value="approved">Approved</option><option value="conditionally_approved">Conditionally approved</option><option value="not_approved">Not approved</option><option value="pending">Pending assessment</option><option value="suspended">Suspended</option><option value="expired">Approval expired</option></select></label>
-                            <label className="wide"><span>Products, services or process supplied *</span><textarea rows="2" value={supplier.supply_scope} onChange={(event) => updateSubTier(supplier.client_key, "supply_scope", event.target.value)} /></label>
-                            <label><span>Certification / standard</span><input value={supplier.certification_standard} onChange={(event) => updateSubTier(supplier.client_key, "certification_standard", event.target.value)} placeholder="e.g. ISO 9001:2015" /></label>
-                            <label><span>Certificate number</span><input value={supplier.certificate_number} onChange={(event) => updateSubTier(supplier.client_key, "certificate_number", event.target.value)} /></label>
-                            <label><span>Certification body</span><input value={supplier.certification_body} onChange={(event) => updateSubTier(supplier.client_key, "certification_body", event.target.value)} /></label>
-                            <label><span>Certificate renewal / expiry</span><input type="date" value={supplier.certificate_expiry} onChange={(event) => updateSubTier(supplier.client_key, "certificate_expiry", event.target.value)} /></label>
-                            <label><span>Send renewal reminder on</span><input type="date" value={supplier.reminder_date} onChange={(event) => updateSubTier(supplier.client_key, "reminder_date", event.target.value)} /></label>
-                            <label className="saFileButton"><span>Certification evidence</span><input type="file" name={`subtier_certificate_${supplier.client_key}`} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" onChange={(event) => updateSubTier(supplier.client_key, "pending_certificate_name", event.target.files?.[0]?.name || "")} /><b>+ Add certificate</b></label>
+                            <label><span>Legal name *</span><input value={supplier.legal_name} onChange={event => updateSubTier(supplier.client_key, "legal_name", event.target.value)} /></label>
+                            <label><span>Approval status</span><select value={supplier.approval_status} onChange={event => updateSubTier(supplier.client_key, "approval_status", event.target.value)}><option value="approved">Approved</option><option value="conditionally_approved">Conditionally approved</option><option value="not_approved">Not approved</option><option value="pending">Pending assessment</option><option value="suspended">Suspended</option><option value="expired">Approval expired</option></select></label>
+                            <label className="wide"><span>Products, services or process supplied *</span><textarea rows="2" value={supplier.supply_scope} onChange={event => updateSubTier(supplier.client_key, "supply_scope", event.target.value)} /></label>
+                            <label><span>Certification / standard</span><input value={supplier.certification_standard} onChange={event => updateSubTier(supplier.client_key, "certification_standard", event.target.value)} placeholder="e.g. ISO 9001:2015" /></label>
+                            <label><span>Certificate number</span><input value={supplier.certificate_number} onChange={event => updateSubTier(supplier.client_key, "certificate_number", event.target.value)} /></label>
+                            <label><span>Certification body</span><input value={supplier.certification_body} onChange={event => updateSubTier(supplier.client_key, "certification_body", event.target.value)} /></label>
+                            <label><span>Certificate renewal / expiry</span><input type="date" value={supplier.certificate_expiry} onChange={event => updateSubTier(supplier.client_key, "certificate_expiry", event.target.value)} /></label>
+                            <label><span>Send renewal reminder on</span><input type="date" value={supplier.reminder_date} onChange={event => updateSubTier(supplier.client_key, "reminder_date", event.target.value)} /></label>
+                            <label className="saFileButton"><span>Certification evidence</span><input type="file" name={"subtier_certificate_" + supplier.client_key + ""} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" onChange={event => updateSubTier(supplier.client_key, "pending_certificate_name", event.target.files?.[0]?.name || "")} /><b>+ Add certificate</b></label>
                             <div className="saCertificateState">
                               {supplier.pending_certificate_name && <span>✓ Selected: <b>{supplier.pending_certificate_name}</b> — press Save draft to upload</span>}
                               {supplier.certificate_url && <a className="saDownload" href={supplier.certificate_url} target="_blank" rel="noreferrer">↧ {supplier.certificate_file_name || "Download current certificate"}</a>}
                               {!supplier.pending_certificate_name && !supplier.certificate_url && <small>No certificate attached</small>}
                             </div>
                           </div>
-                        </article>
-                      ))}
+                        </article>)}
                     </div>
-                  </>
-                )}
-              </>
-            )}
+                  </>}
+              </>}
 
-            {step === 3 && (
-              <>
+            {step === 3 && <>
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 4</small>
@@ -906,28 +833,15 @@ export default function SupplierAssuranceWorkspace({
                       {result.reviewMonths} months
                     </small>
                   </div>
-                  <div className={`saRiskDial ${riskTone}`}>
+                  <div className={"saRiskDial " + riskTone + ""}>
                     <strong>{result.riskScore}</strong>
                     <span>RISK</span>
                   </div>
                 </div>
 
                 <div className="saGrid risk">
-                  <Field
-                    label="Supplier criticality"
-                    value={data.criticality}
-                    onChange={() => {}}
-                  >
-                    <select
-                      name="criticality"
-                      value={data.criticality}
-                      onChange={(event) =>
-                        update(
-                          "criticality",
-                          event.target.value,
-                        )
-                      }
-                    >
+                  <Field label="Supplier criticality" value={data.criticality} onChange={() => {}}>
+                    <select name="criticality" value={data.criticality} onChange={event => update("criticality", event.target.value)}>
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
                       <option value="high">High</option>
@@ -937,62 +851,46 @@ export default function SupplierAssuranceWorkspace({
                     </select>
                   </Field>
 
-                  {[
-                    ["likelihood", "Likelihood of failure"],
-                    ["consequence", "Consequence of failure"],
-                    ["dependency", "Business dependency"],
-                    [
-                      "detectability",
-                      "Difficulty detecting failure",
-                    ],
-                  ].map(([key, label]) => (
-                    <label key={key}>
+                  {[["likelihood", "Likelihood of failure"], ["consequence", "Consequence of failure"], ["dependency", "Business dependency"], ["detectability", "Difficulty detecting failure"]].map(([key, label]) => <label key={key}>
                       <span>{label}</span>
                       <div className="saScale">
-                        {[1, 2, 3, 4, 5].map((value) => (
-                          <button
-                            type="button"
-                            className={
-                              risk[key] === value
-                                ? "selected"
-                                : ""
-                            }
-                            onClick={() =>
-                              setRisk((current) => ({
-                                ...current,
-                                [key]: value,
-                              }))
-                            }
-                            key={value}
-                          >
+                        {[1, 2, 3, 4, 5].map(value => <button type="button" className={(() => {
+                    if (risk[key] === value) {
+                      return "selected";
+                    }
+                    return "";
+                  })()} onClick={() => setRisk(current => ({
+                    ...current,
+                    [key]: value
+                  }))} key={value}>
                             {value}
-                          </button>
-                        ))}
+                          </button>)}
                       </div>
                       <small>
                         1 = lowest · 5 = highest
                       </small>
-                    </label>
-                  ))}
+                    </label>)}
                 </div>
 
                 <div className="saRule">
                   <b>Automated controls</b>
                   <span>
-                    {["High", "Critical"].includes(
-                      result.riskBand,
-                    )
-                      ? "Technical approval + enhanced monitoring + supplier audit"
-                      : result.riskBand === "Medium"
-                        ? "Documented approval + periodic monitoring"
-                        : "Simplified approval + routine monitoring"}
+                    {(() => {
+                  if (["High", "Critical"].includes(result.riskBand)) {
+                    return "Technical approval + enhanced monitoring + supplier audit";
+                  }
+                  return (() => {
+                    if (result.riskBand === "Medium") {
+                      return "Documented approval + periodic monitoring";
+                    }
+                    return "Simplified approval + routine monitoring";
+                  })();
+                })()}
                   </span>
                 </div>
-              </>
-            )}
+              </>}
 
-            {step === 4 && (
-              <>
+            {step === 4 && <>
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 5</small>
@@ -1003,23 +901,25 @@ export default function SupplierAssuranceWorkspace({
                       block approval.
                     </p>
                   </div>
-                  <Pill
-                    tone={
-                      result.blockers.length ? "red" : "green"
-                    }
-                  >
-                    {result.blockers.length
-                      ? `${result.blockers.length} blockers`
-                      : "No blockers"}
+                  <Pill tone={(() => {
+                if (result.blockers.length) {
+                  return "red";
+                }
+                return "green";
+              })()}>
+                    {(() => {
+                  if (result.blockers.length) {
+                    return "" + result.blockers.length + " blockers";
+                  }
+                  return "No blockers";
+                })()}
                   </Pill>
                 </div>
 
                 <div className="saProgress">
-                  <i
-                    style={{
-                      width: `${result.assuranceScore}%`,
-                    }}
-                  />
+                  <i style={{
+                "width": "" + result.assuranceScore + "%"
+              }} />
                   <span>
                     {result.assuranceScore}% assurance complete
                   </span>
@@ -1027,122 +927,96 @@ export default function SupplierAssuranceWorkspace({
 
                 <div className="saQuestions">
                   {questions.map((item, index) => {
-                    const current = answers[item.id] || {};
-
-                    return (
-                      <article
-                        key={item.id}
-                        id={`supplier-control-${item.id}`}
-                        className={
-                          item.blocker &&
-                          [
-                            "no",
-                            "unanswered",
-                            undefined,
-                          ].includes(current.response)
-                            ? "blocker"
-                            : ""
-                        }
-                      >
+                const current = answers[item.id] || {};
+                return <article key={item.id} id={"supplier-control-" + item.id + ""} className={(() => {
+                  if (item.blocker && ["no", "unanswered", undefined].includes(current.response)) {
+                    return "blocker";
+                  }
+                  return "";
+                })()}>
                         <header>
                           <b>{item.id}</b>
                           <div>
                             <span>{item.category}</span>
                             <strong>{item.question}</strong>
                           </div>
-                          {item.blocker && (
-                            <em>MANDATORY</em>
-                          )}
+                          {item.blocker && <em>MANDATORY</em>}
                         </header>
 
                         <div className="saResponses">
-                          {[
-                            ["yes", "Yes"],
-                            ["partial", "Partial"],
-                            ["no", "No"],
-                            ["na", "N/A"],
-                          ].map(([value, label]) => (
-                            <button
-                              type="button"
-                              className={
-                                current.response === value
-                                  ? `selected ${value}`
-                                  : ""
-                              }
-                              onClick={() =>
-                                answer(
-                                  item.id,
-                                  "response",
-                                  value,
-                                )
-                              }
-                              key={value}
-                            >
+                          {[["yes", "Yes"], ["partial", "Partial"], ["no", "No"], ["na", "N/A"]].map(([value, label]) => <button type="button" className={(() => {
+                      if (current.response === value) {
+                        return "selected " + value + "";
+                      }
+                      return "";
+                    })()} onClick={() => answer(item.id, "response", value)} key={value}>
                               {label}
-                            </button>
-                          ))}
+                            </button>)}
                         </div>
 
-                        {["partial", "no"].includes(current.response) && (
-                          <div className="saGapFields">
-                            <label><span>Gap severity</span><select value={current.gap_severity || (item.blocker || current.response === "no" ? "High" : "Medium")} onChange={(event) => answer(item.id, "gap_severity", event.target.value)}><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></label>
-                            <label><span>Responsible supplier contact</span><select value={current.gap_owner_contact_id || ""} onChange={(event) => { const contact = supplierContacts.find((person) => person.id === event.target.value); answer(item.id, "gap_owner_contact_id", event.target.value); answer(item.id, "gap_owner", contact ? `${contact.first_name} ${contact.last_name || ""}`.trim() : ""); }}><option value="">Select supplier contact</option>{supplierContacts.filter((person) => person.is_active !== false).map((person) => <option key={person.id} value={person.id}>{person.first_name} {person.last_name || ""} · {person.business_title || person.email}</option>)}</select></label>
-                            <label><span>Due date</span><input type="date" value={current.gap_due_date || ""} onChange={(event) => answer(item.id, "gap_due_date", event.target.value)} /></label>
-                            <label><span>Company reviewer</span><select value={current.gap_reviewer_person_id || ""} onChange={(event) => { const person = companyPeople.find((entry) => entry.id === event.target.value); answer(item.id, "gap_reviewer_person_id", event.target.value); answer(item.id, "gap_reviewer", person ? `${person.first_name} ${person.last_name}` : ""); }}><option value="">Select independent reviewer</option>{companyPeople.map((person) => <option key={person.id} value={person.id}>{person.first_name} {person.last_name} · {person.position || person.email}</option>)}</select></label>
-                            <label><span>Review date</span><input type="date" value={current.gap_review_date || ""} onChange={(event) => answer(item.id, "gap_review_date", event.target.value)} /></label>
-                            <label><span>Review outcome</span><select value={current.gap_review_outcome || "open"} onChange={(event) => answer(item.id, "gap_review_outcome", event.target.value)}><option value="open">Open — action required</option><option value="awaiting_review">Awaiting reviewer assessment</option><option value="effective">Effective — verified closed</option><option value="partially_effective">Partially effective — further action</option><option value="not_effective">Not effective — reopen action</option></select></label>
-                          </div>
-                        )}
+                        {["partial", "no"].includes(current.response) && <div className="saGapFields">
+                            <label><span>Gap severity</span><select value={current.gap_severity || (() => {
+                        if (item.blocker || current.response === "no") {
+                          return "High";
+                        }
+                        return "Medium";
+                      })()} onChange={event => answer(item.id, "gap_severity", event.target.value)}><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></label>
+                            <label><span>Responsible supplier contact</span><select value={current.gap_owner_contact_id || ""} onChange={event => {
+                        const contact = supplierContacts.find(person => person.id === event.target.value);
+                        answer(item.id, "gap_owner_contact_id", event.target.value);
+                        answer(item.id, "gap_owner", (() => {
+                          if (contact) {
+                            return ("" + contact.first_name + " " + (contact.last_name || "") + "").trim();
+                          }
+                          return "";
+                        })());
+                      }}><option value="">Select supplier contact</option>{supplierContacts.filter(person => person.is_active !== false).map(person => <option key={person.id} value={person.id}>{person.first_name} {person.last_name || ""} · {person.business_title || person.email}</option>)}</select></label>
+                            <label><span>Due date</span><input type="date" value={current.gap_due_date || ""} onChange={event => answer(item.id, "gap_due_date", event.target.value)} /></label>
+                            <label><span>Company reviewer</span><select value={current.gap_reviewer_person_id || ""} onChange={event => {
+                        const person = companyPeople.find(entry => entry.id === event.target.value);
+                        answer(item.id, "gap_reviewer_person_id", event.target.value);
+                        answer(item.id, "gap_reviewer", (() => {
+                          if (person) {
+                            return "" + person.first_name + " " + person.last_name + "";
+                          }
+                          return "";
+                        })());
+                      }}><option value="">Select independent reviewer</option>{companyPeople.map(person => <option key={person.id} value={person.id}>{person.first_name} {person.last_name} · {person.position || person.email}</option>)}</select></label>
+                            <label><span>Review date</span><input type="date" value={current.gap_review_date || ""} onChange={event => answer(item.id, "gap_review_date", event.target.value)} /></label>
+                            <label><span>Review outcome</span><select value={current.gap_review_outcome || "open"} onChange={event => answer(item.id, "gap_review_outcome", event.target.value)}><option value="open">Open — action required</option><option value="awaiting_review">Awaiting reviewer assessment</option><option value="effective">Effective — verified closed</option><option value="partially_effective">Partially effective — further action</option><option value="not_effective">Not effective — reopen action</option></select></label>
+                          </div>}
 
                         <label>
                           <span>
                             Evidence expected: {item.evidence}
                           </span>
-                          <textarea
-                            value={
-                              current.evidence || ""
-                            }
-                            onChange={(event) =>
-                              answer(
-                                item.id,
-                                "evidence",
-                                event.target.value,
-                              )
-                            }
-                            rows="2"
-                            placeholder="Record document references, observations, certificate details or required action"
-                          />
+                          <textarea value={current.evidence || ""} onChange={event => answer(item.id, "evidence", event.target.value)} rows="2" placeholder="Record document references, observations, certificate details or required action" />
                         </label>
 
                         <div className="saEvidenceFiles">
                           <label className="saFileButton">
-                            <input
-                              type="file"
-                              name={`evidence_file_${item.id}`}
-                              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
-                              onChange={(event) => setSelectedFiles((currentFiles) => ({ ...currentFiles, [item.id]: event.target.files?.[0]?.name || "" }))}
-                            />
+                            <input type="file" name={"evidence_file_" + item.id + ""} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx" onChange={event => setSelectedFiles(currentFiles => ({
+                        ...currentFiles,
+                        [item.id]: event.target.files?.[0]?.name || ""
+                      }))} />
                             <b>+ Add evidence</b>
                           </label>
                           {selectedFiles[item.id] && <span>Ready to save: {selectedFiles[item.id]}</span>}
-                          {evidenceFiles.filter((file) => file.control_id === item.id).map((file) => <a key={file.id} href={file.download_url} target="_blank" rel="noreferrer">↧ {file.file_name}</a>)}
+                          {evidenceFiles.filter(file => file.control_id === item.id).map(file => <a key={file.id} href={file.download_url} target="_blank" rel="noreferrer">↧ {file.file_name}</a>)}
                         </div>
-                        <details className="saControlTrail"><summary>View control audit trail ({dueDiligenceEvents.filter((event) => event.control_id === item.id).length})</summary>{dueDiligenceEvents.filter((event) => event.control_id === item.id).map((event) => <div key={event.id}><b>{String(event.event_type).replaceAll("_", " ")}</b><span>{event.event_summary}</span><small>{new Date(event.created_at).toLocaleString("en-GB")} · {event.actor_name || "Recorded user"}</small></div>)}</details>
+                        <details className="saControlTrail"><summary>View control audit trail ({dueDiligenceEvents.filter(event => event.control_id === item.id).length})</summary>{dueDiligenceEvents.filter(event => event.control_id === item.id).map(event => <div key={event.id}><b>{String(event.event_type).replaceAll("_", " ")}</b><span>{event.event_summary}</span><small>{new Date(event.created_at).toLocaleString("en-GB")} · {event.actor_name || "Recorded user"}</small></div>)}</details>
 
                         <small>
                           Control {index + 1} of{" "}
                           {questions.length} · Weight{" "}
                           {item.weight}
                         </small>
-                      </article>
-                    );
-                  })}
+                      </article>;
+              })}
                 </div>
-              </>
-            )}
+              </>}
 
-            {step === 5 && (
-              <>
+            {step === 5 && <>
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 6</small>
@@ -1156,15 +1030,48 @@ export default function SupplierAssuranceWorkspace({
                     </p>
                   </div>
                   <aside className="saGapPanel">
-                    <div><b>Assurance gaps · {gapDetails.length}</b><Pill tone={result.blockers.length ? "red" : "green"}>{result.blockers.length ? "Approval blocked" : "Eligible for approval"}</Pill></div>
-                    {gapDetails.length ? gapDetails.map((gap) => (
-                      <article key={gap.id}>
-                        <header><strong>{gap.id} · {gap.question?.category || "Due diligence"}</strong><Pill tone={["High", "Critical"].includes(gap.severity) ? "red" : gap.severity === "Medium" ? "amber" : "blue"}>{gap.severity}</Pill></header>
+                    <div><b>Assurance gaps · {gapDetails.length}</b><Pill tone={(() => {
+                    if (result.blockers.length) {
+                      return "red";
+                    }
+                    return "green";
+                  })()}>{(() => {
+                      if (result.blockers.length) {
+                        return "Approval blocked";
+                      }
+                      return "Eligible for approval";
+                    })()}</Pill></div>
+                    {(() => {
+                  if (gapDetails.length) {
+                    return gapDetails.map(gap => <article key={gap.id}>
+                        <header><strong>{gap.id} · {gap.question?.category || "Due diligence"}</strong><Pill tone={(() => {
+                          if (["High", "Critical"].includes(gap.severity)) {
+                            return "red";
+                          }
+                          return (() => {
+                            if (gap.severity === "Medium") {
+                              return "amber";
+                            }
+                            return "blue";
+                          })();
+                        })()}>{gap.severity}</Pill></header>
                         <p>{gap.question?.question || "Assurance response requires resolution."}</p>
-                        <small>Owner: {gap.current.gap_owner || "Unassigned"} · Due: {gap.current.gap_due_date ? new Date(`${gap.current.gap_due_date}T12:00:00Z`).toLocaleDateString("en-GB") : "Not set"}</small>
-                        {gap.files[0] ? <a href={gap.files[0].download_url} target="_blank" rel="noreferrer">Open evidence →</a> : <button type="button" onClick={() => openGapControl(gap.id)}>Open control evidence →</button>}
-                      </article>
-                    )) : <p className="clear">No open assurance gaps.</p>}
+                        <small>Owner: {gap.current.gap_owner || "Unassigned"} · Due: {(() => {
+                          if (gap.current.gap_due_date) {
+                            return new Date("" + gap.current.gap_due_date + "T12:00:00Z").toLocaleDateString("en-GB");
+                          }
+                          return "Not set";
+                        })()}</small>
+                        {(() => {
+                        if (gap.files[0]) {
+                          return <a href={gap.files[0].download_url} target="_blank" rel="noreferrer">Open evidence →</a>;
+                        }
+                        return <button type="button" onClick={() => openGapControl(gap.id)}>Open control evidence →</button>;
+                      })()}
+                      </article>);
+                  }
+                  return <p className="clear">No open assurance gaps.</p>;
+                })()}
                   </aside>
                 </div>
 
@@ -1208,105 +1115,53 @@ export default function SupplierAssuranceWorkspace({
                 </div>
 
                 <div className="saGrid">
-                  <Field
-                    label="Approved scope"
-                    name="approval_scope"
-                    value={data.approval_scope}
-                    onChange={(value) =>
-                      update("approval_scope", value)
-                    }
-                    area
-                    rows="4"
-                    className="wide"
-                  />
-                  <Field
-                    label="Approval conditions / restrictions"
-                    name="approval_conditions"
-                    value={data.approval_conditions}
-                    onChange={(value) =>
-                      update("approval_conditions", value)
-                    }
-                    area
-                    rows="4"
-                    className="wide"
-                  />
+                  <Field label="Approved scope" name="approval_scope" value={data.approval_scope} onChange={value => update("approval_scope", value)} area rows="4" className="wide" />
+                  <Field label="Approval conditions / restrictions" name="approval_conditions" value={data.approval_conditions} onChange={value => update("approval_conditions", value)} area rows="4" className="wide" />
                   <Field label="Competent approver" value={data.approved_by_person_id || ""} onChange={() => {}}>
-                    <select name="approved_by_person_id" value={data.approved_by_person_id || ""} onChange={(event) => update("approved_by_person_id", event.target.value)}>
+                    <select name="approved_by_person_id" value={data.approved_by_person_id || ""} onChange={event => update("approved_by_person_id", event.target.value)}>
                       <option value="">Select an authorised company approver</option>
-                      {approvers.map((person) => <option key={person.id} value={person.id}>{person.first_name} {person.last_name} · {person.position || person.email}</option>)}
+                      {approvers.map(person => <option key={person.id} value={person.id}>{person.first_name} {person.last_name} · {person.position || person.email}</option>)}
                     </select>
                   </Field>
-                  <Field
-                    label="Review frequency (months)"
-                    name="review_frequency_months"
-                    value={String(
-                      data.review_frequency_months,
-                    )}
-                    onChange={(value) => setData((current) => ({ ...current, review_frequency_months: value, next_review_date: addMonths(reviewBaseDate, value) }))}
-                    type="number"
-                    min="1"
-                    max="60"
-                  />
-                  <Field
-                    label="Approval expiry"
-                    name="approval_expiry"
-                    value={data.approval_expiry}
-                    onChange={(value) =>
-                      update("approval_expiry", value)
-                    }
-                    type="date"
-                  />
-                  <Field
-                    label="Next review date"
-                    name="next_review_date"
-                    value={data.next_review_date}
-                    onChange={() => {}}
-                    type="date"
-                    readOnly
-                  />
+                  <Field label="Review frequency (months)" name="review_frequency_months" value={String(data.review_frequency_months)} onChange={value => setData(current => ({
+                ...current,
+                "review_frequency_months": value,
+                "next_review_date": addMonths(reviewBaseDate, value)
+              }))} type="number" min="1" max="60" />
+                  <Field label="Approval expiry" name="approval_expiry" value={data.approval_expiry} onChange={value => update("approval_expiry", value)} type="date" />
+                  <Field label="Next review date" name="next_review_date" value={data.next_review_date} onChange={() => {}} type="date" readOnly />
                 </div>
 
-                <div className={`saReviewLogic ${reviewDeviation || expiryBeforeReview ? "warning" : "aligned"}`}>
-                  <div><b>Engine recommendation: review every {result.reviewMonths} months</b><span>{result.riskBand} risk produces a recommended review date of {new Date(`${recommendedReviewDate}T12:00:00Z`).toLocaleDateString("en-GB")}. Approval expiry is the end of approval validity; the next review date controls periodic monitoring.</span></div>
-                  <div>{reviewDeviation ? <strong>Approver override: {selectedReviewMonths} months selected instead of {result.reviewMonths}. The next review date has been recalculated automatically.</strong> : <strong>Selected interval matches the risk-engine recommendation.</strong>}{expiryBeforeReview ? <em>Approval expires before the calculated review date. Extend approval validity or shorten the review interval.</em> : null}</div>
+                <div className={"saReviewLogic " + (() => {
+              if (reviewDeviation || expiryBeforeReview) {
+                return "warning";
+              }
+              return "aligned";
+            })() + ""}>
+                  <div><b>Engine recommendation: review every {result.reviewMonths} months</b><span>{result.riskBand} risk produces a recommended review date of {new Date("" + recommendedReviewDate + "T12:00:00Z").toLocaleDateString("en-GB")}. Approval expiry is the end of approval validity; the next review date controls periodic monitoring.</span></div>
+                  <div>{(() => {
+                  if (reviewDeviation) {
+                    return <strong>Approver override: {selectedReviewMonths} months selected instead of {result.reviewMonths}. The next review date has been recalculated automatically.</strong>;
+                  }
+                  return <strong>Selected interval matches the risk-engine recommendation.</strong>;
+                })()}{(() => {
+                  if (expiryBeforeReview) {
+                    return <em>Approval expires before the calculated review date. Extend approval validity or shorten the review interval.</em>;
+                  }
+                  return null;
+                })()}</div>
                 </div>
 
                 <h3>Performance snapshot</h3>
                 <div className="saPerformance">
-                  {[
-                    ["conformity", "Conformity"],
-                    ["delivery", "On-time delivery"],
-                    [
-                      "responsiveness",
-                      "Responsiveness",
-                    ],
-                    [
-                      "correctiveAction",
-                      "Corrective action",
-                    ],
-                  ].map(([key, label]) => (
-                    <label key={key}>
+                  {[["conformity", "Conformity"], ["delivery", "On-time delivery"], ["responsiveness", "Responsiveness"], ["correctiveAction", "Corrective action"]].map(([key, label]) => <label key={key}>
                       <span>{label}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={performance[key]}
-                        onChange={(event) =>
-                          setPerformance(
-                            (current) => ({
-                              ...current,
-                              [key]: n(
-                                event.target.value,
-                                0,
-                              ),
-                            }),
-                          )
-                        }
-                      />
+                      <input type="number" min="0" max="100" value={performance[key]} onChange={event => setPerformance(current => ({
+                  ...current,
+                  [key]: n(event.target.value, 0)
+                }))} />
                       <b>%</b>
-                    </label>
-                  ))}
+                    </label>)}
                 </div>
 
                 <section className="saAuditHistory">
@@ -1316,28 +1171,50 @@ export default function SupplierAssuranceWorkspace({
                       <h3>Supplier audit history</h3>
                       <p>Audits created for this supplier remain visible against its approval and monitoring record.</p>
                     </div>
-                    {active?.approval_status === "approved" ? <Link href={`/portal/internal-audits?supplier=${active.id}#audit-mandate`}>+ Create Supplier Audit</Link> : null}
+                    {(() => {
+                  if (active?.approval_status === "approved") {
+                    return <Link href={"/portal/internal-audits?supplier=" + active.id + "#audit-mandate"}>+ Create Supplier Audit</Link>;
+                  }
+                  return null;
+                })()}
                   </header>
-                  {supplierAudits.length ? (
-                    <div className="saAuditList">
-                      {supplierAudits.map((audit) => (
-                        <article key={audit.id}>
+                  {(() => {
+                if (supplierAudits.length) {
+                  return <div className="saAuditList">
+                      {supplierAudits.map(audit => <article key={audit.id}>
                           <div><b>{audit.audit_reference} · {audit.title}</b><small>{String(audit.audit_method || "").replaceAll("_", " ")} · Gate: {String(audit.current_gate || "scope").replaceAll("_", " ")}</small></div>
-                          <div><Pill tone={["closed", "report_approved"].includes(audit.status) ? "green" : ["cancelled"].includes(audit.status) ? "red" : "blue"}>{String(audit.status || "draft").replaceAll("_", " ")}</Pill></div>
-                          <div><b>{audit.planned_start_at ? new Date(audit.planned_start_at).toLocaleDateString("en-GB") : "Not scheduled"}</b><small>{audit.planned_end_at ? `to ${new Date(audit.planned_end_at).toLocaleDateString("en-GB")}` : "End date not set"}</small></div>
-                          <Link href={`/portal/internal-audits/${audit.id}`}>Open Audit →</Link>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="saAuditEmpty">No supplier audits have been created for this supplier.</div>
-                  )}
+                          <div><Pill tone={(() => {
+                          if (["closed", "report_approved"].includes(audit.status)) {
+                            return "green";
+                          }
+                          return (() => {
+                            if (["cancelled"].includes(audit.status)) {
+                              return "red";
+                            }
+                            return "blue";
+                          })();
+                        })()}>{String(audit.status || "draft").replaceAll("_", " ")}</Pill></div>
+                          <div><b>{(() => {
+                            if (audit.planned_start_at) {
+                              return new Date(audit.planned_start_at).toLocaleDateString("en-GB");
+                            }
+                            return "Not scheduled";
+                          })()}</b><small>{(() => {
+                            if (audit.planned_end_at) {
+                              return "to " + new Date(audit.planned_end_at).toLocaleDateString("en-GB") + "";
+                            }
+                            return "End date not set";
+                          })()}</small></div>
+                          <Link href={"/portal/internal-audits/" + audit.id + ""}>Open Audit →</Link>
+                        </article>)}
+                    </div>;
+                }
+                return <div className="saAuditEmpty">No supplier audits have been created for this supplier.</div>;
+              })()}
                 </section>
-              </>
-            )}
+              </>}
 
-            {step === 6 && (
-              <>
+            {step === 6 && <>
                 <div className="saSectionHead">
                   <div>
                     <small>STEP 7</small>
@@ -1368,31 +1245,23 @@ export default function SupplierAssuranceWorkspace({
                     </h3>
                     <p>
                       <b>Supplier:</b>{" "}
-                      {data.legal_name ||
-                        "Complete supplier name"}
+                      {data.legal_name || "Complete supplier name"}
                       <br />
                       <b>Address:</b>{" "}
-                      {data.registered_address ||
-                        "Complete registered address"}
+                      {data.registered_address || "Complete registered address"}
                       <br />
                       <b>Scope:</b>{" "}
-                      {data.supply_description ||
-                        "Complete supply description"}
+                      {data.supply_description || "Complete supply description"}
                     </p>
                   </header>
 
                   <div className="saCocStandards">
-                    {standards.map((id) => (
-                      <Pill key={id}>
-                        {SUPPLIER_STANDARDS.find(
-                          (item) => item.id === id,
-                        )?.label || id}
-                      </Pill>
-                    ))}
+                    {standards.map(id => <Pill key={id}>
+                        {SUPPLIER_STANDARDS.find(item => item.id === id)?.label || id}
+                      </Pill>)}
                   </div>
 
-                  {codeSections.map((item, index) => (
-                    <article key={item.id}>
+                  {codeSections.map((item, index) => <article key={item.id}>
                       <b>
                         {index + 1}. {item.title}
                       </b>
@@ -1406,89 +1275,49 @@ export default function SupplierAssuranceWorkspace({
                         {item.requirements.length}{" "}
                         controlled requirements included
                       </small>
-                    </article>
-                  ))}
+                    </article>)}
                 </div>
 
-                {!active && (
-                  <div className="saNotice">
+                {!active && <div className="saNotice">
                     Save the supplier record first.
                     The blue button will then generate
                     a controlled, versioned PDF
                     populated with the supplier name,
                     address, scope and applicable
                     requirements.
-                  </div>
-                )}
-              </>
-            )}
+                  </div>}
+              </>}
 
             <footer className="saActions">
               <div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setStep(
-                      Math.max(0, step - 1),
-                    )
-                  }
-                  disabled={step === 0}
-                >
+                <button type="button" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
                   ← Previous
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setStep(
-                      Math.min(
-                        tabs.length - 1,
-                        step + 1,
-                      ),
-                    )
-                  }
-                  disabled={
-                    step === tabs.length - 1
-                  }
-                >
+                <button type="button" onClick={() => setStep(Math.min(tabs.length - 1, step + 1))} disabled={step === tabs.length - 1}>
                   Next →
                 </button>
               </div>
 
               <div>
-                <button
-                  name="intent"
-                  value="save"
-                  disabled={pending}
-                >
+                <button name="intent" value="save" disabled={pending}>
                   Save draft
                 </button>
-                <button
-                  name="intent"
-                  value="submit"
-                  className="outline"
-                  disabled={pending}
-                >
+                <button name="intent" value="submit" className="outline" disabled={pending}>
                   Submit for approval
                 </button>
-                <button
-                  name="intent"
-                  value="approve"
-                  className="primary"
-                  disabled={
-                    pending ||
-                    result.blockers.length > 0
+                <button name="intent" value="approve" className="primary" disabled={pending || result.blockers.length > 0}>
+                  {(() => {
+                  if (pending) {
+                    return "Saving…";
                   }
-                >
-                  {pending
-                    ? "Saving…"
-                    : "Approve supplier"}
+                  return "Approve supplier";
+                })()}
                 </button>
               </div>
             </footer>
           </form>}
 
-          {active && (
-            <section className="saGenerate">
+          {active && <section className="saGenerate">
               <div>
                 <small>
                   CONTROLLED DOCUMENT GENERATOR
@@ -1503,34 +1332,21 @@ export default function SupplierAssuranceWorkspace({
                   standards.
                 </p>
 
-                {documents.length > 0 && (
-                  <div className="saDocList">
-                    {documents.map((document) => (
-                      <Link
-                        key={document.id}
-                        href={`/portal/suppliers/${active.id}/code-of-conduct?document=${document.id}`}
-                      >
+                {documents.length > 0 && <div className="saDocList">
+                    {documents.map(document => <Link key={document.id} href={"/portal/suppliers/" + active.id + "/code-of-conduct?document=" + document.id + ""}>
                         <b>
-                          {
-                            document.document_reference
-                          }
+                          {document.document_reference}
                         </b>
                         <span>
                           Version {document.version} ·{" "}
                           {document.status}
                         </span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                      </Link>)}
+                  </div>}
               </div>
 
               <form action={generateAction}>
-                <input
-                  type="hidden"
-                  name="supplier_id"
-                  value={active.id}
-                />
+                <input type="hidden" name="supplier_id" value={active.id} />
                 <button type="submit">
                   Generate Supplier Code of Conduct →
                 </button>
@@ -1539,244 +1355,9 @@ export default function SupplierAssuranceWorkspace({
                   and downloadable PDF
                 </small>
               </form>
-            </section>
-          )}
+            </section>}
         </section>
       </div>
-    </main>
-  );
+    </main>;
 }
-
-const styles = `
-*{box-sizing:border-box}
-.saPage{min-height:100vh;background:#edf3f8;color:#071d3a;font-family:Arial,sans-serif}
-.saShell{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
-.saSide{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:26px 18px;background:#07294f;color:#d7e4f1;overflow:auto}
-.saBrand{margin:0 8px 28px;color:#fff;font-size:22px;text-decoration:none}
-.saSide>small{margin:0 9px 12px;color:#7695b4;font-size:9px;font-weight:950;letter-spacing:.13em}
-.saSide nav{display:grid;gap:5px}
-.saSide nav>a{padding:11px;border-radius:8px;color:#d7e4f1;text-decoration:none;font-size:12px;font-weight:800}
-.saSide nav>a:hover,.saSide nav>a.active{background:#19558e;color:#fff}
-.saSide nav>a.accent{background:#315fe6;color:#fff}
-.saSide nav>span{margin:18px 9px 5px;color:#7695b4;font-size:9px;font-weight:950;letter-spacing:.12em}
-.saSide nav>a.supplier{display:grid;gap:4px;border:1px solid #ffffff0d}
-.saSide nav>a.supplier b{font-size:11px}
-.saSide nav>a.supplier small{color:#9db4ca;font-size:8px;text-transform:capitalize}
-.saSide nav>a.supplier .saSupplierNc{color:#66dfd5;font-size:8px;font-weight:800;line-height:1.35}
-.saSideFoot{display:grid;gap:5px;margin-top:auto;padding:15px;border-top:1px solid #ffffff1c}
-.saSideFoot span{color:#9db4ca;font-size:10px}
-.saWork{min-width:0;padding:28px clamp(20px,3vw,48px) 100px}
-.saTop{display:flex;justify-content:space-between;gap:20px;align-items:start}
-.saTop>div:first-child>small,.saSectionHead small,.saGenerate>div>small{color:#315fe6;font-size:10px;font-weight:950;letter-spacing:.13em}
-.saTop h1{margin:6px 0;font-size:34px}
-.saTop p{margin:0;color:#687d92;text-transform:capitalize}
-.saTop>div:last-child{display:flex;gap:8px}
-.saTop a{padding:11px 14px;border:1px solid #c7d5e3;border-radius:9px;background:#fff;color:#173b60;text-decoration:none;font-size:12px;font-weight:850}
-.saTop a.primary{border-color:#315fe6;background:#315fe6;color:#fff}
-.saTop a.issue{border-color:#c87900;background:#fff4df;color:#8a5100}
-.saTop a.audit{border-color:#087d73;background:#e7faf7;color:#086a63}
-.saHero{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:25px;align-items:center;margin-top:22px;padding:28px 30px;border-radius:18px;background:linear-gradient(120deg,#06264d,#0a3a68);color:#fff;box-shadow:0 16px 36px #082a5426}
-.saHero>div>span{color:#61dfdc;font-size:10px;font-weight:950;letter-spacing:.12em}
-.saHero h2{margin:10px 0 8px;font-size:31px}
-.saHero p{max-width:700px;margin:0;color:#cbdbea;line-height:1.55}
-.saHero aside{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.saHero article{padding:13px;border:1px solid #ffffff20;border-radius:10px;background:#ffffff0b}
-.saHero article strong,.saHero article span{display:block}
-.saHero article strong{font-size:22px}
-.saHero article span{margin-top:3px;color:#b8ccdf;font-size:9px}
-.saMetrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:13px}
-.saMetric{display:flex;min-height:112px;flex-direction:column;justify-content:space-between;padding:17px;border:1px solid #d6e1eb;border-radius:13px;background:#fff}
-.saMetric.clickable{color:inherit;text-align:left;text-decoration:none;font:inherit;cursor:pointer;transition:transform .16s,border-color .16s,box-shadow .16s}.saMetric.clickable:hover,.saMetric.clickable:focus-visible{transform:translateY(-2px);border-color:#315fe6;box-shadow:0 10px 24px #173b6018;outline:none}.saMetric.clickable small::after{content:"  →";color:#315fe6;font-weight:950}
-.saMetric>span{color:#5f748a;font-size:11px;font-weight:850}
-.saMetric strong{font-size:28px}
-.saMetric small{color:#8292a3;font-size:9px}
-.saMetric .red,.saDecision strong.red{color:#c8322b}
-.saMetric .amber,.saDecision strong.amber{color:#cc7900}
-.saMetric .green,.saDecision strong.green{color:#008f60}
-.saMetric .blue,.saDecision strong.blue{color:#315fe6}
-.saBoard{margin-top:20px;padding:24px;border:1px solid #d2dee9;border-radius:16px;background:#fff;box-shadow:0 12px 30px #12395f0c}
-.saBoard>header{display:flex;justify-content:space-between;gap:20px;align-items:start;margin-bottom:18px}
-.saBoard>header small{color:#315fe6;font-size:10px;font-weight:950;letter-spacing:.13em}
-.saBoard>header h2{margin:5px 0 6px;font-size:24px}
-.saBoard>header p{margin:0;color:#687d92}
-.saBoard>header>a,.saBoardRow a{padding:10px 13px;border-radius:8px;background:#315fe6;color:#fff;text-decoration:none;font-size:12px;font-weight:850;white-space:nowrap}
-.saBoardTable{overflow:auto;border:1px solid #d9e3ec;border-radius:11px}
-.saBoardRow{display:grid;grid-template-columns:minmax(190px,1.5fr) minmax(120px,1fr) minmax(110px,.8fr) minmax(150px,1fr) minmax(130px,1fr) 115px;gap:14px;align-items:center;min-width:930px;padding:15px;border-top:1px solid #e1e8ef}
-.saBoardRow:first-child{border-top:0}
-.saBoardRow.heading{background:#f2f6fa;color:#526b83;font-size:11px;font-weight:900}
-.saBoardRow>span{display:grid;gap:4px;color:#16395d;font-size:12px}
-.saBoardRow>span small{color:#7890a6;font-size:10px}
-.saBoardRow>span:last-child{justify-items:start}
-.saBoardEmpty{display:grid;gap:6px;padding:35px;border:1px dashed #c9d6e2;border-radius:11px;color:#627990;text-align:center}
-.saBoardEmpty b{color:#173b60;font-size:18px}
-.saAuditHistory{margin-top:25px;border:1px solid #d5e1eb;border-radius:14px;background:#f8fbfe;overflow:hidden}
-.saAuditHistory>header{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:20px 22px;border-bottom:1px solid #dce6ef;background:#fff}
-.saAuditHistory>header span{color:#087d73;font-size:9px;font-weight:950;letter-spacing:.12em}
-.saAuditHistory>header h3{margin:4px 0 5px}
-.saAuditHistory>header p{margin:0;color:#6b7f93;font-size:13px}
-.saAuditHistory>header>a,.saAuditList>article>a{padding:10px 13px;border-radius:8px;background:#087d73;color:#fff;text-decoration:none;font-size:12px;font-weight:850;white-space:nowrap}
-.saAuditList>article{display:grid;grid-template-columns:minmax(260px,1.5fr) 130px 160px 110px;gap:15px;align-items:center;padding:16px 22px;border-top:1px solid #e0e8ef}
-.saAuditList>article:first-child{border-top:0}
-.saAuditList>article>div{display:grid;gap:4px}
-.saAuditList>article small{color:#71869a;font-size:10px}
-.saAuditList>article>a{justify-self:start;background:#315fe6}
-.saAuditEmpty{padding:22px;color:#71869a}
-.saGapPanel{width:min(520px,48vw);padding:13px;border:1px solid #d7e2eb;border-radius:13px;background:#f8fbfe}
-.saGapPanel>div{display:flex;justify-content:space-between;gap:12px;align-items:center}
-.saGapPanel article{margin-top:9px;padding:10px;border:1px solid #e0e7ee;border-radius:9px;background:#fff}
-.saGapPanel article header{display:flex;justify-content:space-between;gap:10px;align-items:center}
-.saGapPanel article p{margin:6px 0;color:#435d76;font-size:11px;line-height:1.4}
-.saGapPanel article small{display:block;color:#6d8195;font-size:10px}
-.saGapPanel article a,.saGapPanel article button{display:inline-block;margin-top:7px;padding:0;border:0;background:none;color:#315fe6;font:inherit;font-size:11px;font-weight:850;text-decoration:none;cursor:pointer}
-.saGapPanel .clear{margin:8px 0 0;color:#087450;font-size:11px}
-.saGapFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:10px 0;padding:12px;border:1px solid #efd28e;border-radius:9px;background:#fff9e9}
-.saGapFields label{display:grid;gap:5px}.saGapFields label span{color:#5c6f82;font-size:10px;font-weight:850}.saGapFields input,.saGapFields select{width:100%;padding:9px;border:1px solid #ccd8e3;border-radius:7px;background:#fff;color:#173b60}
-.saControlTrail{margin-top:10px;padding-top:9px;border-top:1px solid #e0e7ee}.saControlTrail summary{cursor:pointer;color:#2459c5;font-size:11px;font-weight:900}.saControlTrail>div{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;padding:9px 0;border-top:1px solid #e7edf2}.saControlTrail>div:first-of-type{margin-top:8px}.saControlTrail span,.saControlTrail small{color:#687d91;font-size:10px}.saControlTrail b{font-size:10px;text-transform:capitalize}
-.saReviewLogic{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-top:16px;padding:15px 17px;border:1px solid #a9ddcc;border-radius:11px;background:#effaf6}
-.saReviewLogic>div{display:grid;gap:5px}.saReviewLogic b{color:#0a5f4c}.saReviewLogic span{color:#526d68;font-size:12px;line-height:1.45}.saReviewLogic strong{color:#087450;font-size:12px}.saReviewLogic em{color:#a63128;font-size:12px;font-style:normal;font-weight:850}
-.saReviewLogic.warning{border-color:#edc36d;background:#fff8e8}.saReviewLogic.warning b,.saReviewLogic.warning strong{color:#875300}
-.saMessage{margin-top:13px;padding:12px 15px;border-radius:9px;font-weight:800}
-.saMessage.success{background:#e7f8f1;color:#08734f}
-.saMessage.error{background:#ffe9e6;color:#a72822}
-.saTabs{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:20px}
-.saTabs button{display:flex;align-items:center;gap:7px;min-height:55px;padding:10px;border:1px solid #d3dfe9;border-radius:9px;background:#f9fbfd;color:#5f748a;font-size:10px;font-weight:850;cursor:pointer}
-.saTabs button b{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#e7edf4}
-.saTabs button.active{border-color:#315fe6;background:#fff;color:#16395d;box-shadow:0 7px 20px #133b6412}
-.saTabs button.active b{background:#315fe6;color:#fff}
-.saPanel{margin-top:9px;padding:26px;border:1px solid #d2dee9;border-radius:16px;background:#fff;box-shadow:0 12px 30px #12395f0c}
-.saSectionHead{display:flex;justify-content:space-between;gap:20px;align-items:start;margin-bottom:23px}
-.saSectionHead h2{margin:5px 0 7px;font-size:24px}
-.saSectionHead p{max-width:750px;margin:0;color:#687d92;line-height:1.5}
-.saPill{display:inline-flex;padding:7px 9px;border-radius:999px;background:#e9f0ff;color:#2757c9;font-size:9px;font-weight:900}
-.saPill.red{background:#ffe7e4;color:#af2720}
-.saPill.amber{background:#fff0ce;color:#855700}
-.saPill.green{background:#e2f7ef;color:#087450}
-.saPill.purple{background:#eee9ff;color:#6243c4}
-.saGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.saGrid label,.saQuestions label{display:grid;gap:7px}
-.saGrid label>span,.saQuestions label>span,.saPerformance label>span{color:#3d566f;font-size:11px;font-weight:900}
-.saGrid input,.saGrid textarea,.saGrid select,.saQuestions textarea{width:100%;padding:12px;border:1px solid #c8d6e3;border-radius:9px;background:#fbfdff;color:#102e4c;font:inherit;outline:0}
-.saGrid input:focus,.saGrid textarea:focus,.saGrid select:focus,.saQuestions textarea:focus{border-color:#315fe6;box-shadow:0 0 0 3px #315fe615}
-.saGrid .wide{grid-column:1/-1}
-.saPanel h3{margin:25px 0 11px;font-size:15px}
-.saChoices{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.saChoices button,.saStandardGrid button{display:flex;align-items:center;gap:8px;min-height:52px;padding:11px;border:1px solid #cfdae5;border-radius:9px;background:#f9fbfd;color:#29445f;text-align:left;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
-.saChoices button i{display:grid;place-items:center;width:21px;height:21px;border-radius:6px;background:#e6edf4;font-style:normal}
-.saChoices button.selected,.saStandardGrid button.selected{border-color:#315fe6;background:#edf3ff;color:#1c51c6}
-.saChoices button.selected i{background:#315fe6;color:#fff}
-.saStandardGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-.saStandardGrid button{display:grid;gap:4px}
-.saStandardGrid button span{color:#708397;font-size:9px;font-weight:500}
-.saCheck{display:flex;align-items:start;gap:11px;margin-top:18px;padding:15px;border:1px solid #d4dfe9;border-radius:10px;background:#f8fbfe}
-.saCheck input{margin-top:3px}
-.saCheck span{display:grid;gap:4px}
-.saCheck small{color:#72859a}
-.saRiskSummary{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;margin-bottom:20px;padding:20px;border-radius:13px;background:#07294f;color:#fff}
-.saRiskSummary>div:first-child{display:grid;gap:7px}
-.saRiskSummary span{color:#70dcd7;font-size:9px;font-weight:950;letter-spacing:.12em}
-.saRiskSummary strong{font-size:18px}
-.saRiskSummary small{color:#adc3d7}
-.saRiskDial{display:grid;place-items:center;width:84px;height:84px;border:7px solid #315fe6;border-radius:50%}
-.saRiskDial.red{border-color:#e34a41}
-.saRiskDial.amber{border-color:#f0a21b}
-.saRiskDial.green{border-color:#14aa78}
-.saRiskDial strong{font-size:25px}
-.saRiskDial span{font-size:8px;color:#b7cadc}
-.saGrid.risk{grid-template-columns:repeat(5,1fr)}
-.saScale{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
-.saScale button{height:40px;border:1px solid #cedae5;background:#f7fafc;color:#3f5870;font-weight:900;cursor:pointer}
-.saScale button:first-child{border-radius:7px 0 0 7px}
-.saScale button:last-child{border-radius:0 7px 7px 0}
-.saScale button.selected{border-color:#315fe6;background:#315fe6;color:#fff}
-.saGrid.risk label>small{color:#8795a5;font-size:8px}
-.saRule{display:flex;justify-content:space-between;gap:20px;margin-top:18px;padding:14px;border-left:4px solid #315fe6;background:#f0f5fc;font-size:11px}
-.saProgress{position:relative;height:23px;margin-bottom:15px;overflow:hidden;border-radius:999px;background:#e7edf3}
-.saProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#13a77b)}
-.saProgress span{position:absolute;inset:0;display:grid;place-items:center;font-size:9px;font-weight:950}
-.saQuestions{display:grid;gap:10px;max-height:760px;overflow:auto;padding-right:5px}
-.saQuestions article{padding:16px;border:1px solid #d7e1ea;border-radius:11px;background:#fff}
-.saQuestions article.blocker{border-left:4px solid #db3a32}
-.saQuestions header{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:start}
-.saQuestions header>b{display:grid;place-items:center;width:39px;height:39px;border-radius:9px;background:#e9f0ff;color:#315fe6;font-size:10px}
-.saQuestions header div{display:grid;gap:5px}
-.saQuestions header span{color:#315fe6;font-size:9px;font-weight:950;text-transform:uppercase}
-.saQuestions header strong{font-size:12px;line-height:1.4}
-.saQuestions header em{padding:5px 7px;border-radius:999px;background:#ffe5e2;color:#a72a23;font-size:8px;font-style:normal;font-weight:950}
-.saResponses{display:flex;gap:5px;margin:12px 0}
-.saResponses button{padding:7px 12px;border:1px solid #ccd8e3;border-radius:7px;background:#f7fafc;color:#4f657b;font-size:9px;font-weight:900;cursor:pointer}
-.saResponses button.selected.yes{border-color:#0b9b6c;background:#e3f7ef;color:#08714f}
-.saResponses button.selected.partial{border-color:#e3a122;background:#fff2d4;color:#855700}
-.saResponses button.selected.no{border-color:#d94840;background:#ffe8e5;color:#a52b25}
-.saResponses button.selected.na{border-color:#7890a8;background:#edf1f5}
-.saQuestions article>small{display:block;margin-top:7px;color:#8a99a8;font-size:8px}
-.saRegisterHead{display:flex;justify-content:space-between;gap:18px;align-items:end;margin:24px 0 11px}.saRegisterHead h3{margin:0 0 5px}.saRegisterHead p{margin:0;color:#708397;font-size:12px}.saRegisterHead>button{padding:10px 13px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-weight:900;cursor:pointer}
-.saManagedList{display:grid;gap:12px}.saManagedList>article{padding:16px;border:1px solid #cfdae5;border-radius:12px;background:#f9fbfd}.saManagedList>article>header{display:flex;justify-content:space-between;margin-bottom:13px}.saManagedList>article>header button{border:0;background:transparent;color:#b52f29;font-weight:850;cursor:pointer}.saManagedGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.saManagedGrid label{display:grid;gap:6px}.saManagedGrid label>span{color:#3d566f;font-size:11px;font-weight:900}.saManagedGrid input,.saManagedGrid textarea,.saManagedGrid select{width:100%;padding:11px;border:1px solid #c8d6e3;border-radius:8px;background:#fff;font:inherit}.saManagedGrid .wide{grid-column:1/-1}.saEmpty{margin:0;padding:17px;border:1px dashed #b9c9d8;border-radius:10px;color:#708397;text-align:center}
-.saFileButton{position:relative;display:inline-grid!important;width:max-content;align-content:center}.saFileButton input{position:absolute!important;width:1px!important;height:1px!important;opacity:0}.saFileButton b{display:inline-flex;padding:9px 12px;border:1px solid #315fe6;border-radius:7px;background:#fff;color:#315fe6;cursor:pointer}.saDownload{align-self:end;padding:10px;color:#2059cd;font-weight:850}.saEvidenceFiles{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.saEvidenceFiles span{color:#607991;font-size:11px}.saEvidenceFiles a{padding:7px 9px;border-radius:7px;background:#edf3ff;color:#2059cd;text-decoration:none;font-size:11px;font-weight:800}
-.saCertificateState{display:flex;min-height:42px;align-items:center;gap:8px;flex-wrap:wrap}.saCertificateState span{padding:8px 10px;border-radius:7px;background:#e7f8f1;color:#08734f;font-size:11px}.saCertificateState small{color:#7b8c9d}.saCertificateState .saDownload{padding:8px 10px;border-radius:7px;background:#edf3ff;text-decoration:none}
-.saDecision{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:20px}
-.saDecision article{display:grid;gap:4px;padding:16px;border:1px solid #d7e1ea;border-radius:11px;background:#f9fbfd}
-.saDecision span{color:#5e7287;font-size:10px;font-weight:900}
-.saDecision strong{font-size:24px}
-.saDecision small{color:#8996a5}
-.saPerformance{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
-.saPerformance label{position:relative;display:grid;gap:7px;padding:13px;border:1px solid #d7e1ea;border-radius:9px}
-.saPerformance input{width:100%;padding:8px 30px 8px 9px;border:1px solid #cbd8e3;border-radius:7px}
-.saPerformance label>b{position:absolute;right:22px;bottom:22px;color:#708397}
-.saCocPreview{overflow:hidden;border:1px solid #cbd8e3;border-radius:13px;background:#f7f9fc}
-.saCocPreview>header{padding:24px;background:#07294f;color:#fff}
-.saCocPreview>header>span{color:#65ded9;font-size:9px;font-weight:950;letter-spacing:.12em}
-.saCocPreview h3{margin:9px 0;font-size:22px}
-.saCocPreview p{margin:0;color:#d0dfec;font-size:11px;line-height:1.6}
-.saCocStandards{display:flex;gap:5px;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid #dae3eb}
-.saCocPreview>article{display:grid;grid-template-columns:1fr auto;gap:4px 15px;padding:13px 18px;border-bottom:1px solid #e0e7ee}
-.saCocPreview>article>b{font-size:11px}
-.saCocPreview>article>span{color:#315fe6;font-size:8px;font-weight:900}
-.saCocPreview>article>p{grid-column:1/-1;color:#64788b;font-size:9px}
-.saCocPreview>article>small{grid-column:1/-1;color:#8b98a6;font-size:8px}
-.saNotice{margin-top:14px;padding:14px;border-radius:9px;background:#fff3d8;color:#795300;font-size:11px;line-height:1.5}
-.saActions{display:flex;justify-content:space-between;gap:15px;margin-top:25px;padding-top:18px;border-top:1px solid #e0e7ee}
-.saActions>div{display:flex;gap:7px}
-.saActions button,.saGenerate button{padding:11px 14px;border:1px solid #c8d5e2;border-radius:8px;background:#fff;color:#29445f;font:inherit;font-size:11px;font-weight:900;cursor:pointer}
-.saActions button.primary,.saGenerate button{border-color:#315fe6;background:#315fe6;color:#fff}
-.saActions button.outline{border-color:#315fe6;color:#315fe6}
-.saActions button:disabled{opacity:.45;cursor:not-allowed}
-.saGenerate{display:grid;grid-template-columns:1fr auto;gap:25px;align-items:center;margin-top:15px;padding:24px;border:1px solid #9db7dc;border-radius:15px;background:linear-gradient(120deg,#fff,#eef4ff)}
-.saGenerate h2{margin:5px 0 7px}
-.saGenerate p{margin:0;color:#64788e}
-.saGenerate form{display:grid;gap:7px;text-align:center}
-.saGenerate form small{color:#74869a;font-size:8px}
-.saDocList{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}
-.saDocList a{display:grid;gap:3px;padding:9px;border:1px solid #cbd8e5;border-radius:8px;background:#fff;color:#183b5f;text-decoration:none;font-size:9px}
-.saDocList a span{color:#76899c;text-transform:capitalize}
-@media(max-width:1250px){
-  .saHero{grid-template-columns:1fr}
-  .saGrid.risk{grid-template-columns:1fr 1fr}
-  .saChoices{grid-template-columns:repeat(3,1fr)}
-  .saTabs{grid-template-columns:repeat(3,1fr)}
-}
-@media(max-width:900px){
-  .saShell{display:block}
-  .saSide{position:static;height:auto;padding:16px 20px}
-  .saSide nav,.saSide>small,.saSideFoot{display:none}
-  .saBrand{display:block;margin:0}
-  .saWork{padding:20px 14px 80px}
-  .saTop>div:last-child{display:none}
-  .saMetrics{grid-template-columns:1fr 1fr}
-  .saGrid,.saStandardGrid,.saPerformance{grid-template-columns:1fr 1fr}
-  .saManagedGrid{grid-template-columns:1fr}
-  .saManagedGrid .wide{grid-column:auto}
-  .saGenerate{grid-template-columns:1fr}
-}
-@media(max-width:600px){
-  .saHero{padding:22px}
-  .saHero h2{font-size:25px}
-  .saMetrics,.saGrid,.saGrid.risk,.saChoices,.saStandardGrid,.saPerformance,.saDecision{grid-template-columns:1fr}
-  .saTabs{display:flex;overflow:auto}
-  .saTabs button{min-width:155px}
-  .saPanel{padding:18px}
-  .saSectionHead,.saActions{display:grid}
-  .saActions>div{display:grid;grid-template-columns:1fr 1fr}
-  .saActions>div:last-child{grid-template-columns:1fr}
-  .saGrid .wide{grid-column:auto}
-  .saRegisterHead{display:grid}.saRegisterHead>button{width:100%}
-}`;
+const styles = "\n*{box-sizing:border-box}\n.saPage{min-height:100vh;background:#edf3f8;color:#071d3a;font-family:Arial,sans-serif}\n.saShell{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}\n.saSide{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:26px 18px;background:#07294f;color:#d7e4f1;overflow:auto}\n.saBrand{margin:0 8px 28px;color:#fff;font-size:22px;text-decoration:none}\n.saSide>small{margin:0 9px 12px;color:#7695b4;font-size:9px;font-weight:950;letter-spacing:.13em}\n.saSide nav{display:grid;gap:5px}\n.saSide nav>a{padding:11px;border-radius:8px;color:#d7e4f1;text-decoration:none;font-size:12px;font-weight:800}\n.saSide nav>a:hover,.saSide nav>a.active{background:#19558e;color:#fff}\n.saSide nav>a.accent{background:#315fe6;color:#fff}\n.saSide nav>span{margin:18px 9px 5px;color:#7695b4;font-size:9px;font-weight:950;letter-spacing:.12em}\n.saSide nav>a.supplier{display:grid;gap:4px;border:1px solid #ffffff0d}\n.saSide nav>a.supplier b{font-size:11px}\n.saSide nav>a.supplier small{color:#9db4ca;font-size:8px;text-transform:capitalize}\n.saSide nav>a.supplier .saSupplierNc{color:#66dfd5;font-size:8px;font-weight:800;line-height:1.35}\n.saSideFoot{display:grid;gap:5px;margin-top:auto;padding:15px;border-top:1px solid #ffffff1c}\n.saSideFoot span{color:#9db4ca;font-size:10px}\n.saWork{min-width:0;padding:28px clamp(20px,3vw,48px) 100px}\n.saTop{display:flex;justify-content:space-between;gap:20px;align-items:start}\n.saTop>div:first-child>small,.saSectionHead small,.saGenerate>div>small{color:#315fe6;font-size:10px;font-weight:950;letter-spacing:.13em}\n.saTop h1{margin:6px 0;font-size:34px}\n.saTop p{margin:0;color:#687d92;text-transform:capitalize}\n.saTop>div:last-child{display:flex;gap:8px}\n.saTop a{padding:11px 14px;border:1px solid #c7d5e3;border-radius:9px;background:#fff;color:#173b60;text-decoration:none;font-size:12px;font-weight:850}\n.saTop a.primary{border-color:#315fe6;background:#315fe6;color:#fff}\n.saTop a.issue{border-color:#c87900;background:#fff4df;color:#8a5100}\n.saTop a.audit{border-color:#087d73;background:#e7faf7;color:#086a63}\n.saHero{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:25px;align-items:center;margin-top:22px;padding:28px 30px;border-radius:18px;background:linear-gradient(120deg,#06264d,#0a3a68);color:#fff;box-shadow:0 16px 36px #082a5426}\n.saHero>div>span{color:#61dfdc;font-size:10px;font-weight:950;letter-spacing:.12em}\n.saHero h2{margin:10px 0 8px;font-size:31px}\n.saHero p{max-width:700px;margin:0;color:#cbdbea;line-height:1.55}\n.saHero aside{display:grid;grid-template-columns:1fr 1fr;gap:8px}\n.saHero article{padding:13px;border:1px solid #ffffff20;border-radius:10px;background:#ffffff0b}\n.saHero article strong,.saHero article span{display:block}\n.saHero article strong{font-size:22px}\n.saHero article span{margin-top:3px;color:#b8ccdf;font-size:9px}\n.saMetrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:13px}\n.saMetric{display:flex;min-height:112px;flex-direction:column;justify-content:space-between;padding:17px;border:1px solid #d6e1eb;border-radius:13px;background:#fff}\n.saMetric.clickable{color:inherit;text-align:left;text-decoration:none;font:inherit;cursor:pointer;transition:transform .16s,border-color .16s,box-shadow .16s}.saMetric.clickable:hover,.saMetric.clickable:focus-visible{transform:translateY(-2px);border-color:#315fe6;box-shadow:0 10px 24px #173b6018;outline:none}.saMetric.clickable small::after{content:\"  \u2192\";color:#315fe6;font-weight:950}\n.saMetric>span{color:#5f748a;font-size:11px;font-weight:850}\n.saMetric strong{font-size:28px}\n.saMetric small{color:#8292a3;font-size:9px}\n.saMetric .red,.saDecision strong.red{color:#c8322b}\n.saMetric .amber,.saDecision strong.amber{color:#cc7900}\n.saMetric .green,.saDecision strong.green{color:#008f60}\n.saMetric .blue,.saDecision strong.blue{color:#315fe6}\n.saBoard{margin-top:20px;padding:24px;border:1px solid #d2dee9;border-radius:16px;background:#fff;box-shadow:0 12px 30px #12395f0c}\n.saBoard>header{display:flex;justify-content:space-between;gap:20px;align-items:start;margin-bottom:18px}\n.saBoard>header small{color:#315fe6;font-size:10px;font-weight:950;letter-spacing:.13em}\n.saBoard>header h2{margin:5px 0 6px;font-size:24px}\n.saBoard>header p{margin:0;color:#687d92}\n.saBoard>header>a,.saBoardRow a{padding:10px 13px;border-radius:8px;background:#315fe6;color:#fff;text-decoration:none;font-size:12px;font-weight:850;white-space:nowrap}\n.saBoardTable{overflow:auto;border:1px solid #d9e3ec;border-radius:11px}\n.saBoardRow{display:grid;grid-template-columns:minmax(190px,1.5fr) minmax(120px,1fr) minmax(110px,.8fr) minmax(150px,1fr) minmax(130px,1fr) 115px;gap:14px;align-items:center;min-width:930px;padding:15px;border-top:1px solid #e1e8ef}\n.saBoardRow:first-child{border-top:0}\n.saBoardRow.heading{background:#f2f6fa;color:#526b83;font-size:11px;font-weight:900}\n.saBoardRow>span{display:grid;gap:4px;color:#16395d;font-size:12px}\n.saBoardRow>span small{color:#7890a6;font-size:10px}\n.saBoardRow>span:last-child{justify-items:start}\n.saBoardEmpty{display:grid;gap:6px;padding:35px;border:1px dashed #c9d6e2;border-radius:11px;color:#627990;text-align:center}\n.saBoardEmpty b{color:#173b60;font-size:18px}\n.saAuditHistory{margin-top:25px;border:1px solid #d5e1eb;border-radius:14px;background:#f8fbfe;overflow:hidden}\n.saAuditHistory>header{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:20px 22px;border-bottom:1px solid #dce6ef;background:#fff}\n.saAuditHistory>header span{color:#087d73;font-size:9px;font-weight:950;letter-spacing:.12em}\n.saAuditHistory>header h3{margin:4px 0 5px}\n.saAuditHistory>header p{margin:0;color:#6b7f93;font-size:13px}\n.saAuditHistory>header>a,.saAuditList>article>a{padding:10px 13px;border-radius:8px;background:#087d73;color:#fff;text-decoration:none;font-size:12px;font-weight:850;white-space:nowrap}\n.saAuditList>article{display:grid;grid-template-columns:minmax(260px,1.5fr) 130px 160px 110px;gap:15px;align-items:center;padding:16px 22px;border-top:1px solid #e0e8ef}\n.saAuditList>article:first-child{border-top:0}\n.saAuditList>article>div{display:grid;gap:4px}\n.saAuditList>article small{color:#71869a;font-size:10px}\n.saAuditList>article>a{justify-self:start;background:#315fe6}\n.saAuditEmpty{padding:22px;color:#71869a}\n.saGapPanel{width:min(520px,48vw);padding:13px;border:1px solid #d7e2eb;border-radius:13px;background:#f8fbfe}\n.saGapPanel>div{display:flex;justify-content:space-between;gap:12px;align-items:center}\n.saGapPanel article{margin-top:9px;padding:10px;border:1px solid #e0e7ee;border-radius:9px;background:#fff}\n.saGapPanel article header{display:flex;justify-content:space-between;gap:10px;align-items:center}\n.saGapPanel article p{margin:6px 0;color:#435d76;font-size:11px;line-height:1.4}\n.saGapPanel article small{display:block;color:#6d8195;font-size:10px}\n.saGapPanel article a,.saGapPanel article button{display:inline-block;margin-top:7px;padding:0;border:0;background:none;color:#315fe6;font:inherit;font-size:11px;font-weight:850;text-decoration:none;cursor:pointer}\n.saGapPanel .clear{margin:8px 0 0;color:#087450;font-size:11px}\n.saGapFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:10px 0;padding:12px;border:1px solid #efd28e;border-radius:9px;background:#fff9e9}\n.saGapFields label{display:grid;gap:5px}.saGapFields label span{color:#5c6f82;font-size:10px;font-weight:850}.saGapFields input,.saGapFields select{width:100%;padding:9px;border:1px solid #ccd8e3;border-radius:7px;background:#fff;color:#173b60}\n.saControlTrail{margin-top:10px;padding-top:9px;border-top:1px solid #e0e7ee}.saControlTrail summary{cursor:pointer;color:#2459c5;font-size:11px;font-weight:900}.saControlTrail>div{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;padding:9px 0;border-top:1px solid #e7edf2}.saControlTrail>div:first-of-type{margin-top:8px}.saControlTrail span,.saControlTrail small{color:#687d91;font-size:10px}.saControlTrail b{font-size:10px;text-transform:capitalize}\n.saReviewLogic{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-top:16px;padding:15px 17px;border:1px solid #a9ddcc;border-radius:11px;background:#effaf6}\n.saReviewLogic>div{display:grid;gap:5px}.saReviewLogic b{color:#0a5f4c}.saReviewLogic span{color:#526d68;font-size:12px;line-height:1.45}.saReviewLogic strong{color:#087450;font-size:12px}.saReviewLogic em{color:#a63128;font-size:12px;font-style:normal;font-weight:850}\n.saReviewLogic.warning{border-color:#edc36d;background:#fff8e8}.saReviewLogic.warning b,.saReviewLogic.warning strong{color:#875300}\n.saMessage{margin-top:13px;padding:12px 15px;border-radius:9px;font-weight:800}\n.saMessage.success{background:#e7f8f1;color:#08734f}\n.saMessage.error{background:#ffe9e6;color:#a72822}\n.saTabs{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:20px}\n.saTabs button{display:flex;align-items:center;gap:7px;min-height:55px;padding:10px;border:1px solid #d3dfe9;border-radius:9px;background:#f9fbfd;color:#5f748a;font-size:10px;font-weight:850;cursor:pointer}\n.saTabs button b{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#e7edf4}\n.saTabs button.active{border-color:#315fe6;background:#fff;color:#16395d;box-shadow:0 7px 20px #133b6412}\n.saTabs button.active b{background:#315fe6;color:#fff}\n.saPanel{margin-top:9px;padding:26px;border:1px solid #d2dee9;border-radius:16px;background:#fff;box-shadow:0 12px 30px #12395f0c}\n.saSectionHead{display:flex;justify-content:space-between;gap:20px;align-items:start;margin-bottom:23px}\n.saSectionHead h2{margin:5px 0 7px;font-size:24px}\n.saSectionHead p{max-width:750px;margin:0;color:#687d92;line-height:1.5}\n.saPill{display:inline-flex;padding:7px 9px;border-radius:999px;background:#e9f0ff;color:#2757c9;font-size:9px;font-weight:900}\n.saPill.red{background:#ffe7e4;color:#af2720}\n.saPill.amber{background:#fff0ce;color:#855700}\n.saPill.green{background:#e2f7ef;color:#087450}\n.saPill.purple{background:#eee9ff;color:#6243c4}\n.saGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}\n.saGrid label,.saQuestions label{display:grid;gap:7px}\n.saGrid label>span,.saQuestions label>span,.saPerformance label>span{color:#3d566f;font-size:11px;font-weight:900}\n.saGrid input,.saGrid textarea,.saGrid select,.saQuestions textarea{width:100%;padding:12px;border:1px solid #c8d6e3;border-radius:9px;background:#fbfdff;color:#102e4c;font:inherit;outline:0}\n.saGrid input:focus,.saGrid textarea:focus,.saGrid select:focus,.saQuestions textarea:focus{border-color:#315fe6;box-shadow:0 0 0 3px #315fe615}\n.saGrid .wide{grid-column:1/-1}\n.saPanel h3{margin:25px 0 11px;font-size:15px}\n.saChoices{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}\n.saChoices button,.saStandardGrid button{display:flex;align-items:center;gap:8px;min-height:52px;padding:11px;border:1px solid #cfdae5;border-radius:9px;background:#f9fbfd;color:#29445f;text-align:left;font:inherit;font-size:11px;font-weight:800;cursor:pointer}\n.saChoices button i{display:grid;place-items:center;width:21px;height:21px;border-radius:6px;background:#e6edf4;font-style:normal}\n.saChoices button.selected,.saStandardGrid button.selected{border-color:#315fe6;background:#edf3ff;color:#1c51c6}\n.saChoices button.selected i{background:#315fe6;color:#fff}\n.saStandardGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}\n.saStandardGrid button{display:grid;gap:4px}\n.saStandardGrid button span{color:#708397;font-size:9px;font-weight:500}\n.saCheck{display:flex;align-items:start;gap:11px;margin-top:18px;padding:15px;border:1px solid #d4dfe9;border-radius:10px;background:#f8fbfe}\n.saCheck input{margin-top:3px}\n.saCheck span{display:grid;gap:4px}\n.saCheck small{color:#72859a}\n.saRiskSummary{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;margin-bottom:20px;padding:20px;border-radius:13px;background:#07294f;color:#fff}\n.saRiskSummary>div:first-child{display:grid;gap:7px}\n.saRiskSummary span{color:#70dcd7;font-size:9px;font-weight:950;letter-spacing:.12em}\n.saRiskSummary strong{font-size:18px}\n.saRiskSummary small{color:#adc3d7}\n.saRiskDial{display:grid;place-items:center;width:84px;height:84px;border:7px solid #315fe6;border-radius:50%}\n.saRiskDial.red{border-color:#e34a41}\n.saRiskDial.amber{border-color:#f0a21b}\n.saRiskDial.green{border-color:#14aa78}\n.saRiskDial strong{font-size:25px}\n.saRiskDial span{font-size:8px;color:#b7cadc}\n.saGrid.risk{grid-template-columns:repeat(5,1fr)}\n.saScale{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}\n.saScale button{height:40px;border:1px solid #cedae5;background:#f7fafc;color:#3f5870;font-weight:900;cursor:pointer}\n.saScale button:first-child{border-radius:7px 0 0 7px}\n.saScale button:last-child{border-radius:0 7px 7px 0}\n.saScale button.selected{border-color:#315fe6;background:#315fe6;color:#fff}\n.saGrid.risk label>small{color:#8795a5;font-size:8px}\n.saRule{display:flex;justify-content:space-between;gap:20px;margin-top:18px;padding:14px;border-left:4px solid #315fe6;background:#f0f5fc;font-size:11px}\n.saProgress{position:relative;height:23px;margin-bottom:15px;overflow:hidden;border-radius:999px;background:#e7edf3}\n.saProgress i{display:block;height:100%;background:linear-gradient(90deg,#315fe6,#13a77b)}\n.saProgress span{position:absolute;inset:0;display:grid;place-items:center;font-size:9px;font-weight:950}\n.saQuestions{display:grid;gap:10px;max-height:760px;overflow:auto;padding-right:5px}\n.saQuestions article{padding:16px;border:1px solid #d7e1ea;border-radius:11px;background:#fff}\n.saQuestions article.blocker{border-left:4px solid #db3a32}\n.saQuestions header{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:start}\n.saQuestions header>b{display:grid;place-items:center;width:39px;height:39px;border-radius:9px;background:#e9f0ff;color:#315fe6;font-size:10px}\n.saQuestions header div{display:grid;gap:5px}\n.saQuestions header span{color:#315fe6;font-size:9px;font-weight:950;text-transform:uppercase}\n.saQuestions header strong{font-size:12px;line-height:1.4}\n.saQuestions header em{padding:5px 7px;border-radius:999px;background:#ffe5e2;color:#a72a23;font-size:8px;font-style:normal;font-weight:950}\n.saResponses{display:flex;gap:5px;margin:12px 0}\n.saResponses button{padding:7px 12px;border:1px solid #ccd8e3;border-radius:7px;background:#f7fafc;color:#4f657b;font-size:9px;font-weight:900;cursor:pointer}\n.saResponses button.selected.yes{border-color:#0b9b6c;background:#e3f7ef;color:#08714f}\n.saResponses button.selected.partial{border-color:#e3a122;background:#fff2d4;color:#855700}\n.saResponses button.selected.no{border-color:#d94840;background:#ffe8e5;color:#a52b25}\n.saResponses button.selected.na{border-color:#7890a8;background:#edf1f5}\n.saQuestions article>small{display:block;margin-top:7px;color:#8a99a8;font-size:8px}\n.saRegisterHead{display:flex;justify-content:space-between;gap:18px;align-items:end;margin:24px 0 11px}.saRegisterHead h3{margin:0 0 5px}.saRegisterHead p{margin:0;color:#708397;font-size:12px}.saRegisterHead>button{padding:10px 13px;border:1px solid #315fe6;border-radius:8px;background:#315fe6;color:#fff;font-weight:900;cursor:pointer}\n.saManagedList{display:grid;gap:12px}.saManagedList>article{padding:16px;border:1px solid #cfdae5;border-radius:12px;background:#f9fbfd}.saManagedList>article>header{display:flex;justify-content:space-between;margin-bottom:13px}.saManagedList>article>header button{border:0;background:transparent;color:#b52f29;font-weight:850;cursor:pointer}.saManagedGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.saManagedGrid label{display:grid;gap:6px}.saManagedGrid label>span{color:#3d566f;font-size:11px;font-weight:900}.saManagedGrid input,.saManagedGrid textarea,.saManagedGrid select{width:100%;padding:11px;border:1px solid #c8d6e3;border-radius:8px;background:#fff;font:inherit}.saManagedGrid .wide{grid-column:1/-1}.saEmpty{margin:0;padding:17px;border:1px dashed #b9c9d8;border-radius:10px;color:#708397;text-align:center}\n.saFileButton{position:relative;display:inline-grid!important;width:max-content;align-content:center}.saFileButton input{position:absolute!important;width:1px!important;height:1px!important;opacity:0}.saFileButton b{display:inline-flex;padding:9px 12px;border:1px solid #315fe6;border-radius:7px;background:#fff;color:#315fe6;cursor:pointer}.saDownload{align-self:end;padding:10px;color:#2059cd;font-weight:850}.saEvidenceFiles{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.saEvidenceFiles span{color:#607991;font-size:11px}.saEvidenceFiles a{padding:7px 9px;border-radius:7px;background:#edf3ff;color:#2059cd;text-decoration:none;font-size:11px;font-weight:800}\n.saCertificateState{display:flex;min-height:42px;align-items:center;gap:8px;flex-wrap:wrap}.saCertificateState span{padding:8px 10px;border-radius:7px;background:#e7f8f1;color:#08734f;font-size:11px}.saCertificateState small{color:#7b8c9d}.saCertificateState .saDownload{padding:8px 10px;border-radius:7px;background:#edf3ff;text-decoration:none}\n.saDecision{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:20px}\n.saDecision article{display:grid;gap:4px;padding:16px;border:1px solid #d7e1ea;border-radius:11px;background:#f9fbfd}\n.saDecision span{color:#5e7287;font-size:10px;font-weight:900}\n.saDecision strong{font-size:24px}\n.saDecision small{color:#8996a5}\n.saPerformance{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}\n.saPerformance label{position:relative;display:grid;gap:7px;padding:13px;border:1px solid #d7e1ea;border-radius:9px}\n.saPerformance input{width:100%;padding:8px 30px 8px 9px;border:1px solid #cbd8e3;border-radius:7px}\n.saPerformance label>b{position:absolute;right:22px;bottom:22px;color:#708397}\n.saCocPreview{overflow:hidden;border:1px solid #cbd8e3;border-radius:13px;background:#f7f9fc}\n.saCocPreview>header{padding:24px;background:#07294f;color:#fff}\n.saCocPreview>header>span{color:#65ded9;font-size:9px;font-weight:950;letter-spacing:.12em}\n.saCocPreview h3{margin:9px 0;font-size:22px}\n.saCocPreview p{margin:0;color:#d0dfec;font-size:11px;line-height:1.6}\n.saCocStandards{display:flex;gap:5px;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid #dae3eb}\n.saCocPreview>article{display:grid;grid-template-columns:1fr auto;gap:4px 15px;padding:13px 18px;border-bottom:1px solid #e0e7ee}\n.saCocPreview>article>b{font-size:11px}\n.saCocPreview>article>span{color:#315fe6;font-size:8px;font-weight:900}\n.saCocPreview>article>p{grid-column:1/-1;color:#64788b;font-size:9px}\n.saCocPreview>article>small{grid-column:1/-1;color:#8b98a6;font-size:8px}\n.saNotice{margin-top:14px;padding:14px;border-radius:9px;background:#fff3d8;color:#795300;font-size:11px;line-height:1.5}\n.saActions{display:flex;justify-content:space-between;gap:15px;margin-top:25px;padding-top:18px;border-top:1px solid #e0e7ee}\n.saActions>div{display:flex;gap:7px}\n.saActions button,.saGenerate button{padding:11px 14px;border:1px solid #c8d5e2;border-radius:8px;background:#fff;color:#29445f;font:inherit;font-size:11px;font-weight:900;cursor:pointer}\n.saActions button.primary,.saGenerate button{border-color:#315fe6;background:#315fe6;color:#fff}\n.saActions button.outline{border-color:#315fe6;color:#315fe6}\n.saActions button:disabled{opacity:.45;cursor:not-allowed}\n.saGenerate{display:grid;grid-template-columns:1fr auto;gap:25px;align-items:center;margin-top:15px;padding:24px;border:1px solid #9db7dc;border-radius:15px;background:linear-gradient(120deg,#fff,#eef4ff)}\n.saGenerate h2{margin:5px 0 7px}\n.saGenerate p{margin:0;color:#64788e}\n.saGenerate form{display:grid;gap:7px;text-align:center}\n.saGenerate form small{color:#74869a;font-size:8px}\n.saDocList{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}\n.saDocList a{display:grid;gap:3px;padding:9px;border:1px solid #cbd8e5;border-radius:8px;background:#fff;color:#183b5f;text-decoration:none;font-size:9px}\n.saDocList a span{color:#76899c;text-transform:capitalize}\n@media(max-width:1250px){\n  .saHero{grid-template-columns:1fr}\n  .saGrid.risk{grid-template-columns:1fr 1fr}\n  .saChoices{grid-template-columns:repeat(3,1fr)}\n  .saTabs{grid-template-columns:repeat(3,1fr)}\n}\n@media(max-width:900px){\n  .saShell{display:block}\n  .saSide{position:static;height:auto;padding:16px 20px}\n  .saSide nav,.saSide>small,.saSideFoot{display:none}\n  .saBrand{display:block;margin:0}\n  .saWork{padding:20px 14px 80px}\n  .saTop>div:last-child{display:none}\n  .saMetrics{grid-template-columns:1fr 1fr}\n  .saGrid,.saStandardGrid,.saPerformance{grid-template-columns:1fr 1fr}\n  .saManagedGrid{grid-template-columns:1fr}\n  .saManagedGrid .wide{grid-column:auto}\n  .saGenerate{grid-template-columns:1fr}\n}\n@media(max-width:600px){\n  .saHero{padding:22px}\n  .saHero h2{font-size:25px}\n  .saMetrics,.saGrid,.saGrid.risk,.saChoices,.saStandardGrid,.saPerformance,.saDecision{grid-template-columns:1fr}\n  .saTabs{display:flex;overflow:auto}\n  .saTabs button{min-width:155px}\n  .saPanel{padding:18px}\n  .saSectionHead,.saActions{display:grid}\n  .saActions>div{display:grid;grid-template-columns:1fr 1fr}\n  .saActions>div:last-child{grid-template-columns:1fr}\n  .saGrid .wide{grid-column:auto}\n  .saRegisterHead{display:grid}.saRegisterHead>button{width:100%}\n}";
