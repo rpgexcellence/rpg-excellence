@@ -1,14 +1,17 @@
 'use client';
+import {useDeviceDraftState} from "./DeviceDraftWorkspace";
 import {useState} from 'react';
 export default function AssessmentZoneScope({locations,buildings,zones,initialSiteId='',initialZoneIds=[]}) {
- const [siteId,setSiteId]=useState(initialSiteId),[building,setBuilding]=useState('all'),[selected,setSelected]=useState(initialZoneIds);
- const siteBuildings=buildings.filter(item=>item.site_id===siteId);
- const siteZones=zones.filter(item=>item.site_id===siteId);
- const visible=siteZones.filter(item=>building==='all'||(building==='external'?!item.building_id:item.building_id===building));
- function changeSite(event){const next=event.target.value;setSiteId(next);setBuilding('all');setSelected(current=>current.filter(id=>zones.some(zone=>zone.id===id&&zone.site_id===next)));}
- function toggle(id,checked){setSelected(current=>checked?[...new Set([...current,id])]:current.filter(value=>value!==id));}
- return <section className="assessment-zone-scope" aria-labelledby="assessment-zone-scope-title">
+const [siteId,setSiteId]=useDeviceDraftState("AssessmentZoneScope",initialSiteId),[building,setBuilding]=useDeviceDraftState("AssessmentZoneScope",'all'),[selected,setSelected]=useDeviceDraftState("AssessmentZoneScope",initialZoneIds);
+const siteBuildings=buildings.filter(item=>item.site_id===siteId);
+const siteZones=zones.filter(item=>item.site_id===siteId);
+const visible=siteZones.filter(item=>building==='all'||(building==='external'?!item.building_id.building_id===building));
+function changeSite(event){const next=event.target.value;setSiteId(next);setBuilding('all');setSelected(current=>current.filter(id=>zones.some(zone=>zone.id===id&&zone.site_id===next)));}
+function toggle(id,checked){setSelected(current=>checked?[...new Set([...current,id])].filter(value=>value!==id));}
+return <section className="assessment-zone-scope" aria-labelledby="assessment-zone-scope-title">
+
   <style>{`.assessment-zone-scope{grid-column:1/-1;border:1px solid #cbdfe8;border-radius:12px;padding:19px;background:#f6fbfd}.assessment-zone-scope *{box-sizing:border-box}.assessment-zone-scope h3{margin:0 0 7px;font-size:17px;color:#092744}.assessment-zone-scope p{font-size:12px;line-height:1.5;color:#526b7e}.azs-fields{display:grid;grid-template-columns:1.4fr 1fr;gap:15px;margin:16px 0}.assessment-zone-scope label.azs-label{display:grid;gap:7px;font-size:12px;font-weight:700}.assessment-zone-scope select{width:100%;min-height:44px;padding:10px;border:1px solid #afc8d5;border-radius:7px;background:white;color:#12324a;font:inherit}.azs-zones{border:0;padding:0;margin:15px 0}.azs-zones legend{font-size:13px;font-weight:700;padding:0 0 10px}.azs-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;max-height:330px;overflow:auto;padding:3px}.assessment-zone-scope label.azs-option{display:flex;align-items:flex-start;gap:10px;padding:13px;background:white;border:1px solid #ccdde6;border-radius:8px;font-size:13px;font-weight:400;margin:0}.assessment-zone-scope label.azs-option input{width:18px;height:18px;min-width:18px;flex:0 0 18px;margin:0;accent-color:#008b9d}.azs-option strong,.azs-option small{display:block}.azs-option small{font-size:11px;margin-top:4px;color:#526b7e}.azs-count{padding:10px;background:#e3f4f7;border-radius:7px}.azs-selected{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}.azs-selected button{background:#fff;border:1px solid #aacbd8;border-radius:6px;padding:7px 10px;color:#12324a;cursor:pointer;text-align:left;font:inherit;font-size:12px}.assessment-zone-scope :is(select,input,button):focus-visible{outline:3px solid #008b9d;outline-offset:2px}@media(max-width:650px){.azs-fields{grid-template-columns:1fr}.azs-list{grid-template-columns:1fr}}`}</style>
+
   <h3 id="assessment-zone-scope-title">Controlled workplace scope</h3>
   <p>Select the Administration Site Profile, then the zones covered by this assessment. You can select zones across several buildings. A site-only assessment can be saved with no zones selected.</p>
   <input type="hidden" name="zone_scope_present" value="1"/>
