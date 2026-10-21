@@ -1,4 +1,3 @@
-// POWRA_BUILD_FIX_20261021: ordinary strings and four distinct draft keys.
 "use client";
 
 import { useDeviceDraftState } from "./DeviceDraftWorkspace";
