@@ -1,62 +1,292 @@
+// VERIFIED_QBR_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
 
+import { useDeviceDraftState } from "../../../../../components/DeviceDraftWorkspace";
 import { useActionState, useMemo, useState } from "react";
-
-const metrics = [
-  ["otd", "On-time delivery", "Lines received by agreed date / lines due", "%"],
-  ["conformity", "Product or service conformity", "Accepted lines / inspected lines", "%"],
-  ["escapes", "Quality escapes", "Defects found after acceptance or use", "count"],
-  ["capa", "Corrective-action closure", "Actions closed on time / actions due", "%"],
-  ["response", "Response to issues", "Responses within agreed SLA / requests", "%"],
-];
-const assuranceFields = [["audit","Supplier audit"],["nc_capa","Nonconformities and CAPA"],["certification","Certification and competence"],["traceability","Traceability and records"],["change_control","Change control"]];
-const aerospaceFields = [["product_safety","Product safety and critical items"],["counterfeit","Counterfeit part prevention"],["configuration","Configuration and first article"],["subtier","Sub-tier oversight and flow-down"],["special_processes","Special processes and concessions"]];
-const riskFields = [["capacity","Capacity and delivery resilience"],["financial","Financial and single-source exposure"],["continuity","Continuity and disruption"],["regulatory","Regulatory, HSE and sustainability"]];
-const commercialFields = [["demand","Demand and forecast"],["cost","Cost and value"],["changes","Upcoming changes"]];
-const addMonths = (dateValue, months = 3) => { const d = dateValue ? new Date(`${dateValue}T12:00:00Z`) : new Date(); d.setUTCMonth(d.getUTCMonth() + months); return d.toISOString().slice(0,10); };
-const currentQuarter = (dateValue) => { const d = dateValue ? new Date(`${dateValue}T12:00:00Z`) : new Date(); return `Q${Math.floor(d.getUTCMonth()/3)+1} ${d.getUTCFullYear()}`; };
-
-export default function QbrForm({ supplier, review, approvers, audits, ncStats, people = [], supplierContacts = [], findings = [], qbrActions = [], actionEvents = [] }) {
+const metrics = [["otd", "On-time delivery", "Lines received by agreed date / lines due", "%"], ["conformity", "Product or service conformity", "Accepted lines / inspected lines", "%"], ["escapes", "Quality escapes", "Defects found after acceptance or use", "count"], ["capa", "Corrective-action closure", "Actions closed on time / actions due", "%"], ["response", "Response to issues", "Responses within agreed SLA / requests", "%"]];
+const assuranceFields = [["audit", "Supplier audit"], ["nc_capa", "Nonconformities and CAPA"], ["certification", "Certification and competence"], ["traceability", "Traceability and records"], ["change_control", "Change control"]];
+const aerospaceFields = [["product_safety", "Product safety and critical items"], ["counterfeit", "Counterfeit part prevention"], ["configuration", "Configuration and first article"], ["subtier", "Sub-tier oversight and flow-down"], ["special_processes", "Special processes and concessions"]];
+const riskFields = [["capacity", "Capacity and delivery resilience"], ["financial", "Financial and single-source exposure"], ["continuity", "Continuity and disruption"], ["regulatory", "Regulatory, HSE and sustainability"]];
+const commercialFields = [["demand", "Demand and forecast"], ["cost", "Cost and value"], ["changes", "Upcoming changes"]];
+const addMonths = (dateValue, months = 3) => {
+  const d = (() => {
+    if (dateValue) {
+      return new Date("" + dateValue + "T12:00:00Z");
+    }
+    return new Date();
+  })();
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+};
+const currentQuarter = dateValue => {
+  const d = (() => {
+    if (dateValue) {
+      return new Date("" + dateValue + "T12:00:00Z");
+    }
+    return new Date();
+  })();
+  return "Q" + (Math.floor(d.getUTCMonth() / 3) + 1) + " " + d.getUTCFullYear() + "";
+};
+export default function QbrForm({
+  supplier,
+  review,
+  approvers,
+  audits,
+  ncStats,
+  people = [],
+  supplierContacts = [],
+  findings = [],
+  qbrActions = [],
+  actionEvents = []
+}) {
   const boundAction = saveAction.bind(null, supplier.id);
   const [state, action, pending] = useActionState(boundAction, {});
-  const today = new Date().toISOString().slice(0,10);
-  const [reviewDate, setReviewDate] = useState(review?.review_date || today);
-  const [nextDate, setNextDate] = useState(review?.next_qbr_date || addMonths(review?.review_date || today));
-  const [scorecard, setScorecard] = useState(review?.scorecard || {});
-  const [assurance, setAssurance] = useState(review?.assurance_review || {});
-  const [aerospace, setAerospace] = useState(review?.aerospace_review || {});
-  const [risk, setRisk] = useState(review?.risk_review || {});
-  const [commercial, setCommercial] = useState(review?.commercial_review || {});
-  const restoredActions = qbrActions.map(item=>({ id:item.id, reference:item.action_reference, action:item.action_required, accountable:item.accountable_type==="company_person"?`company:${item.accountable_person_id}`:`supplier:${item.accountable_contact_id}`, reviewer:item.reviewer_type==="company_person"?`company:${item.reviewer_person_id}`:`supplier:${item.reviewer_contact_id}`, due:item.due_date, status:item.status, closure_evidence:item.closure_evidence||"", closed_at:item.closed_at, closed_by_name:item.closed_by_name }));
-  const [actions, setActions] = useState(restoredActions.length ? restoredActions : [{ id:"", reference:"", action:"", accountable:"", reviewer:"", due:"", status:"open", closure_evidence:"" }]);
+  const today = new Date().toISOString().slice(0, 10);
+  const [reviewDate, setReviewDate] = useDeviceDraftState("QbrForm_reviewDate", review?.review_date || today);
+  const [nextDate, setNextDate] = useDeviceDraftState("QbrForm_nextDate", review?.next_qbr_date || addMonths(review?.review_date || today));
+  const [scorecard, setScorecard] = useDeviceDraftState("QbrForm_scorecard", review?.scorecard || {});
+  const [assurance, setAssurance] = useDeviceDraftState("QbrForm_assurance", review?.assurance_review || {});
+  const [aerospace, setAerospace] = useDeviceDraftState("QbrForm_aerospace", review?.aerospace_review || {});
+  const [risk, setRisk] = useDeviceDraftState("QbrForm_risk", review?.risk_review || {});
+  const [commercial, setCommercial] = useDeviceDraftState("QbrForm_commercial", review?.commercial_review || {});
+  const restoredActions = qbrActions.map(item => ({
+    "id": item.id,
+    "reference": item.action_reference,
+    "action": item.action_required,
+    "accountable": (() => {
+      if (item.accountable_type === "company_person") {
+        return "company:" + item.accountable_person_id + "";
+      }
+      return "supplier:" + item.accountable_contact_id + "";
+    })(),
+    "reviewer": (() => {
+      if (item.reviewer_type === "company_person") {
+        return "company:" + item.reviewer_person_id + "";
+      }
+      return "supplier:" + item.reviewer_contact_id + "";
+    })(),
+    "due": item.due_date,
+    "status": item.status,
+    "closure_evidence": item.closure_evidence || "",
+    "closed_at": item.closed_at,
+    "closed_by_name": item.closed_by_name
+  }));
+  const [actions, setActions] = useDeviceDraftState("QbrForm_actions", (() => {
+    if (restoredActions.length) {
+      return restoredActions;
+    }
+    return [{
+      "id": "",
+      "reference": "",
+      "action": "",
+      "accountable": "",
+      "reviewer": "",
+      "due": "",
+      "status": "open",
+      "closure_evidence": ""
+    }];
+  })());
   const quarter = useMemo(() => currentQuarter(reviewDate), [reviewDate]);
-  const updateObject = (setter, key, value) => setter(current => ({...current, [key]: value}));
-  const updateMetric = (key, field, value) => setScorecard(current => ({...current, [key]: {...(current[key]||{}), [field]:value}}));
-  const updateAction = (index, field, value) => setActions(current => current.map((item,i)=>i===index?{...item,[field]:value}:item));
-
+  const updateObject = (setter, key, value) => setter(current => ({
+    ...current,
+    [key]: value
+  }));
+  const updateMetric = (key, field, value) => setScorecard(current => ({
+    ...current,
+    [key]: {
+      ...(current[key] || {}),
+      [field]: value
+    }
+  }));
+  const updateAction = (index, field, value) => setActions(current => current.map((item, i) => (() => {
+    if (i === index) {
+      return {
+        ...item,
+        [field]: value
+      };
+    }
+    return item;
+  })()));
   return <form action={action} className="qbrForm">
-    <input type="hidden" name="qbr_id" value={review?.id || ""}/><input type="hidden" name="qbr_reference" value={review?.qbr_reference || ""}/><input type="hidden" name="quarter" value={quarter}/>
-    <input type="hidden" name="scorecard" value={JSON.stringify(scorecard)}/><input type="hidden" name="assurance_review" value={JSON.stringify(assurance)}/><input type="hidden" name="aerospace_review" value={JSON.stringify(aerospace)}/><input type="hidden" name="risk_review" value={JSON.stringify(risk)}/><input type="hidden" name="commercial_review" value={JSON.stringify(commercial)}/><input type="hidden" name="actions" value={JSON.stringify(actions)}/>
+    <input type="hidden" name="qbr_id" value={review?.id || ""} /><input type="hidden" name="qbr_reference" value={review?.qbr_reference || ""} /><input type="hidden" name="quarter" value={quarter} />
+    <input type="hidden" name="scorecard" value={JSON.stringify(scorecard)} /><input type="hidden" name="assurance_review" value={JSON.stringify(assurance)} /><input type="hidden" name="aerospace_review" value={JSON.stringify(aerospace)} /><input type="hidden" name="risk_review" value={JSON.stringify(risk)} /><input type="hidden" name="commercial_review" value={JSON.stringify(commercial)} /><input type="hidden" name="actions" value={JSON.stringify(actions)} />
     {state?.error && <div className="qbrError" role="alert">{state.error}</div>}
     <Section number="01" title="Review details & executive decision" text="Confirm the controlled period, participants, conclusion and risk-based recommendation.">
-      <div className="qbrGrid"><Read label="Supplier and approved scope" value={`${supplier.legal_name} · ${supplier.approval_scope || supplier.supply_description}`}/><Read label="Current approval and risk" value={`${String(supplier.approval_status).replaceAll("_"," ")} · ${supplier.risk_result?.riskBand || "Not assessed"}`}/><label>Review date *<input type="date" name="review_date" value={reviewDate} onChange={e=>{setReviewDate(e.target.value);setNextDate(addMonths(e.target.value));}} required/></label><Read label="Quarter" value={quarter}/><label>Buyer / internal QBR lead<select name="buyer_person_id" defaultValue={review?.buyer_person_id || ""}><option value="">Select company user</option>{people.map(p=><option key={p.id} value={p.id}>{p.first_name} {p.last_name} · {p.position || p.email}</option>)}</select></label><label>Supplier representative<select name="supplier_contact_id" defaultValue={review?.supplier_contact_id || ""}><option value="">Select supplier contact</option>{supplierContacts.map(p=><option key={p.id} value={p.id}>{p.first_name} {p.last_name || ""} · {p.business_title || p.email}</option>)}</select></label><label className="wide">Additional participants / meeting notes<textarea name="participants" defaultValue={review?.participants || ""} placeholder="Additional names, roles and organisations"/></label><label className="wide">Quarterly conclusion<textarea name="executive_conclusion" defaultValue={review?.executive_conclusion || ""} placeholder="What changed, material concerns, supplier response and business impact"/></label><label>Recommended decision<select name="recommended_decision" defaultValue={review?.recommended_decision || "maintain"}><option value="maintain">Maintain approval</option><option value="conditional">Conditional approval</option><option value="escalate">Escalate</option><option value="suspend">Suspend</option><option value="remove">Remove</option></select></label><label>Authorised approver<select name="approver_person_id" defaultValue={review?.approver_person_id || ""}><option value="">Select approver</option>{approvers.map(p=><option key={p.id} value={p.id}>{p.first_name} {p.last_name} · {p.position || "Approver"}</option>)}</select></label><label className="wide">Decision rationale and exception<textarea name="decision_rationale" defaultValue={review?.decision_rationale || ""} placeholder="Evidence considered and any departure from the risk-based recommendation"/></label></div>
+      <div className="qbrGrid"><Read label="Supplier and approved scope" value={"" + supplier.legal_name + " \xB7 " + (supplier.approval_scope || supplier.supply_description) + ""} /><Read label="Current approval and risk" value={"" + String(supplier.approval_status).replaceAll("_", " ") + " \xB7 " + (supplier.risk_result?.riskBand || "Not assessed") + ""} /><label>Review date *<input type="date" name="review_date" value={reviewDate} onChange={e => {
+            setReviewDate(e.target.value);
+            setNextDate(addMonths(e.target.value));
+          }} required /></label><Read label="Quarter" value={quarter} /><label>Buyer / internal QBR lead<select name="buyer_person_id" defaultValue={review?.buyer_person_id || ""}><option value="">Select company user</option>{people.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name} · {p.position || p.email}</option>)}</select></label><label>Supplier representative<select name="supplier_contact_id" defaultValue={review?.supplier_contact_id || ""}><option value="">Select supplier contact</option>{supplierContacts.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name || ""} · {p.business_title || p.email}</option>)}</select></label><label className="wide">Additional participants / meeting notes<textarea name="participants" defaultValue={review?.participants || ""} placeholder="Additional names, roles and organisations" /></label><label className="wide">Quarterly conclusion<textarea name="executive_conclusion" defaultValue={review?.executive_conclusion || ""} placeholder="What changed, material concerns, supplier response and business impact" /></label><label>Recommended decision<select name="recommended_decision" defaultValue={review?.recommended_decision || "maintain"}><option value="maintain">Maintain approval</option><option value="conditional">Conditional approval</option><option value="escalate">Escalate</option><option value="suspend">Suspend</option><option value="remove">Remove</option></select></label><label>Authorised approver<select name="approver_person_id" defaultValue={review?.approver_person_id || ""}><option value="">Select approver</option>{approvers.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name} · {p.position || "Approver"}</option>)}</select></label><label className="wide">Decision rationale and exception<textarea name="decision_rationale" defaultValue={review?.decision_rationale || ""} placeholder="Evidence considered and any departure from the risk-based recommendation" /></label></div>
     </Section>
-    <Section number="02" title="Performance scorecard" text="Enter percentage values as 0–100. Quality escapes are recorded as a count; use the interpretation field where data is unavailable."><div className="qbrScore"><div className="head"><span>Measure</span><span>Target</span><span>Prior</span><span>Actual</span><span>Trend</span></div>{metrics.map(([key,label,definition,unit])=><div key={key}><span><b>{label}</b><small>{definition}</small></span>{["target","prior","actual"].map(field=><label className="qbrNumber" key={field}><input type="number" min="0" max={unit==="%"?"100":undefined} step={unit==="%"?"0.1":"1"} value={scorecard[key]?.[field]||""} onChange={e=>updateMetric(key,field,e.target.value)} placeholder={unit==="%"?"0–100":"0"}/><b>{unit==="%"?"%":"No."}</b></label>)}<select value={scorecard[key]?.trend||"stable"} onChange={e=>updateMetric(key,"trend",e.target.value)}><option value="improving">↑ Improving</option><option value="stable">→ Stable</option><option value="declining">↓ Declining</option></select></div>)}</div><label className="qbrWide">Scorecard interpretation<textarea value={scorecard.interpretation||""} onChange={e=>updateObject(setScorecard,"interpretation",e.target.value)} placeholder="Explain misses, unavailable data, confidence, commercial effect and corrective action"/></label></Section>
-    <ReviewSection number="03" title="Quality and audit assurance" fields={assuranceFields} value={assurance} setter={setAssurance}/>
-    <ReviewSection number="04" title="Aerospace requirements where applicable" text="Complete for AS9100 or contractual aerospace scope; record N/A with a reason when not applicable." fields={aerospaceFields} value={aerospace} setter={setAerospace}/>
-    <Section number="05" title="Risk and business continuity" text="Assess operational resilience and the controls protecting supply continuity."><div className="qbrFacts"><b>Live linked position</b><span>{ncStats.open} open NC · {ncStats.pending} pending · {ncStats.closed} closed</span><span>{audits.length} linked supplier audit{audits.length===1?"":"s"}</span></div><ReviewFields fields={riskFields} value={risk} setter={setRisk}/></Section>
-    <ReviewSection number="06" title="Commercial and forward plan" fields={commercialFields} value={commercial} setter={setCommercial}/>
-    <Section number="07" title="Action and escalation register" text="Supplier issues are live-linked to NC/CAPA. QBR actions remain visible in this QBR’s history until independently reviewed and closed."><div className="qbrIssueHead"><a className="qbrRaise" href={`/portal/internal-audit-actions?raise=1&supplier=${supplier.id}#raise-manual-nc`}>+ Raise supplier issue</a><span>Issue number, owner, raised date and status come directly from NC/CAPA.</span></div><div className="qbrIssues"><div className="head"><span>Issue No</span><span>Issue</span><span>Owner</span><span>Date raised</span><span>Live NC / CAPA status</span></div>{findings.length?findings.map(item=><div key={item.id}><a href={item.audit_id?`/portal/internal-audits/${item.audit_id}#action-${item.id}`:`/portal/internal-audit-actions?record=${item.id}#nc-${item.id}`}>{item.finding_reference || "NC pending"}</a><span>{item.title || "Supplier nonconformity"}</span><span>{item.responsible_owner_name || "Owner not assigned"}</span><span>{new Date(item.created_at).toLocaleDateString("en-GB")}</span><Status item={item}/></div>):<p>No controlled supplier issues are currently linked.</p>}</div><h3 className="qbrActionTitle">Controlled QBR actions</h3><div className="qbrControlledActions">{actions.map((item,index)=><article key={item.id||index}><header><input value={item.reference||""} onChange={e=>updateAction(index,"reference",e.target.value)} placeholder="Reference generated on save" readOnly={Boolean(item.id)}/><select value={item.status} onChange={e=>updateAction(index,"status",e.target.value)}><option value="open">Open</option><option value="in_progress">In progress</option><option value="awaiting_review">Awaiting review</option><option value="closed">Closed</option></select>{!item.id&&<button type="button" onClick={()=>setActions(current=>current.filter((_,i)=>i!==index))}>Remove</button>}</header><div className="qbrActionGrid"><label className="wide">Action and evidence required<textarea value={item.action} onChange={e=>updateAction(index,"action",e.target.value)}/></label><PartySelect label="Action owner" value={item.accountable} onChange={value=>updateAction(index,"accountable",value)} people={people} contacts={supplierContacts}/><PartySelect label="Independent reviewer" value={item.reviewer} onChange={value=>updateAction(index,"reviewer",value)} people={people} contacts={supplierContacts}/><label>Due date<input type="date" value={item.due} onChange={e=>updateAction(index,"due",e.target.value)}/></label><label className="wide">Closure and effectiveness evidence {item.status==="closed"?"*":""}<textarea value={item.closure_evidence||""} onChange={e=>updateAction(index,"closure_evidence",e.target.value)} placeholder="Reviewer conclusion and evidence demonstrating effective completion"/></label></div>{item.closed_at&&<div className="qbrClosed"><b>Closed {new Date(item.closed_at).toLocaleString("en-GB")}</b><span>Closed by {item.closed_by_name||"Recorded user"}</span></div>}<ActionTrail actionId={item.id} events={actionEvents}/></article>)}</div><button className="qbrAdd" type="button" onClick={()=>setActions(current=>[...current,{id:"",reference:"",action:"",accountable:"",reviewer:"",due:"",status:"open",closure_evidence:""}])}>+ Add controlled QBR action</button></Section>
-    <Section number="08" title="Monitoring and approval record" text="The quarterly engine calculates the next QBR from the current review date."><div className="qbrGrid"><label>Monitoring level<select name="monitoring_level" defaultValue={review?.monitoring_level || "routine"}><option value="routine">Routine</option><option value="enhanced">Enhanced</option><option value="restricted">Restricted</option></select></label><label>Next QBR date *<input type="date" name="next_qbr_date" value={nextDate} onChange={e=>setNextDate(e.target.value)} required/><small>Automatically set three months after the review date; an authorised user may adjust it.</small></label><label>Approval expiry<input type="date" name="approval_expiry" defaultValue={review?.approval_expiry || supplier.approval_expiry || ""}/></label><label className="wide">Approval conditions<textarea name="approval_conditions" defaultValue={review?.approval_conditions || supplier.approval_conditions || ""}/></label></div></Section>
-    <footer className="qbrSubmit"><div><b>{review?.qbr_reference || "New controlled QBR"}</b><span>Drafts remain editable. Complete only after the review decision has been authorised.</span></div><button name="intent" value="draft" disabled={pending}>Save draft</button><button className="primary" name="intent" value="complete" disabled={pending}>{pending?"Saving…":"Complete QBR"}</button></footer>
+    <Section number="02" title="Performance scorecard" text="Enter percentage values as 0–100. Quality escapes are recorded as a count; use the interpretation field where data is unavailable."><div className="qbrScore"><div className="head"><span>Measure</span><span>Target</span><span>Prior</span><span>Actual</span><span>Trend</span></div>{metrics.map(([key, label, definition, unit]) => <div key={key}><span><b>{label}</b><small>{definition}</small></span>{["target", "prior", "actual"].map(field => <label className="qbrNumber" key={field}><input type="number" min="0" max={(() => {
+              if (unit === "%") {
+                return "100";
+              }
+              return undefined;
+            })()} step={(() => {
+              if (unit === "%") {
+                return "0.1";
+              }
+              return "1";
+            })()} value={scorecard[key]?.[field] || ""} onChange={e => updateMetric(key, field, e.target.value)} placeholder={(() => {
+              if (unit === "%") {
+                return "0–100";
+              }
+              return "0";
+            })()} /><b>{(() => {
+                if (unit === "%") {
+                  return "%";
+                }
+                return "No.";
+              })()}</b></label>)}<select value={scorecard[key]?.trend || "stable"} onChange={e => updateMetric(key, "trend", e.target.value)}><option value="improving">↑ Improving</option><option value="stable">→ Stable</option><option value="declining">↓ Declining</option></select></div>)}</div><label className="qbrWide">Scorecard interpretation<textarea value={scorecard.interpretation || ""} onChange={e => updateObject(setScorecard, "interpretation", e.target.value)} placeholder="Explain misses, unavailable data, confidence, commercial effect and corrective action" /></label></Section>
+    <ReviewSection number="03" title="Quality and audit assurance" fields={assuranceFields} value={assurance} setter={setAssurance} />
+    <ReviewSection number="04" title="Aerospace requirements where applicable" text="Complete for AS9100 or contractual aerospace scope; record N/A with a reason when not applicable." fields={aerospaceFields} value={aerospace} setter={setAerospace} />
+    <Section number="05" title="Risk and business continuity" text="Assess operational resilience and the controls protecting supply continuity."><div className="qbrFacts"><b>Live linked position</b><span>{ncStats.open} open NC · {ncStats.pending} pending · {ncStats.closed} closed</span><span>{audits.length} linked supplier audit{(() => {
+            if (audits.length === 1) {
+              return "";
+            }
+            return "s";
+          })()}</span></div><ReviewFields fields={riskFields} value={risk} setter={setRisk} /></Section>
+    <ReviewSection number="06" title="Commercial and forward plan" fields={commercialFields} value={commercial} setter={setCommercial} />
+    <Section number="07" title="Action and escalation register" text="Supplier issues are live-linked to NC/CAPA. QBR actions remain visible in this QBR’s history until independently reviewed and closed."><div className="qbrIssueHead"><a className="qbrRaise" href={"/portal/internal-audit-actions?raise=1&supplier=" + supplier.id + "#raise-manual-nc"}>+ Raise supplier issue</a><span>Issue number, owner, raised date and status come directly from NC/CAPA.</span></div><div className="qbrIssues"><div className="head"><span>Issue No</span><span>Issue</span><span>Owner</span><span>Date raised</span><span>Live NC / CAPA status</span></div>{(() => {
+          if (findings.length) {
+            return findings.map(item => <div key={item.id}><a href={(() => {
+                if (item.audit_id) {
+                  return "/portal/internal-audits/" + item.audit_id + "#action-" + item.id + "";
+                }
+                return "/portal/internal-audit-actions?record=" + item.id + "#nc-" + item.id + "";
+              })()}>{item.finding_reference || "NC pending"}</a><span>{item.title || "Supplier nonconformity"}</span><span>{item.responsible_owner_name || "Owner not assigned"}</span><span>{new Date(item.created_at).toLocaleDateString("en-GB")}</span><Status item={item} /></div>);
+          }
+          return <p>No controlled supplier issues are currently linked.</p>;
+        })()}</div><h3 className="qbrActionTitle">Controlled QBR actions</h3><div className="qbrControlledActions">{actions.map((item, index) => <article key={item.id || index}><header><input value={item.reference || ""} onChange={e => updateAction(index, "reference", e.target.value)} placeholder="Reference generated on save" readOnly={Boolean(item.id)} /><select value={item.status} onChange={e => updateAction(index, "status", e.target.value)}><option value="open">Open</option><option value="in_progress">In progress</option><option value="awaiting_review">Awaiting review</option><option value="closed">Closed</option></select>{!item.id && <button type="button" onClick={() => setActions(current => current.filter((_, i) => i !== index))}>Remove</button>}</header><div className="qbrActionGrid"><label className="wide">Action and evidence required<textarea value={item.action} onChange={e => updateAction(index, "action", e.target.value)} /></label><PartySelect label="Action owner" value={item.accountable} onChange={value => updateAction(index, "accountable", value)} people={people} contacts={supplierContacts} /><PartySelect label="Independent reviewer" value={item.reviewer} onChange={value => updateAction(index, "reviewer", value)} people={people} contacts={supplierContacts} /><label>Due date<input type="date" value={item.due} onChange={e => updateAction(index, "due", e.target.value)} /></label><label className="wide">Closure and effectiveness evidence {(() => {
+                if (item.status === "closed") {
+                  return "*";
+                }
+                return "";
+              })()}<textarea value={item.closure_evidence || ""} onChange={e => updateAction(index, "closure_evidence", e.target.value)} placeholder="Reviewer conclusion and evidence demonstrating effective completion" /></label></div>{item.closed_at && <div className="qbrClosed"><b>Closed {new Date(item.closed_at).toLocaleString("en-GB")}</b><span>Closed by {item.closed_by_name || "Recorded user"}</span></div>}<ActionTrail actionId={item.id} events={actionEvents} /></article>)}</div><button className="qbrAdd" type="button" onClick={() => setActions(current => [...current, {
+        "id": "",
+        "reference": "",
+        "action": "",
+        "accountable": "",
+        "reviewer": "",
+        "due": "",
+        "status": "open",
+        "closure_evidence": ""
+      }])}>+ Add controlled QBR action</button></Section>
+    <Section number="08" title="Monitoring and approval record" text="The quarterly engine calculates the next QBR from the current review date."><div className="qbrGrid"><label>Monitoring level<select name="monitoring_level" defaultValue={review?.monitoring_level || "routine"}><option value="routine">Routine</option><option value="enhanced">Enhanced</option><option value="restricted">Restricted</option></select></label><label>Next QBR date *<input type="date" name="next_qbr_date" value={nextDate} onChange={e => setNextDate(e.target.value)} required /><small>Automatically set three months after the review date; an authorised user may adjust it.</small></label><label>Approval expiry<input type="date" name="approval_expiry" defaultValue={review?.approval_expiry || supplier.approval_expiry || ""} /></label><label className="wide">Approval conditions<textarea name="approval_conditions" defaultValue={review?.approval_conditions || supplier.approval_conditions || ""} /></label></div></Section>
+    <footer className="qbrSubmit"><div><b>{review?.qbr_reference || "New controlled QBR"}</b><span>Drafts remain editable. Complete only after the review decision has been authorised.</span></div><button name="intent" value="draft" disabled={pending}>Save draft</button><button className="primary" name="intent" value="complete" disabled={pending}>{(() => {
+          if (pending) {
+            return "Saving…";
+          }
+          return "Complete QBR";
+        })()}</button></footer>
   </form>;
 }
-
 import { saveSupplierQbr as saveAction } from "./actions";
-function Section({number,title,text,children}){return <section className="qbrSection"><header><span>{number}</span><div><h2>{title}</h2>{text&&<p>{text}</p>}</div></header>{children}</section>}
-function Read({label,value}){return <div className="qbrRead"><span>{label}</span><b>{value||"Not set"}</b></div>}
-function ReviewFields({fields,value,setter}){const entry=(key)=>typeof value[key]==="string"?{evidence:value[key],status:""}:(value[key]||{});const update=(key,field,next)=>setter(current=>({...current,[key]:{...(typeof current[key]==="string"?{evidence:current[key]}:(current[key]||{})),[field]:next}}));return <div className="qbrReviewLines">{fields.map(([key,label])=><div className="qbrReviewLine" key={key}><label><span>{label}</span><textarea value={entry(key).evidence||""} onChange={e=>update(key,"evidence",e.target.value)} placeholder="Evidence reviewed, conclusion and follow-up"/></label><label className={`qbrResult ${entry(key).status||"unset"}`}><span>Assessment result</span><select value={entry(key).status||""} onChange={e=>update(key,"status",e.target.value)}><option value="">Select result</option><option value="meets">Meets requirements</option><option value="partial">Partially meets</option><option value="not_meet">Does not meet</option><option value="na">Not applicable</option></select></label></div>)}</div>}
-function ReviewSection({number,title,text,fields,value,setter}){return <Section number={number} title={title} text={text}><ReviewFields fields={fields} value={value} setter={setter}/></Section>}
-function Status({item}){const closed=item.status==="closed"&&item.closure_verified;const text=closed?"Closed — effectiveness verified":item.linked_rca_case_id?"CAPA–8D in progress":item.status==="verification"?"Awaiting verification":String(item.status||"open").replaceAll("_"," ");return <span className={`qbrLiveStatus ${closed?"closed":item.linked_rca_case_id?"capa":"open"}`}>{text}</span>}
-function PartySelect({label,value,onChange,people,contacts}){return <label>{label} *<select value={value||""} onChange={e=>onChange(e.target.value)}><option value="">Select controlled person</option><optgroup label="Company People">{people.map(p=><option key={`company:${p.id}`} value={`company:${p.id}`}>{p.first_name} {p.last_name} · {p.position||p.email}</option>)}</optgroup><optgroup label="Supplier contacts">{contacts.map(p=><option key={`supplier:${p.id}`} value={`supplier:${p.id}`}>{p.first_name} {p.last_name||""} · {p.business_title||p.email}</option>)}</optgroup></select></label>}
-function ActionTrail({actionId,events}){const rows=events.filter(event=>event.action_id===actionId);if(!actionId)return <small className="qbrUnsaved">Save the QBR draft to create the controlled action reference and audit trail.</small>;return <details className="qbrTrail"><summary>View action audit trail ({rows.length})</summary>{rows.length?rows.map(event=><div key={event.id}><b>{String(event.event_type).replaceAll("_"," ")}</b><span>{event.event_summary}</span><small>{new Date(event.created_at).toLocaleString("en-GB")} · {event.actor_name||"Recorded user"}</small></div>):<p>No recorded events.</p>}</details>}
+function Section({
+  number,
+  title,
+  text,
+  children
+}) {
+  return <section className="qbrSection"><header><span>{number}</span><div><h2>{title}</h2>{text && <p>{text}</p>}</div></header>{children}</section>;
+}
+function Read({
+  label,
+  value
+}) {
+  return <div className="qbrRead"><span>{label}</span><b>{value || "Not set"}</b></div>;
+}
+function ReviewFields({
+  fields,
+  value,
+  setter
+}) {
+  const entry = key => (() => {
+    if (typeof value[key] === "string") {
+      return {
+        "evidence": value[key],
+        "status": ""
+      };
+    }
+    return value[key] || {};
+  })();
+  const update = (key, field, next) => setter(current => ({
+    ...current,
+    [key]: {
+      ...(() => {
+        if (typeof current[key] === "string") {
+          return {
+            "evidence": current[key]
+          };
+        }
+        return current[key] || {};
+      })(),
+      [field]: next
+    }
+  }));
+  return <div className="qbrReviewLines">{fields.map(([key, label]) => <div className="qbrReviewLine" key={key}><label><span>{label}</span><textarea value={entry(key).evidence || ""} onChange={e => update(key, "evidence", e.target.value)} placeholder="Evidence reviewed, conclusion and follow-up" /></label><label className={"qbrResult " + (entry(key).status || "unset") + ""}><span>Assessment result</span><select value={entry(key).status || ""} onChange={e => update(key, "status", e.target.value)}><option value="">Select result</option><option value="meets">Meets requirements</option><option value="partial">Partially meets</option><option value="not_meet">Does not meet</option><option value="na">Not applicable</option></select></label></div>)}</div>;
+}
+function ReviewSection({
+  number,
+  title,
+  text,
+  fields,
+  value,
+  setter
+}) {
+  return <Section number={number} title={title} text={text}><ReviewFields fields={fields} value={value} setter={setter} /></Section>;
+}
+function Status({
+  item
+}) {
+  const closed = item.status === "closed" && item.closure_verified;
+  const text = (() => {
+    if (closed) {
+      return "Closed — effectiveness verified";
+    }
+    return (() => {
+      if (item.linked_rca_case_id) {
+        return "CAPA–8D in progress";
+      }
+      return (() => {
+        if (item.status === "verification") {
+          return "Awaiting verification";
+        }
+        return String(item.status || "open").replaceAll("_", " ");
+      })();
+    })();
+  })();
+  return <span className={"qbrLiveStatus " + (() => {
+    if (closed) {
+      return "closed";
+    }
+    return (() => {
+      if (item.linked_rca_case_id) {
+        return "capa";
+      }
+      return "open";
+    })();
+  })() + ""}>{text}</span>;
+}
+function PartySelect({
+  label,
+  value,
+  onChange,
+  people,
+  contacts
+}) {
+  return <label>{label} *<select value={value || ""} onChange={e => onChange(e.target.value)}><option value="">Select controlled person</option><optgroup label="Company People">{people.map(p => <option key={"company:" + p.id + ""} value={"company:" + p.id + ""}>{p.first_name} {p.last_name} · {p.position || p.email}</option>)}</optgroup><optgroup label="Supplier contacts">{contacts.map(p => <option key={"supplier:" + p.id + ""} value={"supplier:" + p.id + ""}>{p.first_name} {p.last_name || ""} · {p.business_title || p.email}</option>)}</optgroup></select></label>;
+}
+function ActionTrail({
+  actionId,
+  events
+}) {
+  const rows = events.filter(event => event.action_id === actionId);
+  if (!actionId) return <small className="qbrUnsaved">Save the QBR draft to create the controlled action reference and audit trail.</small>;
+  return <details className="qbrTrail"><summary>View action audit trail ({rows.length})</summary>{(() => {
+      if (rows.length) {
+        return rows.map(event => <div key={event.id}><b>{String(event.event_type).replaceAll("_", " ")}</b><span>{event.event_summary}</span><small>{new Date(event.created_at).toLocaleString("en-GB")} · {event.actor_name || "Recorded user"}</small></div>);
+      }
+      return <p>No recorded events.</p>;
+    })()}</details>;
+}
