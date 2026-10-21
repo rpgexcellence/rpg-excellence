@@ -1,59 +1,77 @@
+// VERIFIED_BCP_INCIDENT_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
+
+import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import BCPModuleNavigation from "./BCPModuleNavigation";
-
 import { useActionState, useEffect, useRef, useState } from "react";
-
 import { HazardIcon } from "./BCPHazardScenarioAssessment";
 import { incidentScenarios, synchroniseIncidentScenarios, reconcilePeople, scenarioResponseOptions } from "../lib/bcpIncidentScenarioLinks";
-
 import { TEAM_AUTHORITIES, TEAM_RESPONSIBILITIES, TEAM_PROCEDURE_STEPS, buildIncidentTeam, initialiseIncidentTeam } from "../lib/bcpIncidentTeamEngine";
-
 import { siteEmergencyContacts, emergencyContactFor, synchroniseEmergencyCommunications } from "../lib/bcpIncidentEmergencyContacts";
-
 import { RECOVERY_SECTIONS, initialiseIncidentRecovery, buildIncidentRecovery, incidentRecoveryMissing, recoveryScenarioOptions, recoveryScenarioLinked } from "../lib/bcpIncidentRecoveryEngine";
-
 const steps = ["Controlled sources", "Response teams", "Activation & escalation", "Warning & communications", "Incident Action Plan", "Recovery & approval"];
-const arr = (value) => Array.isArray(value) ? value : [];
+const arr = value => (() => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return [];
+})();
 const fields = {
-  teams: [["name", "Team / function"], ["leadPersonId", "Team leader", "person"], ["alternatePersonId", "Deputy", "person"], ["authority", "Decision authority", "authority"], ["responsibilities", "Responsibilities", "responsibilities"], ["procedure", "Procedural control", "long"]],
-  thresholds: [["scenario", "Linked scenario", "readonly"], ["activationCriteria", "Activation criteria", "long"], ["initialControls", "Immediate protective actions", "long"], ["responseLevel", "Response level", "level"]],
-  communications: [["audience", "Audience"], ["what", "Message / information", "long"], ["when", "Trigger and frequency"], ["ownerPersonId", "Communication owner", "person"], ["logMethod", "Communication record"], ["primaryMethod", "Primary channel", "channel"], ["fallbackMethod", "Fallback channel", "channel"]],
-  actions: [["objective", "Response objective"], ["action", "Action", "long"], ["ownerPersonId", "Action owner", "person"], ["priority", "Priority", "priority"], ["status", "Status", "status"]],
+  "teams": [["name", "Team / function"], ["leadPersonId", "Team leader", "person"], ["alternatePersonId", "Deputy", "person"], ["authority", "Decision authority", "authority"], ["responsibilities", "Responsibilities", "responsibilities"], ["procedure", "Procedural control", "long"]],
+  "thresholds": [["scenario", "Linked scenario", "readonly"], ["activationCriteria", "Activation criteria", "long"], ["initialControls", "Immediate protective actions", "long"], ["responseLevel", "Response level", "level"]],
+  "communications": [["audience", "Audience"], ["what", "Message / information", "long"], ["when", "Trigger and frequency"], ["ownerPersonId", "Communication owner", "person"], ["logMethod", "Communication record"], ["primaryMethod", "Primary channel", "channel"], ["fallbackMethod", "Fallback channel", "channel"]],
+  "actions": [["objective", "Response objective"], ["action", "Action", "long"], ["ownerPersonId", "Action owner", "person"], ["priority", "Priority", "priority"], ["status", "Status", "status"]]
 };
 const options = {
-  authority: ["Activate the incident response", "Escalate to the incident controller", "Authorise evacuation and immediate protection", "Approve emergency expenditure", "Authorise recovery and operational handback"],
-  responsibilities: ["Coordinate the incident response", "Protect people and account for personnel", "Maintain communications and stakeholder updates", "Restore priority processes and dependencies", "Coordinate supplier and technical support"],
-  level: ["Local response", "Site incident", "Organisation crisis"],
-  channel: ["Telephone", "SMS", "Email", "Teams / video call", "Public address", "In-person briefing", "Radio", "Approved alert system", "Alternate mobile", "Nominated contact chain"],
-  priority: ["Critical", "High", "Normal"], status: ["open", "in_progress", "closed"],
+  "authority": ["Activate the incident response", "Escalate to the incident controller", "Authorise evacuation and immediate protection", "Approve emergency expenditure", "Authorise recovery and operational handback"],
+  "responsibilities": ["Coordinate the incident response", "Protect people and account for personnel", "Maintain communications and stakeholder updates", "Restore priority processes and dependencies", "Coordinate supplier and technical support"],
+  "level": ["Local response", "Site incident", "Organisation crisis"],
+  "channel": ["Telephone", "SMS", "Email", "Teams / video call", "Public address", "In-person briefing", "Radio", "Approved alert system", "Alternate mobile", "Nominated contact chain"],
+  "priority": ["Critical", "High", "Normal"],
+  "status": ["open", "in_progress", "closed"]
 };
 const actionObjectives = ["Protect life safety and stabilise the incident", "Assess impacts and coordinate the response", "Maintain priority operations", "Communicate with affected parties", "Restore services and verify recovery", "Support people and capture lessons"];
-const actionGuidance = [
-  "Confirm immediate protective measures under the site's approved emergency arrangements, account for affected people and report unresolved hazards to the incident controller.",
-  "Record the affected people, processes, assets and dependencies; confirm the incident level, response coordination and outstanding decisions.",
-  "Confirm the affected priority operations and agreed continuity arrangements; allocate resources and record the service level that can be maintained.",
-  "Prepare the agreed message, confirm recipients and approved channels, record delivery and schedule the next update.",
-  "Confirm the recovery sequence and acceptance criteria, coordinate restoration and obtain the authorised operational handback.",
-  "Confirm welfare and support needs, record follow-up responsibilities and capture response lessons for the post-incident review."
-];
+const actionGuidance = ["Confirm immediate protective measures under the site's approved emergency arrangements, account for affected people and report unresolved hazards to the incident controller.", "Record the affected people, processes, assets and dependencies; confirm the incident level, response coordination and outstanding decisions.", "Confirm the affected priority operations and agreed continuity arrangements; allocate resources and record the service level that can be maintained.", "Prepare the agreed message, confirm recipients and approved channels, record delivery and schedule the next update.", "Confirm the recovery sequence and acceptance criteria, coordinate restoration and obtain the authorised operational handback.", "Confirm welfare and support needs, record follow-up responsibilities and capture response lessons for the post-incident review."];
 const actionPriorities = ["1 - Life safety", "2 - Incident stabilisation", "3 - Continuity", "4 - Recovery"];
 const actionStatuses = [["open", "Open"], ["in_progress", "In progress"], ["blocked", "Blocked"], ["closed", "Completed"]];
-const actionStatusLabel = (value) => actionStatuses.find(([id]) => id === value)?.[1] || value || "Not selected";
-const localDateTime = (value) => { const date = new Date(value); return value && !Number.isNaN(date.getTime()) ? new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""; };
-const actionScenarioValid = (row, hazard, scenarios) => row.scenarioScope !== "specific" || (row.hazardAssessmentId === hazard?.id && arr(row.scenarioIds).length > 0 && row.scenarioIds.every((id) => scenarios.some((source) => source.id === id)));
+const actionStatusLabel = value => actionStatuses.find(([id]) => id === value)?.[1] || value || "Not selected";
+const localDateTime = value => {
+  const date = new Date(value);
+  return (() => {
+    if (value && !Number.isNaN(date.getTime())) {
+      return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    }
+    return "";
+  })();
+};
+const actionScenarioValid = (row, hazard, scenarios) => row.scenarioScope !== "specific" || row.hazardAssessmentId === hazard?.id && arr(row.scenarioIds).length > 0 && row.scenarioIds.every(id => scenarios.some(source => source.id === id));
 const recoveryFields = [["normalOperationsCriteria", "Criteria for returning to normal operations"], ["handbackAuthority", "Operational handback authority"], ["eocClosureCriteria", "Incident coordination centre closure criteria"], ["standDownProcess", "Stand-down and resource release"], ["employeeSupport", "Employee welfare and support"], ["postIncidentReview", "Post-incident review and improvement"], ["planAvailability", "Plan availability during an outage"]];
-const blank = (type) => Object.fromEntries(fields[type].map(([key]) => [key, ""]));
-const scenarioTone = (scenario) => {
+const blank = type => Object.fromEntries(fields[type].map(([key]) => [key, ""]));
+const scenarioTone = scenario => {
   if (!scenario) return "Unlinked";
-  const impact = Math.max(1, ...Object.values(scenario.impact || {}).map((value) => Number(value) || 0));
+  const impact = Math.max(1, ...Object.values(scenario.impact || {}).map(value => Number(value) || 0));
   const likelihood = Math.max(1, Math.min(5, Number(scenario.likelihood) || 1));
   const effectiveness = Math.max(0, Math.min(100, Number(scenario.controlEffectiveness) || 0));
   const score = impact * Math.max(1, Math.ceil(likelihood * (1 - effectiveness / 100)));
-  return score <= 5 ? "Low" : score <= 11 ? "Moderate" : score <= 19 ? "High" : "Critical";
+  return (() => {
+    if (score <= 5) {
+      return "Low";
+    }
+    return (() => {
+      if (score <= 11) {
+        return "Moderate";
+      }
+      return (() => {
+        if (score <= 19) {
+          return "High";
+        }
+        return "Critical";
+      })();
+    })();
+  })();
 };
-const name = (person) => `${person.first_name || ""} ${person.last_name || ""}`.trim();
-
-const teamIconType = (team) => {
+const name = person => ("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim();
+const teamIconType = team => {
   if (["incident", "centre", "communications", "recovery", "support"].includes(team.iconType)) return team.iconType;
   const text = String(team.name || "").toLowerCase();
   if (/communication|media|stakeholder/.test(text)) return "communications";
@@ -62,199 +80,1175 @@ const teamIconType = (team) => {
   if (/incident|crisis|command/.test(text)) return "incident";
   return "support";
 };
-const teamIconNames = { incident: "Incident command shield", centre: "Response control centre network", communications: "Crisis communications megaphone", recovery: "Business recovery arrows", support: "Response support team" };
-function TeamIcon({ team, small = false }) {
+const teamIconNames = {
+  "incident": "Incident command shield",
+  "centre": "Response control centre network",
+  "communications": "Crisis communications megaphone",
+  "recovery": "Business recovery arrows",
+  "support": "Response support team"
+};
+function TeamIcon({
+  team,
+  small = false
+}) {
   const type = teamIconType(team);
-  return <span className={`teamIcon ${type} ${small ? "small" : ""}`} role="img" aria-label={teamIconNames[type]}><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {type === "incident" && <><path d="M24 5 39 11v12c0 10-7 17-15 20C16 40 9 33 9 23V11Z"/><path d="m17 23 5 5 10-11"/><path d="M17 12h14"/></>}
-    {type === "centre" && <><rect x="13" y="14" width="22" height="19" rx="3"/><path d="M19 21h10M19 26h6M24 8v6M24 33v7M6 24h7M35 24h7"/><circle cx="24" cy="5" r="3"/><circle cx="24" cy="43" r="3"/><circle cx="4" cy="24" r="2"/><circle cx="44" cy="24" r="2"/></>}
-    {type === "communications" && <><path d="M7 20h10l18-9v26l-18-9H7Z"/><path d="m13 28 3 12h7l-4-11M17 20v8M40 20l5-3M40 28l5 3M40 24h6"/></>}
-    {type === "recovery" && <><path d="M38 17A16 16 0 0 0 10 12L5 18M5 10v8h8M10 31a16 16 0 0 0 28 5l5-6M43 38v-8h-8"/><path d="M17 30v-5M24 30V20M31 30V15M15 33h18"/></>}
-    {type === "support" && <><circle cx="24" cy="15" r="6"/><circle cx="10" cy="20" r="4"/><circle cx="38" cy="20" r="4"/><path d="M13 39v-5a11 11 0 0 1 22 0v5M3 37v-5a7 7 0 0 1 8-7M45 37v-5a7 7 0 0 0-8-7"/></>}
+  return <span className={"teamIcon " + type + " " + (() => {
+    if (small) {
+      return "small";
+    }
+    return "";
+  })() + ""} role="img" aria-label={teamIconNames[type]}><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {type === "incident" && <><path d="M24 5 39 11v12c0 10-7 17-15 20C16 40 9 33 9 23V11Z" /><path d="m17 23 5 5 10-11" /><path d="M17 12h14" /></>}
+    {type === "centre" && <><rect x="13" y="14" width="22" height="19" rx="3" /><path d="M19 21h10M19 26h6M24 8v6M24 33v7M6 24h7M35 24h7" /><circle cx="24" cy="5" r="3" /><circle cx="24" cy="43" r="3" /><circle cx="4" cy="24" r="2" /><circle cx="44" cy="24" r="2" /></>}
+    {type === "communications" && <><path d="M7 20h10l18-9v26l-18-9H7Z" /><path d="m13 28 3 12h7l-4-11M17 20v8M40 20l5-3M40 28l5 3M40 24h6" /></>}
+    {type === "recovery" && <><path d="M38 17A16 16 0 0 0 10 12L5 18M5 10v8h8M10 31a16 16 0 0 0 28 5l5-6M43 38v-8h-8" /><path d="M17 30v-5M24 30V20M31 30V15M15 33h18" /></>}
+    {type === "support" && <><circle cx="24" cy="15" r="6" /><circle cx="10" cy="20" r="4" /><circle cx="38" cy="20" r="4" /><path d="M13 39v-5a11 11 0 0 1 22 0v5M3 37v-5a7 7 0 0 1 8-7M45 37v-5a7 7 0 0 0-8-7" /></>}
   </svg></span>;
 }
-
-export default function BCPIncidentManagement({ action, profiles = [], contexts = [], roles = [], hazards = [], bias = [], strategies = [], people = [], initial, startStep = 0 }) {
-  const [formState, formAction, pending] = useActionState(action, { error: "" });
+export default function BCPIncidentManagement({
+  action,
+  profiles = [],
+  contexts = [],
+  roles = [],
+  hazards = [],
+  bias = [],
+  strategies = [],
+  people = [],
+  initial,
+  startStep = 0
+}) {
+  const [formState, formAction, pending] = useActionState(action, {
+    "error": ""
+  });
   const formRef = useRef(null);
   const [renderRevision, setRenderRevision] = useState(0);
-  useEffect(() => { setRenderRevision((value) => value + 1); }, [formState]);
-  const [step, setStep] = useState(Math.max(0, Math.min(5, Number(startStep) || 0)));
-  const [sources, setSources] = useState({ site_profile_id: initial?.site_profile_id || "", context_assessment_id: initial?.context_assessment_id || "", role_assessment_id: initial?.role_assessment_id || "", hazard_assessment_id: initial?.hazard_assessment_id || "", bia_assessment_id: initial?.bia_assessment_id || "", strategy_assessment_id: initial?.strategy_assessment_id || "" });
-  const [title, setTitle] = useState(initial?.assessment_title || "Incident Management, Response & Recovery");
-  const [frequency, setFrequency] = useState(initial?.review_frequency || "Every 12 months");
-  const [date, setDate] = useState(initial?.next_review_date || "");
-  const [selectedTeamIndex, setSelectedTeamIndex] = useState(0);
-  const [rawTeams, setTeams] = useState(reconcilePeople(initial?.response_teams, people, [["leadPersonId", "lead"], ["alternatePersonId", "alternate"]]).map(initialiseIncidentTeam));
-  const [selectedScenarioIndex, setSelectedScenarioIndex] = useState(0);
-  const [rawThresholds, setThresholds] = useState(arr(initial?.activation_thresholds));
-  const [selectedCommunicationIndex, setSelectedCommunicationIndex] = useState(0);
-  const [rawCommunications, setCommunications] = useState(reconcilePeople(initial?.warning_communications, people, [["ownerPersonId", "owner"]]));
-  const [selectedActionIndex, setSelectedActionIndex] = useState(0);
-  const [actionFilters, setActionFilters] = useState({ status: "", scenario: "", owner: "", priority: "" });
+  useEffect(() => {
+    setRenderRevision(value => value + 1);
+  }, [formState]);
+  const [step, setStep] = useDeviceDraftState("BCPIncidentManagement_step", Math.max(0, Math.min(5, Number(startStep) || 0)));
+  const [sources, setSources] = useDeviceDraftState("BCPIncidentManagement_sources", {
+    "site_profile_id": initial?.site_profile_id || "",
+    "context_assessment_id": initial?.context_assessment_id || "",
+    "role_assessment_id": initial?.role_assessment_id || "",
+    "hazard_assessment_id": initial?.hazard_assessment_id || "",
+    "bia_assessment_id": initial?.bia_assessment_id || "",
+    "strategy_assessment_id": initial?.strategy_assessment_id || ""
+  });
+  const [title, setTitle] = useDeviceDraftState("BCPIncidentManagement_title", initial?.assessment_title || "Incident Management, Response & Recovery");
+  const [frequency, setFrequency] = useDeviceDraftState("BCPIncidentManagement_frequency", initial?.review_frequency || "Every 12 months");
+  const [date, setDate] = useDeviceDraftState("BCPIncidentManagement_date", initial?.next_review_date || "");
+  const [selectedTeamIndex, setSelectedTeamIndex] = useDeviceDraftState("BCPIncidentManagement_selectedTeamIndex", 0);
+  const [rawTeams, setTeams] = useDeviceDraftState("BCPIncidentManagement_rawTeams", reconcilePeople(initial?.response_teams, people, [["leadPersonId", "lead"], ["alternatePersonId", "alternate"]]).map(initialiseIncidentTeam));
+  const [selectedScenarioIndex, setSelectedScenarioIndex] = useDeviceDraftState("BCPIncidentManagement_selectedScenarioIndex", 0);
+  const [rawThresholds, setThresholds] = useDeviceDraftState("BCPIncidentManagement_rawThresholds", arr(initial?.activation_thresholds));
+  const [selectedCommunicationIndex, setSelectedCommunicationIndex] = useDeviceDraftState("BCPIncidentManagement_selectedCommunicationIndex", 0);
+  const [rawCommunications, setCommunications] = useDeviceDraftState("BCPIncidentManagement_rawCommunications", reconcilePeople(initial?.warning_communications, people, [["ownerPersonId", "owner"]]));
+  const [selectedActionIndex, setSelectedActionIndex] = useDeviceDraftState("BCPIncidentManagement_selectedActionIndex", 0);
+  const [actionFilters, setActionFilters] = useDeviceDraftState("BCPIncidentManagement_actionFilters", {
+    "status": "",
+    "scenario": "",
+    "owner": "",
+    "priority": ""
+  });
   const [actionClock, setActionClock] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setActionClock(Date.now()), 60000); return () => clearInterval(timer); }, []);
-  const [actions, setActions] = useState(reconcilePeople(initial?.incident_action_plan, people, [["ownerPersonId", "owner"]]));
-  const [rawRecovery, setRecovery] = useState(() => initialiseIncidentRecovery(initial?.recovery_stand_down || {}));
-  const [selectedRecoverySection, setSelectedRecoverySection] = useState("normalOperationsCriteria");
-  const [selectedRecoveryScenarioIndex, setSelectedRecoveryScenarioIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setActionClock(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  const [actions, setActions] = useDeviceDraftState("BCPIncidentManagement_actions", reconcilePeople(initial?.incident_action_plan, people, [["ownerPersonId", "owner"]]));
+  const [rawRecovery, setRecovery] = useDeviceDraftState("BCPIncidentManagement_rawRecovery", () => initialiseIncidentRecovery(initial?.recovery_stand_down || {}));
+  const [selectedRecoverySection, setSelectedRecoverySection] = useDeviceDraftState("BCPIncidentManagement_selectedRecoverySection", "normalOperationsCriteria");
+  const [selectedRecoveryScenarioIndex, setSelectedRecoveryScenarioIndex] = useDeviceDraftState("BCPIncidentManagement_selectedRecoveryScenarioIndex", 0);
   const [approver, setApprover] = useState(initial?.approver_person_id || "");
-  const [comment, setComment] = useState(initial?.review_comment || "");
-  const hazard = hazards.find((row) => row.id === sources.hazard_assessment_id);
-  const linkedContext = contexts.find((row) => row.id === sources.context_assessment_id);
-  const interestedParties = arr(linkedContext?.interested_parties).filter((party) => party.id && String(party.name || "").trim());
-  const siteProfile = profiles.find((row) => row.id === sources.site_profile_id);
+  const [comment, setComment] = useDeviceDraftState("BCPIncidentManagement_comment", initial?.review_comment || "");
+  const hazard = hazards.find(row => row.id === sources.hazard_assessment_id);
+  const linkedContext = contexts.find(row => row.id === sources.context_assessment_id);
+  const interestedParties = arr(linkedContext?.interested_parties).filter(party => party.id && String(party.name || "").trim());
+  const siteProfile = profiles.find(row => row.id === sources.site_profile_id);
   const emergencyContacts = siteEmergencyContacts(siteProfile);
-  const communications = synchroniseEmergencyCommunications(rawCommunications, siteProfile).map((row) => {
-    const party = row.interestedPartyContextId === linkedContext?.id ? interestedParties.find((item) => item.id === row.interestedPartyId) : null;
-    return party ? { ...row, audience: party.name } : row;
+  const communications = synchroniseEmergencyCommunications(rawCommunications, siteProfile).map(row => {
+    const party = (() => {
+      if (row.interestedPartyContextId === linkedContext?.id) {
+        return interestedParties.find(item => item.id === row.interestedPartyId);
+      }
+      return null;
+    })();
+    return (() => {
+      if (party) {
+        return {
+          ...row,
+          "audience": party.name
+        };
+      }
+      return row;
+    })();
   });
   const hazardMatchesSite = Boolean(sources.site_profile_id && hazard?.site_profile_id === sources.site_profile_id);
   const scenarios = incidentScenarios(hazard);
-  const recoveryContext = { people, hazard, scenarios, siteName: siteProfile?.location_name || "", approverPersonId: approver };
+  const recoveryContext = {
+    "people": people,
+    "hazard": hazard,
+    "scenarios": scenarios,
+    "siteName": siteProfile?.location_name || "",
+    "approverPersonId": approver
+  };
   const recovery = buildIncidentRecovery(rawRecovery, recoveryContext);
   const recoveryMissing = incidentRecoveryMissing(recovery, recoveryContext);
-  const thresholds = synchroniseIncidentScenarios(rawThresholds, scenarios, { allScenarios: arr(hazard?.scenario_assessments) });
-  const teams = rawTeams.map((team) => buildIncidentTeam(team, { people, siteName: profiles.find((item) => item.id === sources.site_profile_id)?.location_name || "", scenarios: thresholds.filter((row) => scenarios.some((item) => item.id === row.scenarioId)) }));
-  const datasets = { teams: [teams, setTeams], thresholds: [thresholds, setThresholds], communications: [communications, setCommunications], actions: [actions, setActions] };
+  const thresholds = synchroniseIncidentScenarios(rawThresholds, scenarios, {
+    "allScenarios": arr(hazard?.scenario_assessments)
+  });
+  const teams = rawTeams.map(team => buildIncidentTeam(team, {
+    "people": people,
+    "siteName": profiles.find(item => item.id === sources.site_profile_id)?.location_name || "",
+    "scenarios": thresholds.filter(row => scenarios.some(item => item.id === row.scenarioId))
+  }));
+  const datasets = {
+    "teams": [teams, setTeams],
+    "thresholds": [thresholds, setThresholds],
+    "communications": [communications, setCommunications],
+    "actions": [actions, setActions]
+  };
   const sourceSpecs = [["site_profile_id", "Module 1 · Site profile", profiles], ["context_assessment_id", "Module 3 · Context", contexts], ["role_assessment_id", "Module 4 · Roles", roles], ["hazard_assessment_id", "Module 5 · Hazard scenarios", hazards], ["bia_assessment_id", "Module 6 · Business impact analysis", bias], ["strategy_assessment_id", "Module 8 · Continuity strategies", strategies]];
-  const completeRows = (type, rows) => rows.length > 0 && rows.every((row) => fields[type].every(([key]) => String(row[key] || "").trim()));
-  const checks = [Boolean(sources.site_profile_id && sources.role_assessment_id && sources.hazard_assessment_id && sources.strategy_assessment_id), completeRows("teams", teams) && teams.every((row) => row.leadPersonId !== row.alternatePersonId && (row.procedureMode !== "automatic" || (Array.isArray(row.procedureSelections) && row.procedureSelections.length > 0))), completeRows("thresholds", thresholds) && thresholds.every((row) => scenarios.some((s) => s.id === row.scenarioId)), completeRows("communications", communications) && communications.every((row) => !row.emergencyContactKey || Boolean(emergencyContactFor(row, siteProfile))) && communications.every((row) => !row.interestedPartyId || (row.interestedPartyContextId === linkedContext?.id && interestedParties.some((party) => party.id === row.interestedPartyId))), completeRows("actions", actions) && actions.every((row) => actionScenarioValid(row, hazard, scenarios)), recoveryMissing.length === 0];
+  const completeRows = (type, rows) => rows.length > 0 && rows.every(row => fields[type].every(([key]) => String(row[key] || "").trim()));
+  const checks = [Boolean(sources.site_profile_id && sources.role_assessment_id && sources.hazard_assessment_id && sources.strategy_assessment_id), completeRows("teams", teams) && teams.every(row => row.leadPersonId !== row.alternatePersonId && (row.procedureMode !== "automatic" || Array.isArray(row.procedureSelections) && row.procedureSelections.length > 0)), completeRows("thresholds", thresholds) && thresholds.every(row => scenarios.some(s => s.id === row.scenarioId)), completeRows("communications", communications) && communications.every(row => !row.emergencyContactKey || Boolean(emergencyContactFor(row, siteProfile))) && communications.every(row => !row.interestedPartyId || row.interestedPartyContextId === linkedContext?.id && interestedParties.some(party => party.id === row.interestedPartyId)), completeRows("actions", actions) && actions.every(row => actionScenarioValid(row, hazard, scenarios)), recoveryMissing.length === 0];
   const percent = Math.round(checks.filter(Boolean).length / 6 * 100);
-  const update = (type, index, key, value) => { const [rows, setter] = datasets[type]; setter(rows.map((row, i) => i === index ? { ...row, [key]: value } : row)); };
-  const personSelect = (value, onChange) => <select key={`${value || ""}-${formState.error || ""}`} value={value || ""} onChange={(event) => onChange(event.target.value)}><option value="">Select Company User</option>{people.map((person) => <option key={person.id} value={person.id}>{name(person)}</option>)}</select>;
-  const activeTeamIndex = selectedTeamIndex < 0 ? -1 : Math.min(selectedTeamIndex, teams.length - 1);
-  const teamReady = (team) => Boolean(team.name && team.leadPersonId && team.alternatePersonId && team.leadPersonId !== team.alternatePersonId && team.authority && team.responsibilities && team.procedure && (team.procedureMode !== "automatic" || team.procedureSelections?.length));
-  const teamPersonName = (id, fallback) => { const person = people.find((row) => row.id === id); return person ? name(person) : fallback || "Not assigned"; };
-  const addTeam = () => { setTeams([...teams, initialiseIncidentTeam({ ...blank("teams"), id: crypto.randomUUID() })]); setSelectedTeamIndex(teams.length); };
-  const teamEditor = () => <><div className="teamOverviewHeading"><div><h3>Response teams</h3><p>Select a card to edit that team. All teams are included when you save.</p></div><button type="button" className="add" onClick={addTeam}>+ Add response team</button></div><div className="teamOverview">{teams.map((team, index) => <button type="button" className={`teamSummary icon-${teamIconType(team)} ${activeTeamIndex === index ? "active" : ""}`} key={team.id || index} aria-expanded={activeTeamIndex === index} aria-controls={`team-details-${index}`} onClick={() => setSelectedTeamIndex(activeTeamIndex === index ? -1 : index)}><div className="teamSummaryTop"><b className="teamNumber">{index + 1}</b><span className={`teamReadiness ${teamReady(team) ? "ready" : "attention"}`}>{teamReady(team) ? "Complete" : "Needs attention"}</span></div><strong>{team.name || `Response team ${index + 1}`}</strong><span>Leader: {teamPersonName(team.leadPersonId, team.lead)}</span><span>Deputy: {teamPersonName(team.alternatePersonId, team.alternate)}</span><span>{arr(team.additionalMembers).filter((member) => String(member.name || "").trim()).length} additional members</span><small>{activeTeamIndex === index ? "Editing · click to collapse" : "Click to view and edit"}</small><TeamIcon team={team} /></button>)}</div>{!teams.length && <p className="teamEmpty">Add a response team to assign people and controls.</p>}{teams.map((team, index) => {
-    if (index !== activeTeamIndex) return null;
-    const patch = (changes) => setTeams(teams.map((row, i) => i === index ? { ...row, ...changes } : row));
-    const choices = (key, catalogue) => <div className="teamChoices">{catalogue.map(([id, label, guidance]) => { const selected = (team[key] || []).includes(id); return <button type="button" key={id} className={selected ? "selected" : ""} aria-pressed={selected} title={guidance} onClick={() => patch({ [key]: selected ? team[key].filter((value) => value !== id) : [...(team[key] || []), id] })}><b>{selected ? "✓" : "+"}</b><span>{label}</span></button>; })}</div>;
-    return <article id={`team-details-${index}`} className="teamDetails" key={team.id || index}><div className="rowHeading"><h3><TeamIcon team={team} small />{team.name || `Response team ${index + 1}`}</h3><div className="teamDetailActions"><button type="button" className="collapseTeam" onClick={() => setSelectedTeamIndex(-1)}>Collapse</button><button type="button" onClick={() => { setTeams(teams.filter((_, i) => i !== index)); setSelectedTeamIndex(Math.max(0, index - 1)); }}>Remove</button></div></div>
-      <div className="grid"><label>Team / function<input value={team.name || ""} onChange={(e) => patch({ name: e.target.value })} /></label><label>Team leader{personSelect(team.leadPersonId, (value) => patch({ leadPersonId: value }))}</label><label>Deputy{personSelect(team.alternatePersonId, (value) => patch({ alternatePersonId: value }))}</label><label>Team icon<select value={team.iconType || "automatic"} onChange={(e) => patch({ iconType: e.target.value })}><option value="automatic">Automatic — based on team name</option>{Object.entries(teamIconNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Procedure text mode<select value={team.procedureMode} onChange={(e) => patch({ procedureMode: e.target.value, previousProcedure: team.previousProcedure || team.procedure })}><option value="automatic">Automatic — update from selections</option><option value="custom">Custom — retain my procedure text</option></select></label></div>
-      <div className="additionalMembers"><div className="membersHeading"><div><h3>Additional team members</h3><p>Add employees, contractors, advisers or other people directly. Company User accounts are not required.</p></div><button type="button" className="add" onClick={() => patch({ additionalMembers: [...arr(team.additionalMembers), { id: crypto.randomUUID(), name: "", role: "", organisation: "", contact: "" }] })}>+ Add person</button></div>
-        {arr(team.additionalMembers).map((member, memberIndex) => <div className="memberRow" key={member.id || memberIndex}><div className="memberFields">{[["name", "Person's name"], ["role", "Team role / responsibility"], ["organisation", "Organisation"], ["contact", "Contact details"]].map(([key, label]) => <label key={key}>{label}{key !== "name" && <small>Optional</small>}<input type="text" value={member[key] || ""} onChange={(e) => patch({ additionalMembers: arr(team.additionalMembers).map((row, i) => i === memberIndex ? { ...row, [key]: e.target.value } : row) })} placeholder={key === "contact" ? "Phone, email or other contact" : "Enter freely"} /></label>)}</div><button type="button" className="removeMember" aria-label={`Remove additional member ${member.name || memberIndex + 1}`} onClick={() => patch({ additionalMembers: arr(team.additionalMembers).filter((_, i) => i !== memberIndex) })}>Remove</button></div>)}
+  const update = (type, index, key, value) => {
+    const [rows, setter] = datasets[type];
+    setter(rows.map((row, i) => (() => {
+      if (i === index) {
+        return {
+          ...row,
+          [key]: value
+        };
+      }
+      return row;
+    })()));
+  };
+  const personSelect = (value, onChange) => <select key={"" + (value || "") + "-" + (formState.error || "") + ""} value={value || ""} onChange={event => onChange(event.target.value)}><option value="">Select Company User</option>{people.map(person => <option key={person.id} value={person.id}>{name(person)}</option>)}</select>;
+  const activeTeamIndex = (() => {
+    if (selectedTeamIndex < 0) {
+      return -1;
+    }
+    return Math.min(selectedTeamIndex, teams.length - 1);
+  })();
+  const teamReady = team => Boolean(team.name && team.leadPersonId && team.alternatePersonId && team.leadPersonId !== team.alternatePersonId && team.authority && team.responsibilities && team.procedure && (team.procedureMode !== "automatic" || team.procedureSelections?.length));
+  const teamPersonName = (id, fallback) => {
+    const person = people.find(row => row.id === id);
+    return (() => {
+      if (person) {
+        return name(person);
+      }
+      return fallback || "Not assigned";
+    })();
+  };
+  const addTeam = () => {
+    setTeams([...teams, initialiseIncidentTeam({
+      ...blank("teams"),
+      "id": crypto.randomUUID()
+    })]);
+    setSelectedTeamIndex(teams.length);
+  };
+  const teamEditor = () => <><div className="teamOverviewHeading"><div><h3>Response teams</h3><p>Select a card to edit that team. All teams are included when you save.</p></div><button type="button" className="add" onClick={addTeam}>+ Add response team</button></div><div className="teamOverview">{teams.map((team, index) => <button type="button" className={"teamSummary icon-" + teamIconType(team) + " " + (() => {
+        if (activeTeamIndex === index) {
+          return "active";
+        }
+        return "";
+      })() + ""} key={team.id || index} aria-expanded={activeTeamIndex === index} aria-controls={"team-details-" + index + ""} onClick={() => setSelectedTeamIndex((() => {
+        if (activeTeamIndex === index) {
+          return -1;
+        }
+        return index;
+      })())}><div className="teamSummaryTop"><b className="teamNumber">{index + 1}</b><span className={"teamReadiness " + (() => {
+            if (teamReady(team)) {
+              return "ready";
+            }
+            return "attention";
+          })() + ""}>{(() => {
+              if (teamReady(team)) {
+                return "Complete";
+              }
+              return "Needs attention";
+            })()}</span></div><strong>{team.name || "Response team " + (index + 1) + ""}</strong><span>Leader: {teamPersonName(team.leadPersonId, team.lead)}</span><span>Deputy: {teamPersonName(team.alternatePersonId, team.alternate)}</span><span>{arr(team.additionalMembers).filter(member => String(member.name || "").trim()).length} additional members</span><small>{(() => {
+            if (activeTeamIndex === index) {
+              return "Editing · click to collapse";
+            }
+            return "Click to view and edit";
+          })()}</small><TeamIcon team={team} /></button>)}</div>{!teams.length && <p className="teamEmpty">Add a response team to assign people and controls.</p>}{teams.map((team, index) => {
+      if (index !== activeTeamIndex) return null;
+      const patch = changes => setTeams(teams.map((row, i) => (() => {
+        if (i === index) {
+          return {
+            ...row,
+            ...changes
+          };
+        }
+        return row;
+      })()));
+      const choices = (key, catalogue) => <div className="teamChoices">{catalogue.map(([id, label, guidance]) => {
+          const selected = (team[key] || []).includes(id);
+          return <button type="button" key={id} className={(() => {
+            if (selected) {
+              return "selected";
+            }
+            return "";
+          })()} aria-pressed={selected} title={guidance} onClick={() => patch({
+            [key]: (() => {
+              if (selected) {
+                return team[key].filter(value => value !== id);
+              }
+              return [...(team[key] || []), id];
+            })()
+          })}><b>{(() => {
+                if (selected) {
+                  return "✓";
+                }
+                return "+";
+              })()}</b><span>{label}</span></button>;
+        })}</div>;
+      return <article id={"team-details-" + index + ""} className="teamDetails" key={team.id || index}><div className="rowHeading"><h3><TeamIcon team={team} small />{team.name || "Response team " + (index + 1) + ""}</h3><div className="teamDetailActions"><button type="button" className="collapseTeam" onClick={() => setSelectedTeamIndex(-1)}>Collapse</button><button type="button" onClick={() => {
+              setTeams(teams.filter((_, i) => i !== index));
+              setSelectedTeamIndex(Math.max(0, index - 1));
+            }}>Remove</button></div></div>
+      <div className="grid"><label>Team / function<input value={team.name || ""} onChange={e => patch({
+              "name": e.target.value
+            })} /></label><label>Team leader{personSelect(team.leadPersonId, value => patch({
+              "leadPersonId": value
+            }))}</label><label>Deputy{personSelect(team.alternatePersonId, value => patch({
+              "alternatePersonId": value
+            }))}</label><label>Team icon<select value={team.iconType || "automatic"} onChange={e => patch({
+              "iconType": e.target.value
+            })}><option value="automatic">Automatic — based on team name</option>{Object.entries(teamIconNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Procedure text mode<select value={team.procedureMode} onChange={e => patch({
+              "procedureMode": e.target.value,
+              "previousProcedure": team.previousProcedure || team.procedure
+            })}><option value="automatic">Automatic — update from selections</option><option value="custom">Custom — retain my procedure text</option></select></label></div>
+      <div className="additionalMembers"><div className="membersHeading"><div><h3>Additional team members</h3><p>Add employees, contractors, advisers or other people directly. Company User accounts are not required.</p></div><button type="button" className="add" onClick={() => patch({
+              "additionalMembers": [...arr(team.additionalMembers), {
+                "id": crypto.randomUUID(),
+                "name": "",
+                "role": "",
+                "organisation": "",
+                "contact": ""
+              }]
+            })}>+ Add person</button></div>
+        {arr(team.additionalMembers).map((member, memberIndex) => <div className="memberRow" key={member.id || memberIndex}><div className="memberFields">{[["name", "Person's name"], ["role", "Team role / responsibility"], ["organisation", "Organisation"], ["contact", "Contact details"]].map(([key, label]) => <label key={key}>{label}{key !== "name" && <small>Optional</small>}<input type="text" value={member[key] || ""} onChange={e => patch({
+                  "additionalMembers": arr(team.additionalMembers).map((row, i) => (() => {
+                    if (i === memberIndex) {
+                      return {
+                        ...row,
+                        [key]: e.target.value
+                      };
+                    }
+                    return row;
+                  })())
+                })} placeholder={(() => {
+                  if (key === "contact") {
+                    return "Phone, email or other contact";
+                  }
+                  return "Enter freely";
+                })()} /></label>)}</div><button type="button" className="removeMember" aria-label={"Remove additional member " + (member.name || memberIndex + 1) + ""} onClick={() => patch({
+              "additionalMembers": arr(team.additionalMembers).filter((_, i) => i !== memberIndex)
+            })}>Remove</button></div>)}
         {!arr(team.additionalMembers).length && <p className="memberEmpty">No additional people added yet. Use “Add person” to build this team's membership.</p>}
       </div>
-      <fieldset className="teamField"><legend>Decision authority · select all that apply</legend>{choices("authoritySelections", TEAM_AUTHORITIES)}<label>Additional local authority<textarea value={team.customAuthority || ""} onChange={(e) => patch({ customAuthority: e.target.value })} placeholder="Optional delegated authority or local limits" /></label></fieldset>
-      <fieldset className="teamField"><legend>Responsibilities · select all that apply</legend>{choices("responsibilitySelections", TEAM_RESPONSIBILITIES)}<label>Additional local responsibilities<textarea value={team.customResponsibilities || ""} onChange={(e) => patch({ customResponsibilities: e.target.value })} placeholder="Optional local responsibilities" /></label></fieldset>
-      <fieldset className="teamField"><legend>Controlled procedure · select the required steps</legend>{choices("procedureSelections", TEAM_PROCEDURE_STEPS)}<label>Local procedural instructions<textarea value={team.procedureNotes || ""} onChange={(e) => patch({ procedureNotes: e.target.value })} placeholder="Optional site-specific contacts, arrangements or limits" /></label></fieldset>
-      <div className="procedurePreview"><h3>{team.procedureMode === "automatic" ? "Live procedural control" : "Custom procedural control"}</h3><p>{team.procedureMode === "automatic" ? "The full text updates when you change the team, people, authorities, responsibilities, procedure steps or linked response scenarios." : "Your existing procedure is retained. Switch to Automatic to generate and update it from the selections above."}</p><textarea aria-label={`Procedural control for ${team.name || `team ${index + 1}`}`} readOnly={team.procedureMode === "automatic"} value={team.procedure || ""} onChange={(e) => patch({ procedure: e.target.value })} />{team.previousProcedure && <details><summary>Previously retained procedure text</summary><p style={{ whiteSpace: "pre-wrap" }}>{team.previousProcedure}</p></details>}</div>
+      <fieldset className="teamField"><legend>Decision authority · select all that apply</legend>{choices("authoritySelections", TEAM_AUTHORITIES)}<label>Additional local authority<textarea value={team.customAuthority || ""} onChange={e => patch({
+              "customAuthority": e.target.value
+            })} placeholder="Optional delegated authority or local limits" /></label></fieldset>
+      <fieldset className="teamField"><legend>Responsibilities · select all that apply</legend>{choices("responsibilitySelections", TEAM_RESPONSIBILITIES)}<label>Additional local responsibilities<textarea value={team.customResponsibilities || ""} onChange={e => patch({
+              "customResponsibilities": e.target.value
+            })} placeholder="Optional local responsibilities" /></label></fieldset>
+      <fieldset className="teamField"><legend>Controlled procedure · select the required steps</legend>{choices("procedureSelections", TEAM_PROCEDURE_STEPS)}<label>Local procedural instructions<textarea value={team.procedureNotes || ""} onChange={e => patch({
+              "procedureNotes": e.target.value
+            })} placeholder="Optional site-specific contacts, arrangements or limits" /></label></fieldset>
+      <div className="procedurePreview"><h3>{(() => {
+              if (team.procedureMode === "automatic") {
+                return "Live procedural control";
+              }
+              return "Custom procedural control";
+            })()}</h3><p>{(() => {
+              if (team.procedureMode === "automatic") {
+                return "The full text updates when you change the team, people, authorities, responsibilities, procedure steps or linked response scenarios.";
+              }
+              return "Your existing procedure is retained. Switch to Automatic to generate and update it from the selections above.";
+            })()}</p><textarea aria-label={"Procedural control for " + (team.name || "team " + (index + 1) + "") + ""} readOnly={team.procedureMode === "automatic"} value={team.procedure || ""} onChange={e => patch({
+            "procedure": e.target.value
+          })} />{team.previousProcedure && <details><summary>Previously retained procedure text</summary><p style={{
+              "whiteSpace": "pre-wrap"
+            }}>{team.previousProcedure}</p></details>}</div>
       {team.leadPersonId && team.leadPersonId === team.alternatePersonId && <p className="error">Choose a different deputy to provide cover.</p>}
     </article>;
-  })}</>;
+    })}</>;
   const audienceField = (row, index, rows, setter) => {
     if (row.emergencyContactKey) {
       const contact = emergencyContactFor(row, siteProfile);
       const details = contact || row.emergencyContactSnapshot || {};
-      return <div className="audienceSource"><input aria-label="Site emergency service audience" readOnly value={row.audience || ""} /><small>{contact ? `Linked to Module 1 · ${siteProfile.location_name || "Site profile"} · v${siteProfile.version || 1}` : "Emergency service link needs confirmation. The original details are retained; remove this old card after transferring any instructions to the current service card."}</small><details open><summary>Site emergency contact details</summary>{[["emergencyNumber", "Emergency telephone"], ["nonEmergencyNumber", "Direct / non-emergency telephone"], ["address", "Address"], ["travelTimeMinutes", "Estimated travel time (minutes)"], ["accessNotes", "Access and arrival notes"], ["directionsReference", "Route / reference"], ["lastVerified", "Last verified"]].map(([key, label]) => <p key={key}><strong>{label}:</strong> {String(details[key] ?? "").trim() || "Not recorded"}</p>)}</details></div>;
+      return <div className="audienceSource"><input aria-label="Site emergency service audience" readOnly value={row.audience || ""} /><small>{(() => {
+            if (contact) {
+              return "Linked to Module 1 \xB7 " + (siteProfile.location_name || "Site profile") + " \xB7 v" + (siteProfile.version || 1) + "";
+            }
+            return "Emergency service link needs confirmation. The original details are retained; remove this old card after transferring any instructions to the current service card.";
+          })()}</small><details open><summary>Site emergency contact details</summary>{[["emergencyNumber", "Emergency telephone"], ["nonEmergencyNumber", "Direct / non-emergency telephone"], ["address", "Address"], ["travelTimeMinutes", "Estimated travel time (minutes)"], ["accessNotes", "Access and arrival notes"], ["directionsReference", "Route / reference"], ["lastVerified", "Last verified"]].map(([key, label]) => <p key={key}><strong>{label}:</strong> {String(details[key] ?? "").trim() || "Not recorded"}</p>)}</details></div>;
     }
-    const sourceParty = row.interestedPartyContextId === linkedContext?.id ? interestedParties.find((party) => party.id === row.interestedPartyId) : null;
+    const sourceParty = (() => {
+      if (row.interestedPartyContextId === linkedContext?.id) {
+        return interestedParties.find(party => party.id === row.interestedPartyId);
+      }
+      return null;
+    })();
     const invalidLink = Boolean(row.interestedPartyId && !sourceParty);
-    const selectParty = (value) => {
-      const party = interestedParties.find((item) => item.id === value);
-      if (!party) { setter(rows.map((item, i) => i === index ? { ...item, interestedPartyId: "", interestedPartyContextId: "" } : item)); return; }
-      const ownerMatches = people.filter((person) => person.id === party.owner || name(person).toLowerCase() === String(party.owner || "").trim().toLowerCase());
-      setter(rows.map((item, i) => i === index ? { ...item, audience: party.name, interestedPartyId: party.id, interestedPartyContextId: linkedContext.id, what: item.what || party.requirement || "", when: item.when || party.communication || "", ownerPersonId: item.ownerPersonId || (ownerMatches.length === 1 ? ownerMatches[0].id : "") } : item));
+    const selectParty = value => {
+      const party = interestedParties.find(item => item.id === value);
+      if (!party) {
+        setter(rows.map((item, i) => (() => {
+          if (i === index) {
+            return {
+              ...item,
+              "interestedPartyId": "",
+              "interestedPartyContextId": ""
+            };
+          }
+          return item;
+        })()));
+        return;
+      }
+      const ownerMatches = people.filter(person => person.id === party.owner || name(person).toLowerCase() === String(party.owner || "").trim().toLowerCase());
+      setter(rows.map((item, i) => (() => {
+        if (i === index) {
+          return {
+            ...item,
+            "audience": party.name,
+            "interestedPartyId": party.id,
+            "interestedPartyContextId": linkedContext.id,
+            "what": item.what || party.requirement || "",
+            "when": item.when || party.communication || "",
+            "ownerPersonId": item.ownerPersonId || (() => {
+              if (ownerMatches.length === 1) {
+                return ownerMatches[0].id;
+              }
+              return "";
+            })()
+          };
+        }
+        return item;
+      })()));
     };
-    return <div className="audienceSource"><select aria-label="Audience from Module 3 interested parties" value={sourceParty?.id || (invalidLink ? "missing" : "custom")} onChange={(e) => selectParty(e.target.value)}><option value="custom">Custom / existing audience</option>{invalidLink && <option value="missing">Previous source link needs confirmation</option>}{interestedParties.map((party) => <option key={party.id} value={party.id}>{party.name}{party.type ? ` · ${party.type}` : ""}</option>)}</select>{!sourceParty && <input aria-label="Custom audience" value={row.audience || ""} onChange={(e) => update("communications", index, "audience", e.target.value)} placeholder="Enter an additional audience" />}
-      <small>{sourceParty ? `Linked to Module 3 · ${linkedContext.assessment_reference || linkedContext.assessment_title || "Context assessment"} · v${linkedContext.version || 1}` : invalidLink ? "This interested party is no longer available in the linked Context assessment. Re-select its source or use a custom audience. Your communication text is retained." : linkedContext ? `${interestedParties.length} interested parties available from the linked Module 3 assessment. Selecting a party fills only empty message, timing and owner fields.` : "Link a Module 3 Context assessment in Controlled sources to select its interested parties. Custom audiences remain available."}</small>
+    return <div className="audienceSource"><select aria-label="Audience from Module 3 interested parties" value={sourceParty?.id || (() => {
+        if (invalidLink) {
+          return "missing";
+        }
+        return "custom";
+      })()} onChange={e => selectParty(e.target.value)}><option value="custom">Custom / existing audience</option>{invalidLink && <option value="missing">Previous source link needs confirmation</option>}{interestedParties.map(party => <option key={party.id} value={party.id}>{party.name}{(() => {
+            if (party.type) {
+              return " \xB7 " + party.type + "";
+            }
+            return "";
+          })()}</option>)}</select>{!sourceParty && <input aria-label="Custom audience" value={row.audience || ""} onChange={e => update("communications", index, "audience", e.target.value)} placeholder="Enter an additional audience" />}
+      <small>{(() => {
+          if (sourceParty) {
+            return "Linked to Module 3 \xB7 " + (linkedContext.assessment_reference || linkedContext.assessment_title || "Context assessment") + " \xB7 v" + (linkedContext.version || 1) + "";
+          }
+          return (() => {
+            if (invalidLink) {
+              return "This interested party is no longer available in the linked Context assessment. Re-select its source or use a custom audience. Your communication text is retained.";
+            }
+            return (() => {
+              if (linkedContext) {
+                return "" + interestedParties.length + " interested parties available from the linked Module 3 assessment. Selecting a party fills only empty message, timing and owner fields.";
+              }
+              return "Link a Module 3 Context assessment in Controlled sources to select its interested parties. Custom audiences remain available.";
+            })();
+          })();
+        })()}</small>
       {sourceParty && <details><summary>View Module 3 requirements and communication</summary><p><strong>Expectation:</strong> {sourceParty.requirement || "Not recorded"}</p><p><strong>Communication:</strong> {sourceParty.communication || "Not recorded"}</p><p><strong>Accountable owner:</strong> {sourceParty.owner || "Not recorded"}</p></details>}
     </div>;
   };
   const channelField = (row, index, key, label, rows, setter) => {
-    const selectionKey = `${key}Selections`;
-    const legacyKey = `${key}RetainedValue`;
-    const legacy = row[legacyKey] ?? (Array.isArray(row[selectionKey]) ? "" : row[key] || "");
-    const selected = Array.isArray(row[selectionKey]) ? row[selectionKey] : row[key] ? [row[key]] : [];
+    const selectionKey = "" + key + "Selections";
+    const legacyKey = "" + key + "RetainedValue";
+    const legacy = row[legacyKey] ?? (() => {
+      if (Array.isArray(row[selectionKey])) {
+        return "";
+      }
+      return row[key] || "";
+    })();
+    const selected = (() => {
+      if (Array.isArray(row[selectionKey])) {
+        return row[selectionKey];
+      }
+      return (() => {
+        if (row[key]) {
+          return [row[key]];
+        }
+        return [];
+      })();
+    })();
     const available = [...new Set([...options.channel, legacy, ...selected].filter(Boolean))];
-    const groups = [
-      ["Direct contact", ["Telephone", "SMS", "Alternate mobile"]],
-      ["Digital", ["Email", "Teams / video call"]],
-      ["On-site briefings", ["Public address", "In-person briefing", "Radio"]],
-      ["Alert & escalation", ["Approved alert system", "Nominated contact chain"]],
-      ["Saved arrangements", available.filter((value) => !options.channel.includes(value))],
-    ].filter(([, values]) => values.length);
-    return <div className="channelField"><small>Select all applicable channels. Open a group to change its selections.</small><div className="channelGroups">{groups.map(([group, values]) => <details className="channelGroup" key={group} open={values.some((value) => selected.includes(value)) || undefined}><summary>{group}<span>{values.filter((value) => selected.includes(value)).length} selected</span></summary><div className="teamChoices" role="group" aria-label={`${label} · ${group}`}>{values.map((value) => { const active = selected.includes(value); return <button type="button" key={value} className={active ? "selected" : ""} aria-pressed={active} onClick={() => { const next = active ? selected.filter((item) => item !== value) : [...selected, value]; setter(rows.map((item, i) => i === index ? { ...item, [selectionKey]: next, [legacyKey]: legacy, [key]: next.join("; ") } : item)); }}><b>{active ? "✓" : "+"}</b><span>{value}</span></button>; })}</div></details>)}</div><p className="channelSummary">{selected.length ? selected.join("; ") : "No channel selected"}</p></div>;
-
+    const groups = [["Direct contact", ["Telephone", "SMS", "Alternate mobile"]], ["Digital", ["Email", "Teams / video call"]], ["On-site briefings", ["Public address", "In-person briefing", "Radio"]], ["Alert & escalation", ["Approved alert system", "Nominated contact chain"]], ["Saved arrangements", available.filter(value => !options.channel.includes(value))]].filter(([, values]) => values.length);
+    return <div className="channelField"><small>Select all applicable channels. Open a group to change its selections.</small><div className="channelGroups">{groups.map(([group, values]) => <details className="channelGroup" key={group} open={values.some(value => selected.includes(value)) || undefined}><summary>{group}<span>{values.filter(value => selected.includes(value)).length} selected</span></summary><div className="teamChoices" role="group" aria-label={"" + label + " \xB7 " + group + ""}>{values.map(value => {
+              const active = selected.includes(value);
+              return <button type="button" key={value} className={(() => {
+                if (active) {
+                  return "selected";
+                }
+                return "";
+              })()} aria-pressed={active} onClick={() => {
+                const next = (() => {
+                  if (active) {
+                    return selected.filter(item => item !== value);
+                  }
+                  return [...selected, value];
+                })();
+                setter(rows.map((item, i) => (() => {
+                  if (i === index) {
+                    return {
+                      ...item,
+                      [selectionKey]: next,
+                      [legacyKey]: legacy,
+                      [key]: next.join("; ")
+                    };
+                  }
+                  return item;
+                })()));
+              }}><b>{(() => {
+                    if (active) {
+                      return "✓";
+                    }
+                    return "+";
+                  })()}</b><span>{value}</span></button>;
+            })}</div></details>)}</div><p className="channelSummary">{(() => {
+          if (selected.length) {
+            return selected.join("; ");
+          }
+          return "No channel selected";
+        })()}</p></div>;
   };
-  const activeCommunicationIndex = selectedCommunicationIndex < 0 ? -1 : Math.min(selectedCommunicationIndex, communications.length - 1);
-  const rowEditor = (type) => {
+  const activeCommunicationIndex = (() => {
+    if (selectedCommunicationIndex < 0) {
+      return -1;
+    }
+    return Math.min(selectedCommunicationIndex, communications.length - 1);
+  })();
+  const rowEditor = type => {
     const [rows, setter] = datasets[type];
-    return <>{type === "communications" && <><div className="teamOverviewHeading"><div><h3>Communication plans by audience</h3><p>Select a card to edit one plan. All plans are included when you save. {emergencyContacts.length} emergency services are included automatically from the selected Module 1 Site Profile.</p></div></div><div className="communicationOverview">{rows.map((row, index) => <button type="button" className={`communicationCard ${activeCommunicationIndex === index ? "active" : ""} ${row.emergencyContactKey ? emergencyContactFor(row, siteProfile) ? "emergencyLinked" : "emergencyMissing" : ""}`} key={row.id || index} aria-expanded={activeCommunicationIndex === index} aria-controls="communication-details" onClick={() => setSelectedCommunicationIndex(activeCommunicationIndex === index ? -1 : index)}><strong>{row.audience || `Communication plan ${index + 1}`}</strong><span>{row.emergencyContactKey ? emergencyContactFor(row, siteProfile) ? "Linked to Module 1 emergency service" : "Emergency-service link needs confirmation" : row.interestedPartyId ? row.interestedPartyContextId === linkedContext?.id && interestedParties.some((party) => party.id === row.interestedPartyId) ? "Linked to Module 3 interested party" : "Interested-party link needs confirmation" : "Custom / existing audience"}</span><span>Primary: {row.primaryMethod || "Not selected"}</span><span>Fallback: {row.fallbackMethod || "Not selected"}</span><small>{activeCommunicationIndex === index ? "Editing · click to collapse" : "Click to edit"}</small></button>)}</div></>}{rows.map((row, index) => type === "communications" && index !== activeCommunicationIndex ? null : <article id={type === "communications" ? "communication-details" : type === "thresholds" ? `incident-scenario-${index}` : undefined} tabIndex={type === "thresholds" ? -1 : undefined} key={row.id || index}><div className="rowHeading"><h3>{type === "thresholds" && <HazardIcon name={row.scenario} tone={scenarioTone(scenarios.find((item) => item.id === row.scenarioId))} small />}{type === "thresholds" ? row.scenario : type === "communications" ? row.audience || `Communication plan ${index + 1}` : `${steps[step]} ${index + 1}`}</h3>{(type !== "thresholds" || !scenarios.some((source) => source.id === row.scenarioId)) && !emergencyContactFor(row, siteProfile) && <button type="button" onClick={() => { setter(rows.filter((_, i) => i !== index)); if (type === "communications") setSelectedCommunicationIndex(Math.max(0, index - 1)); }}>Remove</button>}</div><div className="grid">{fields[type].map(([key, label, kind]) => kind === "channel" ? <fieldset className="communicationChannel" key={key}><legend>{label}</legend>{channelField(row, index, key, label, rows, setter)}</fieldset> : <label className={kind === "long" || (type === "communications" && ["audience", "logMethod"].includes(key)) ? "longField" : ""} key={key}>{label}{type === "communications" && key === "audience" ? audienceField(row, index, rows, setter) : kind === "person" ? personSelect(row[key], (value) => update(type, index, key, value)) : type === "communications" && ["when", "logMethod"].includes(key) ? <textarea className="communicationText" rows={2} value={row[key] || ""} onChange={(e) => update(type, index, key, e.target.value)} /> : kind === "long" ? <textarea value={row[key] || ""} onChange={(e) => update(type, index, key, e.target.value)} /> : options[kind] ? <><select value={options[kind].includes(row[key]) ? row[key] : ""} onChange={(e) => { const value = e.target.value; update(type, index, key, value); if (type === "teams" && key === "responsibilities" && !row.procedure) update(type, index, "procedure", `${value}. Follow the incident controller's instructions, confirm the assigned owner and deputy, record decisions and escalate when agreed limits are exceeded.`); }}><option value="">Choose a suggestion</option>{options[kind].map((value) => <option key={value}>{value}</option>)}</select><input aria-label={`${label} custom value`} value={row[key] || ""} onChange={(e) => update(type, index, key, e.target.value)} placeholder="Choose above or customise here" /></> : <input readOnly={kind === "readonly"} value={row[key] || ""} onChange={(e) => update(type, index, key, e.target.value)} />}</label>)}</div>{type === "thresholds" && !scenarios.some((item) => item.id === row.scenarioId) && <label className="relink">Confirm linked Module 5 scenario<select value="" onChange={(event) => { const source = scenarios.find((item) => item.id === event.target.value); if (source) setter(rows.map((item, i) => i === index ? { ...item, scenarioId: source.id, scenario: source.name } : item)); }}><option value="">Select the correct scenario — existing response text will be kept</option>{scenarios.map((source, sourceIndex) => <option key={source.id} value={source.id}>{source.name} · source item {sourceIndex + 1}</option>)}</select></label>}{type === "teams" && row.leadPersonId && row.leadPersonId === row.alternatePersonId && <p className="error">Choose a different deputy to provide cover.</p>}</article>)}{type !== "thresholds" && <button type="button" className="add" onClick={() => { setter([...rows, { ...blank(type), id: crypto.randomUUID() }]); if (type === "communications") setSelectedCommunicationIndex(rows.length); }}>+ Add {type === "teams" ? "response team" : type === "communications" ? "communication control" : "action"}</button>}</>;
+    return <>{type === "communications" && <><div className="teamOverviewHeading"><div><h3>Communication plans by audience</h3><p>Select a card to edit one plan. All plans are included when you save. {emergencyContacts.length} emergency services are included automatically from the selected Module 1 Site Profile.</p></div></div><div className="communicationOverview">{rows.map((row, index) => <button type="button" className={"communicationCard " + (() => {
+            if (activeCommunicationIndex === index) {
+              return "active";
+            }
+            return "";
+          })() + " " + (() => {
+            if (row.emergencyContactKey) {
+              return (() => {
+                if (emergencyContactFor(row, siteProfile)) {
+                  return "emergencyLinked";
+                }
+                return "emergencyMissing";
+              })();
+            }
+            return "";
+          })() + ""} key={row.id || index} aria-expanded={activeCommunicationIndex === index} aria-controls="communication-details" onClick={() => setSelectedCommunicationIndex((() => {
+            if (activeCommunicationIndex === index) {
+              return -1;
+            }
+            return index;
+          })())}><strong>{row.audience || "Communication plan " + (index + 1) + ""}</strong><span>{(() => {
+                if (row.emergencyContactKey) {
+                  return (() => {
+                    if (emergencyContactFor(row, siteProfile)) {
+                      return "Linked to Module 1 emergency service";
+                    }
+                    return "Emergency-service link needs confirmation";
+                  })();
+                }
+                return (() => {
+                  if (row.interestedPartyId) {
+                    return (() => {
+                      if (row.interestedPartyContextId === linkedContext?.id && interestedParties.some(party => party.id === row.interestedPartyId)) {
+                        return "Linked to Module 3 interested party";
+                      }
+                      return "Interested-party link needs confirmation";
+                    })();
+                  }
+                  return "Custom / existing audience";
+                })();
+              })()}</span><span>Primary: {row.primaryMethod || "Not selected"}</span><span>Fallback: {row.fallbackMethod || "Not selected"}</span><small>{(() => {
+                if (activeCommunicationIndex === index) {
+                  return "Editing · click to collapse";
+                }
+                return "Click to edit";
+              })()}</small></button>)}</div></>}{rows.map((row, index) => (() => {
+        if (type === "communications" && index !== activeCommunicationIndex) {
+          return null;
+        }
+        return <article id={(() => {
+          if (type === "communications") {
+            return "communication-details";
+          }
+          return (() => {
+            if (type === "thresholds") {
+              return "incident-scenario-" + index + "";
+            }
+            return undefined;
+          })();
+        })()} tabIndex={(() => {
+          if (type === "thresholds") {
+            return -1;
+          }
+          return undefined;
+        })()} key={row.id || index}><div className="rowHeading"><h3>{type === "thresholds" && <HazardIcon name={row.scenario} tone={scenarioTone(scenarios.find(item => item.id === row.scenarioId))} small />}{(() => {
+                if (type === "thresholds") {
+                  return row.scenario;
+                }
+                return (() => {
+                  if (type === "communications") {
+                    return row.audience || "Communication plan " + (index + 1) + "";
+                  }
+                  return "" + steps[step] + " " + (index + 1) + "";
+                })();
+              })()}</h3>{(type !== "thresholds" || !scenarios.some(source => source.id === row.scenarioId)) && !emergencyContactFor(row, siteProfile) && <button type="button" onClick={() => {
+              setter(rows.filter((_, i) => i !== index));
+              if (type === "communications") setSelectedCommunicationIndex(Math.max(0, index - 1));
+            }}>Remove</button>}</div><div className="grid">{fields[type].map(([key, label, kind]) => (() => {
+              if (kind === "channel") {
+                return <fieldset className="communicationChannel" key={key}><legend>{label}</legend>{channelField(row, index, key, label, rows, setter)}</fieldset>;
+              }
+              return <label className={(() => {
+                if (kind === "long" || type === "communications" && ["audience", "logMethod"].includes(key)) {
+                  return "longField";
+                }
+                return "";
+              })()} key={key}>{label}{(() => {
+                  if (type === "communications" && key === "audience") {
+                    return audienceField(row, index, rows, setter);
+                  }
+                  return (() => {
+                    if (kind === "person") {
+                      return personSelect(row[key], value => update(type, index, key, value));
+                    }
+                    return (() => {
+                      if (type === "communications" && ["when", "logMethod"].includes(key)) {
+                        return <textarea className="communicationText" rows={2} value={row[key] || ""} onChange={e => update(type, index, key, e.target.value)} />;
+                      }
+                      return (() => {
+                        if (kind === "long") {
+                          return <textarea value={row[key] || ""} onChange={e => update(type, index, key, e.target.value)} />;
+                        }
+                        return (() => {
+                          if (options[kind]) {
+                            return <><select value={(() => {
+                                if (options[kind].includes(row[key])) {
+                                  return row[key];
+                                }
+                                return "";
+                              })()} onChange={e => {
+                                const value = e.target.value;
+                                update(type, index, key, value);
+                                if (type === "teams" && key === "responsibilities" && !row.procedure) update(type, index, "procedure", "" + value + ". Follow the incident controller's instructions, confirm the assigned owner and deputy, record decisions and escalate when agreed limits are exceeded.");
+                              }}><option value="">Choose a suggestion</option>{options[kind].map(value => <option key={value}>{value}</option>)}</select><input aria-label={"" + label + " custom value"} value={row[key] || ""} onChange={e => update(type, index, key, e.target.value)} placeholder="Choose above or customise here" /></>;
+                          }
+                          return <input readOnly={kind === "readonly"} value={row[key] || ""} onChange={e => update(type, index, key, e.target.value)} />;
+                        })();
+                      })();
+                    })();
+                  })();
+                })()}</label>;
+            })())}</div>{type === "thresholds" && !scenarios.some(item => item.id === row.scenarioId) && <label className="relink">Confirm linked Module 5 scenario<select value="" onChange={event => {
+              const source = scenarios.find(item => item.id === event.target.value);
+              if (source) setter(rows.map((item, i) => (() => {
+                if (i === index) {
+                  return {
+                    ...item,
+                    "scenarioId": source.id,
+                    "scenario": source.name
+                  };
+                }
+                return item;
+              })()));
+            }}><option value="">Select the correct scenario — existing response text will be kept</option>{scenarios.map((source, sourceIndex) => <option key={source.id} value={source.id}>{source.name} · source item {sourceIndex + 1}</option>)}</select></label>}{type === "teams" && row.leadPersonId && row.leadPersonId === row.alternatePersonId && <p className="error">Choose a different deputy to provide cover.</p>}</article>;
+      })())}{type !== "thresholds" && <button type="button" className="add" onClick={() => {
+        setter([...rows, {
+          ...blank(type),
+          "id": crypto.randomUUID()
+        }]);
+        if (type === "communications") setSelectedCommunicationIndex(rows.length);
+      }}>+ Add {(() => {
+          if (type === "teams") {
+            return "response team";
+          }
+          return (() => {
+            if (type === "communications") {
+              return "communication control";
+            }
+            return "action";
+          })();
+        })()}</button>}</>;
   };
   const actionEditor = () => {
-    const activeIndex = selectedActionIndex < 0 ? -1 : Math.min(selectedActionIndex, actions.length - 1);
-    const overdue = (row) => row.status !== "closed" && row.dueAt && new Date(row.dueAt).getTime() < actionClock;
-    const scopeNames = (row) => row.scenarioScope === "specific" ? arr(row.scenarioIds).map((id) => scenarios.find((source) => source.id === id)?.name || "Source needs confirmation").join("; ") : "All selected Module 5 scenarios";
-    const visible = actions.map((row, index) => ({ row, index })).filter(({ row }) => (!actionFilters.status || row.status === actionFilters.status) && (!actionFilters.owner || row.ownerPersonId === actionFilters.owner) && (!actionFilters.priority || row.priority === actionFilters.priority) && (!actionFilters.scenario || row.scenarioScope !== "specific" || (row.hazardAssessmentId === hazard?.id && arr(row.scenarioIds).includes(actionFilters.scenario))));
-    const patch = (index, changes) => setActions(actions.map((row, i) => i === index ? { ...row, ...changes } : row));
-    const addAction = () => { setActions([...actions, { ...blank("actions"), id: crypto.randomUUID(), status: "open", scenarioScope: "all" }]); setActionFilters({ status: "", scenario: "", owner: "", priority: "" }); setSelectedActionIndex(actions.length); };
-    const active = visible.some(({ index }) => index === activeIndex) ? actions[activeIndex] : null;
-    const suggestion = active?.objective ? `${active.objective}. For ${siteProfile?.location_name || "the linked site"}, address ${scopeNames(active)}. ${actionGuidance[actionObjectives.indexOf(active.objective)] || "Confirm the agreed response arrangements and record the required task."} Record the specific task, resources, target time and escalation route. Report progress to the incident controller and confirm the result before closure.` : "";
-    const choices = (label, values, current, onChange, tone) => <div className="actionChoices" role="group" aria-label={label}>{values.map(([value, title], index) => <button type="button" key={value} className={`${tone}-${index} ${(Array.isArray(current) ? current.includes(value) : current === value) ? "selected" : ""}`} aria-pressed={(Array.isArray(current) ? current.includes(value) : current === value)} onClick={() => onChange(value)}>{(Array.isArray(current) ? current.includes(value) : current === value) ? "✓ " : "+ "}{title}</button>)}</div>;
+    const activeIndex = (() => {
+      if (selectedActionIndex < 0) {
+        return -1;
+      }
+      return Math.min(selectedActionIndex, actions.length - 1);
+    })();
+    const overdue = row => row.status !== "closed" && row.dueAt && new Date(row.dueAt).getTime() < actionClock;
+    const scopeNames = row => (() => {
+      if (row.scenarioScope === "specific") {
+        return arr(row.scenarioIds).map(id => scenarios.find(source => source.id === id)?.name || "Source needs confirmation").join("; ");
+      }
+      return "All selected Module 5 scenarios";
+    })();
+    const visible = actions.map((row, index) => ({
+      "row": row,
+      "index": index
+    })).filter(({
+      row
+    }) => (!actionFilters.status || row.status === actionFilters.status) && (!actionFilters.owner || row.ownerPersonId === actionFilters.owner) && (!actionFilters.priority || row.priority === actionFilters.priority) && (!actionFilters.scenario || row.scenarioScope !== "specific" || row.hazardAssessmentId === hazard?.id && arr(row.scenarioIds).includes(actionFilters.scenario)));
+    const patch = (index, changes) => setActions(actions.map((row, i) => (() => {
+      if (i === index) {
+        return {
+          ...row,
+          ...changes
+        };
+      }
+      return row;
+    })()));
+    const addAction = () => {
+      setActions([...actions, {
+        ...blank("actions"),
+        "id": crypto.randomUUID(),
+        "status": "open",
+        "scenarioScope": "all"
+      }]);
+      setActionFilters({
+        "status": "",
+        "scenario": "",
+        "owner": "",
+        "priority": ""
+      });
+      setSelectedActionIndex(actions.length);
+    };
+    const active = (() => {
+      if (visible.some(({
+        index
+      }) => index === activeIndex)) {
+        return actions[activeIndex];
+      }
+      return null;
+    })();
+    const suggestion = (() => {
+      if (active?.objective) {
+        return "" + active.objective + ". For " + (siteProfile?.location_name || "the linked site") + ", address " + scopeNames(active) + ". " + (actionGuidance[actionObjectives.indexOf(active.objective)] || "Confirm the agreed response arrangements and record the required task.") + " Record the specific task, resources, target time and escalation route. Report progress to the incident controller and confirm the result before closure.";
+      }
+      return "";
+    })();
+    const choices = (label, values, current, onChange, tone) => <div className="actionChoices" role="group" aria-label={label}>{values.map(([value, title], index) => <button type="button" key={value} className={"" + tone + "-" + index + " " + (() => {
+        if ((() => {
+          if (Array.isArray(current)) {
+            return current.includes(value);
+          }
+          return current === value;
+        })()) {
+          return "selected";
+        }
+        return "";
+      })() + ""} aria-pressed={(() => {
+        if (Array.isArray(current)) {
+          return current.includes(value);
+        }
+        return current === value;
+      })()} onClick={() => onChange(value)}>{(() => {
+          if ((() => {
+            if (Array.isArray(current)) {
+              return current.includes(value);
+            }
+            return current === value;
+          })()) {
+            return "✓ ";
+          }
+          return "+ ";
+        })()}{title}</button>)}</div>;
     return <><div className="teamOverviewHeading"><div><h3>Incident actions</h3><p>Select a card to edit one action. Filters affect the view; all actions are saved.</p></div><button type="button" className="add" onClick={addAction}>+ Add action</button></div>
-      <div className="actionMetrics">{actionStatuses.map(([value, title]) => <button type="button" key={value} aria-pressed={actionFilters.status === value} className={actionFilters.status === value ? "selected" : ""} onClick={() => setActionFilters({ ...actionFilters, status: actionFilters.status === value ? "" : value })}><strong>{actions.filter((row) => row.status === value).length}</strong><span>{title}</span></button>)}<div className="overdueMetric"><strong>{actions.filter(overdue).length}</strong><span>Overdue</span></div></div>
-      <div className="actionFilters"><label>Scenario<select value={actionFilters.scenario} onChange={(e) => setActionFilters({ ...actionFilters, scenario: e.target.value })}><option value="">All scenarios</option>{scenarios.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}</select></label><label>Owner<select value={actionFilters.owner} onChange={(e) => setActionFilters({ ...actionFilters, owner: e.target.value })}><option value="">All owners</option>{people.map((person) => <option key={person.id} value={person.id}>{name(person)}</option>)}</select></label><label>Priority<select value={actionFilters.priority} onChange={(e) => setActionFilters({ ...actionFilters, priority: e.target.value })}><option value="">All priorities</option>{[...new Set(actions.map((row) => row.priority).filter(Boolean))].map((value) => <option key={value}>{value}</option>)}</select></label><button type="button" onClick={() => setActionFilters({ status: "", scenario: "", owner: "", priority: "" })}>Clear filters</button></div>
-      <div className="actionOverview">{visible.map(({ row, index }) => <button type="button" key={row.id || index} className={`actionCard ${activeIndex === index ? "active" : ""} ${overdue(row) ? "overdue" : ""}`} aria-expanded={activeIndex === index} aria-controls="action-details" onClick={() => setSelectedActionIndex(activeIndex === index ? -1 : index)}><div className="actionCardTop"><b>Action {index + 1}</b><span className={`actionBadge status-${row.status}`}>{actionStatusLabel(row.status)}</span></div><strong>{row.objective || "Select response objective"}</strong><span>Owner: {teamPersonName(row.ownerPersonId, row.owner)}</span><span>Priority: {row.priority || "Not selected"}</span><span>{scopeNames(row)}</span><span suppressHydrationWarning>{row.dueAt ? `Target: ${new Date(row.dueAt).toLocaleString()}${overdue(row) ? " · Overdue" : ""}` : "Target time not set"}</span>{!actionScenarioValid(row, hazard, scenarios) && <span className="actionSourceWarning">Scenario link needs confirmation</span>}<small>{activeIndex === index ? "Editing · click to collapse" : "Click to edit"}</small></button>)}</div>
-      {!visible.length && <p className="teamEmpty">{actions.length ? "No actions match these filters. Clear filters to see all actions." : "Add an action to assign an objective, owner and response task."}</p>}
-      {active && <article id="action-details" className="actionDetails"><div className="rowHeading"><h3>Action {activeIndex + 1} · {active.objective || "New action"}</h3><div className="teamDetailActions"><button type="button" className="collapseTeam" onClick={() => setSelectedActionIndex(-1)}>Collapse</button><button type="button" onClick={() => { setActions(actions.filter((_, index) => index !== activeIndex)); setSelectedActionIndex(-1); }}>Remove</button></div></div>
-        <fieldset className="teamField"><legend>Response objective</legend>{choices("Response objective", [...actionObjectives.map((value) => [value, value]), ["custom", "Other / custom objective"]], actionObjectives.includes(active.objective) ? active.objective : "custom", (value) => patch(activeIndex, { objective: value === "custom" ? "" : value }), "objective")}{!actionObjectives.includes(active.objective) && <label>Custom objective<input value={active.objective || ""} onChange={(e) => patch(activeIndex, { objective: e.target.value })} /></label>}</fieldset>
-        <fieldset className="teamField"><legend>Linked hazard scenarios</legend><div className="actionChoices"><button type="button" className={active.scenarioScope !== "specific" ? "selected" : ""} aria-pressed={active.scenarioScope !== "specific"} onClick={() => patch(activeIndex, { scenarioScope: "all" })}>All selected Module 5 scenarios</button><button type="button" className={active.scenarioScope === "specific" ? "selected" : ""} aria-pressed={active.scenarioScope === "specific"} onClick={() => patch(activeIndex, { scenarioScope: "specific", hazardAssessmentId: hazard?.id || "", scenarioIds: active.hazardAssessmentId === hazard?.id ? arr(active.scenarioIds) : [] })}>Specific scenarios</button></div>{active.scenarioScope === "specific" && <>{!actionScenarioValid(active, hazard, scenarios) && <p className="actionSourceWarning">Select current Module 5 sources to confirm this action's scenario links. The action text is retained.</p>}{choices("Action hazard scenarios", scenarios.map((source) => [source.id, source.name]), active.hazardAssessmentId === hazard?.id ? arr(active.scenarioIds) : [], (id) => patch(activeIndex, { hazardAssessmentId: hazard?.id || "", scenarioIds: active.hazardAssessmentId === hazard?.id ? arr(active.scenarioIds).includes(id) ? arr(active.scenarioIds).filter((value) => value !== id && scenarios.some((source) => source.id === value)) : [...arr(active.scenarioIds).filter((value) => scenarios.some((source) => source.id === value)), id] : [id] }), "scenario")}<p>Selected: {scopeNames(active)}</p></>}</fieldset>
-        <div className="actionSuggestion"><h4>Suggested action</h4><p>{suggestion || "Select an objective to prepare an editable suggestion."}</p><button type="button" disabled={!suggestion || !actionScenarioValid(active, hazard, scenarios)} onClick={() => patch(activeIndex, { previousAction: active.action || active.previousAction || "", action: suggestion })}>{active.action ? "Replace action with suggestion" : "Use suggestion"}</button><small>Review the wording and add the specific task and local arrangements.</small></div>
-        <label className="actionTextLabel">Action<textarea value={active.action || ""} onChange={(e) => patch(activeIndex, { action: e.target.value })} /></label>{active.previousAction && <details className="retainedScenarioText"><summary>Previous action text</summary><p>{active.previousAction}</p></details>}
-        <div className="grid actionAssignments"><label>Action owner{personSelect(active.ownerPersonId, (value) => patch(activeIndex, { ownerPersonId: value }))}</label><label>Target date / time<input type="datetime-local" value={localDateTime(active.dueAt)} onChange={(e) => patch(activeIndex, { dueAt: e.target.value ? new Date(e.target.value).toISOString() : "" })} /><small>Optional · shown in your local time</small></label></div>
-        <fieldset className="teamField"><legend>Priority</legend>{choices("Action priority", [...actionPriorities, ...(!actionPriorities.includes(active.priority) && active.priority ? [active.priority] : [])].map((value) => [value, value]), active.priority, (value) => patch(activeIndex, { priority: value }), "priority")}</fieldset>
-        <fieldset className="teamField"><legend>Status</legend>{choices("Action status", [...actionStatuses, ...(!actionStatuses.some(([id]) => id === active.status) && active.status ? [[active.status, active.status]] : [])], active.status, (value) => patch(activeIndex, { status: value, completedAt: value === "closed" ? active.completedAt || new Date().toISOString() : "" }), "status")}</fieldset>
-        <label>Completion / progress note<small>Optional</small><textarea className="communicationText" value={active.completionNote || ""} onChange={(e) => patch(activeIndex, { completionNote: e.target.value })} /></label>{active.status === "closed" && <label>Completed date / time<input type="datetime-local" value={localDateTime(active.completedAt)} onChange={(e) => patch(activeIndex, { completedAt: e.target.value ? new Date(e.target.value).toISOString() : "" })} /></label>}
+      <div className="actionMetrics">{actionStatuses.map(([value, title]) => <button type="button" key={value} aria-pressed={actionFilters.status === value} className={(() => {
+          if (actionFilters.status === value) {
+            return "selected";
+          }
+          return "";
+        })()} onClick={() => setActionFilters({
+          ...actionFilters,
+          "status": (() => {
+            if (actionFilters.status === value) {
+              return "";
+            }
+            return value;
+          })()
+        })}><strong>{actions.filter(row => row.status === value).length}</strong><span>{title}</span></button>)}<div className="overdueMetric"><strong>{actions.filter(overdue).length}</strong><span>Overdue</span></div></div>
+      <div className="actionFilters"><label>Scenario<select value={actionFilters.scenario} onChange={e => setActionFilters({
+            ...actionFilters,
+            "scenario": e.target.value
+          })}><option value="">All scenarios</option>{scenarios.map(source => <option key={source.id} value={source.id}>{source.name}</option>)}</select></label><label>Owner<select value={actionFilters.owner} onChange={e => setActionFilters({
+            ...actionFilters,
+            "owner": e.target.value
+          })}><option value="">All owners</option>{people.map(person => <option key={person.id} value={person.id}>{name(person)}</option>)}</select></label><label>Priority<select value={actionFilters.priority} onChange={e => setActionFilters({
+            ...actionFilters,
+            "priority": e.target.value
+          })}><option value="">All priorities</option>{[...new Set(actions.map(row => row.priority).filter(Boolean))].map(value => <option key={value}>{value}</option>)}</select></label><button type="button" onClick={() => setActionFilters({
+          "status": "",
+          "scenario": "",
+          "owner": "",
+          "priority": ""
+        })}>Clear filters</button></div>
+      <div className="actionOverview">{visible.map(({
+          row,
+          index
+        }) => <button type="button" key={row.id || index} className={"actionCard " + (() => {
+          if (activeIndex === index) {
+            return "active";
+          }
+          return "";
+        })() + " " + (() => {
+          if (overdue(row)) {
+            return "overdue";
+          }
+          return "";
+        })() + ""} aria-expanded={activeIndex === index} aria-controls="action-details" onClick={() => setSelectedActionIndex((() => {
+          if (activeIndex === index) {
+            return -1;
+          }
+          return index;
+        })())}><div className="actionCardTop"><b>Action {index + 1}</b><span className={"actionBadge status-" + row.status + ""}>{actionStatusLabel(row.status)}</span></div><strong>{row.objective || "Select response objective"}</strong><span>Owner: {teamPersonName(row.ownerPersonId, row.owner)}</span><span>Priority: {row.priority || "Not selected"}</span><span>{scopeNames(row)}</span><span suppressHydrationWarning>{(() => {
+              if (row.dueAt) {
+                return "Target: " + new Date(row.dueAt).toLocaleString() + "" + (() => {
+                  if (overdue(row)) {
+                    return " · Overdue";
+                  }
+                  return "";
+                })() + "";
+              }
+              return "Target time not set";
+            })()}</span>{!actionScenarioValid(row, hazard, scenarios) && <span className="actionSourceWarning">Scenario link needs confirmation</span>}<small>{(() => {
+              if (activeIndex === index) {
+                return "Editing · click to collapse";
+              }
+              return "Click to edit";
+            })()}</small></button>)}</div>
+      {!visible.length && <p className="teamEmpty">{(() => {
+          if (actions.length) {
+            return "No actions match these filters. Clear filters to see all actions.";
+          }
+          return "Add an action to assign an objective, owner and response task.";
+        })()}</p>}
+      {active && <article id="action-details" className="actionDetails"><div className="rowHeading"><h3>Action {activeIndex + 1} · {active.objective || "New action"}</h3><div className="teamDetailActions"><button type="button" className="collapseTeam" onClick={() => setSelectedActionIndex(-1)}>Collapse</button><button type="button" onClick={() => {
+              setActions(actions.filter((_, index) => index !== activeIndex));
+              setSelectedActionIndex(-1);
+            }}>Remove</button></div></div>
+        <fieldset className="teamField"><legend>Response objective</legend>{choices("Response objective", [...actionObjectives.map(value => [value, value]), ["custom", "Other / custom objective"]], (() => {
+            if (actionObjectives.includes(active.objective)) {
+              return active.objective;
+            }
+            return "custom";
+          })(), value => patch(activeIndex, {
+            "objective": (() => {
+              if (value === "custom") {
+                return "";
+              }
+              return value;
+            })()
+          }), "objective")}{!actionObjectives.includes(active.objective) && <label>Custom objective<input value={active.objective || ""} onChange={e => patch(activeIndex, {
+              "objective": e.target.value
+            })} /></label>}</fieldset>
+        <fieldset className="teamField"><legend>Linked hazard scenarios</legend><div className="actionChoices"><button type="button" className={(() => {
+              if (active.scenarioScope !== "specific") {
+                return "selected";
+              }
+              return "";
+            })()} aria-pressed={active.scenarioScope !== "specific"} onClick={() => patch(activeIndex, {
+              "scenarioScope": "all"
+            })}>All selected Module 5 scenarios</button><button type="button" className={(() => {
+              if (active.scenarioScope === "specific") {
+                return "selected";
+              }
+              return "";
+            })()} aria-pressed={active.scenarioScope === "specific"} onClick={() => patch(activeIndex, {
+              "scenarioScope": "specific",
+              "hazardAssessmentId": hazard?.id || "",
+              "scenarioIds": (() => {
+                if (active.hazardAssessmentId === hazard?.id) {
+                  return arr(active.scenarioIds);
+                }
+                return [];
+              })()
+            })}>Specific scenarios</button></div>{active.scenarioScope === "specific" && <>{!actionScenarioValid(active, hazard, scenarios) && <p className="actionSourceWarning">Select current Module 5 sources to confirm this action's scenario links. The action text is retained.</p>}{choices("Action hazard scenarios", scenarios.map(source => [source.id, source.name]), (() => {
+              if (active.hazardAssessmentId === hazard?.id) {
+                return arr(active.scenarioIds);
+              }
+              return [];
+            })(), id => patch(activeIndex, {
+              "hazardAssessmentId": hazard?.id || "",
+              "scenarioIds": (() => {
+                if (active.hazardAssessmentId === hazard?.id) {
+                  return (() => {
+                    if (arr(active.scenarioIds).includes(id)) {
+                      return arr(active.scenarioIds).filter(value => value !== id && scenarios.some(source => source.id === value));
+                    }
+                    return [...arr(active.scenarioIds).filter(value => scenarios.some(source => source.id === value)), id];
+                  })();
+                }
+                return [id];
+              })()
+            }), "scenario")}<p>Selected: {scopeNames(active)}</p></>}</fieldset>
+        <div className="actionSuggestion"><h4>Suggested action</h4><p>{suggestion || "Select an objective to prepare an editable suggestion."}</p><button type="button" disabled={!suggestion || !actionScenarioValid(active, hazard, scenarios)} onClick={() => patch(activeIndex, {
+            "previousAction": active.action || active.previousAction || "",
+            "action": suggestion
+          })}>{(() => {
+              if (active.action) {
+                return "Replace action with suggestion";
+              }
+              return "Use suggestion";
+            })()}</button><small>Review the wording and add the specific task and local arrangements.</small></div>
+        <label className="actionTextLabel">Action<textarea value={active.action || ""} onChange={e => patch(activeIndex, {
+            "action": e.target.value
+          })} /></label>{active.previousAction && <details className="retainedScenarioText"><summary>Previous action text</summary><p>{active.previousAction}</p></details>}
+        <div className="grid actionAssignments"><label>Action owner{personSelect(active.ownerPersonId, value => patch(activeIndex, {
+              "ownerPersonId": value
+            }))}</label><label>Target date / time<input type="datetime-local" value={localDateTime(active.dueAt)} onChange={e => patch(activeIndex, {
+              "dueAt": (() => {
+                if (e.target.value) {
+                  return new Date(e.target.value).toISOString();
+                }
+                return "";
+              })()
+            })} /><small>Optional · shown in your local time</small></label></div>
+        <fieldset className="teamField"><legend>Priority</legend>{choices("Action priority", [...actionPriorities, ...(() => {
+            if (!actionPriorities.includes(active.priority) && active.priority) {
+              return [active.priority];
+            }
+            return [];
+          })()].map(value => [value, value]), active.priority, value => patch(activeIndex, {
+            "priority": value
+          }), "priority")}</fieldset>
+        <fieldset className="teamField"><legend>Status</legend>{choices("Action status", [...actionStatuses, ...(() => {
+            if (!actionStatuses.some(([id]) => id === active.status) && active.status) {
+              return [[active.status, active.status]];
+            }
+            return [];
+          })()], active.status, value => patch(activeIndex, {
+            "status": value,
+            "completedAt": (() => {
+              if (value === "closed") {
+                return active.completedAt || new Date().toISOString();
+              }
+              return "";
+            })()
+          }), "status")}</fieldset>
+        <label>Completion / progress note<small>Optional</small><textarea className="communicationText" value={active.completionNote || ""} onChange={e => patch(activeIndex, {
+            "completionNote": e.target.value
+          })} /></label>{active.status === "closed" && <label>Completed date / time<input type="datetime-local" value={localDateTime(active.completedAt)} onChange={e => patch(activeIndex, {
+            "completedAt": (() => {
+              if (e.target.value) {
+                return new Date(e.target.value).toISOString();
+              }
+              return "";
+            })()
+          })} /></label>}
       </article>}
     </>;
   };
   const recoveryEditor = () => {
-    const section = RECOVERY_SECTIONS.find((item) => item.key === selectedRecoverySection) || RECOVERY_SECTIONS[0];
-    const patch = (changes) => setRecovery({ ...recovery, ...changes });
-    const patchScenario = (index, changes) => patch({ scenarioRecovery: recovery.scenarioRecovery.map((row, i) => i === index ? { ...row, ...changes } : row) });
-    const choiceButtons = (values, selected, onChange, label) => <div className="teamChoices" role="group" aria-label={label}>{[...new Set([...values, ...selected])].map((value) => { const active = selected.includes(value); return <button type="button" key={value} className={active ? "selected" : ""} aria-pressed={active} onClick={() => onChange(active ? selected.filter((item) => item !== value) : [...selected, value])}><b>{active ? "✓" : "+"}</b><span>{value}</span></button>; })}</div>;
-    const goToMissing = (item) => { if (item.key === "approval") document.getElementById("recovery-approval")?.focus(); else { setSelectedRecoverySection(item.key); if (item.scenarioId) setSelectedRecoveryScenarioIndex(recovery.scenarioRecovery.findIndex((row) => row.scenarioId === item.scenarioId)); requestAnimationFrame(() => { const target = document.getElementById("recovery-details"); target?.scrollIntoView({ behavior: "smooth", block: "start" }); target?.focus(); }); } };
-    const scenarioIndex = selectedRecoveryScenarioIndex < 0 ? -1 : Math.min(selectedRecoveryScenarioIndex, recovery.scenarioRecovery.length - 1);
+    const section = RECOVERY_SECTIONS.find(item => item.key === selectedRecoverySection) || RECOVERY_SECTIONS[0];
+    const patch = changes => setRecovery({
+      ...recovery,
+      ...changes
+    });
+    const patchScenario = (index, changes) => patch({
+      "scenarioRecovery": recovery.scenarioRecovery.map((row, i) => (() => {
+        if (i === index) {
+          return {
+            ...row,
+            ...changes
+          };
+        }
+        return row;
+      })())
+    });
+    const choiceButtons = (values, selected, onChange, label) => <div className="teamChoices" role="group" aria-label={label}>{[...new Set([...values, ...selected])].map(value => {
+        const active = selected.includes(value);
+        return <button type="button" key={value} className={(() => {
+          if (active) {
+            return "selected";
+          }
+          return "";
+        })()} aria-pressed={active} onClick={() => onChange((() => {
+          if (active) {
+            return selected.filter(item => item !== value);
+          }
+          return [...selected, value];
+        })())}><b>{(() => {
+              if (active) {
+                return "✓";
+              }
+              return "+";
+            })()}</b><span>{value}</span></button>;
+      })}</div>;
+    const goToMissing = item => {
+      if (item.key === "approval") document.getElementById("recovery-approval")?.focus();else {
+        setSelectedRecoverySection(item.key);
+        if (item.scenarioId) setSelectedRecoveryScenarioIndex(recovery.scenarioRecovery.findIndex(row => row.scenarioId === item.scenarioId));
+        requestAnimationFrame(() => {
+          const target = document.getElementById("recovery-details");
+          target?.scrollIntoView({
+            "behavior": "smooth",
+            "block": "start"
+          });
+          target?.focus();
+        });
+      }
+    };
+    const scenarioIndex = (() => {
+      if (selectedRecoveryScenarioIndex < 0) {
+        return -1;
+      }
+      return Math.min(selectedRecoveryScenarioIndex, recovery.scenarioRecovery.length - 1);
+    })();
     const scenarioRow = recovery.scenarioRecovery[scenarioIndex];
-    const linkedScenario = scenarioRow && scenarios.find((source) => source.id === scenarioRow.scenarioId && scenarioRow.hazardAssessmentId === hazard?.id);
-    return <><div className={`recoveryReadiness ${recoveryMissing.length ? "attention" : "ready"}`}><strong>{recoveryMissing.length ? "Recovery arrangements need attention" : "Recovery arrangements complete"}</strong><p>{recoveryMissing.length ? `${recoveryMissing.length} planning requirements remain. Select a card or use the checklist below.` : "The planned recovery arrangements are defined. Actual recovery and handback must be verified during an incident."}</p></div>
-      <div className="recoveryOverview">{RECOVERY_SECTIONS.map((item, index) => { const missing = recoveryMissing.filter((issue) => issue.key === item.key); return <button type="button" key={item.key} className={`recoveryCard ${selectedRecoverySection === item.key ? "active" : ""}`} aria-expanded={selectedRecoverySection === item.key} aria-controls="recovery-details" onClick={() => setSelectedRecoverySection(selectedRecoverySection === item.key ? "" : item.key)}><div><b className="teamNumber">{index + 1}</b><span className={`teamReadiness ${missing.length ? "attention" : "ready"}`}>{missing.length ? "Needs attention" : "Complete"}</span></div><strong>{item.title}</strong><small>{missing.length ? missing[0].label : "Arrangements defined"}</small></button>; })}</div>
-      {selectedRecoverySection && <article className="recoveryDetails" id="recovery-details" tabIndex={-1}><div className="rowHeading"><h3>{section.title}</h3><button type="button" className="collapseTeam" onClick={() => setSelectedRecoverySection("")}>Collapse</button></div><p className="recoveryGuidance">{section.guidance}</p><fieldset className="teamField"><legend>Select applicable arrangements</legend>{choiceButtons(section.options, recovery.selections[section.key], (values) => patch({ selections: { ...recovery.selections, [section.key]: values } }), section.title)}</fieldset>
-        {section.key === "normalOperationsCriteria" && <><div className="scenarioSource">Module 5 · {hazard?.assessment_reference || hazard?.assessment_title || "Select a Hazard assessment in Controlled sources"} · v{hazard?.version || 1}</div><h4>Recovery conditions by hazard</h4><div className="recoveryScenarioOverview">{recovery.scenarioRecovery.map((row, index) => { const linked = recoveryScenarioLinked(row, recoveryContext); const missing = recoveryMissing.some((issue) => issue.scenarioId === row.scenarioId && issue.key === "normalOperationsCriteria"); return <button type="button" key={`${row.hazardAssessmentId}-${row.scenarioId}-${index}`} className={`recoveryScenarioCard ${scenarioIndex === index ? "active" : ""} ${linked ? "linked" : "unlinked"}`} aria-expanded={scenarioIndex === index} aria-controls="recovery-scenario-details" onClick={() => setSelectedRecoveryScenarioIndex(scenarioIndex === index ? -1 : index)}><HazardIcon name={row.scenario} tone={scenarioTone(linked ? scenarios.find((source) => source.id === row.scenarioId) : null)} small /><strong>{row.scenario}</strong><small>{!linked ? "Source needs confirmation" : missing ? "Criteria needed / check thresholds" : "Criteria defined"}</small></button>; })}</div>{!recovery.scenarioRecovery.length && <p className="teamEmpty">Link Module 5 hazard scenarios to define their recovery conditions.</p>}
-          {scenarioRow && <div className="recoveryScenarioDetails" id="recovery-scenario-details"><div className="rowHeading"><h4>{scenarioRow.scenario}</h4><button type="button" onClick={() => setSelectedRecoveryScenarioIndex(-1)}>Collapse</button></div>{linkedScenario ? choiceButtons(recoveryScenarioOptions(linkedScenario), scenarioRow.criteriaSelections, (values) => patchScenario(scenarioIndex, { criteriaSelections: values }), `Recovery criteria for ${scenarioRow.scenario}`) : <><p className="actionSourceWarning">This source is no longer included in the linked Module 5 assessment. Transfer any relevant instructions to a current hazard card, then remove this retained entry.</p><button type="button" onClick={() => { patch({ scenarioRecovery: recovery.scenarioRecovery.filter((_, index) => index !== scenarioIndex) }); setSelectedRecoveryScenarioIndex(0); }}>Remove previous source entry</button></>}
-            <label>Additional site-specific recovery criteria<textarea value={scenarioRow.localCriteria || ""} onChange={(e) => patchScenario(scenarioIndex, { localCriteria: e.target.value })} /></label><div className="grid"><label>Minimum people required<small>Optional · whole number</small><input type="number" min="1" step="1" value={scenarioRow.minimumPeople || ""} onChange={(e) => patchScenario(scenarioIndex, { minimumPeople: e.target.value })} /></label><label>Minimum workforce available (%)<small>Optional · set the threshold for this site</small><input type="number" min="0.01" max="100" step="any" value={scenarioRow.minimumWorkforcePercent || ""} onChange={(e) => patchScenario(scenarioIndex, { minimumWorkforcePercent: e.target.value })} /></label></div>
+    const linkedScenario = scenarioRow && scenarios.find(source => source.id === scenarioRow.scenarioId && scenarioRow.hazardAssessmentId === hazard?.id);
+    return <><div className={"recoveryReadiness " + (() => {
+        if (recoveryMissing.length) {
+          return "attention";
+        }
+        return "ready";
+      })() + ""}><strong>{(() => {
+            if (recoveryMissing.length) {
+              return "Recovery arrangements need attention";
+            }
+            return "Recovery arrangements complete";
+          })()}</strong><p>{(() => {
+            if (recoveryMissing.length) {
+              return "" + recoveryMissing.length + " planning requirements remain. Select a card or use the checklist below.";
+            }
+            return "The planned recovery arrangements are defined. Actual recovery and handback must be verified during an incident.";
+          })()}</p></div>
+      <div className="recoveryOverview">{RECOVERY_SECTIONS.map((item, index) => {
+          const missing = recoveryMissing.filter(issue => issue.key === item.key);
+          return <button type="button" key={item.key} className={"recoveryCard " + (() => {
+            if (selectedRecoverySection === item.key) {
+              return "active";
+            }
+            return "";
+          })() + ""} aria-expanded={selectedRecoverySection === item.key} aria-controls="recovery-details" onClick={() => setSelectedRecoverySection((() => {
+            if (selectedRecoverySection === item.key) {
+              return "";
+            }
+            return item.key;
+          })())}><div><b className="teamNumber">{index + 1}</b><span className={"teamReadiness " + (() => {
+                if (missing.length) {
+                  return "attention";
+                }
+                return "ready";
+              })() + ""}>{(() => {
+                  if (missing.length) {
+                    return "Needs attention";
+                  }
+                  return "Complete";
+                })()}</span></div><strong>{item.title}</strong><small>{(() => {
+                if (missing.length) {
+                  return missing[0].label;
+                }
+                return "Arrangements defined";
+              })()}</small></button>;
+        })}</div>
+      {selectedRecoverySection && <article className="recoveryDetails" id="recovery-details" tabIndex={-1}><div className="rowHeading"><h3>{section.title}</h3><button type="button" className="collapseTeam" onClick={() => setSelectedRecoverySection("")}>Collapse</button></div><p className="recoveryGuidance">{section.guidance}</p><fieldset className="teamField"><legend>Select applicable arrangements</legend>{choiceButtons(section.options, recovery.selections[section.key], values => patch({
+            "selections": {
+              ...recovery.selections,
+              [section.key]: values
+            }
+          }), section.title)}</fieldset>
+        {section.key === "normalOperationsCriteria" && <><div className="scenarioSource">Module 5 · {hazard?.assessment_reference || hazard?.assessment_title || "Select a Hazard assessment in Controlled sources"} · v{hazard?.version || 1}</div><h4>Recovery conditions by hazard</h4><div className="recoveryScenarioOverview">{recovery.scenarioRecovery.map((row, index) => {
+              const linked = recoveryScenarioLinked(row, recoveryContext);
+              const missing = recoveryMissing.some(issue => issue.scenarioId === row.scenarioId && issue.key === "normalOperationsCriteria");
+              return <button type="button" key={"" + row.hazardAssessmentId + "-" + row.scenarioId + "-" + index + ""} className={"recoveryScenarioCard " + (() => {
+                if (scenarioIndex === index) {
+                  return "active";
+                }
+                return "";
+              })() + " " + (() => {
+                if (linked) {
+                  return "linked";
+                }
+                return "unlinked";
+              })() + ""} aria-expanded={scenarioIndex === index} aria-controls="recovery-scenario-details" onClick={() => setSelectedRecoveryScenarioIndex((() => {
+                if (scenarioIndex === index) {
+                  return -1;
+                }
+                return index;
+              })())}><HazardIcon name={row.scenario} tone={scenarioTone((() => {
+                  if (linked) {
+                    return scenarios.find(source => source.id === row.scenarioId);
+                  }
+                  return null;
+                })())} small /><strong>{row.scenario}</strong><small>{(() => {
+                    if (!linked) {
+                      return "Source needs confirmation";
+                    }
+                    return (() => {
+                      if (missing) {
+                        return "Criteria needed / check thresholds";
+                      }
+                      return "Criteria defined";
+                    })();
+                  })()}</small></button>;
+            })}</div>{!recovery.scenarioRecovery.length && <p className="teamEmpty">Link Module 5 hazard scenarios to define their recovery conditions.</p>}
+          {scenarioRow && <div className="recoveryScenarioDetails" id="recovery-scenario-details"><div className="rowHeading"><h4>{scenarioRow.scenario}</h4><button type="button" onClick={() => setSelectedRecoveryScenarioIndex(-1)}>Collapse</button></div>{(() => {
+              if (linkedScenario) {
+                return choiceButtons(recoveryScenarioOptions(linkedScenario), scenarioRow.criteriaSelections, values => patchScenario(scenarioIndex, {
+                  "criteriaSelections": values
+                }), "Recovery criteria for " + scenarioRow.scenario + "");
+              }
+              return <><p className="actionSourceWarning">This source is no longer included in the linked Module 5 assessment. Transfer any relevant instructions to a current hazard card, then remove this retained entry.</p><button type="button" onClick={() => {
+                  patch({
+                    "scenarioRecovery": recovery.scenarioRecovery.filter((_, index) => index !== scenarioIndex)
+                  });
+                  setSelectedRecoveryScenarioIndex(0);
+                }}>Remove previous source entry</button></>;
+            })()}
+            <label>Additional site-specific recovery criteria<textarea value={scenarioRow.localCriteria || ""} onChange={e => patchScenario(scenarioIndex, {
+                "localCriteria": e.target.value
+              })} /></label><div className="grid"><label>Minimum people required<small>Optional · whole number</small><input type="number" min="1" step="1" value={scenarioRow.minimumPeople || ""} onChange={e => patchScenario(scenarioIndex, {
+                  "minimumPeople": e.target.value
+                })} /></label><label>Minimum workforce available (%)<small>Optional · set the threshold for this site</small><input type="number" min="0.01" max="100" step="any" value={scenarioRow.minimumWorkforcePercent || ""} onChange={e => patchScenario(scenarioIndex, {
+                  "minimumWorkforcePercent": e.target.value
+                })} /></label></div>
           </div>}</>}
-        {section.key === "handbackAuthority" && <div className="grid"><label>Handback authority{personSelect(recovery.handbackPersonId, (value) => patch({ handbackPersonId: value }))}</label><label>Deputy{personSelect(recovery.handbackDeputyPersonId, (value) => patch({ handbackDeputyPersonId: value }))}</label></div>}
-        {section.key === "employeeSupport" && <label>Support coordinator{personSelect(recovery.welfarePersonId, (value) => patch({ welfarePersonId: value }))}</label>}
-        {section.key === "postIncidentReview" && <div className="grid"><label>Review owner{personSelect(recovery.reviewPersonId, (value) => patch({ reviewPersonId: value }))}</label><label>Target review timeframe<select value={["Within 48 hours", "Within 7 days", "Within 14 days", "Within 30 days"].includes(recovery.reviewTimeframe) ? recovery.reviewTimeframe : "custom"} onChange={(e) => patch({ reviewTimeframe: e.target.value === "custom" ? "" : e.target.value })}><option value="custom">Custom / select timeframe</option>{["Within 48 hours", "Within 7 days", "Within 14 days", "Within 30 days"].map((value) => <option key={value}>{value}</option>)}</select>{!["Within 48 hours", "Within 7 days", "Within 14 days", "Within 30 days"].includes(recovery.reviewTimeframe) && <input value={recovery.reviewTimeframe || ""} onChange={(e) => patch({ reviewTimeframe: e.target.value })} placeholder="Enter the agreed timeframe" />}</label></div>}
-        {section.key === "planAvailability" && <label>Controlled copy location / access instructions<textarea value={recovery.planLocation || ""} onChange={(e) => patch({ planLocation: e.target.value })} placeholder="Record where copies are held and how authorised people can access them during an outage" /></label>}
-        <label>Additional local instructions / retained text<small>Optional · previous recovery text is preserved here</small><textarea value={recovery.localNotes[section.key] || ""} onChange={(e) => patch({ localNotes: { ...recovery.localNotes, [section.key]: e.target.value } })} /></label>
-        <div className="procedurePreview"><h4>Live section text</h4><textarea readOnly aria-label={`Generated ${section.title}`} value={recovery[section.key] || ""} /></div>
+        {section.key === "handbackAuthority" && <div className="grid"><label>Handback authority{personSelect(recovery.handbackPersonId, value => patch({
+              "handbackPersonId": value
+            }))}</label><label>Deputy{personSelect(recovery.handbackDeputyPersonId, value => patch({
+              "handbackDeputyPersonId": value
+            }))}</label></div>}
+        {section.key === "employeeSupport" && <label>Support coordinator{personSelect(recovery.welfarePersonId, value => patch({
+            "welfarePersonId": value
+          }))}</label>}
+        {section.key === "postIncidentReview" && <div className="grid"><label>Review owner{personSelect(recovery.reviewPersonId, value => patch({
+              "reviewPersonId": value
+            }))}</label><label>Target review timeframe<select value={(() => {
+              if (["Within 48 hours", "Within 7 days", "Within 14 days", "Within 30 days"].includes(recovery.reviewTimeframe)) {
+                return recovery.reviewTimeframe;
+              }
+              return "custom";
+            })()} onChange={e => patch({
+              "reviewTimeframe": (() => {
+                if (e.target.value === "custom") {
+                  return "";
+                }
+                return e.target.value;
+              })()
+            })}><option value="custom">Custom / select timeframe</option>{["Within 48 hours", "Within 7 days", "Within 14 days", "Within 30 days"].map(value => <option key={value}>{value}</option>)}</select>{!["Within 48 hours", "Within 7 days", "Within 14 days", "Within 30 days"].includes(recovery.reviewTimeframe) && <input value={recovery.reviewTimeframe || ""} onChange={e => patch({
+              "reviewTimeframe": e.target.value
+            })} placeholder="Enter the agreed timeframe" />}</label></div>}
+        {section.key === "planAvailability" && <label>Controlled copy location / access instructions<textarea value={recovery.planLocation || ""} onChange={e => patch({
+            "planLocation": e.target.value
+          })} placeholder="Record where copies are held and how authorised people can access them during an outage" /></label>}
+        <label>Additional local instructions / retained text<small>Optional · previous recovery text is preserved here</small><textarea value={recovery.localNotes[section.key] || ""} onChange={e => patch({
+            "localNotes": {
+              ...recovery.localNotes,
+              [section.key]: e.target.value
+            }
+          })} /></label>
+        <div className="procedurePreview"><h4>Live section text</h4><textarea readOnly aria-label={"Generated " + section.title + ""} value={recovery[section.key] || ""} /></div>
       </article>}
       <details className="recoveryFullProcedure"><summary>View full recovery procedure</summary><textarea readOnly aria-label="Full generated recovery procedure" value={recovery.generatedProcedure || ""} /></details>
-      <article><h3>Missing before approval</h3><p>Complete the planning requirements below. Every linked controlled source must also be approved before Module 9 approval.</p><div className="recoveryChecklist">{steps.slice(0, 5).map((label, index) => !checks[index] && <button type="button" key={label} onClick={() => setStep(index)}>→ Complete {label}</button>)}{recoveryMissing.map((item, index) => <button type="button" key={`${item.key}-${index}`} onClick={() => goToMissing(item)}>→ {item.label}</button>)}{sourceSpecs.flatMap(([key, label, records]) => { const selected = records.find((row) => row.id === sources[key]); return selected && selected.status !== "approved" ? [<button type="button" key={key} onClick={() => setStep(0)}>→ Approve linked source: {label}</button>] : []; })}{checks.every(Boolean) && sourceSpecs.every(([key, , records]) => !sources[key] || records.find((row) => row.id === sources[key])?.status === "approved") && <p className="recoveryAllReady">All planning requirements are complete and linked sources are approved.</p>}</div></article>
-      <article id="recovery-approval" tabIndex={-1}><h3>Plan review and approval</h3><div className="grid"><label>Approver{personSelect(approver, setApprover)}</label><label>Review / approval comment<textarea value={comment} onChange={(e) => setComment(e.target.value)} /></label></div><p>Approval confirms the controlled plan. Use the authorised handback process to verify actual recovery during an incident.</p></article>
+      <article><h3>Missing before approval</h3><p>Complete the planning requirements below. Every linked controlled source must also be approved before Module 9 approval.</p><div className="recoveryChecklist">{steps.slice(0, 5).map((label, index) => !checks[index] && <button type="button" key={label} onClick={() => setStep(index)}>→ Complete {label}</button>)}{recoveryMissing.map((item, index) => <button type="button" key={"" + item.key + "-" + index + ""} onClick={() => goToMissing(item)}>→ {item.label}</button>)}{sourceSpecs.flatMap(([key, label, records]) => {
+            const selected = records.find(row => row.id === sources[key]);
+            return (() => {
+              if (selected && selected.status !== "approved") {
+                return [<button type="button" key={key} onClick={() => setStep(0)}>→ Approve linked source: {label}</button>];
+              }
+              return [];
+            })();
+          })}{checks.every(Boolean) && sourceSpecs.every(([key,, records]) => !sources[key] || records.find(row => row.id === sources[key])?.status === "approved") && <p className="recoveryAllReady">All planning requirements are complete and linked sources are approved.</p>}</div></article>
+      <article id="recovery-approval" tabIndex={-1}><h3>Plan review and approval</h3><div className="grid"><label>Approver{personSelect(approver, setApprover)}</label><label>Review / approval comment<textarea value={comment} onChange={e => setComment(e.target.value)} /></label></div><p>Approval confirms the controlled plan. Use the authorised handback process to verify actual recovery during an incident.</p></article>
     </>;
   };
-  const activeScenarioIndex = selectedScenarioIndex < 0 ? -1 : Math.min(selectedScenarioIndex, thresholds.length - 1);
+  const activeScenarioIndex = (() => {
+    if (selectedScenarioIndex < 0) {
+      return -1;
+    }
+    return Math.min(selectedScenarioIndex, thresholds.length - 1);
+  })();
   const scenarioEditor = () => {
     const row = thresholds[activeScenarioIndex];
     if (!row) return <p>Select a scenario card to view and edit its response controls.</p>;
-    const source = scenarios.find((item) => item.id === row.scenarioId);
+    const source = scenarios.find(item => item.id === row.scenarioId);
     const catalogue = scenarioResponseOptions(source);
-    const patch = (changes) => setThresholds(thresholds.map((item, index) => index === activeScenarioIndex ? { ...item, ...changes } : item));
-    const choices = (key, values) => <div className="teamChoices">{[...new Set([...values, ...arr(row[key])])].map((value) => { const selected = arr(row[key]).includes(value); return <button type="button" key={value} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => patch({ [key]: selected ? row[key].filter((item) => item !== value) : [...arr(row[key]), value] })}><b>{selected ? "✓" : "+"}</b><span>{value}</span></button>; })}</div>;
+    const patch = changes => setThresholds(thresholds.map((item, index) => (() => {
+      if (index === activeScenarioIndex) {
+        return {
+          ...item,
+          ...changes
+        };
+      }
+      return item;
+    })()));
+    const choices = (key, values) => <div className="teamChoices">{[...new Set([...values, ...arr(row[key])])].map(value => {
+        const selected = arr(row[key]).includes(value);
+        return <button type="button" key={value} className={(() => {
+          if (selected) {
+            return "selected";
+          }
+          return "";
+        })()} aria-pressed={selected} onClick={() => patch({
+          [key]: (() => {
+            if (selected) {
+              return row[key].filter(item => item !== value);
+            }
+            return [...arr(row[key]), value];
+          })()
+        })}><b>{(() => {
+              if (selected) {
+                return "✓";
+              }
+              return "+";
+            })()}</b><span>{value}</span></button>;
+      })}</div>;
     return <article id="scenario-details" className="scenarioDetails"><div className="rowHeading"><h3><HazardIcon name={row.scenario} tone={scenarioTone(source)} small />{row.scenario}</h3><button type="button" className="collapseTeam" onClick={() => setSelectedScenarioIndex(-1)}>Collapse</button></div>
-      {!source && <label className="relink">Confirm linked Module 5 scenario<select value="" onChange={(e) => { const linked = scenarios.find((item) => item.id === e.target.value); if (linked) { const existingIndex = thresholds.findIndex((item) => item.scenarioId === linked.id); const updated = { ...row, scenarioId: linked.id, scenario: linked.name }; if (existingIndex >= 0) { const next = thresholds.filter((_, index) => index !== activeScenarioIndex); const targetIndex = next.findIndex((item) => item.scenarioId === linked.id); const prior = next[targetIndex]; const combine = (a, b) => [...new Set([a, b].filter(Boolean))].join("; "); next[targetIndex] = { ...prior, ...updated, activationSelections: [...new Set([...arr(prior.activationSelections), ...arr(updated.activationSelections)])], protectionSelections: [...new Set([...arr(prior.protectionSelections), ...arr(updated.protectionSelections)])], activationNotes: combine(prior.activationNotes, updated.activationNotes), protectionNotes: combine(prior.protectionNotes, updated.protectionNotes) }; setThresholds(next); setSelectedScenarioIndex(targetIndex); } else patch(updated); } }}><option value="">Select the correct source — retained text is preserved</option>{scenarios.map((item, index) => <option key={item.id} value={item.id}>{item.name} · source item {index + 1}</option>)}</select></label>}
-      <fieldset className="teamField"><legend>Activation criteria · select all that apply</legend><p>Module 5 warning indicators appear alongside standard activation conditions. Your retained text is shown below.</p>{choices("activationSelections", catalogue.activation)}<label>Additional / retained activation criteria<textarea value={row.activationNotes || ""} onChange={(e) => patch({ activationNotes: e.target.value })} placeholder="Optional local trigger or threshold" /></label></fieldset>
-      <fieldset className="teamField"><legend>Immediate protective actions · select all that apply</legend><p>Select the applicable source controls and response actions, following your approved local arrangements.</p>{choices("protectionSelections", catalogue.protection)}<label>Additional / retained protective actions<textarea value={row.protectionNotes || ""} onChange={(e) => patch({ protectionNotes: e.target.value })} placeholder="Optional local instructions" /></label></fieldset>
-      <label>Response level<select value={row.responseLevel || ""} onChange={(e) => patch({ responseLevel: e.target.value })}><option value="">Select response level</option>{[...new Set([...options.level, row.responseLevel].filter(Boolean))].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+      {!source && <label className="relink">Confirm linked Module 5 scenario<select value="" onChange={e => {
+          const linked = scenarios.find(item => item.id === e.target.value);
+          if (linked) {
+            const existingIndex = thresholds.findIndex(item => item.scenarioId === linked.id);
+            const updated = {
+              ...row,
+              "scenarioId": linked.id,
+              "scenario": linked.name
+            };
+            if (existingIndex >= 0) {
+              const next = thresholds.filter((_, index) => index !== activeScenarioIndex);
+              const targetIndex = next.findIndex(item => item.scenarioId === linked.id);
+              const prior = next[targetIndex];
+              const combine = (a, b) => [...new Set([a, b].filter(Boolean))].join("; ");
+              next[targetIndex] = {
+                ...prior,
+                ...updated,
+                "activationSelections": [...new Set([...arr(prior.activationSelections), ...arr(updated.activationSelections)])],
+                "protectionSelections": [...new Set([...arr(prior.protectionSelections), ...arr(updated.protectionSelections)])],
+                "activationNotes": combine(prior.activationNotes, updated.activationNotes),
+                "protectionNotes": combine(prior.protectionNotes, updated.protectionNotes)
+              };
+              setThresholds(next);
+              setSelectedScenarioIndex(targetIndex);
+            } else patch(updated);
+          }
+        }}><option value="">Select the correct source — retained text is preserved</option>{scenarios.map((item, index) => <option key={item.id} value={item.id}>{item.name} · source item {index + 1}</option>)}</select></label>}
+      <fieldset className="teamField"><legend>Activation criteria · select all that apply</legend><p>Module 5 warning indicators appear alongside standard activation conditions. Your retained text is shown below.</p>{choices("activationSelections", catalogue.activation)}<label>Additional / retained activation criteria<textarea value={row.activationNotes || ""} onChange={e => patch({
+            "activationNotes": e.target.value
+          })} placeholder="Optional local trigger or threshold" /></label></fieldset>
+      <fieldset className="teamField"><legend>Immediate protective actions · select all that apply</legend><p>Select the applicable source controls and response actions, following your approved local arrangements.</p>{choices("protectionSelections", catalogue.protection)}<label>Additional / retained protective actions<textarea value={row.protectionNotes || ""} onChange={e => patch({
+            "protectionNotes": e.target.value
+          })} placeholder="Optional local instructions" /></label></fieldset>
+      <label>Response level<select value={row.responseLevel || ""} onChange={e => patch({
+          "responseLevel": e.target.value
+        })}><option value="">Select response level</option>{[...new Set([...options.level, row.responseLevel].filter(Boolean))].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
       <div className="procedurePreview"><h3>Live response summary</h3><p><strong>Activate when:</strong> {row.activationCriteria || "Select activation criteria above."}</p><p><strong>Immediate actions:</strong> {row.initialControls || "Select protective actions above."}</p><p><strong>Response level:</strong> {row.responseLevel || "Not selected"}</p></div>
       {arr(row.retainedResponseEntries).length > 0 && <details className="retainedScenarioText"><summary>Earlier response details retained from merged entries ({row.retainedResponseEntries.length})</summary><p>Repeated entries were combined into this current Module 5 scenario. Their selections and local instructions are included above; review the retained response levels below.</p>{row.retainedResponseEntries.map((entry, index) => <div key={index}><p><strong>Activation criteria:</strong> {entry.activationCriteria || "Not recorded"}</p><p><strong>Protective actions:</strong> {entry.initialControls || "Not recorded"}</p><p><strong>Earlier response level:</strong> {entry.responseLevel || "Not recorded"}</p></div>)}</details>}
-      {!source && <button type="button" onClick={() => { setThresholds(thresholds.filter((_, index) => index !== activeScenarioIndex)); setSelectedScenarioIndex(0); }}>Remove unlinked entry</button>}
+      {!source && <button type="button" onClick={() => {
+        setThresholds(thresholds.filter((_, index) => index !== activeScenarioIndex));
+        setSelectedScenarioIndex(0);
+      }}>Remove unlinked entry</button>}
     </article>;
   };
   const savedId = formState.savedId || initial?.id || "";
@@ -262,34 +1256,109 @@ export default function BCPIncidentManagement({ action, profiles = [], contexts 
     <input type="hidden" name="assessment_id" value={savedId} />
     <input type="hidden" name="next_step" value={Math.min(5, step + 1)} />
     {Object.entries(sources).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
-    {Object.entries({ assessment_title: title, review_frequency: frequency, next_review_date: date, approver_person_id: approver, review_comment: comment, response_teams: JSON.stringify(teams), activation_thresholds: JSON.stringify(thresholds), warning_communications: JSON.stringify(communications), incident_action_plan: JSON.stringify(actions), recovery_stand_down: JSON.stringify(recovery) }).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
+    {Object.entries({
+      "assessment_title": title,
+      "review_frequency": frequency,
+      "next_review_date": date,
+      "approver_person_id": approver,
+      "review_comment": comment,
+      "response_teams": JSON.stringify(teams),
+      "activation_thresholds": JSON.stringify(thresholds),
+      "warning_communications": JSON.stringify(communications),
+      "incident_action_plan": JSON.stringify(actions),
+      "recovery_stand_down": JSON.stringify(recovery)
+    }).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
     <BCPModuleNavigation moduleNumber={9} title="Incident management" percent={percent} steps={steps} checks={checks} activeStep={step} onSelect={setStep}>
-<b>Controlled outputs</b><span className={teams.length ? "ready" : ""}>Response structure · {teams.length} teams</span><span className={thresholds.length ? "ready" : ""}>Activation register · {thresholds.length} scenarios</span><span className={communications.length ? "ready" : ""}>Warning & communication controls</span><span className={actions.length ? "ready" : ""}>Incident Action Plan · {actions.filter((row) => row.status !== "closed").length} open actions</span><span className={checks[5] ? "ready" : ""}>Recovery & stand-down controls</span>
+      <b>Controlled outputs</b><span className={(() => {
+        if (teams.length) {
+          return "ready";
+        }
+        return "";
+      })()}>Response structure · {teams.length} teams</span><span className={(() => {
+        if (thresholds.length) {
+          return "ready";
+        }
+        return "";
+      })()}>Activation register · {thresholds.length} scenarios</span><span className={(() => {
+        if (communications.length) {
+          return "ready";
+        }
+        return "";
+      })()}>Warning & communication controls</span><span className={(() => {
+        if (actions.length) {
+          return "ready";
+        }
+        return "";
+      })()}>Incident Action Plan · {actions.filter(row => row.status !== "closed").length} open actions</span><span className={(() => {
+        if (checks[5]) {
+          return "ready";
+        }
+        return "";
+      })()}>Recovery & stand-down controls</span>
       </BCPModuleNavigation>
-    <section className="workspace"><header className="stepHeader"><div><small>STEP {step + 1} OF 6 · ISO 22301 CLAUSE 8.4</small><h2>{steps[step]}</h2><p>Connect assessed disruptions to the people, decisions and procedures needed to respond and recover.</p></div><b className={`recordStatus ${initial?.status === "approved" ? "approved" : ""}`}>{initial?.status?.replaceAll("_", " ") || "draft"}</b></header><div className="stepDivider" />
+    <section className="workspace"><header className="stepHeader"><div><small>STEP {step + 1} OF 6 · ISO 22301 CLAUSE 8.4</small><h2>{steps[step]}</h2><p>Connect assessed disruptions to the people, decisions and procedures needed to respond and recover.</p></div><b className={"recordStatus " + (() => {
+          if (initial?.status === "approved") {
+            return "approved";
+          }
+          return "";
+        })() + ""}>{initial?.status?.replaceAll("_", " ") || "draft"}</b></header><div className="stepDivider" />
       {formState.error && <div className="error" role="alert">{formState.error}</div>}
       <div className="content" key={renderRevision}>
-      {step === 0 && <><div className="intro"><strong>Connect the controlled incident-management source records.</strong><p>Modules 1, 4, 5 and 8 are required. Link context and BIA where applicable. All linked records must be approved before approval of Module 9.</p></div><div className="grid">{sourceSpecs.map(([key, label, records]) => <label key={key}>{label}<select key={`${key}-${formState.error || ""}`} value={sources[key]} onChange={(event) => setSources({ ...sources, [key]: event.target.value })}><option value="">Select controlled record</option>{records.map((row) => <option key={row.id} value={row.id}>{row.assessment_reference || row.location_name || row.assessment_title} · v{row.version || 1} · {row.status}</option>)}</select></label>)}<label>Assessment title<input value={title} onChange={(e) => setTitle(e.target.value)} /></label><label>Review frequency<select value={frequency} onChange={(e) => setFrequency(e.target.value)}>{["Quarterly", "Semi-annually", "Every 12 months", "After material change or incident"].map((value) => <option key={value}>{value}</option>)}</select></label><label>Next review date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label></div></>}
+      {step === 0 && <><div className="intro"><strong>Connect the controlled incident-management source records.</strong><p>Modules 1, 4, 5 and 8 are required. Link context and BIA where applicable. All linked records must be approved before approval of Module 9.</p></div><div className="grid">{sourceSpecs.map(([key, label, records]) => <label key={key}>{label}<select key={"" + key + "-" + (formState.error || "") + ""} value={sources[key]} onChange={event => setSources({
+                ...sources,
+                [key]: event.target.value
+              })}><option value="">Select controlled record</option>{records.map(row => <option key={row.id} value={row.id}>{row.assessment_reference || row.location_name || row.assessment_title} · v{row.version || 1} · {row.status}</option>)}</select></label>)}<label>Assessment title<input value={title} onChange={e => setTitle(e.target.value)} /></label><label>Review frequency<select value={frequency} onChange={e => setFrequency(e.target.value)}>{["Quarterly", "Semi-annually", "Every 12 months", "After material change or incident"].map(value => <option key={value}>{value}</option>)}</select></label><label>Next review date<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label></div></>}
       {step === 1 && <><div className="intro"><strong>Define the response structure and decision authority.</strong><p>Assign a leader and a different deputy. Select the applicable authorities, responsibilities and procedure steps. Automatic mode updates the full procedural control as selections change.</p></div>{teamEditor()}</>}
-      {step === 2 && <><div className="intro"><strong>Turn selected hazard scenarios into response triggers.</strong><p>Eligible scenarios from the linked Module 5 assessment are automatically included. Select a card to display only that scenario’s controls. Choose activation criteria, protective actions and response level; the live summary updates as you select.</p></div>{!hazard && <p className="error">Select a Module 5 hazard assessment in Controlled sources first.</p>}<div className="scenarioLegend"><span className="siteLinked">Green · linked to this site through Module 5</span><span className="needsConfirmation">Amber · site or source link needs confirmation</span><span className="editingLegend">Blue outline · currently editing</span></div><p className="scenarioSource">Site: <strong>{siteProfile?.location_name || "Not selected"}</strong> · Module 5: <strong>{hazard?.assessment_reference || hazard?.assessment_title || "Not selected"}</strong>{hazard && ` · v${hazard.version || 1}`}</p><div className="cards">{thresholds.map((row, index) => { const source = scenarios.find((item) => item.id === row.scenarioId); const active = activeScenarioIndex === index; return <button type="button" key={row.id || `${row.scenarioId || "unlinked"}-${index}`} className={`scenarioCard ${source && hazardMatchesSite ? "siteLinked" : "needsConfirmation"} ${active ? "editing" : ""}`} aria-expanded={active} aria-controls="scenario-details" onClick={() => setSelectedScenarioIndex(active ? -1 : index)}><HazardIcon name={row.scenario} tone={scenarioTone(source)} /><span><strong>{row.scenario}</strong><small>{source ? hazardMatchesSite ? "Linked to this site · Module 5" : "Linked to Module 5 · site needs confirmation" : "Source link needs confirmation"} · {active ? "Editing" : "Click to edit"} · {scenarioTone(source)} risk</small></span><b className="selectionMark" aria-hidden="true">{active ? "✎" : source && hazardMatchesSite ? "✓" : "!"}</b></button>; })}</div>{hazard && scenarios.length === 0 && <p>No scenarios are included in the linked Module 5 incident plan.</p>}{thresholds.some((row) => !scenarios.some((s) => s.id === row.scenarioId)) && <p className="error">Some saved scenarios need their source link confirmed. Draft saving preserves them; select their cards to confirm the links before review or approval.</p>}{scenarioEditor()}</>}
+      {step === 2 && <><div className="intro"><strong>Turn selected hazard scenarios into response triggers.</strong><p>Eligible scenarios from the linked Module 5 assessment are automatically included. Select a card to display only that scenario’s controls. Choose activation criteria, protective actions and response level; the live summary updates as you select.</p></div>{!hazard && <p className="error">Select a Module 5 hazard assessment in Controlled sources first.</p>}<div className="scenarioLegend"><span className="siteLinked">Green · linked to this site through Module 5</span><span className="needsConfirmation">Amber · site or source link needs confirmation</span><span className="editingLegend">Blue outline · currently editing</span></div><p className="scenarioSource">Site: <strong>{siteProfile?.location_name || "Not selected"}</strong> · Module 5: <strong>{hazard?.assessment_reference || hazard?.assessment_title || "Not selected"}</strong>{hazard && " \xB7 v" + (hazard.version || 1) + ""}</p><div className="cards">{thresholds.map((row, index) => {
+              const source = scenarios.find(item => item.id === row.scenarioId);
+              const active = activeScenarioIndex === index;
+              return <button type="button" key={row.id || "" + (row.scenarioId || "unlinked") + "-" + index + ""} className={"scenarioCard " + (() => {
+                if (source && hazardMatchesSite) {
+                  return "siteLinked";
+                }
+                return "needsConfirmation";
+              })() + " " + (() => {
+                if (active) {
+                  return "editing";
+                }
+                return "";
+              })() + ""} aria-expanded={active} aria-controls="scenario-details" onClick={() => setSelectedScenarioIndex((() => {
+                if (active) {
+                  return -1;
+                }
+                return index;
+              })())}><HazardIcon name={row.scenario} tone={scenarioTone(source)} /><span><strong>{row.scenario}</strong><small>{(() => {
+                      if (source) {
+                        return (() => {
+                          if (hazardMatchesSite) {
+                            return "Linked to this site · Module 5";
+                          }
+                          return "Linked to Module 5 · site needs confirmation";
+                        })();
+                      }
+                      return "Source link needs confirmation";
+                    })()} · {(() => {
+                      if (active) {
+                        return "Editing";
+                      }
+                      return "Click to edit";
+                    })()} · {scenarioTone(source)} risk</small></span><b className="selectionMark" aria-hidden="true">{(() => {
+                    if (active) {
+                      return "✎";
+                    }
+                    return (() => {
+                      if (source && hazardMatchesSite) {
+                        return "✓";
+                      }
+                      return "!";
+                    })();
+                  })()}</b></button>;
+            })}</div>{hazard && scenarios.length === 0 && <p>No scenarios are included in the linked Module 5 incident plan.</p>}{thresholds.some(row => !scenarios.some(s => s.id === row.scenarioId)) && <p className="error">Some saved scenarios need their source link confirmed. Draft saving preserves them; select their cards to confirm the links before review or approval.</p>}{scenarioEditor()}</>}
       {step === 3 && <><div className="intro"><strong>Control warnings and incident communications.</strong><p>Define who needs which information, when it is sent and how communication continues if the primary channel fails.</p></div>{rowEditor("communications")}</>}
       {step === 4 && <><div className="intro"><strong>Maintain the controlled Incident Action Plan.</strong><p>Assign response objectives and actions to named owners. Track priority and progress through recovery.</p></div>{actionEditor()}</>}
       {step === 5 && <><div className="intro"><strong>Control recovery, handback and stand-down.</strong><p>Select recovery arrangements, define hazard-specific conditions and assign the people responsible for handback, support and review.</p></div>{recoveryEditor()}</>}
       </div><footer><button type="button" disabled={pending || step === 0} onClick={() => setStep(step - 1)}>← Back</button><button disabled={pending} name="intent" value="draft">Save draft</button>{step < 5 && <button disabled={pending} name="intent" value="continue">Save & continue →</button>}<button disabled={pending} name="intent" value="review">Submit for review</button><button disabled={pending} className="primary" name="intent" value="approve">Approve controlled version</button>{savedId && <button disabled={pending} name="intent" value="archive">Archive</button>}</footer>
     </section>
-    <style jsx global>{`
-      .im button.communicationCard.emergencyLinked{background:#eaf8f2;border-color:#8ecab2}.im button.communicationCard.emergencyMissing{background:#fff5df;border-color:#e5bd69}.im button.communicationCard.active{outline:2px solid #315fe6;outline-offset:2px}
-      .im .additionalMembers{margin:20px 0;padding:20px;border:1px solid #c7d8e9;border-radius:12px;background:#f7faff}.im .membersHeading{display:flex;align-items:center;justify-content:space-between;gap:16px}.im .membersHeading h3{margin:0;font-size:17px}.im .membersHeading p,.im .memberEmpty{margin:7px 0;color:#62788e;font-size:13px;line-height:1.5}.im .memberRow{display:flex;align-items:flex-end;gap:12px;margin-top:16px;padding:16px;border:1px solid #d2deeb;border-radius:10px;background:#fff}.im .memberFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;flex:1;min-width:0}.im .memberFields label>small{font-size:10px;color:#62788e;font-weight:400}.im .removeMember{background:#fff0ed;color:#b42318;border-color:#efbcb5}@media(max-width:700px){.im .membersHeading{flex-direction:column;align-items:flex-start}.im .memberRow{flex-direction:column;align-items:stretch}.im .memberFields{grid-template-columns:1fr;width:100%}.im .additionalMembers{padding:14px}}
-      .im .teamIcon{display:grid;place-items:center;width:54px;height:54px;border-radius:15px;background:#e3edff;color:#2459d6;border:1px solid #bfd1f1;flex-shrink:0;transition:transform .18s ease,box-shadow .18s ease}.im .teamIcon svg{width:36px;height:36px}.im .teamIcon.centre{background:#fff1da;color:#a36008;border-color:#edce99}.im .teamIcon.communications{background:#eee5ff;color:#7441bf;border-color:#d4bef1}.im .teamIcon.recovery{background:#dcf6ef;color:#087e6b;border-color:#a7ded0}.im .teamIcon.support{background:#e7edf4;color:#516e89;border-color:#c3d1df}.im .teamIcon.small{position:static;width:34px;height:34px;border-radius:10px}.im .teamIcon.small svg{width:25px;height:25px}.im button.teamSummary{position:relative;padding-bottom:24px}.im .teamSummary>.teamIcon{position:absolute;right:14px;bottom:14px}.im .teamSummary>span{padding-right:64px}.im .teamSummary>small{margin-right:66px;min-height:30px;display:flex;align-items:center}.im button.teamSummary:hover>.teamIcon,.im button.teamSummary:focus-visible>.teamIcon{transform:translateY(-3px) scale(1.05);box-shadow:0 5px 12px #173f6220}.im .teamSummary.active>.teamIcon{box-shadow:0 0 0 3px #315fe620}.im .teamSummary.icon-centre.active>.teamIcon{box-shadow:0 0 0 3px #a3600820}.im .teamSummary.icon-communications.active>.teamIcon{box-shadow:0 0 0 3px #7441bf20}.im .teamSummary.icon-recovery.active>.teamIcon{box-shadow:0 0 0 3px #087e6b20}@media(prefers-reduced-motion:reduce){.im .teamIcon{transition:none}.im button.teamSummary:hover>.teamIcon,.im button.teamSummary:focus-visible>.teamIcon{transform:none}}
-      .im .teamOverviewHeading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}.im .teamOverviewHeading h3{margin:0;font-size:18px}.im .teamOverviewHeading p{margin:5px 0 0;color:#62788e;font-size:13px}.im .teamOverview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}.im button.teamSummary{display:flex;flex-direction:column;align-items:stretch;gap:9px;min-width:0;padding:16px;text-align:left;border:1px solid #c5d6e7;border-radius:12px;background:#f7faff;min-height:175px}.im button.teamSummary.active{border:2px solid #315fe6;background:#edf3ff;padding:15px;box-shadow:0 3px 12px #315fe618}.im .teamSummaryTop{display:flex;align-items:center;justify-content:space-between;gap:6px}.im .teamNumber{display:grid;place-items:center;width:27px;height:27px;flex-shrink:0;border-radius:8px;background:#e0eaff;color:#315fe6}.im .teamReadiness{padding:5px 7px;border-radius:20px;font-size:10px;white-space:nowrap}.im .teamReadiness.ready{background:#daf5e9;color:#08745d}.im .teamReadiness.attention{background:#fff0d5;color:#8a5300}.im .teamSummary>strong{font-size:15px;line-height:1.4;overflow-wrap:anywhere}.im .teamSummary>span{font-size:12px;font-weight:400;color:#52708b;overflow-wrap:anywhere}.im .teamSummary>small{margin-top:auto;color:#315fe6;font-size:11px}.im .teamDetailActions{display:flex;gap:8px}.im .rowHeading .collapseTeam{background:#edf4ff;color:#2459d6;border-color:#b7cbdf}.im .teamEmpty{padding:20px;border:1px dashed #c5d6e7;border-radius:12px;color:#62788e}@media(max-width:1250px){.im .teamOverview{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.im .teamOverview{grid-template-columns:1fr}.im .teamOverviewHeading{align-items:flex-start;flex-direction:column}.im .rowHeading{flex-wrap:wrap}}
-      .im .teamField{margin:20px 0;padding:18px;border:1px solid #c7d8e9;border-radius:12px;min-width:0}.im .teamField legend{font-size:15px;font-weight:850;padding:0 8px}.im .teamChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}.im .teamChoices button{display:flex;align-items:center;gap:10px;text-align:left;min-height:54px;background:#f4f8ff;border-color:#c6d7ee}.im .teamChoices button>b{color:#315fe6;font-size:18px}.im .teamChoices button.selected{background:#dcf7f1;border-color:#15ad9e;color:#086254}.im .teamChoices button.selected>b{color:#078d7d}.im .teamField textarea{min-height:80px}.im .procedurePreview{padding:20px;border-left:4px solid #315fe6;border-radius:12px;background:#f1f6ff}.im .procedurePreview h3{margin:0}.im .procedurePreview p{font-size:14px;color:#62788e}.im .procedurePreview textarea{min-height:340px;background:#fff;font-size:16px;line-height:1.7}.im .procedurePreview details{margin-top:16px}.im .procedurePreview summary{cursor:pointer;font-weight:750}@media(max-width:700px){.im .teamChoices{grid-template-columns:1fr}.im .teamField{padding:12px}.im .procedurePreview{padding:14px}}
-      .im article[id^="incident-scenario-"]{scroll-margin-top:24px}.im .scenarioLegend{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px}.im .scenarioLegend>span{padding:7px 10px;border-radius:7px;font-size:12px;border:1px solid #c5d6e7}.im .scenarioLegend .siteLinked,.im .cards button.scenarioCard.siteLinked{background:#dcf7f1;border-color:#14afa0;color:#086254}.im .scenarioLegend .needsConfirmation,.im .cards button.scenarioCard.needsConfirmation{background:#fff7e7;border-color:#eac67c;color:#80540b}.im .scenarioLegend .editingLegend{background:#edf3ff;border-color:#315fe6;color:#2459d6}.im .scenarioSource{font-size:13px;color:#52708b;margin:8px 0 16px}.im .cards button.scenarioCard.editing{outline:3px solid #315fe6;outline-offset:2px;box-shadow:0 3px 12px #315fe618}.im .cards button.scenarioCard.needsConfirmation .selectionMark{color:#80540b}.im .channelField>small{font-size:12px;color:#62788e;font-weight:400}.im .channelField .teamChoices{margin-top:10px;margin-bottom:8px}.im .channelField .teamChoices button{padding:10px;min-height:48px}.im .channelField .teamChoices button span>small{display:block;font-size:10px;font-weight:400;margin-top:4px}.im .channelSummary{padding:10px;border-radius:8px;background:#eef5fa;color:#52708b;font-size:12px;font-weight:400;line-height:1.5;margin:0}.im .retainedScenarioText{margin-top:18px;padding:14px;background:#f4f8ff;border:1px solid #c5d6e7;border-radius:9px}.im .retainedScenarioText summary{cursor:pointer;font-weight:750}.im .retainedScenarioText p{font-size:14px}.im .retainedScenarioText>div{border-top:1px solid #c5d6e7;margin-top:12px}.im .scenarioDetails .procedurePreview{margin-top:20px}.im .scenarioDetails fieldset>p{font-size:14px;color:#62788e}.im .longField{grid-column:1/-1}.im .rowHeading h3{display:flex;align-items:center;gap:10px}.im .cards button{display:flex;align-items:center;gap:14px}.im .cards button>span:not(.hazardIcon){flex:1;min-width:0}.im .cards button strong,.im .cards button small{display:block}.im .cards button small{margin-top:5px;color:#60788e;font-size:12px;font-weight:400}.im .selectionMark{font-size:22px;color:#008b80}.im .relink{margin-top:16px;padding:15px;background:#fff7e7;border:1px solid #eac67c;border-radius:10px}.im .hazardIcon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:14px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6;box-shadow:0 5px 14px #143a6420}.im .hazardIcon svg{width:38px;height:38px}.im .hazardIcon.small{width:25px;height:25px;flex-basis:25px;border-radius:7px;box-shadow:none}.im .hazardIcon.small svg{width:17px;height:17px}.im .hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.im .hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.im .hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.im .hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.im footer{row-gap:12px}.im footer button{min-height:44px}.im .grid>label input,.im .grid>label select{min-height:44px}
-      .im,.im *{box-sizing:border-box}.im{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342;align-items:start}.im>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.im .brand{font-size:21px;font-weight:950}.im .brand span{font-weight:500}.im aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-size:13px;font-weight:900;letter-spacing:.14em}.im .completion{padding:16px;border-radius:12px;background:#ffffff0a}.im .completion strong{font-size:28px}.im .completion>span{float:right;margin-top:10px;font-size:10px}.im .completionTrack{height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.im .completionTrack i{display:block;height:100%;background:#55e1d4}.im nav{display:grid;gap:6px;margin-top:18px}.im nav button{display:flex;gap:10px;align-items:center;width:100%;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left;font-size:13px;font-weight:500}.im nav button.active{background:#245d97}.im nav button>b{display:grid;place-items:center;width:26px;height:26px;flex-shrink:0;border:1px solid #4b779f;border-radius:7px;color:#61dfd3;font-size:16px}.im .outputs{display:grid;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25}.im .outputs>b{font-size:16px}.im .outputs>span{padding:8px;border-radius:7px;background:#ffffff08;color:#a9bfd5;font-size:10px;line-height:1.4}.im .outputs>span.ready{color:#63e2d4}.im .workspace{min-width:0}.im .stepHeader{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;background:transparent;border:0;padding:0}.im .stepHeader small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.14em}.im .stepHeader h2{margin:9px 0 4px;font-size:36px;line-height:1.2}.im .stepHeader p{margin:0;color:#62788e;font-size:16px;line-height:1.5}.im .recordStatus{text-transform:capitalize;color:#62788e;white-space:nowrap;font-size:16px}.im .recordStatus.approved{color:#008e80}.im .stepDivider{height:6px;border-radius:5px;background:#315fe6;margin:16px 0 18px}.im .content{padding:25px;border:1px solid #cbd9e6;border-radius:18px;background:#fff}.im .intro{padding:20px;margin-bottom:18px;border-radius:12px;background:#eef5fa}.im .intro strong{font-size:16px}.im .intro p{margin:7px 0 0;color:#62788e;font-size:16px;line-height:1.5}.im .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.im label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:850;min-width:0}.im input,.im select,.im textarea{width:100%;min-width:0;font:inherit;font-weight:750;color:#143556;padding:12px;border:1px solid #b7cbdf;border-radius:9px;background:#fafcff;line-height:1.4}.im select{background:#fafcff}.im textarea{min-height:130px;resize:vertical;line-height:1.6;font-size:15px;font-weight:400;background:#fff}.im input:focus-visible,.im select:focus-visible,.im textarea:focus-visible,.im button:focus-visible{outline:3px solid #55cfc5;outline-offset:2px}.im article{padding:20px;margin:0 0 20px;border:1px solid #cfdae6;border-radius:12px;background:#fff}.im .rowHeading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:12px}.im .rowHeading h3{margin:0;font-size:18px}.im .rowHeading button{background:#fff0ed;color:#b42318;border-color:#efbcb5;font-size:12px}.im button{font:inherit;font-size:13px;font-weight:850;padding:11px 14px;border-radius:8px;border:1px solid #c5d4e2;background:#fff;color:#183c61;cursor:pointer}.im button:disabled{opacity:.5;cursor:wait}.im .primary,.im .add{background:#315fe6;color:#fff;border-color:#315fe6}.im footer{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.im footer .primary{margin-left:auto}.im .error{padding:16px;background:#fff0ef;border:1px solid #edaaa5;border-radius:10px;color:#a6241c;margin:16px 0;line-height:1.5}.im .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:24px}.im .cards button{text-align:left;min-height:70px;background:#fafcff}.im .cards button.selected{background:#dcf7f1;border-color:#14afa0;color:#086254}.im p{line-height:1.55}@media(max-width:950px) and (min-width:701px){.im{grid-template-columns:80px minmax(0,1fr)}.im .brand,.im aside>small,.im .completion,.im nav button>span,.im .outputs{display:none}.im>aside{padding:18px 10px}.im nav button{justify-content:center;padding:8px}}@media(max-width:700px){.im{display:block}.im>aside{position:static;height:auto;margin-bottom:15px;padding:20px}.im nav{display:flex;overflow:auto}.im nav button{width:auto;flex-shrink:0}.im .outputs{display:none}.im .grid,.im .cards{grid-template-columns:1fr}.im .stepHeader{align-items:flex-start}.im .stepHeader h2{font-size:29px}.im .stepHeader p{font-size:14px}.im .content{padding:18px}.im .intro{padding:16px}.im footer .primary{margin-left:0}}
-      .im .audienceSource{display:grid;gap:10px}.im .audienceSource>small{font-size:12px;font-weight:400;color:#52708b;line-height:1.5}.im .audienceSource details{padding:12px;background:#eef5fa;border-radius:8px;font-size:13px;font-weight:400}.im .audienceSource summary{cursor:pointer;font-weight:750}.im .audienceSource p{overflow-wrap:anywhere}.im .communicationOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}.im button.communicationCard{display:flex;flex-direction:column;gap:8px;text-align:left;min-width:0;background:#f5f8ff;padding:16px;border-radius:12px}.im button.communicationCard.active{background:#dcf7f1;border-color:#14afa0;outline:2px solid #315fe6;outline-offset:2px}.im .communicationCard strong{font-size:16px}.im .communicationCard span{font-size:12px;font-weight:400;color:#52708b;overflow-wrap:anywhere}.im .communicationCard small{font-size:11px;color:#2459d6}.im .communicationChannel{min-width:0;margin:0;padding:16px;border:1px solid #c5d6e7;border-radius:12px;background:#fafcff}.im .communicationChannel legend{font-size:15px;font-weight:850;padding:0 6px}.im .channelGroups{display:grid;gap:8px;margin:12px 0}.im .channelGroup{border:1px solid #c7d8e9;border-radius:8px;background:#fff;min-width:0}.im .channelGroup summary{cursor:pointer;padding:12px;min-height:44px;font-size:13px;font-weight:750;overflow-wrap:anywhere}.im .channelGroup summary>span{float:right;margin-left:8px;font-size:11px;font-weight:400;color:#52708b}.im .channelGroup .teamChoices{padding:0 10px 10px;margin:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.im .channelGroup button{min-width:0;min-height:44px;white-space:normal;overflow-wrap:anywhere}.im .channelSummary{overflow-wrap:anywhere}.im .workspace,.im .content,.im #communication-details{min-width:0}.im #communication-details>.grid{align-items:start}.im #communication-details .communicationText{min-height:76px;font-size:14px;line-height:1.5}.im #communication-details .communicationChannel{align-self:start}.im #communication-details .audienceSource{width:100%}@media(max-width:1100px){.im .communicationOverview{grid-template-columns:repeat(2,minmax(0,1fr))}.im #communication-details>.grid{grid-template-columns:1fr}}@media(max-width:700px){.im #communication-details .communicationText{font-size:16px}.im .communicationOverview{grid-template-columns:1fr}.im .communicationChannel{padding:12px}.im input,.im select,.im textarea{font-size:16px}.im footer button{flex:1 1 140px}.im nav button{min-height:44px}.im .channelGroup .teamChoices{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:380px){.im .channelGroup .teamChoices{grid-template-columns:1fr}.im .channelGroup summary>span{float:none;display:block;margin:4px 0 0}}
-
-      .im .actionMetrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}.im .actionMetrics>button,.im .actionMetrics>div{display:flex;flex-direction:column;gap:5px;text-align:left;padding:14px;border:1px solid #c5d6e7;border-radius:10px;background:#f5f8ff}.im .actionMetrics strong{font-size:24px}.im .actionMetrics span{font-size:12px}.im .actionMetrics>.selected{background:#dcf7f1;border-color:#14afa0}.im .actionMetrics>.overdueMetric{background:#fff1ec;color:#a13a25}.im .actionFilters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end;gap:12px;margin-bottom:18px}.im .actionFilters button{min-height:44px}.im .actionOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}.im button.actionCard{display:flex;flex-direction:column;gap:9px;text-align:left;padding:16px;min-width:0;background:#f5f8ff;border-radius:12px}.im .actionCard strong{font-size:16px}.im .actionCard>span{font-size:12px;font-weight:400;overflow-wrap:anywhere}.im .actionCard small{color:#2459d6}.im button.actionCard.active{outline:2px solid #315fe6;outline-offset:2px;border-color:#315fe6}.im button.actionCard.overdue{border-color:#dc906e;background:#fff5ef}.im .actionCardTop{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;width:100%}.im .actionBadge{padding:5px 8px;border-radius:6px;background:#e6edf6;font-size:11px}.im .actionBadge.status-in_progress{background:#e4eeff;color:#2459d6}.im .actionBadge.status-blocked{background:#ffe1d8;color:#a13a25}.im .actionBadge.status-closed{background:#dff5e9;color:#087242}.im .actionSourceWarning{color:#8a5a0b;background:#fff5df;padding:10px;border-radius:7px}.im .actionChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.im .actionChoices button{text-align:left;min-height:48px;white-space:normal;overflow-wrap:anywhere;background:#f4f8ff}.im .actionChoices button.selected{background:#dcf7f1;border-color:#14afa0;color:#086254}.im .actionChoices .priority-0.selected{background:#ffe0df;border-color:#d9908c;color:#982c25}.im .actionChoices .priority-1.selected{background:#ffedca;border-color:#dcb86d;color:#80530b}.im .actionChoices .priority-2.selected{background:#e4eeff;border-color:#9dbced;color:#2459d6}.im .actionChoices .status-2.selected{background:#ffe1d8;border-color:#dc906e;color:#a13a25}.im .actionDetails .teamField{margin:18px 0}.im .actionDetails .teamField>label{margin-top:14px}.im .actionDetails .rowHeading h3{overflow-wrap:anywhere}.im .actionSuggestion{padding:16px;border:1px solid #c5d6e7;border-radius:10px;background:#eef5fa;margin:18px 0}.im .actionSuggestion h4{margin:0}.im .actionSuggestion small{display:block;margin-top:10px;color:#52708b}.im .actionAssignments{margin:18px 0}.im .actionDetails label>small{font-weight:400;color:#52708b}.im .actionDetails textarea{font-size:16px}.im .actionDetails>label{margin-top:16px}.im .actionTextLabel textarea{min-height:160px}.im .actionDetails>label input{min-height:44px}@media(max-width:1100px){.im .actionOverview{grid-template-columns:repeat(2,minmax(0,1fr))}.im .actionFilters{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.im .actionOverview,.im .actionFilters,.im .actionAssignments,.im .actionChoices{grid-template-columns:1fr}.im .actionMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}.im .actionDetails .rowHeading{align-items:flex-start;flex-direction:column}.im .actionDetails{padding:14px}.im .actionCardTop{gap:12px}}
-
-      .im .recoveryReadiness{padding:18px;border-radius:12px;background:#fff5df;color:#80540b;margin-bottom:18px}.im .recoveryReadiness.ready{background:#dcf7f1;color:#086254}.im .recoveryReadiness p{margin:8px 0 0;font-size:14px}.im .recoveryOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:22px}.im button.recoveryCard{display:flex;flex-direction:column;gap:12px;text-align:left;padding:16px;background:#f4f8ff;min-width:0}.im .recoveryCard>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.im .recoveryCard strong{font-size:16px}.im .recoveryCard small{font-size:12px;font-weight:400;overflow-wrap:anywhere}.im button.recoveryCard.active{outline:2px solid #315fe6;outline-offset:2px;background:#edf3ff}.im .recoveryDetails{scroll-margin-top:20px}.im .recoveryDetails .teamField{margin:18px 0}.im .recoveryDetails>label,.im .recoveryDetails>.grid{margin-top:18px}.im .recoveryDetails small{font-weight:400;color:#52708b}.im .recoveryGuidance{padding:14px;background:#eef5fa;border-radius:8px;color:#52708b}.im .recoveryScenarioOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.im button.recoveryScenarioCard{display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-align:left;min-width:0;background:#eaf8f2;border-color:#8ecab2}.im .recoveryScenarioCard strong{flex:1;overflow-wrap:anywhere}.im .recoveryScenarioCard small{width:100%;font-size:11px}.im button.recoveryScenarioCard.active{outline:2px solid #315fe6;outline-offset:2px}.im button.recoveryScenarioCard.unlinked{background:#fff5df;border-color:#e5bd69}.im .recoveryScenarioDetails{padding:16px;border:1px solid #c5d6e7;border-radius:10px;background:#f8fbfe}.im .recoveryScenarioDetails>label,.im .recoveryScenarioDetails>.grid{margin-top:16px}.im .recoveryScenarioDetails h4{margin:0}.im .recoveryDetails .procedurePreview{margin-top:20px}.im .recoveryFullProcedure{padding:18px;border:1px solid #c5d6e7;border-radius:12px;background:#eef5fa;margin:20px 0}.im .recoveryFullProcedure summary{cursor:pointer;font-weight:850}.im .recoveryFullProcedure textarea{min-height:400px;margin-top:14px}.im .recoveryChecklist{display:grid;gap:8px}.im .recoveryChecklist button{text-align:left;min-height:44px;background:#fff5df;color:#80540b;border-color:#e5bd69}.im .recoveryAllReady{padding:12px;background:#dcf7f1;color:#086254;border-radius:8px}.im .recoveryDetails textarea,.im .recoveryFullProcedure textarea{font-size:16px}.im #recovery-approval{scroll-margin-top:20px}@media(max-width:1100px){.im .recoveryOverview,.im .recoveryScenarioOverview{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.im .recoveryOverview,.im .recoveryScenarioOverview,.im .recoveryDetails .grid,.im .recoveryDetails .teamChoices{grid-template-columns:1fr}.im .recoveryDetails{padding:14px}.im .recoveryDetails .rowHeading{align-items:flex-start;flex-wrap:wrap}.im .recoveryScenarioDetails{padding:12px}}
-    `}</style>
+    <style jsx global>{"\n      .im button.communicationCard.emergencyLinked{background:#eaf8f2;border-color:#8ecab2}.im button.communicationCard.emergencyMissing{background:#fff5df;border-color:#e5bd69}.im button.communicationCard.active{outline:2px solid #315fe6;outline-offset:2px}\n      .im .additionalMembers{margin:20px 0;padding:20px;border:1px solid #c7d8e9;border-radius:12px;background:#f7faff}.im .membersHeading{display:flex;align-items:center;justify-content:space-between;gap:16px}.im .membersHeading h3{margin:0;font-size:17px}.im .membersHeading p,.im .memberEmpty{margin:7px 0;color:#62788e;font-size:13px;line-height:1.5}.im .memberRow{display:flex;align-items:flex-end;gap:12px;margin-top:16px;padding:16px;border:1px solid #d2deeb;border-radius:10px;background:#fff}.im .memberFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;flex:1;min-width:0}.im .memberFields label>small{font-size:10px;color:#62788e;font-weight:400}.im .removeMember{background:#fff0ed;color:#b42318;border-color:#efbcb5}@media(max-width:700px){.im .membersHeading{flex-direction:column;align-items:flex-start}.im .memberRow{flex-direction:column;align-items:stretch}.im .memberFields{grid-template-columns:1fr;width:100%}.im .additionalMembers{padding:14px}}\n      .im .teamIcon{display:grid;place-items:center;width:54px;height:54px;border-radius:15px;background:#e3edff;color:#2459d6;border:1px solid #bfd1f1;flex-shrink:0;transition:transform .18s ease,box-shadow .18s ease}.im .teamIcon svg{width:36px;height:36px}.im .teamIcon.centre{background:#fff1da;color:#a36008;border-color:#edce99}.im .teamIcon.communications{background:#eee5ff;color:#7441bf;border-color:#d4bef1}.im .teamIcon.recovery{background:#dcf6ef;color:#087e6b;border-color:#a7ded0}.im .teamIcon.support{background:#e7edf4;color:#516e89;border-color:#c3d1df}.im .teamIcon.small{position:static;width:34px;height:34px;border-radius:10px}.im .teamIcon.small svg{width:25px;height:25px}.im button.teamSummary{position:relative;padding-bottom:24px}.im .teamSummary>.teamIcon{position:absolute;right:14px;bottom:14px}.im .teamSummary>span{padding-right:64px}.im .teamSummary>small{margin-right:66px;min-height:30px;display:flex;align-items:center}.im button.teamSummary:hover>.teamIcon,.im button.teamSummary:focus-visible>.teamIcon{transform:translateY(-3px) scale(1.05);box-shadow:0 5px 12px #173f6220}.im .teamSummary.active>.teamIcon{box-shadow:0 0 0 3px #315fe620}.im .teamSummary.icon-centre.active>.teamIcon{box-shadow:0 0 0 3px #a3600820}.im .teamSummary.icon-communications.active>.teamIcon{box-shadow:0 0 0 3px #7441bf20}.im .teamSummary.icon-recovery.active>.teamIcon{box-shadow:0 0 0 3px #087e6b20}@media(prefers-reduced-motion:reduce){.im .teamIcon{transition:none}.im button.teamSummary:hover>.teamIcon,.im button.teamSummary:focus-visible>.teamIcon{transform:none}}\n      .im .teamOverviewHeading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}.im .teamOverviewHeading h3{margin:0;font-size:18px}.im .teamOverviewHeading p{margin:5px 0 0;color:#62788e;font-size:13px}.im .teamOverview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}.im button.teamSummary{display:flex;flex-direction:column;align-items:stretch;gap:9px;min-width:0;padding:16px;text-align:left;border:1px solid #c5d6e7;border-radius:12px;background:#f7faff;min-height:175px}.im button.teamSummary.active{border:2px solid #315fe6;background:#edf3ff;padding:15px;box-shadow:0 3px 12px #315fe618}.im .teamSummaryTop{display:flex;align-items:center;justify-content:space-between;gap:6px}.im .teamNumber{display:grid;place-items:center;width:27px;height:27px;flex-shrink:0;border-radius:8px;background:#e0eaff;color:#315fe6}.im .teamReadiness{padding:5px 7px;border-radius:20px;font-size:10px;white-space:nowrap}.im .teamReadiness.ready{background:#daf5e9;color:#08745d}.im .teamReadiness.attention{background:#fff0d5;color:#8a5300}.im .teamSummary>strong{font-size:15px;line-height:1.4;overflow-wrap:anywhere}.im .teamSummary>span{font-size:12px;font-weight:400;color:#52708b;overflow-wrap:anywhere}.im .teamSummary>small{margin-top:auto;color:#315fe6;font-size:11px}.im .teamDetailActions{display:flex;gap:8px}.im .rowHeading .collapseTeam{background:#edf4ff;color:#2459d6;border-color:#b7cbdf}.im .teamEmpty{padding:20px;border:1px dashed #c5d6e7;border-radius:12px;color:#62788e}@media(max-width:1250px){.im .teamOverview{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.im .teamOverview{grid-template-columns:1fr}.im .teamOverviewHeading{align-items:flex-start;flex-direction:column}.im .rowHeading{flex-wrap:wrap}}\n      .im .teamField{margin:20px 0;padding:18px;border:1px solid #c7d8e9;border-radius:12px;min-width:0}.im .teamField legend{font-size:15px;font-weight:850;padding:0 8px}.im .teamChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}.im .teamChoices button{display:flex;align-items:center;gap:10px;text-align:left;min-height:54px;background:#f4f8ff;border-color:#c6d7ee}.im .teamChoices button>b{color:#315fe6;font-size:18px}.im .teamChoices button.selected{background:#dcf7f1;border-color:#15ad9e;color:#086254}.im .teamChoices button.selected>b{color:#078d7d}.im .teamField textarea{min-height:80px}.im .procedurePreview{padding:20px;border-left:4px solid #315fe6;border-radius:12px;background:#f1f6ff}.im .procedurePreview h3{margin:0}.im .procedurePreview p{font-size:14px;color:#62788e}.im .procedurePreview textarea{min-height:340px;background:#fff;font-size:16px;line-height:1.7}.im .procedurePreview details{margin-top:16px}.im .procedurePreview summary{cursor:pointer;font-weight:750}@media(max-width:700px){.im .teamChoices{grid-template-columns:1fr}.im .teamField{padding:12px}.im .procedurePreview{padding:14px}}\n      .im article[id^=\"incident-scenario-\"]{scroll-margin-top:24px}.im .scenarioLegend{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px}.im .scenarioLegend>span{padding:7px 10px;border-radius:7px;font-size:12px;border:1px solid #c5d6e7}.im .scenarioLegend .siteLinked,.im .cards button.scenarioCard.siteLinked{background:#dcf7f1;border-color:#14afa0;color:#086254}.im .scenarioLegend .needsConfirmation,.im .cards button.scenarioCard.needsConfirmation{background:#fff7e7;border-color:#eac67c;color:#80540b}.im .scenarioLegend .editingLegend{background:#edf3ff;border-color:#315fe6;color:#2459d6}.im .scenarioSource{font-size:13px;color:#52708b;margin:8px 0 16px}.im .cards button.scenarioCard.editing{outline:3px solid #315fe6;outline-offset:2px;box-shadow:0 3px 12px #315fe618}.im .cards button.scenarioCard.needsConfirmation .selectionMark{color:#80540b}.im .channelField>small{font-size:12px;color:#62788e;font-weight:400}.im .channelField .teamChoices{margin-top:10px;margin-bottom:8px}.im .channelField .teamChoices button{padding:10px;min-height:48px}.im .channelField .teamChoices button span>small{display:block;font-size:10px;font-weight:400;margin-top:4px}.im .channelSummary{padding:10px;border-radius:8px;background:#eef5fa;color:#52708b;font-size:12px;font-weight:400;line-height:1.5;margin:0}.im .retainedScenarioText{margin-top:18px;padding:14px;background:#f4f8ff;border:1px solid #c5d6e7;border-radius:9px}.im .retainedScenarioText summary{cursor:pointer;font-weight:750}.im .retainedScenarioText p{font-size:14px}.im .retainedScenarioText>div{border-top:1px solid #c5d6e7;margin-top:12px}.im .scenarioDetails .procedurePreview{margin-top:20px}.im .scenarioDetails fieldset>p{font-size:14px;color:#62788e}.im .longField{grid-column:1/-1}.im .rowHeading h3{display:flex;align-items:center;gap:10px}.im .cards button{display:flex;align-items:center;gap:14px}.im .cards button>span:not(.hazardIcon){flex:1;min-width:0}.im .cards button strong,.im .cards button small{display:block}.im .cards button small{margin-top:5px;color:#60788e;font-size:12px;font-weight:400}.im .selectionMark{font-size:22px;color:#008b80}.im .relink{margin-top:16px;padding:15px;background:#fff7e7;border:1px solid #eac67c;border-radius:10px}.im .hazardIcon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:14px;border:1px solid #bdd0e1;background:#edf4ff;color:#2459d6;box-shadow:0 5px 14px #143a6420}.im .hazardIcon svg{width:38px;height:38px}.im .hazardIcon.small{width:25px;height:25px;flex-basis:25px;border-radius:7px;box-shadow:none}.im .hazardIcon.small svg{width:17px;height:17px}.im .hazardIcon.tone-Low{background:#dff5e9;color:#087242;border-color:#a8dfc2}.im .hazardIcon.tone-Moderate{background:#fff2bf;color:#805d00;border-color:#ead377}.im .hazardIcon.tone-High{background:#ffe1b8;color:#944f00;border-color:#efba78}.im .hazardIcon.tone-Critical{background:#ffd4d4;color:#a61f1f;border-color:#efa4a4}.im footer{row-gap:12px}.im footer button{min-height:44px}.im .grid>label input,.im .grid>label select{min-height:44px}\n      .im,.im *{box-sizing:border-box}.im{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342;align-items:start}.im>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.im .brand{font-size:21px;font-weight:950}.im .brand span{font-weight:500}.im aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-size:13px;font-weight:900;letter-spacing:.14em}.im .completion{padding:16px;border-radius:12px;background:#ffffff0a}.im .completion strong{font-size:28px}.im .completion>span{float:right;margin-top:10px;font-size:10px}.im .completionTrack{height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.im .completionTrack i{display:block;height:100%;background:#55e1d4}.im nav{display:grid;gap:6px;margin-top:18px}.im nav button{display:flex;gap:10px;align-items:center;width:100%;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left;font-size:13px;font-weight:500}.im nav button.active{background:#245d97}.im nav button>b{display:grid;place-items:center;width:26px;height:26px;flex-shrink:0;border:1px solid #4b779f;border-radius:7px;color:#61dfd3;font-size:16px}.im .outputs{display:grid;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25}.im .outputs>b{font-size:16px}.im .outputs>span{padding:8px;border-radius:7px;background:#ffffff08;color:#a9bfd5;font-size:10px;line-height:1.4}.im .outputs>span.ready{color:#63e2d4}.im .workspace{min-width:0}.im .stepHeader{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;background:transparent;border:0;padding:0}.im .stepHeader small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.14em}.im .stepHeader h2{margin:9px 0 4px;font-size:36px;line-height:1.2}.im .stepHeader p{margin:0;color:#62788e;font-size:16px;line-height:1.5}.im .recordStatus{text-transform:capitalize;color:#62788e;white-space:nowrap;font-size:16px}.im .recordStatus.approved{color:#008e80}.im .stepDivider{height:6px;border-radius:5px;background:#315fe6;margin:16px 0 18px}.im .content{padding:25px;border:1px solid #cbd9e6;border-radius:18px;background:#fff}.im .intro{padding:20px;margin-bottom:18px;border-radius:12px;background:#eef5fa}.im .intro strong{font-size:16px}.im .intro p{margin:7px 0 0;color:#62788e;font-size:16px;line-height:1.5}.im .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.im label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:850;min-width:0}.im input,.im select,.im textarea{width:100%;min-width:0;font:inherit;font-weight:750;color:#143556;padding:12px;border:1px solid #b7cbdf;border-radius:9px;background:#fafcff;line-height:1.4}.im select{background:#fafcff}.im textarea{min-height:130px;resize:vertical;line-height:1.6;font-size:15px;font-weight:400;background:#fff}.im input:focus-visible,.im select:focus-visible,.im textarea:focus-visible,.im button:focus-visible{outline:3px solid #55cfc5;outline-offset:2px}.im article{padding:20px;margin:0 0 20px;border:1px solid #cfdae6;border-radius:12px;background:#fff}.im .rowHeading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:12px}.im .rowHeading h3{margin:0;font-size:18px}.im .rowHeading button{background:#fff0ed;color:#b42318;border-color:#efbcb5;font-size:12px}.im button{font:inherit;font-size:13px;font-weight:850;padding:11px 14px;border-radius:8px;border:1px solid #c5d4e2;background:#fff;color:#183c61;cursor:pointer}.im button:disabled{opacity:.5;cursor:wait}.im .primary,.im .add{background:#315fe6;color:#fff;border-color:#315fe6}.im footer{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.im footer .primary{margin-left:auto}.im .error{padding:16px;background:#fff0ef;border:1px solid #edaaa5;border-radius:10px;color:#a6241c;margin:16px 0;line-height:1.5}.im .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:24px}.im .cards button{text-align:left;min-height:70px;background:#fafcff}.im .cards button.selected{background:#dcf7f1;border-color:#14afa0;color:#086254}.im p{line-height:1.55}@media(max-width:950px) and (min-width:701px){.im{grid-template-columns:80px minmax(0,1fr)}.im .brand,.im aside>small,.im .completion,.im nav button>span,.im .outputs{display:none}.im>aside{padding:18px 10px}.im nav button{justify-content:center;padding:8px}}@media(max-width:700px){.im{display:block}.im>aside{position:static;height:auto;margin-bottom:15px;padding:20px}.im nav{display:flex;overflow:auto}.im nav button{width:auto;flex-shrink:0}.im .outputs{display:none}.im .grid,.im .cards{grid-template-columns:1fr}.im .stepHeader{align-items:flex-start}.im .stepHeader h2{font-size:29px}.im .stepHeader p{font-size:14px}.im .content{padding:18px}.im .intro{padding:16px}.im footer .primary{margin-left:0}}\n      .im .audienceSource{display:grid;gap:10px}.im .audienceSource>small{font-size:12px;font-weight:400;color:#52708b;line-height:1.5}.im .audienceSource details{padding:12px;background:#eef5fa;border-radius:8px;font-size:13px;font-weight:400}.im .audienceSource summary{cursor:pointer;font-weight:750}.im .audienceSource p{overflow-wrap:anywhere}.im .communicationOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}.im button.communicationCard{display:flex;flex-direction:column;gap:8px;text-align:left;min-width:0;background:#f5f8ff;padding:16px;border-radius:12px}.im button.communicationCard.active{background:#dcf7f1;border-color:#14afa0;outline:2px solid #315fe6;outline-offset:2px}.im .communicationCard strong{font-size:16px}.im .communicationCard span{font-size:12px;font-weight:400;color:#52708b;overflow-wrap:anywhere}.im .communicationCard small{font-size:11px;color:#2459d6}.im .communicationChannel{min-width:0;margin:0;padding:16px;border:1px solid #c5d6e7;border-radius:12px;background:#fafcff}.im .communicationChannel legend{font-size:15px;font-weight:850;padding:0 6px}.im .channelGroups{display:grid;gap:8px;margin:12px 0}.im .channelGroup{border:1px solid #c7d8e9;border-radius:8px;background:#fff;min-width:0}.im .channelGroup summary{cursor:pointer;padding:12px;min-height:44px;font-size:13px;font-weight:750;overflow-wrap:anywhere}.im .channelGroup summary>span{float:right;margin-left:8px;font-size:11px;font-weight:400;color:#52708b}.im .channelGroup .teamChoices{padding:0 10px 10px;margin:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.im .channelGroup button{min-width:0;min-height:44px;white-space:normal;overflow-wrap:anywhere}.im .channelSummary{overflow-wrap:anywhere}.im .workspace,.im .content,.im #communication-details{min-width:0}.im #communication-details>.grid{align-items:start}.im #communication-details .communicationText{min-height:76px;font-size:14px;line-height:1.5}.im #communication-details .communicationChannel{align-self:start}.im #communication-details .audienceSource{width:100%}@media(max-width:1100px){.im .communicationOverview{grid-template-columns:repeat(2,minmax(0,1fr))}.im #communication-details>.grid{grid-template-columns:1fr}}@media(max-width:700px){.im #communication-details .communicationText{font-size:16px}.im .communicationOverview{grid-template-columns:1fr}.im .communicationChannel{padding:12px}.im input,.im select,.im textarea{font-size:16px}.im footer button{flex:1 1 140px}.im nav button{min-height:44px}.im .channelGroup .teamChoices{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:380px){.im .channelGroup .teamChoices{grid-template-columns:1fr}.im .channelGroup summary>span{float:none;display:block;margin:4px 0 0}}\n\n      .im .actionMetrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}.im .actionMetrics>button,.im .actionMetrics>div{display:flex;flex-direction:column;gap:5px;text-align:left;padding:14px;border:1px solid #c5d6e7;border-radius:10px;background:#f5f8ff}.im .actionMetrics strong{font-size:24px}.im .actionMetrics span{font-size:12px}.im .actionMetrics>.selected{background:#dcf7f1;border-color:#14afa0}.im .actionMetrics>.overdueMetric{background:#fff1ec;color:#a13a25}.im .actionFilters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end;gap:12px;margin-bottom:18px}.im .actionFilters button{min-height:44px}.im .actionOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}.im button.actionCard{display:flex;flex-direction:column;gap:9px;text-align:left;padding:16px;min-width:0;background:#f5f8ff;border-radius:12px}.im .actionCard strong{font-size:16px}.im .actionCard>span{font-size:12px;font-weight:400;overflow-wrap:anywhere}.im .actionCard small{color:#2459d6}.im button.actionCard.active{outline:2px solid #315fe6;outline-offset:2px;border-color:#315fe6}.im button.actionCard.overdue{border-color:#dc906e;background:#fff5ef}.im .actionCardTop{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;width:100%}.im .actionBadge{padding:5px 8px;border-radius:6px;background:#e6edf6;font-size:11px}.im .actionBadge.status-in_progress{background:#e4eeff;color:#2459d6}.im .actionBadge.status-blocked{background:#ffe1d8;color:#a13a25}.im .actionBadge.status-closed{background:#dff5e9;color:#087242}.im .actionSourceWarning{color:#8a5a0b;background:#fff5df;padding:10px;border-radius:7px}.im .actionChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.im .actionChoices button{text-align:left;min-height:48px;white-space:normal;overflow-wrap:anywhere;background:#f4f8ff}.im .actionChoices button.selected{background:#dcf7f1;border-color:#14afa0;color:#086254}.im .actionChoices .priority-0.selected{background:#ffe0df;border-color:#d9908c;color:#982c25}.im .actionChoices .priority-1.selected{background:#ffedca;border-color:#dcb86d;color:#80530b}.im .actionChoices .priority-2.selected{background:#e4eeff;border-color:#9dbced;color:#2459d6}.im .actionChoices .status-2.selected{background:#ffe1d8;border-color:#dc906e;color:#a13a25}.im .actionDetails .teamField{margin:18px 0}.im .actionDetails .teamField>label{margin-top:14px}.im .actionDetails .rowHeading h3{overflow-wrap:anywhere}.im .actionSuggestion{padding:16px;border:1px solid #c5d6e7;border-radius:10px;background:#eef5fa;margin:18px 0}.im .actionSuggestion h4{margin:0}.im .actionSuggestion small{display:block;margin-top:10px;color:#52708b}.im .actionAssignments{margin:18px 0}.im .actionDetails label>small{font-weight:400;color:#52708b}.im .actionDetails textarea{font-size:16px}.im .actionDetails>label{margin-top:16px}.im .actionTextLabel textarea{min-height:160px}.im .actionDetails>label input{min-height:44px}@media(max-width:1100px){.im .actionOverview{grid-template-columns:repeat(2,minmax(0,1fr))}.im .actionFilters{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.im .actionOverview,.im .actionFilters,.im .actionAssignments,.im .actionChoices{grid-template-columns:1fr}.im .actionMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}.im .actionDetails .rowHeading{align-items:flex-start;flex-direction:column}.im .actionDetails{padding:14px}.im .actionCardTop{gap:12px}}\n\n      .im .recoveryReadiness{padding:18px;border-radius:12px;background:#fff5df;color:#80540b;margin-bottom:18px}.im .recoveryReadiness.ready{background:#dcf7f1;color:#086254}.im .recoveryReadiness p{margin:8px 0 0;font-size:14px}.im .recoveryOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:22px}.im button.recoveryCard{display:flex;flex-direction:column;gap:12px;text-align:left;padding:16px;background:#f4f8ff;min-width:0}.im .recoveryCard>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.im .recoveryCard strong{font-size:16px}.im .recoveryCard small{font-size:12px;font-weight:400;overflow-wrap:anywhere}.im button.recoveryCard.active{outline:2px solid #315fe6;outline-offset:2px;background:#edf3ff}.im .recoveryDetails{scroll-margin-top:20px}.im .recoveryDetails .teamField{margin:18px 0}.im .recoveryDetails>label,.im .recoveryDetails>.grid{margin-top:18px}.im .recoveryDetails small{font-weight:400;color:#52708b}.im .recoveryGuidance{padding:14px;background:#eef5fa;border-radius:8px;color:#52708b}.im .recoveryScenarioOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.im button.recoveryScenarioCard{display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-align:left;min-width:0;background:#eaf8f2;border-color:#8ecab2}.im .recoveryScenarioCard strong{flex:1;overflow-wrap:anywhere}.im .recoveryScenarioCard small{width:100%;font-size:11px}.im button.recoveryScenarioCard.active{outline:2px solid #315fe6;outline-offset:2px}.im button.recoveryScenarioCard.unlinked{background:#fff5df;border-color:#e5bd69}.im .recoveryScenarioDetails{padding:16px;border:1px solid #c5d6e7;border-radius:10px;background:#f8fbfe}.im .recoveryScenarioDetails>label,.im .recoveryScenarioDetails>.grid{margin-top:16px}.im .recoveryScenarioDetails h4{margin:0}.im .recoveryDetails .procedurePreview{margin-top:20px}.im .recoveryFullProcedure{padding:18px;border:1px solid #c5d6e7;border-radius:12px;background:#eef5fa;margin:20px 0}.im .recoveryFullProcedure summary{cursor:pointer;font-weight:850}.im .recoveryFullProcedure textarea{min-height:400px;margin-top:14px}.im .recoveryChecklist{display:grid;gap:8px}.im .recoveryChecklist button{text-align:left;min-height:44px;background:#fff5df;color:#80540b;border-color:#e5bd69}.im .recoveryAllReady{padding:12px;background:#dcf7f1;color:#086254;border-radius:8px}.im .recoveryDetails textarea,.im .recoveryFullProcedure textarea{font-size:16px}.im #recovery-approval{scroll-margin-top:20px}@media(max-width:1100px){.im .recoveryOverview,.im .recoveryScenarioOverview{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.im .recoveryOverview,.im .recoveryScenarioOverview,.im .recoveryDetails .grid,.im .recoveryDetails .teamChoices{grid-template-columns:1fr}.im .recoveryDetails{padding:14px}.im .recoveryDetails .rowHeading{align-items:flex-start;flex-wrap:wrap}.im .recoveryScenarioDetails{padding:12px}}\n    "}</style>
   </form>;
 }
