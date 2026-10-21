@@ -1,228 +1,129 @@
+// VERIFIED_BCP_ROLES_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
+
+import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import BCPModuleNavigation from "./BCPModuleNavigation";
 import { useActionState, useEffect, useMemo, useState } from "react";
-
 const uid = () => crypto.randomUUID();
-const arr = (value) => (Array.isArray(value) ? value : []);
-const systems = [
-  { code: "Q", name: "Quality", standard: "ISO 9001:2026" },
-  { code: "E", name: "Environmental", standard: "ISO 14001:2026" },
-  {
-    code: "S",
-    name: "Occupational health & safety",
-    standard: "ISO 45001:2018/Amd 1:2024",
-  },
-  {
-    code: "B",
-    name: "Business continuity",
-    standard: "ISO 22301:2019/Amd 1:2024",
-  },
-  {
-    code: "IS",
-    name: "Information security",
-    standard: "ISO/IEC 27001:2022/Amd 1:2024",
-  },
-  { code: "EN", name: "Energy", standard: "ISO 50001:2018/Amd 1:2024" },
-];
-const roleLibrary = [
-  [
-    "Executive sponsor",
-    "Provides direction, approves policy, scope, objectives and resources, and removes barriers.",
-    ["B"],
-    "Top management",
-  ],
-  [
-    "BCMS leader",
-    "Maintains the BCMS framework, coordinates implementation and reports performance to top management.",
-    ["B"],
-    "BCMS coordination",
-  ],
-  [
-    "Site leader",
-    "Ensures local plans are developed, maintained, exercised and improved against applicable requirements.",
-    ["B"],
-    "Site governance",
-  ],
-  [
-    "Process owner",
-    "Completes BIA, validates dependencies, selects recovery strategies and maintains process recovery procedures.",
-    ["B"],
-    "Process recovery",
-  ],
-  [
-    "Risk and treatment owner",
-    "Evaluates disruption risks and opportunities, implements treatment and monitors residual exposure.",
-    ["B"],
-    "Risk management",
-  ],
-  [
-    "Plan owner",
-    "Develops, maintains and activates the relevant continuity or response plan.",
-    ["B"],
-    "Plans",
-  ],
-  [
-    "Incident commander",
-    "Authorises activation, sets priorities, coordinates response and records critical decisions.",
-    ["B", "S"],
-    "Response authority",
-  ],
-  [
-    "Communications lead",
-    "Coordinates approved internal and external disruption communications and stakeholder updates.",
-    ["B", "Q"],
-    "Communication",
-  ],
-  [
-    "Exercise coordinator",
-    "Plans exercises, records results and tracks lessons through controlled improvement.",
-    ["B"],
-    "Exercise programme",
-  ],
-  [
-    "Internal auditor",
-    "Provides independent assurance on conformity, implementation and effectiveness.",
-    ["B", "Q", "E", "S", "IS"],
-    "Assurance",
-  ],
-  [
-    "Management review chair",
-    "Ensures planned management review evaluates suitability, adequacy and effectiveness.",
-    ["B"],
-    "Management review",
-  ],
-  [
-    "Information security lead",
-    "Maintains secure physical and logical access and coordinates ICT/information continuity.",
-    ["B", "IS"],
-    "Information continuity",
-  ],
-];
-const activityLibrary = [
-  ["Management-system training and awareness", "Core management process"],
-  [
-    "Applicable requirements, standards and compliance obligations",
-    "Core management process",
-  ],
-  [
-    "Environmental aspects, impacts, objectives and targets",
-    "Core management process",
-  ],
-  [
-    "Management of critical activities and operational controls",
-    "Core management process",
-  ],
-  [
-    "Performance indicators, monitoring and reporting",
-    "Core management process",
-  ],
-  [
-    "Communication, consultation, participation and recognition",
-    "Core management process",
-  ],
-  [
-    "Continual improvement, nonconformity and corrective action",
-    "Core management process",
-  ],
-  [
-    "Supplier, contractor and outsourced-process control",
-    "Core management process",
-  ],
-  ["Driving in the course of work", "Critical activity"],
-  ["Work at height and elevated work", "Critical activity"],
-  ["Laboratory and engineering work", "Critical activity"],
-  ["Warehouse, lifting and material handling", "Critical activity"],
-  ["Computer and display-screen work", "Critical activity"],
-  ["Facilities and maintenance work", "Critical activity"],
-  ["Site-specific high-risk or quality-critical activity", "Critical activity"],
-  [
-    "Preventive maintenance - operational equipment",
-    "Critical support activity",
-  ],
-  [
-    "Preventive maintenance - facilities and infrastructure",
-    "Critical support activity",
-  ],
-  ["Emergency preparedness and response", "Critical support activity"],
-  ["Control of nonconforming outputs", "Critical support activity"],
-  ["Monitoring and measuring resources", "Critical support activity"],
-  ["Workplace organisation and 5S", "Critical support activity"],
-];
+const arr = value => (() => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return [];
+})();
+const systems = [{
+  "code": "Q",
+  "name": "Quality",
+  "standard": "ISO 9001:2026"
+}, {
+  "code": "E",
+  "name": "Environmental",
+  "standard": "ISO 14001:2026"
+}, {
+  "code": "S",
+  "name": "Occupational health & safety",
+  "standard": "ISO 45001:2018/Amd 1:2024"
+}, {
+  "code": "B",
+  "name": "Business continuity",
+  "standard": "ISO 22301:2019/Amd 1:2024"
+}, {
+  "code": "IS",
+  "name": "Information security",
+  "standard": "ISO/IEC 27001:2022/Amd 1:2024"
+}, {
+  "code": "EN",
+  "name": "Energy",
+  "standard": "ISO 50001:2018/Amd 1:2024"
+}];
+const roleLibrary = [["Executive sponsor", "Provides direction, approves policy, scope, objectives and resources, and removes barriers.", ["B"], "Top management"], ["BCMS leader", "Maintains the BCMS framework, coordinates implementation and reports performance to top management.", ["B"], "BCMS coordination"], ["Site leader", "Ensures local plans are developed, maintained, exercised and improved against applicable requirements.", ["B"], "Site governance"], ["Process owner", "Completes BIA, validates dependencies, selects recovery strategies and maintains process recovery procedures.", ["B"], "Process recovery"], ["Risk and treatment owner", "Evaluates disruption risks and opportunities, implements treatment and monitors residual exposure.", ["B"], "Risk management"], ["Plan owner", "Develops, maintains and activates the relevant continuity or response plan.", ["B"], "Plans"], ["Incident commander", "Authorises activation, sets priorities, coordinates response and records critical decisions.", ["B", "S"], "Response authority"], ["Communications lead", "Coordinates approved internal and external disruption communications and stakeholder updates.", ["B", "Q"], "Communication"], ["Exercise coordinator", "Plans exercises, records results and tracks lessons through controlled improvement.", ["B"], "Exercise programme"], ["Internal auditor", "Provides independent assurance on conformity, implementation and effectiveness.", ["B", "Q", "E", "S", "IS"], "Assurance"], ["Management review chair", "Ensures planned management review evaluates suitability, adequacy and effectiveness.", ["B"], "Management review"], ["Information security lead", "Maintains secure physical and logical access and coordinates ICT/information continuity.", ["B", "IS"], "Information continuity"]];
+const activityLibrary = [["Management-system training and awareness", "Core management process"], ["Applicable requirements, standards and compliance obligations", "Core management process"], ["Environmental aspects, impacts, objectives and targets", "Core management process"], ["Management of critical activities and operational controls", "Core management process"], ["Performance indicators, monitoring and reporting", "Core management process"], ["Communication, consultation, participation and recognition", "Core management process"], ["Continual improvement, nonconformity and corrective action", "Core management process"], ["Supplier, contractor and outsourced-process control", "Core management process"], ["Driving in the course of work", "Critical activity"], ["Work at height and elevated work", "Critical activity"], ["Laboratory and engineering work", "Critical activity"], ["Warehouse, lifting and material handling", "Critical activity"], ["Computer and display-screen work", "Critical activity"], ["Facilities and maintenance work", "Critical activity"], ["Site-specific high-risk or quality-critical activity", "Critical activity"], ["Preventive maintenance - operational equipment", "Critical support activity"], ["Preventive maintenance - facilities and infrastructure", "Critical support activity"], ["Emergency preparedness and response", "Critical support activity"], ["Control of nonconforming outputs", "Critical support activity"], ["Monitoring and measuring resources", "Critical support activity"], ["Workplace organisation and 5S", "Critical support activity"]];
 const newRole = (title = "") => ({
-  id: uid(),
-  title,
-  purpose: "",
-  people: [],
-  primaryHolder: "",
-  deputies: [],
-  systems: ["B"],
-  authority: "",
-  escalation: "",
-  competence: "",
-  communication: "",
-  source: "User defined",
+  "id": uid(),
+  "title": title,
+  "purpose": "",
+  "people": [],
+  "primaryHolder": "",
+  "deputies": [],
+  "systems": ["B"],
+  "authority": "",
+  "escalation": "",
+  "competence": "",
+  "communication": "",
+  "source": "User defined"
 });
 const newAssignment = (activity = "") => ({
-  id: uid(),
-  activity,
-  accountable: "",
-  responsible: [],
-  consulted: [],
-  informed: [],
-  frequency: "",
-  evidence: "",
-  source: "User defined",
+  "id": uid(),
+  "activity": activity,
+  "accountable": "",
+  "responsible": [],
+  "consulted": [],
+  "informed": [],
+  "frequency": "",
+  "evidence": "",
+  "source": "User defined"
 });
-const steps = [
-  "Record & applicability",
-  "Core processes",
-  "Critical activities",
-  "Support activities",
-  "BCMS responsibilities",
-  "Controlled record",
-];
-
-function Chips({ items, selected = [], toggle, prefix = "+" }) {
-  return (
-    <div className="r4Chips">
-      {items.map((item) => {
-        const value = typeof item === "string" ? item : item.value,
-          label = typeof item === "string" ? item : item.label,
-          active = selected.includes(value);
-        return (
-          <button
-            type="button"
-            key={value}
-            className={active ? "selected" : ""}
-            onClick={() => toggle(value)}
-          >
-            {active ? "✓" : prefix} {label}
-          </button>
-        );
-      })}
-    </div>
-  );
+const steps = ["Record & applicability", "Core processes", "Critical activities", "Support activities", "BCMS responsibilities", "Controlled record"];
+function Chips({
+  items,
+  selected = [],
+  toggle,
+  prefix = "+"
+}) {
+  return <div className="r4Chips">
+      {items.map(item => {
+      const value = (() => {
+          if (typeof item === "string") {
+            return item;
+          }
+          return item.value;
+        })(),
+        label = (() => {
+          if (typeof item === "string") {
+            return item;
+          }
+          return item.label;
+        })(),
+        active = selected.includes(value);
+      return <button type="button" key={value} className={(() => {
+        if (active) {
+          return "selected";
+        }
+        return "";
+      })()} onClick={() => toggle(value)}>
+            {(() => {
+          if (active) {
+            return "✓";
+          }
+          return prefix;
+        })()} {label}
+          </button>;
+    })}
+    </div>;
 }
-function Field({ label, value, onChange, area = false, placeholder = "", invalid = false }) {
-  return (
-    <label className={invalid ? "r4FieldMissing" : ""}>
+function Field({
+  label,
+  value,
+  onChange,
+  area = false,
+  placeholder = "",
+  invalid = false
+}) {
+  return <label className={(() => {
+    if (invalid) {
+      return "r4FieldMissing";
+    }
+    return "";
+  })()}>
       {label}
       {invalid && <em>Required</em>}
-      {area ? (
-        <textarea
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-        />
-      ) : (
-        <input
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-        />
-      )}
-    </label>
-  );
+      {(() => {
+      if (area) {
+        return <textarea value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} />;
+      }
+      return <input value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} />;
+    })()}
+    </label>;
 }
 function PersonSelect({
   value = "",
@@ -231,216 +132,213 @@ function PersonSelect({
   people = [],
   required = false,
   exclude = [],
-  placeholder = "Select a Company User",
+  placeholder = "Select a Company User"
 }) {
-  const options = people.filter((person) => {
-    const value = typeof person === "string" ? person : person.id;
+  const options = people.filter(person => {
+    const value = (() => {
+      if (typeof person === "string") {
+        return person;
+      }
+      return person.id;
+    })();
     return !exclude.includes(value);
   });
-  return (
-    <select
-      name={name}
-      value={value}
-      required={required}
-      onChange={(event) => onChange?.(event.target.value)}
-    >
+  return <select name={name} value={value} required={required} onChange={event => onChange?.(event.target.value)}>
       <option value="">
-        {options.length ? placeholder : "No eligible Company Users available"}
+        {(() => {
+        if (options.length) {
+          return placeholder;
+        }
+        return "No eligible Company Users available";
+      })()}
       </option>
-      {options.map((person) => {
-        const value = typeof person === "string" ? person : person.id;
-        const label = typeof person === "string" ? person : person.label;
-        return (
-        <option key={value} value={value}>
+      {options.map(person => {
+      const value = (() => {
+        if (typeof person === "string") {
+          return person;
+        }
+        return person.id;
+      })();
+      const label = (() => {
+        if (typeof person === "string") {
+          return person;
+        }
+        return person.label;
+      })();
+      return <option key={value} value={value}>
           {label}
-        </option>
-        );
-      })}
-    </select>
-  );
+        </option>;
+    })}
+    </select>;
 }
-function RoleCard({ role, roles, setRoles, people }) {
-  const change = (key, value) =>
-    setRoles(roles.map((x) => (x.id === role.id ? { ...x, [key]: value } : x)));
-  const toggle = (key, value) =>
-    change(
-      key,
-      arr(role[key]).includes(value)
-        ? arr(role[key]).filter((x) => x !== value)
-        : [...arr(role[key]), value],
-    );
-  const missing = [
-    !role.title && "Role title",
-    !role.purpose && "Purpose and responsibility",
-    !role.primaryHolder && "Primary role holder",
-    !arr(role.people).length && "Assigned people",
-    !role.authority && "Decision authority",
-    !role.escalation && "Escalation route",
-    !role.competence && "Competence requirement",
-    !role.communication && "Communication / acknowledgement",
-  ].filter(Boolean);
-  return (
-    <article className={`r4Card ${missing.length ? "roleIncomplete" : "roleComplete"}`}>
+function RoleCard({
+  role,
+  roles,
+  setRoles,
+  people
+}) {
+  const change = (key, value) => setRoles(roles.map(x => (() => {
+    if (x.id === role.id) {
+      return {
+        ...x,
+        [key]: value
+      };
+    }
+    return x;
+  })()));
+  const toggle = (key, value) => change(key, (() => {
+    if (arr(role[key]).includes(value)) {
+      return arr(role[key]).filter(x => x !== value);
+    }
+    return [...arr(role[key]), value];
+  })());
+  const missing = [!role.title && "Role title", !role.purpose && "Purpose and responsibility", !role.primaryHolder && "Primary role holder", !arr(role.people).length && "Assigned people", !role.authority && "Decision authority", !role.escalation && "Escalation route", !role.competence && "Competence requirement", !role.communication && "Communication / acknowledgement"].filter(Boolean);
+  return <article className={"r4Card " + (() => {
+    if (missing.length) {
+      return "roleIncomplete";
+    }
+    return "roleComplete";
+  })() + ""}>
       <header>
         <div>
           <b>{role.title || "New role"}</b>
           <small>{role.source}</small>
         </div>
-        <span className={`r4RoleStatus ${missing.length ? "missing" : "ready"}`}>
-          {missing.length ? `${missing.length} required field${missing.length === 1 ? "" : "s"} missing` : "✓ Complete"}
+        <span className={"r4RoleStatus " + (() => {
+        if (missing.length) {
+          return "missing";
+        }
+        return "ready";
+      })() + ""}>
+          {(() => {
+          if (missing.length) {
+            return "" + missing.length + " required field" + (() => {
+              if (missing.length === 1) {
+                return "";
+              }
+              return "s";
+            })() + " missing";
+          }
+          return "✓ Complete";
+        })()}
         </span>
-        <button
-          type="button"
-          onClick={() => setRoles(roles.filter((x) => x.id !== role.id))}
-        >
+        <button type="button" onClick={() => setRoles(roles.filter(x => x.id !== role.id))}>
           Remove
         </button>
       </header>
-      {missing.length > 0 && (
-        <div className="r4RoleMissing" role="status">
+      {missing.length > 0 && <div className="r4RoleMissing" role="status">
           <b>Complete this role:</b> {missing.join(" · ")}
-        </div>
-      )}
+        </div>}
       <div className="r4Grid">
-        <Field
-          label="Role title"
-          value={role.title}
-          invalid={!role.title}
-          onChange={(v) => change("title", v)}
-        />
-        <Field
-          label="Purpose and responsibility"
-          area
-          value={role.purpose}
-          invalid={!role.purpose}
-          onChange={(v) => change("purpose", v)}
-        />
-        <label className={!role.primaryHolder ? "r4FieldMissing" : ""}>
+        <Field label="Role title" value={role.title} invalid={!role.title} onChange={v => change("title", v)} />
+        <Field label="Purpose and responsibility" area value={role.purpose} invalid={!role.purpose} onChange={v => change("purpose", v)} />
+        <label className={(() => {
+        if (!role.primaryHolder) {
+          return "r4FieldMissing";
+        }
+        return "";
+      })()}>
           Primary role holder *
           {!role.primaryHolder && <em>Required</em>}
-          <PersonSelect
-            value={role.primaryHolder || ""}
-            people={people}
-            required
-            onChange={(value) =>
-              setRoles(
-                roles.map((item) =>
-                  item.id === role.id
-                    ? {
-                        ...item,
-                        primaryHolder: value,
-                        people: value
-                          ? [...new Set([...arr(item.people), value])]
-                          : arr(item.people),
-                        deputies: arr(item.deputies).filter(
-                          (deputy) => deputy !== value,
-                        ),
-                      }
-                    : item,
-                ),
-              )
-            }
-          />
+          <PersonSelect value={role.primaryHolder || ""} people={people} required onChange={value => setRoles(roles.map(item => (() => {
+          if (item.id === role.id) {
+            return {
+              ...item,
+              "primaryHolder": value,
+              "people": (() => {
+                if (value) {
+                  return [...new Set([...arr(item.people), value])];
+                }
+                return arr(item.people);
+              })(),
+              "deputies": arr(item.deputies).filter(deputy => deputy !== value)
+            };
+          }
+          return item;
+        })()))} />
           <small>
             The nominated Company User accountable for acting in this role.
           </small>
         </label>
       </div>
       <b className="r4Label">Applicable management systems</b>
-      <Chips
-        items={systems.map((x) => ({
-          value: x.code,
-          label: `${x.code} · ${x.name}`,
-        }))}
-        selected={arr(role.systems)}
-        toggle={(v) => toggle("systems", v)}
-      />
-      <div className={!arr(role.people).length ? "r4ChoiceMissing" : ""}>
+      <Chips items={systems.map(x => ({
+      "value": x.code,
+      "label": "" + x.code + " \xB7 " + x.name + ""
+    }))} selected={arr(role.systems)} toggle={v => toggle("systems", v)} />
+      <div className={(() => {
+      if (!arr(role.people).length) {
+        return "r4ChoiceMissing";
+      }
+      return "";
+    })()}>
         <b className="r4Label">Assigned people — select one or more</b>
         {!arr(role.people).length && <em>Required</em>}
-        <Chips
-          items={people.map((person) => ({
-            value: person.id,
-            label: person.label,
-          }))}
-          selected={arr(role.people)}
-          toggle={(v) => toggle("people", v)}
-        />
+        <Chips items={people.map(person => ({
+        "value": person.id,
+        "label": person.label
+      }))} selected={arr(role.people)} toggle={v => toggle("people", v)} />
       </div>
       <div className="r4Grid">
         <label>
           Deputy / alternate
-          <PersonSelect
-            value={arr(role.deputies)[0] || ""}
-            people={people}
-            exclude={[role.primaryHolder].filter(Boolean)}
-            placeholder="Select a different Company User"
-            onChange={(value) => change("deputies", value ? [value] : [])}
-          />
+          <PersonSelect value={arr(role.deputies)[0] || ""} people={people} exclude={[role.primaryHolder].filter(Boolean)} placeholder="Select a different Company User" onChange={value => change("deputies", (() => {
+          if (value) {
+            return [value];
+          }
+          return [];
+        })())} />
           <small>The primary role holder cannot also be their deputy.</small>
         </label>
-        <Field
-          label="Decision authority"
-          value={role.authority}
-          invalid={!role.authority}
-          onChange={(v) => change("authority", v)}
-          placeholder="What may this role authorise?"
-        />
-        <Field
-          label="Escalation route"
-          value={role.escalation}
-          invalid={!role.escalation}
-          onChange={(v) => change("escalation", v)}
-        />
-        <Field
-          label="Competence requirement"
-          value={role.competence}
-          invalid={!role.competence}
-          onChange={(v) => change("competence", v)}
-        />
-        <Field
-          label="Communication / acknowledgement"
-          value={role.communication}
-          invalid={!role.communication}
-          onChange={(v) => change("communication", v)}
-          placeholder="Briefing, role card, exercise, annual confirmation..."
-        />
+        <Field label="Decision authority" value={role.authority} invalid={!role.authority} onChange={v => change("authority", v)} placeholder="What may this role authorise?" />
+        <Field label="Escalation route" value={role.escalation} invalid={!role.escalation} onChange={v => change("escalation", v)} />
+        <Field label="Competence requirement" value={role.competence} invalid={!role.competence} onChange={v => change("competence", v)} />
+        <Field label="Communication / acknowledgement" value={role.communication} invalid={!role.communication} onChange={v => change("communication", v)} placeholder="Briefing, role card, exercise, annual confirmation..." />
       </div>
-    </article>
-  );
+    </article>;
 }
 function RaciMatrix({
   item,
   actors,
   externalActors = [],
   unavailableActors = [],
-  change,
+  change
 }) {
   const assignments = {
-    R: arr(item.responsible),
-    C: arr(item.consulted),
-    I: arr(item.informed),
+    "R": arr(item.responsible),
+    "C": arr(item.consulted),
+    "I": arr(item.informed)
   };
   const toggle = (code, actor) => {
     if (code === "A") {
-      change("accountable", item.accountable === actor ? "" : actor);
+      change("accountable", (() => {
+        if (item.accountable === actor) {
+          return "";
+        }
+        return actor;
+      })());
       return;
     }
-    const key = { R: "responsible", C: "consulted", I: "informed" }[code],
+    const key = {
+        "R": "responsible",
+        "C": "consulted",
+        "I": "informed"
+      }[code],
       current = assignments[code];
-    change(
-      key,
-      current.includes(actor)
-        ? current.filter((x) => x !== actor)
-        : [...current, actor],
-    );
+    change(key, (() => {
+      if (current.includes(actor)) {
+        return current.filter(x => x !== actor);
+      }
+      return [...current, actor];
+    })());
   };
-  const active = (code, actor) =>
-    code === "A"
-      ? item.accountable === actor
-      : assignments[code].includes(actor);
-  return (
-    <section className="r4Raci">
+  const active = (code, actor) => (() => {
+    if (code === "A") {
+      return item.accountable === actor;
+    }
+    return assignments[code].includes(actor);
+  })();
+  return <section className="r4Raci">
       <header>
         <div>
           <b>Responsibility assignment matrix</b>
@@ -456,196 +354,209 @@ function RaciMatrix({
           <span className="i">I · Informed</span>
         </div>
       </header>
-      {actors.length ? (
-        <div className="r4RaciScroll">
+      {(() => {
+      if (actors.length) {
+        return <div className="r4RaciScroll">
           <table>
             <thead>
               <tr>
                 <th>Role or person</th>
-                {[
-                  ["R", "Performs the work"],
-                  ["A", "Owns the outcome"],
-                  ["C", "Provides input"],
-                  ["I", "Receives updates"],
-                ].map(([code, title]) => (
-                  <th key={code} className={code.toLowerCase()}>
+                {[["R", "Performs the work"], ["A", "Owns the outcome"], ["C", "Provides input"], ["I", "Receives updates"]].map(([code, title]) => <th key={code} className={code.toLowerCase()}>
                     <b>{code}</b>
                     <small>{title}</small>
-                  </th>
-                ))}
+                  </th>)}
               </tr>
             </thead>
             <tbody>
-              {actors.map((actor) => (
-                <tr
-                  key={actor}
-                  className={unavailableActors.includes(actor) ? "unavailable" : ""}
-                >
+              {actors.map(actor => <tr key={actor} className={(() => {
+                if (unavailableActors.includes(actor)) {
+                  return "unavailable";
+                }
+                return "";
+              })()}>
                   <th>
                     {actor}
-                    {externalActors.includes(actor) && (
-                      <small className="r4External">External / manual</small>
-                    )}
-                    {unavailableActors.includes(actor) && (
-                      <small className="r4Unavailable">
+                    {externalActors.includes(actor) && <small className="r4External">External / manual</small>}
+                    {unavailableActors.includes(actor) && <small className="r4Unavailable">
                         Unavailable — clear assigned cells or remove below
-                      </small>
-                    )}
+                      </small>}
                   </th>
-                  {["R", "A", "C", "I"].map((code) => (
-                    <td key={code}>
-                      <button
-                        type="button"
-                        aria-label={`${code} ${actor}`}
-                        aria-pressed={active(code, actor)}
-                        className={`${code.toLowerCase()} ${active(code, actor) ? "selected" : ""}`}
-                        onClick={() => toggle(code, actor)}
-                      >
-                        {active(code, actor) ? code : ""}
+                  {["R", "A", "C", "I"].map(code => <td key={code}>
+                      <button type="button" aria-label={"" + code + " " + actor + ""} aria-pressed={active(code, actor)} className={"" + code.toLowerCase() + " " + (() => {
+                    if (active(code, actor)) {
+                      return "selected";
+                    }
+                    return "";
+                  })() + ""} onClick={() => toggle(code, actor)}>
+                        {(() => {
+                      if (active(code, actor)) {
+                        return code;
+                      }
+                      return "";
+                    })()}
                       </button>
-                    </td>
-                  ))}
-                </tr>
-              ))}
+                    </td>)}
+                </tr>)}
             </tbody>
           </table>
-        </div>
-      ) : (
-        <p className="r4Empty">
+        </div>;
+      }
+      return <p className="r4Empty">
           No roles or people are available. Add people in the Site Profile or
           create BCMS roles in Step 5.
-        </p>
-      )}
+        </p>;
+    })()}
       <footer>
-        <span className={item.responsible?.length ? "complete" : ""}>
+        <span className={(() => {
+        if (item.responsible?.length) {
+          return "complete";
+        }
+        return "";
+      })()}>
           {item.responsible?.length || 0} Responsible
         </span>
-        <span className={item.accountable ? "complete" : ""}>
-          {item.accountable ? "1" : "0"} Accountable
+        <span className={(() => {
+        if (item.accountable) {
+          return "complete";
+        }
+        return "";
+      })()}>
+          {(() => {
+          if (item.accountable) {
+            return "1";
+          }
+          return "0";
+        })()} Accountable
         </span>
         <span>{item.consulted?.length || 0} Consulted</span>
         <span>{item.informed?.length || 0} Informed</span>
       </footer>
-    </section>
-  );
+    </section>;
 }
-function AssignmentCard({ item, items, setItems, roles, people }) {
-  const change = (key, value) =>
-    setItems(items.map((x) => (x.id === item.id ? { ...x, [key]: value } : x)));
+function AssignmentCard({
+  item,
+  items,
+  setItems,
+  roles,
+  people
+}) {
+  const change = (key, value) => setItems(items.map(x => (() => {
+    if (x.id === item.id) {
+      return {
+        ...x,
+        [key]: value
+      };
+    }
+    return x;
+  })()));
   const [roleDraft, setRoleDraft] = useState("");
-  const roleNames = roles.map((x) => x.title).filter(Boolean),
+  const roleNames = roles.map(x => x.title).filter(Boolean),
     customActors = arr(item.customActors),
     availableActors = [...new Set([...roleNames, ...people, ...customActors])];
-  const actorKey = (value) => String(value || "").trim().toLocaleLowerCase();
+  const actorKey = value => String(value || "").trim().toLocaleLowerCase();
   const allowedActors = new Set(availableActors.map(actorKey));
-  const invalidActors = [
-    item.accountable,
-    ...arr(item.responsible),
-    ...arr(item.consulted),
-    ...arr(item.informed),
-  ]
-    .filter(Boolean)
-    .filter((actor) => !allowedActors.has(actorKey(actor)));
+  const invalidActors = [item.accountable, ...arr(item.responsible), ...arr(item.consulted), ...arr(item.informed)].filter(Boolean).filter(actor => !allowedActors.has(actorKey(actor)));
   const unavailableActors = [...new Set(invalidActors)];
   const actors = [...new Set([...availableActors, ...unavailableActors])];
-  const missing = [
-    !item.activity && "Process / activity name",
-    !item.accountable && "Accountable owner (A)",
-    !arr(item.responsible).length && "Responsible person or role (R)",
-    invalidActors.length > 0 &&
-      `Invalid or unavailable actor: ${[...new Set(invalidActors)].join(", ")}`,
-  ].filter(Boolean);
-  const toggleSystem = (code) =>
-    change(
-      "systems",
-      arr(item.systems).includes(code)
-        ? arr(item.systems).filter((x) => x !== code)
-        : [...arr(item.systems), code],
-    );
+  const missing = [!item.activity && "Process / activity name", !item.accountable && "Accountable owner (A)", !arr(item.responsible).length && "Responsible person or role (R)", invalidActors.length > 0 && "Invalid or unavailable actor: " + [...new Set(invalidActors)].join(", ") + ""].filter(Boolean);
+  const toggleSystem = code => change("systems", (() => {
+    if (arr(item.systems).includes(code)) {
+      return arr(item.systems).filter(x => x !== code);
+    }
+    return [...arr(item.systems), code];
+  })());
   const addActor = () => {
     const actor = roleDraft.trim();
     if (!actor || actors.includes(actor)) return;
     change("customActors", [...customActors, actor]);
     setRoleDraft("");
   };
-  const removeActor = (actor) =>
-    setItems(
-      items.map((x) =>
-        x.id === item.id
-          ? {
-              ...x,
-              customActors: customActors.filter((name) => name !== actor),
-              accountable: x.accountable === actor ? "" : x.accountable,
-              responsible: arr(x.responsible).filter((name) => name !== actor),
-              consulted: arr(x.consulted).filter((name) => name !== actor),
-              informed: arr(x.informed).filter((name) => name !== actor),
-            }
-          : x,
-      ),
-    );
+  const removeActor = actor => setItems(items.map(x => (() => {
+    if (x.id === item.id) {
+      return {
+        ...x,
+        "customActors": customActors.filter(name => name !== actor),
+        "accountable": (() => {
+          if (x.accountable === actor) {
+            return "";
+          }
+          return x.accountable;
+        })(),
+        "responsible": arr(x.responsible).filter(name => name !== actor),
+        "consulted": arr(x.consulted).filter(name => name !== actor),
+        "informed": arr(x.informed).filter(name => name !== actor)
+      };
+    }
+    return x;
+  })()));
   const removeUnavailableActors = () => {
     const unavailableKeys = new Set(unavailableActors.map(actorKey));
-    setItems(
-      items.map((x) =>
-        x.id === item.id
-          ? {
-              ...x,
-              accountable: unavailableKeys.has(actorKey(x.accountable))
-                ? ""
-                : x.accountable,
-              responsible: arr(x.responsible).filter(
-                (name) => !unavailableKeys.has(actorKey(name)),
-              ),
-              consulted: arr(x.consulted).filter(
-                (name) => !unavailableKeys.has(actorKey(name)),
-              ),
-              informed: arr(x.informed).filter(
-                (name) => !unavailableKeys.has(actorKey(name)),
-              ),
+    setItems(items.map(x => (() => {
+      if (x.id === item.id) {
+        return {
+          ...x,
+          "accountable": (() => {
+            if (unavailableKeys.has(actorKey(x.accountable))) {
+              return "";
             }
-          : x,
-      ),
-    );
+            return x.accountable;
+          })(),
+          "responsible": arr(x.responsible).filter(name => !unavailableKeys.has(actorKey(name))),
+          "consulted": arr(x.consulted).filter(name => !unavailableKeys.has(actorKey(name))),
+          "informed": arr(x.informed).filter(name => !unavailableKeys.has(actorKey(name)))
+        };
+      }
+      return x;
+    })()));
   };
-  return (
-    <article
-      className={`r4Assignment ${missing.length ? "assignmentIncomplete" : "assignmentComplete"}`}
-    >
+  return <article className={"r4Assignment " + (() => {
+    if (missing.length) {
+      return "assignmentIncomplete";
+    }
+    return "assignmentComplete";
+  })() + ""}>
       <header>
         <div>
           <b>{item.activity || "New responsibility"}</b>
           <small>{item.source}</small>
         </div>
-        <span className={`r4RoleStatus ${missing.length ? "missing" : "ready"}`}>
-          {missing.length
-            ? `${missing.length} requirement${missing.length === 1 ? "" : "s"} missing`
-            : "✓ Complete"}
+        <span className={"r4RoleStatus " + (() => {
+        if (missing.length) {
+          return "missing";
+        }
+        return "ready";
+      })() + ""}>
+          {(() => {
+          if (missing.length) {
+            return "" + missing.length + " requirement" + (() => {
+              if (missing.length === 1) {
+                return "";
+              }
+              return "s";
+            })() + " missing";
+          }
+          return "✓ Complete";
+        })()}
         </span>
-        <button
-          type="button"
-          onClick={() => setItems(items.filter((x) => x.id !== item.id))}
-        >
+        <button type="button" onClick={() => setItems(items.filter(x => x.id !== item.id))}>
           Remove
         </button>
       </header>
-      {missing.length > 0 && (
-        <div className="r4RoleMissing r4ActorWarning" role="status">
+      {missing.length > 0 && <div className="r4RoleMissing r4ActorWarning" role="status">
           <span>
             <b>Complete this process:</b> {missing.join(" · ")}
           </span>
-          {unavailableActors.length > 0 && (
-            <button type="button" onClick={removeUnavailableActors}>
+          {unavailableActors.length > 0 && <button type="button" onClick={removeUnavailableActors}>
               Remove {unavailableActors.length} unavailable actor
-              {unavailableActors.length === 1 ? "" : "s"}
-            </button>
-          )}
-        </div>
-      )}
-      <Field
-        label="Process / activity"
-        value={item.activity}
-        onChange={(v) => change("activity", v)}
-      />
+              {(() => {
+          if (unavailableActors.length === 1) {
+            return "";
+          }
+          return "s";
+        })()}
+            </button>}
+        </div>}
+      <Field label="Process / activity" value={item.activity} onChange={v => change("activity", v)} />
       <section className="r4Standards">
         <header>
           <div>
@@ -658,25 +569,28 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
           <strong>{arr(item.systems).length} selected</strong>
         </header>
         <div>
-          {systems.map((system) => {
-            const selected = arr(item.systems).includes(system.code);
-            return (
-              <button
-                type="button"
-                key={system.code}
-                className={selected ? "selected" : ""}
-                onClick={() => toggleSystem(system.code)}
-              >
-                <i>{selected ? "✓" : ""}</i>
+          {systems.map(system => {
+          const selected = arr(item.systems).includes(system.code);
+          return <button type="button" key={system.code} className={(() => {
+            if (selected) {
+              return "selected";
+            }
+            return "";
+          })()} onClick={() => toggleSystem(system.code)}>
+                <i>{(() => {
+                if (selected) {
+                  return "✓";
+                }
+                return "";
+              })()}</i>
                 <span>
                   <b>
                     {system.code} · {system.name}
                   </b>
                   <small>{system.standard}</small>
                 </span>
-              </button>
-            );
-          })}
+              </button>;
+        })}
         </div>
       </section>
       <section className="r4ActorBuilder">
@@ -688,62 +602,34 @@ function AssignmentCard({ item, items, setItems, roles, people }) {
           </p>
         </header>
         <div className="r4ActorInput">
-          <input
-            value={roleDraft}
-            onChange={(e) => setRoleDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addActor();
-              }
-            }}
-            placeholder="Enter role or person's name"
-          />
+          <input value={roleDraft} onChange={e => setRoleDraft(e.target.value)} onKeyDown={e => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            addActor();
+          }
+        }} placeholder="Enter role or person's name" />
           <button type="button" onClick={addActor}>
             + Add to RACI
           </button>
         </div>
-        {customActors.length > 0 && (
-          <div className="r4CustomActors">
-            {customActors.map((actor) => (
-              <span key={actor}>
+        {customActors.length > 0 && <div className="r4CustomActors">
+            {customActors.map(actor => <span key={actor}>
                 {actor}
-                <button
-                  type="button"
-                  aria-label={`Remove ${actor}`}
-                  onClick={() => removeActor(actor)}
-                >
+                <button type="button" aria-label={"Remove " + actor + ""} onClick={() => removeActor(actor)}>
                   ×
                 </button>
-              </span>
-            ))}
-          </div>
-        )}
+              </span>)}
+          </div>}
       </section>
-      <RaciMatrix
-        item={item}
-        actors={actors}
-        externalActors={customActors}
-        unavailableActors={unavailableActors}
-        change={change}
-      />
+      <RaciMatrix item={item} actors={actors} externalActors={customActors} unavailableActors={unavailableActors} change={change} />
       <details className="r4ControlDetails">
         <summary>Control details</summary>
         <div className="r4Grid">
-          <Field
-            label="Review frequency"
-            value={item.frequency}
-            onChange={(v) => change("frequency", v)}
-          />
-          <Field
-            label="Evidence / controlled output"
-            value={item.evidence}
-            onChange={(v) => change("evidence", v)}
-          />
+          <Field label="Review frequency" value={item.frequency} onChange={v => change("frequency", v)} />
+          <Field label="Evidence / controlled output" value={item.evidence} onChange={v => change("evidence", v)} />
         </div>
       </details>
-    </article>
-  );
+    </article>;
 }
 export default function BCPRolesResponsibilities({
   action,
@@ -752,175 +638,95 @@ export default function BCPRolesResponsibilities({
   companyPeople = [],
   initial,
   organisationName = "",
-  startStep = 0,
+  startStep = 0
 }) {
   const [formState, formAction, isPending] = useActionState(action, {
-      error: "",
+      "error": ""
     }),
-    [step, setStep] = useState(Math.max(0, Math.min(5, +startStep || 0))),
-    [profileId, setProfileId] = useState(initial?.site_profile_id || ""),
-    [contextId, setContextId] = useState(initial?.context_assessment_id || "");
-  const profile = profiles.find((x) => x.id === profileId),
-    context = contexts.find((x) => x.id === contextId),
-    processRecords = [
-      ...arr(profile?.value_chain_processes),
-      ...arr(profile?.support_processes),
-    ].filter((x) => x.name),
-    companyUsers = companyPeople
-      .map((person) => ({
-        id: person.id,
-        label: `${person.first_name || ""} ${person.last_name || ""}`.trim(),
-      }))
-      .filter((person) => person.id && person.label),
-    people = [...new Set(companyUsers.map((person) => person.label))],
-    userIdByLabel = new Map(
-      companyUsers.map((person) => [person.label.toLowerCase(), person.id]),
-    ),
-    userLabelById = new Map(
-      companyUsers.map((person) => [person.id, person.label]),
-    ),
-    resolveUserId = (value) => {
+    [step, setStep] = useDeviceDraftState("BCPRolesResponsibilities_step", Math.max(0, Math.min(5, +startStep || 0))),
+    [profileId, setProfileId] = useDeviceDraftState("BCPRolesResponsibilities_profileId", initial?.site_profile_id || ""),
+    [contextId, setContextId] = useDeviceDraftState("BCPRolesResponsibilities_contextId", initial?.context_assessment_id || "");
+  const profile = profiles.find(x => x.id === profileId),
+    context = contexts.find(x => x.id === contextId),
+    processRecords = [...arr(profile?.value_chain_processes), ...arr(profile?.support_processes)].filter(x => x.name),
+    companyUsers = companyPeople.map(person => ({
+      "id": person.id,
+      "label": ("" + (person.first_name || "") + " " + (person.last_name || "") + "").trim()
+    })).filter(person => person.id && person.label),
+    people = [...new Set(companyUsers.map(person => person.label))],
+    userIdByLabel = new Map(companyUsers.map(person => [person.label.toLowerCase(), person.id])),
+    userLabelById = new Map(companyUsers.map(person => [person.id, person.label])),
+    resolveUserId = value => {
       const candidate = String(value || "").trim();
-      return userLabelById.has(candidate)
-        ? candidate
-        : userIdByLabel.get(candidate.toLowerCase()) || "";
+      return (() => {
+        if (userLabelById.has(candidate)) {
+          return candidate;
+        }
+        return userIdByLabel.get(candidate.toLowerCase()) || "";
+      })();
     },
-    userLabel = (value) =>
-      userLabelById.get(value) || value || "Not assigned";
-  const [roles, setRoles] = useState(() =>
-      arr(initial?.roles).map((role) => ({
-        ...role,
-        primaryHolder: resolveUserId(role.primaryHolder),
-        people: arr(role.people).map(resolveUserId).filter(Boolean),
-        deputies: arr(role.deputies).map(resolveUserId).filter(Boolean),
-      })),
-    ),
-    [assignments, setAssignments] = useState(arr(initial?.assignments)),
-    [notes, setNotes] = useState(initial?.notes || ""),
-    [distribution, setDistribution] = useState(
-      initial?.distribution || "Electronic controlled copy",
-    ),
+    userLabel = value => userLabelById.get(value) || value || "Not assigned";
+  const [roles, setRoles] = useDeviceDraftState("BCPRolesResponsibilities_roles", () => arr(initial?.roles).map(role => ({
+      ...role,
+      "primaryHolder": resolveUserId(role.primaryHolder),
+      "people": arr(role.people).map(resolveUserId).filter(Boolean),
+      "deputies": arr(role.deputies).map(resolveUserId).filter(Boolean)
+    }))),
+    [assignments, setAssignments] = useDeviceDraftState("BCPRolesResponsibilities_assignments", arr(initial?.assignments)),
+    [notes, setNotes] = useDeviceDraftState("BCPRolesResponsibilities_notes", initial?.notes || ""),
+    [distribution, setDistribution] = useDeviceDraftState("BCPRolesResponsibilities_distribution", initial?.distribution || "Electronic controlled copy"),
     [reviewerName, setReviewerName] = useState(() => {
-      const stored =
-        initial?.reviewed_by ||
-        initial?.approved_by ||
-        profile?.site_leader ||
-        "";
-      return people.includes(stored) ? stored : "";
+      const stored = initial?.reviewed_by || initial?.approved_by || profile?.site_leader || "";
+      return (() => {
+        if (people.includes(stored)) {
+          return stored;
+        }
+        return "";
+      })();
     });
-  const gaps = useMemo(
-    () => [
-      ...roles
-        .filter(
-          (x) =>
-            !x.title ||
-            !x.purpose ||
-            !x.primaryHolder ||
-            !x.people?.length ||
-            !x.authority,
-        )
-        .map((x) => `${x.title || "Unnamed role"}: incomplete role assignment`),
-      ...assignments
-        .filter((x) => !x.activity || !x.accountable || !x.responsible?.length)
-        .map((x) => `${x.activity || "Unnamed activity"}: RACI incomplete`),
-      ...roles
-        .filter((x) => !x.deputies?.length)
-        .map((x) => `${x.title || "Unnamed role"}: no deputy recorded`),
-    ],
-    [roles, assignments],
-  );
+  const gaps = useMemo(() => [...roles.filter(x => !x.title || !x.purpose || !x.primaryHolder || !x.people?.length || !x.authority).map(x => "" + (x.title || "Unnamed role") + ": incomplete role assignment"), ...assignments.filter(x => !x.activity || !x.accountable || !x.responsible?.length).map(x => "" + (x.activity || "Unnamed activity") + ": RACI incomplete"), ...roles.filter(x => !x.deputies?.length).map(x => "" + (x.title || "Unnamed role") + ": no deputy recorded")], [roles, assignments]);
   const generate = () => {
-    const approvedPerson = (name) => resolveUserId(name);
-    const generatedRoles = roleLibrary.map(
-      ([title, purpose, roleSystems, category]) => {
-        const existing = roles.find((x) => x.title === title);
-        if (existing) return existing;
-        let suggested = [];
-        if (title === "Site leader")
-          suggested = [approvedPerson(profile?.site_leader)].filter(Boolean);
-        else if (title === "BCMS leader")
-          suggested = [approvedPerson(profile?.local_facilitator)].filter(
-            Boolean,
-          );
-        else if (title === "Information security lead")
-          suggested = arr(profile?.information_continuity?.systems)
-            .map((x) => x.technicalOwner || x.businessOwner)
-            .map(resolveUserId)
-            .filter(Boolean);
-        else if (title === "Process owner")
-          suggested = [
-            ...new Set(
-              processRecords
-                .map((x) => x.owner)
-                .map(resolveUserId)
-                .filter(Boolean),
-            ),
-          ];
-        return {
-          ...newRole(title),
-          purpose,
-          systems: roleSystems,
-          people: suggested,
-          primaryHolder: suggested[0] || "",
-          source: `BCMS operational responsibility · ${category}`,
-        };
-      },
-    );
-    const generatedAssignments = activityLibrary.map(
-      ([activity, source]) =>
-        assignments.find((x) => x.activity === activity) || {
-          ...newAssignment(activity),
-          frequency: "At least annually and after material change",
-          evidence: `Controlled ${activity.toLowerCase()} record`,
-          source,
-        },
-    );
-    const processAssignments = processRecords.map(
-      (p) =>
-        assignments.find((x) => x.activity === p.name) || {
-          ...newAssignment(p.name),
-          accountable: approvedPerson(p.owner),
-          responsible: [approvedPerson(p.owner)].filter(Boolean),
-          consulted: [approvedPerson(profile?.local_facilitator)].filter(
-            Boolean,
-          ),
-          informed: [approvedPerson(profile?.site_leader)].filter(Boolean),
-          frequency: "Review after change and at planned intervals",
-          evidence:
-            "Current process responsibility and management-system record",
-          source: "Module 1 · Core management process",
-        },
-    );
+    const approvedPerson = name => resolveUserId(name);
+    const generatedRoles = roleLibrary.map(([title, purpose, roleSystems, category]) => {
+      const existing = roles.find(x => x.title === title);
+      if (existing) return existing;
+      let suggested = [];
+      if (title === "Site leader") suggested = [approvedPerson(profile?.site_leader)].filter(Boolean);else if (title === "BCMS leader") suggested = [approvedPerson(profile?.local_facilitator)].filter(Boolean);else if (title === "Information security lead") suggested = arr(profile?.information_continuity?.systems).map(x => x.technicalOwner || x.businessOwner).map(resolveUserId).filter(Boolean);else if (title === "Process owner") suggested = [...new Set(processRecords.map(x => x.owner).map(resolveUserId).filter(Boolean))];
+      return {
+        ...newRole(title),
+        "purpose": purpose,
+        "systems": roleSystems,
+        "people": suggested,
+        "primaryHolder": suggested[0] || "",
+        "source": "BCMS operational responsibility \xB7 " + category + ""
+      };
+    });
+    const generatedAssignments = activityLibrary.map(([activity, source]) => assignments.find(x => x.activity === activity) || {
+      ...newAssignment(activity),
+      "frequency": "At least annually and after material change",
+      "evidence": "Controlled " + activity.toLowerCase() + " record",
+      "source": source
+    });
+    const processAssignments = processRecords.map(p => assignments.find(x => x.activity === p.name) || {
+      ...newAssignment(p.name),
+      "accountable": approvedPerson(p.owner),
+      "responsible": [approvedPerson(p.owner)].filter(Boolean),
+      "consulted": [approvedPerson(profile?.local_facilitator)].filter(Boolean),
+      "informed": [approvedPerson(profile?.site_leader)].filter(Boolean),
+      "frequency": "Review after change and at planned intervals",
+      "evidence": "Current process responsibility and management-system record",
+      "source": "Module 1 · Core management process"
+    });
     setRoles(generatedRoles);
-    setAssignments([
-      ...generatedAssignments,
-      ...processAssignments.filter(
-        (x) => !generatedAssignments.some((y) => y.activity === x.activity),
-      ),
-    ]);
+    setAssignments([...generatedAssignments, ...processAssignments.filter(x => !generatedAssignments.some(y => y.activity === x.activity))]);
   };
-  const actorKey = (value) => String(value || "").trim().toLocaleLowerCase();
-  const assignmentActorsValid = (assignment) => {
-    const allowed = new Set([
-      ...people.map(actorKey),
-      ...roles.map((role) => actorKey(role.title)).filter(Boolean),
-      ...arr(assignment.customActors).map(actorKey),
-    ]);
-    return [
-      assignment.accountable,
-      ...arr(assignment.responsible),
-      ...arr(assignment.consulted),
-      ...arr(assignment.informed),
-    ]
-      .filter(Boolean)
-      .every((actor) => allowed.has(actorKey(actor)));
+  const actorKey = value => String(value || "").trim().toLocaleLowerCase();
+  const assignmentActorsValid = assignment => {
+    const allowed = new Set([...people.map(actorKey), ...roles.map(role => actorKey(role.title)).filter(Boolean), ...arr(assignment.customActors).map(actorKey)]);
+    return [assignment.accountable, ...arr(assignment.responsible), ...arr(assignment.consulted), ...arr(assignment.informed)].filter(Boolean).every(actor => allowed.has(actorKey(actor)));
   };
-  const valid = (x) =>
-    x.activity &&
-    x.accountable &&
-    x.responsible?.length &&
-    assignmentActorsValid(x);
-  const assignmentIssueText = (item) => {
+  const valid = x => x.activity && x.accountable && x.responsible?.length && assignmentActorsValid(x);
+  const assignmentIssueText = item => {
     const issues = [];
     if (!item.activity) issues.push("process name");
     if (!item.accountable) issues.push("Accountable (A)");
@@ -928,88 +734,59 @@ export default function BCPRolesResponsibilities({
     if (!assignmentActorsValid(item)) issues.push("invalid or unavailable actor");
     return issues;
   };
-  const core = assignments.filter((x) =>
-      x.source?.includes("Core management process"),
-    ),
-    critical = assignments.filter((x) =>
-      x.source?.startsWith("Critical activity"),
-    ),
-    support = assignments.filter((x) =>
-      x.source?.startsWith("Critical support activity"),
-    );
-  const completionChecks = [
-    Boolean(profileId),
-    core.length > 0 && core.every(valid),
-    critical.length > 0 && critical.every(valid),
-    support.length > 0 && support.every(valid),
-    roles.length > 0 &&
-      roles.every(
-        (x) =>
-          x.title &&
-          x.purpose &&
-          x.primaryHolder &&
-          x.people?.length &&
-          x.authority &&
-          x.escalation &&
-          x.competence &&
-          x.communication,
-      ),
-    Boolean(
-      !gaps.filter((x) => !x.includes("no deputy")).length && distribution,
-    ),
-  ];
-  const completion = Math.round(
-    (completionChecks.filter(Boolean).length / 6) * 100,
-  );
+  const core = assignments.filter(x => x.source?.includes("Core management process")),
+    critical = assignments.filter(x => x.source?.startsWith("Critical activity")),
+    support = assignments.filter(x => x.source?.startsWith("Critical support activity"));
+  const completionChecks = [Boolean(profileId), core.length > 0 && core.every(valid), critical.length > 0 && critical.every(valid), support.length > 0 && support.every(valid), roles.length > 0 && roles.every(x => x.title && x.purpose && x.primaryHolder && x.people?.length && x.authority && x.escalation && x.competence && x.communication), Boolean(!gaps.filter(x => !x.includes("no deputy")).length && distribution)];
+  const completion = Math.round(completionChecks.filter(Boolean).length / 6 * 100);
   useEffect(() => {
     const failedStep = Number(formState?.validation?.step);
-    if (Number.isInteger(failedStep) && failedStep >= 0 && failedStep < steps.length)
-      setStep(failedStep);
+    if (Number.isInteger(failedStep) && failedStep >= 0 && failedStep < steps.length) setStep(failedStep);
   }, [formState?.validation?.step]);
-  const go = (n) => {
+  const go = n => {
     setStep(Math.max(0, Math.min(5, n)));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      "top": 0,
+      "behavior": "smooth"
+    });
   };
-  return (
-    <form action={formAction} className="r4Shell bcpCardLayout">
+  return <form action={formAction} className="r4Shell bcpCardLayout">
       <style>{styles}</style>
       <style>{peopleStyles}</style>
       <style>{assignmentStatusStyles}</style>
-      {[
-        ["assessment_id", initial?.id || ""],
-        ["site_profile_id", profileId],
-        ["context_assessment_id", contextId],
-        ["roles", JSON.stringify(roles)],
-        ["assignments", JSON.stringify(assignments)],
-        ["notes", notes],
-        ["distribution", distribution],
-        ["next_step", Math.min(5, step + 1)],
-      ].map(([name, value]) => (
-        <input key={name} type="hidden" name={name} value={value} />
-      ))}
-      {formState?.error && (
-        <div className="r4Error" role="alert">
+      {[["assessment_id", initial?.id || ""], ["site_profile_id", profileId], ["context_assessment_id", contextId], ["roles", JSON.stringify(roles)], ["assignments", JSON.stringify(assignments)], ["notes", notes], ["distribution", distribution], ["next_step", Math.min(5, step + 1)]].map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+      {formState?.error && <div className="r4Error" role="alert">
           <b>Cannot save Module 4</b>
           <span>{formState.error}</span>
-          {formState?.validation?.items?.length > 0 && (
-            <ul>
-              {formState.validation.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+          {formState?.validation?.items?.length > 0 && <ul>
+              {formState.validation.items.map(item => <li key={item}>{item}</li>)}
+            </ul>}
+        </div>}
       <BCPModuleNavigation moduleNumber={4} title="Roles & responsibilities" percent={completion} steps={steps} checks={completionChecks} activeStep={step} onSelect={go}>
 
           <b>Controlled outputs</b>
-          <span className={assignments.length ? "ready" : ""}>
+          <span className={(() => {
+        if (assignments.length) {
+          return "ready";
+        }
+        return "";
+      })()}>
             Responsibility assignments
           </span>
-          <span className={roles.length ? "ready" : ""}>
+          <span className={(() => {
+        if (roles.length) {
+          return "ready";
+        }
+        return "";
+      })()}>
             BCMS authority register
           </span>
-          <span className={!gaps.length ? "ready" : ""}>
+          <span className={(() => {
+        if (!gaps.length) {
+          return "ready";
+        }
+        return "";
+      })()}>
             Assignment assurance
           </span>
         
@@ -1027,310 +804,188 @@ export default function BCPRolesResponsibilities({
           <b>{initial?.status?.replaceAll("_", " ") || "draft"}</b>
         </header>
         <div className="r4Progress">
-          <i style={{ width: `${completion}%` }} />
+          <i style={{
+          "width": "" + completion + "%"
+        }} />
         </div>
-        {step === 0 && (
-          <section className="r4Panel">
-            <Intro
-              title="Create the controlled responsibility-assignment record."
-              text="Link the approved site boundary, identify the applicable management systems and draw named people and process owners from Modules 1 and 3."
-            />
+        {step === 0 && <section className="r4Panel">
+            <Intro title="Create the controlled responsibility-assignment record." text="Link the approved site boundary, identify the applicable management systems and draw named people and process owners from Modules 1 and 3." />
             <div className="r4Grid">
               <label>
                 Module 1 Site Profile *
-                <select
-                  value={profileId}
-                  onChange={(e) => setProfileId(e.target.value)}
-                >
+                <select value={profileId} onChange={e => setProfileId(e.target.value)}>
                   <option value="">Select site profile</option>
-                  {profiles.map((x) => (
-                    <option key={x.id} value={x.id}>
+                  {profiles.map(x => <option key={x.id} value={x.id}>
                       {x.location_name} · v{x.version || 1} · {x.status}
-                    </option>
-                  ))}
+                    </option>)}
                 </select>
               </label>
               <label>
                 Module 3 Context Assessment
-                <select
-                  value={contextId}
-                  onChange={(e) => setContextId(e.target.value)}
-                >
+                <select value={contextId} onChange={e => setContextId(e.target.value)}>
                   <option value="">Select context assessment</option>
-                  {contexts
-                    .filter(
-                      (x) => !profileId || x.site_profile_id === profileId,
-                    )
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
+                  {contexts.filter(x => !profileId || x.site_profile_id === profileId).map(x => <option key={x.id} value={x.id}>
                         {x.assessment_reference} · v{x.version || 1} ·{" "}
                         {x.status}
-                      </option>
-                    ))}
+                      </option>)}
                 </select>
               </label>
               <label>
                 Record title
-                <input
-                  name="assessment_title"
-                  defaultValue={
-                    initial?.assessment_title ||
-                    `${organisationName || "Organisation"} management responsibility assignments`
-                  }
-                />
+                <input name="assessment_title" defaultValue={initial?.assessment_title || "" + (organisationName || "Organisation") + " management responsibility assignments"} />
               </label>
               <label>
                 Review due date
-                <input
-                  type="date"
-                  name="review_due_date"
-                  defaultValue={initial?.review_due_date || ""}
-                />
+                <input type="date" name="review_due_date" defaultValue={initial?.review_due_date || ""} />
               </label>
             </div>
             <b className="r4Label">Management-system applicability key</b>
             <div className="r4SystemGrid">
-              {systems.map((x) => (
-                <article key={x.code}>
+              {systems.map(x => <article key={x.code}>
                   <b>{x.code}</b>
                   <span>{x.name}</span>
                   <small>{x.standard}</small>
-                </article>
-              ))}
+                </article>)}
             </div>
-            {profile && (
-              <div className="r4Source">
+            {profile && <div className="r4Source">
                 <b>{profile.location_name}</b>
                 <span>
                   {processRecords.length} processes · {people.length} available
                   people/owners · Profile version {profile.version || 1}
                 </span>
                 <small>
-                  {context
-                    ? `${arr(context.risks_opportunities).length} risks/opportunities and ${arr(context.objectives).length} objectives linked from Module 3.`
-                    : "Select Module 3 to include risk and objective owners."}
+                  {(() => {
+              if (context) {
+                return "" + arr(context.risks_opportunities).length + " risks/opportunities and " + arr(context.objectives).length + " objectives linked from Module 3.";
+              }
+              return "Select Module 3 to include risk and objective owners.";
+            })()}
                 </small>
-              </div>
-            )}
-          </section>
-        )}
-        {step === 1 && (
-          <section className="r4Panel">
-            <Intro
-              title="Assign local ownership of the core management-system processes."
-              text="These processes form the integrated foundation for quality, environmental, OH&amp;S, continuity, information-security and energy controls."
-            />
+              </div>}
+          </section>}
+        {step === 1 && <section className="r4Panel">
+            <Intro title="Assign local ownership of the core management-system processes." text="These processes form the integrated foundation for quality, environmental, OH&amp;S, continuity, information-security and energy controls." />
             <div className="r4Toolbar">
               <button type="button" onClick={generate}>
                 ✦ Generate core assignments
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setAssignments([
-                    ...assignments,
-                    {
-                      ...newAssignment(),
-                      source: "Core management process · User defined",
-                    },
-                  ])
-                }
-              >
+              <button type="button" onClick={() => setAssignments([...assignments, {
+            ...newAssignment(),
+            "source": "Core management process · User defined"
+          }])}>
                 + Add core process
               </button>
             </div>
-            {core.some((item) => !valid(item)) && (
-              <div className="r4StepIssues" role="alert">
+            {core.some(item => !valid(item)) && <div className="r4StepIssues" role="alert">
                 <b>Module 2 cannot complete yet</b>
                 <span>Correct the following core-process records:</span>
                 <ul>
-                  {core
-                    .filter((item) => !valid(item))
-                    .map((item) => (
-                      <li key={item.id}>
+                  {core.filter(item => !valid(item)).map(item => <li key={item.id}>
                         {item.activity || "Unnamed process"}: {assignmentIssueText(item).join(", ")}
-                      </li>
-                    ))}
+                      </li>)}
                 </ul>
-              </div>
-            )}
+              </div>}
             <div className="r4Records">
-              {core.map((x) => (
-                <AssignmentCard
-                  key={x.id}
-                  item={x}
-                  items={assignments}
-                  setItems={setAssignments}
-                  roles={roles}
-                  people={people}
-                />
-              ))}
+              {core.map(x => <AssignmentCard key={x.id} item={x} items={assignments} setItems={setAssignments} roles={roles} people={people} />)}
             </div>
-          </section>
-        )}
-        {step === 2 && (
-          <section className="r4Panel">
-            <Intro
-              title="Assign the work activities carrying elevated operational risk."
-              text="Select only locally applicable activities, add site-specific work and nominate the accountable owner and assigned team."
-            />
+          </section>}
+        {step === 2 && <section className="r4Panel">
+            <Intro title="Assign the work activities carrying elevated operational risk." text="Select only locally applicable activities, add site-specific work and nominate the accountable owner and assigned team." />
             <div className="r4Toolbar">
               <button type="button" onClick={generate}>
                 ✦ Generate critical activities
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setAssignments([
-                    ...assignments,
-                    {
-                      ...newAssignment(),
-                      source: "Critical activity · Site specific",
-                    },
-                  ])
-                }
-              >
+              <button type="button" onClick={() => setAssignments([...assignments, {
+            ...newAssignment(),
+            "source": "Critical activity · Site specific"
+          }])}>
                 + Add critical activity
               </button>
             </div>
             <div className="r4Records">
-              {critical.map((x) => (
-                <AssignmentCard
-                  key={x.id}
-                  item={x}
-                  items={assignments}
-                  setItems={setAssignments}
-                  roles={roles}
-                  people={people}
-                />
-              ))}
+              {critical.map(x => <AssignmentCard key={x.id} item={x} items={assignments} setItems={setAssignments} roles={roles} people={people} />)}
             </div>
-          </section>
-        )}
-        {step === 3 && (
-          <section className="r4Panel">
-            <Intro
-              title="Assign the activities that support effective control."
-              text="Support responsibilities cover maintenance, emergency readiness, measurement, nonconformity control and workplace organisation."
-            />
+          </section>}
+        {step === 3 && <section className="r4Panel">
+            <Intro title="Assign the activities that support effective control." text="Support responsibilities cover maintenance, emergency readiness, measurement, nonconformity control and workplace organisation." />
             <div className="r4Toolbar">
               <button type="button" onClick={generate}>
                 ✦ Generate support activities
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setAssignments([
-                    ...assignments,
-                    {
-                      ...newAssignment(),
-                      source: "Critical support activity · Site specific",
-                    },
-                  ])
-                }
-              >
+              <button type="button" onClick={() => setAssignments([...assignments, {
+            ...newAssignment(),
+            "source": "Critical support activity · Site specific"
+          }])}>
                 + Add support activity
               </button>
             </div>
             <div className="r4Records">
-              {support.map((x) => (
-                <AssignmentCard
-                  key={x.id}
-                  item={x}
-                  items={assignments}
-                  setItems={setAssignments}
-                  roles={roles}
-                  people={people}
-                />
-              ))}
+              {support.map(x => <AssignmentCard key={x.id} item={x} items={assignments} setItems={setAssignments} roles={roles} people={people} />)}
             </div>
-          </section>
-        )}
-        {step === 4 && (
-          <section className="r4Panel">
-            <Intro
-              title="Assign BCMS operational responsibility and authority."
-              text="Cover governance, BIA, risk treatment, strategies, plans, exercising, evaluation, internal audit, management review, incident command and information continuity."
-            />
+          </section>}
+        {step === 4 && <section className="r4Panel">
+            <Intro title="Assign BCMS operational responsibility and authority." text="Cover governance, BIA, risk treatment, strategies, plans, exercising, evaluation, internal audit, management review, incident command and information continuity." />
             <div className="r4Toolbar">
               <button type="button" onClick={generate}>
                 ✦ Generate BCMS responsibilities
               </button>
-              <button
-                type="button"
-                onClick={() => setRoles([...roles, newRole()])}
-              >
+              <button type="button" onClick={() => setRoles([...roles, newRole()])}>
                 + Add local BCMS role
               </button>
             </div>
             <div className="r4GapGrid">
               <article>
                 <strong>
-                  {roles.filter((x) => x.authority).length}/{roles.length}
+                  {roles.filter(x => x.authority).length}/{roles.length}
                 </strong>
                 <span>authority defined</span>
               </article>
               <article>
                 <strong>
-                  {roles.filter((x) => x.deputies?.length).length}/
+                  {roles.filter(x => x.deputies?.length).length}/
                   {roles.length}
                 </strong>
                 <span>deputies recorded</span>
               </article>
               <article>
                 <strong>
-                  {roles.filter((x) => x.competence).length}/{roles.length}
+                  {roles.filter(x => x.competence).length}/{roles.length}
                 </strong>
                 <span>competence defined</span>
               </article>
               <article>
                 <strong>
-                  {roles.filter((x) => x.communication).length}/{roles.length}
+                  {roles.filter(x => x.communication).length}/{roles.length}
                 </strong>
                 <span>communication controlled</span>
               </article>
             </div>
             <div className="r4Records">
-              {roles.map((x) => (
-                <RoleCard
-                  key={x.id}
-                  role={x}
-                  roles={roles}
-                  setRoles={setRoles}
-                  people={companyUsers}
-                />
-              ))}
+              {roles.map(x => <RoleCard key={x.id} role={x} roles={roles} setRoles={setRoles} people={companyUsers} />)}
             </div>
-          </section>
-        )}
-        {step === 5 && (
-          <section className="r4Panel">
-            <Intro
-              title="Review and approve the controlled responsibility-assignment record."
-              text="Confirm every applicable process and activity has one accountable owner, assigned people and controlled evidence before approval."
-            />
+          </section>}
+        {step === 5 && <section className="r4Panel">
+            <Intro title="Review and approve the controlled responsibility-assignment record." text="Confirm every applicable process and activity has one accountable owner, assigned people and controlled evidence before approval." />
             <div className="r4Gap">
               <header>
                 <b>Assignment assurance</b>
                 <span>{gaps.length} gaps</span>
               </header>
-              {gaps.length ? (
-                <ul>
-                  {gaps.map((x, i) => (
-                    <li key={i}>{x}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>
+              {(() => {
+            if (gaps.length) {
+              return <ul>
+                  {gaps.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>;
+            }
+            return <p>
                   All mandatory responsibility and authority controls are
                   complete.
-                </p>
-              )}
+                </p>;
+          })()}
             </div>
             <section className="r4Register">
               <h2>Management responsibility assignments</h2>
-              {assignments.map((x, i) => (
-                <article key={x.id}>
+              {assignments.map((x, i) => <article key={x.id}>
                   <b>
                     {i + 1}. {x.activity}
                   </b>
@@ -1346,13 +1001,11 @@ export default function BCPRolesResponsibilities({
                     {x.frequency || "Frequency not recorded"} ·{" "}
                     {x.evidence || "Evidence not recorded"}
                   </em>
-                </article>
-              ))}
+                </article>)}
             </section>
             <section className="r4Register">
               <h2>BCMS operational authority register</h2>
-              {roles.map((x, i) => (
-                <article key={x.id}>
+              {roles.map((x, i) => <article key={x.id}>
                   <b>
                     {i + 1}. {x.title}
                   </b>
@@ -1364,133 +1017,82 @@ export default function BCPRolesResponsibilities({
                     {x.systems.join(", ")}
                   </small>
                   <em>Authority: {x.authority || "Not recorded"}</em>
-                </article>
-              ))}
+                </article>)}
             </section>
             <div className="r4Grid">
-              <Field
-                label="Notes / local arrangements and exclusions"
-                area
-                value={notes}
-                onChange={setNotes}
-              />
-              <Field
-                label="Controlled-copy location / distribution"
-                area
-                value={distribution}
-                onChange={setDistribution}
-              />
+              <Field label="Notes / local arrangements and exclusions" area value={notes} onChange={setNotes} />
+              <Field label="Controlled-copy location / distribution" area value={distribution} onChange={setDistribution} />
               <label>
                 Competent reviewer / approver *
-                <PersonSelect
-                  name="reviewer_name"
-                  value={reviewerName}
-                  people={people}
-                  required
-                  placeholder="Select reviewer from Company Users"
-                  onChange={setReviewerName}
-                />
+                <PersonSelect name="reviewer_name" value={reviewerName} people={people} required placeholder="Select reviewer from Company Users" onChange={setReviewerName} />
               </label>
               <label>
                 Review decision comment
-                <textarea
-                  name="review_comment"
-                  defaultValue={initial?.review_comment || ""}
-                />
+                <textarea name="review_comment" defaultValue={initial?.review_comment || ""} />
               </label>
             </div>
             <p className="r4Control">
               Version {initial?.version || 1} · Prepared by{" "}
               {initial?.prepared_by || "current account owner"} · Approved{" "}
-              {initial?.approved_at
-                ? new Date(initial.approved_at).toLocaleDateString("en-GB")
-                : "not yet"}
+              {(() => {
+            if (initial?.approved_at) {
+              return new Date(initial.approved_at).toLocaleDateString("en-GB");
+            }
+            return "not yet";
+          })()}
             </p>
-          </section>
-        )}
+          </section>}
         <footer>
-          <button
-            type="button"
-            disabled={!step || isPending}
-            onClick={() => go(step - 1)}
-          >
+          <button type="button" disabled={!step || isPending} onClick={() => go(step - 1)}>
             ← Previous
           </button>
-          {initial?.id && (
-            <button
-              className="danger"
-              name="intent"
-              value="archive"
-              disabled={isPending}
-              onClick={(e) => {
-                if (!window.confirm("Archive this Module 4 assessment?"))
-                  e.preventDefault();
-              }}
-            >
+          {initial?.id && <button className="danger" name="intent" value="archive" disabled={isPending} onClick={e => {
+          if (!window.confirm("Archive this Module 4 assessment?")) e.preventDefault();
+        }}>
               Archive
-            </button>
-          )}
+            </button>}
           <span>
-            {isPending ? "Saving…" : "Progress saves to your account"}
+            {(() => {
+            if (isPending) {
+              return "Saving…";
+            }
+            return "Progress saves to your account";
+          })()}
           </span>
-          {step < 5 ? (
-            <button
-              className="primary"
-              name="intent"
-              value="continue"
-              disabled={isPending}
-            >
+          {(() => {
+          if (step < 5) {
+            return <button className="primary" name="intent" value="continue" disabled={isPending}>
               Save &amp; continue →
-            </button>
-          ) : (
-            <>
+            </button>;
+          }
+          return <>
               <button name="intent" value="draft" disabled={isPending}>
                 Save draft
               </button>
-              {initial?.status === "ready_for_review" && (
-                <button name="intent" value="changes" disabled={isPending}>
+              {initial?.status === "ready_for_review" && <button name="intent" value="changes" disabled={isPending}>
                   Request changes
-                </button>
-              )}
+                </button>}
               <button name="intent" value="review" disabled={isPending}>
                 Submit for review
               </button>
-              <button
-                className="primary"
-                name="intent"
-                value="approve"
-                disabled={isPending}
-              >
+              <button className="primary" name="intent" value="approve" disabled={isPending}>
                 Approve controlled version →
               </button>
-            </>
-          )}
+            </>;
+        })()}
         </footer>
       </main>
-    </form>
-  );
+    </form>;
 }
-const peopleStyles = `.r4External{display:block;margin-top:3px;color:#a05a00;font-size:8px;font-weight:850;text-transform:uppercase}.r4Unavailable{display:block;margin-top:3px;color:#b42318;font-size:8px;font-weight:900;text-transform:uppercase}.r4Raci tr.unavailable{background:#fff4f2}.r4Raci tr.unavailable>th{color:#8f241c}`;
-const assignmentStatusStyles = `
-.r4StepIssues{margin:0 0 14px;padding:13px 15px;border:1px solid #e7a23d;border-radius:10px;background:#fff7e7;color:#704400}
-.r4StepIssues b,.r4StepIssues span{display:block}
-.r4StepIssues span{margin-top:4px;font-size:11px}
-.r4StepIssues ul{margin:8px 0 0;padding-left:20px}
-.r4StepIssues li{margin:4px 0;font-size:11px}
-.r4Assignment.assignmentIncomplete{border:2px solid #e6a33a;background:#fffdf7}
-.r4Assignment.assignmentComplete{border-left:5px solid #11a786}
-.r4ActorWarning{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.r4ActorWarning>span{min-width:0}
-.r4ActorWarning>button{flex:0 0 auto;padding:8px 11px;border:1px solid #d92d20;border-radius:7px;background:#fff;color:#b42318;font-size:10px;font-weight:900;cursor:pointer}
-.r4ActorWarning>button:hover{background:#fff0ed}
-@media(max-width:700px){.r4Assignment>header{flex-wrap:wrap}}
-`;
-function Intro({ title, text }) {
-  return (
-    <div className="r4Intro">
+const peopleStyles = ".r4External{display:block;margin-top:3px;color:#a05a00;font-size:8px;font-weight:850;text-transform:uppercase}.r4Unavailable{display:block;margin-top:3px;color:#b42318;font-size:8px;font-weight:900;text-transform:uppercase}.r4Raci tr.unavailable{background:#fff4f2}.r4Raci tr.unavailable>th{color:#8f241c}";
+const assignmentStatusStyles = "\n.r4StepIssues{margin:0 0 14px;padding:13px 15px;border:1px solid #e7a23d;border-radius:10px;background:#fff7e7;color:#704400}\n.r4StepIssues b,.r4StepIssues span{display:block}\n.r4StepIssues span{margin-top:4px;font-size:11px}\n.r4StepIssues ul{margin:8px 0 0;padding-left:20px}\n.r4StepIssues li{margin:4px 0;font-size:11px}\n.r4Assignment.assignmentIncomplete{border:2px solid #e6a33a;background:#fffdf7}\n.r4Assignment.assignmentComplete{border-left:5px solid #11a786}\n.r4ActorWarning{display:flex;align-items:center;justify-content:space-between;gap:12px}\n.r4ActorWarning>span{min-width:0}\n.r4ActorWarning>button{flex:0 0 auto;padding:8px 11px;border:1px solid #d92d20;border-radius:7px;background:#fff;color:#b42318;font-size:10px;font-weight:900;cursor:pointer}\n.r4ActorWarning>button:hover{background:#fff0ed}\n@media(max-width:700px){.r4Assignment>header{flex-wrap:wrap}}\n";
+function Intro({
+  title,
+  text
+}) {
+  return <div className="r4Intro">
       <b>{title}</b>
       <p>{text}</p>
-    </div>
-  );
+    </div>;
 }
-const styles = `*{box-sizing:border-box}.r4Shell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.r4Shell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.r4Brand{font-size:21px;font-weight:950}.r4Brand span{font-weight:500}.r4Shell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.r4Shell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.r4Shell>aside>section strong{font-size:28px}.r4Shell>aside>section span{float:right;margin-top:10px;font-size:10px}.r4Shell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.r4Shell>aside>section i b{display:block;height:100%;background:#55e1d4}.r4Shell nav{display:grid;gap:6px;margin-top:18px}.r4Shell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.r4Shell nav button.active{background:#245d97}.r4Shell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.r4Outputs{display:grid;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25}.r4Outputs span{padding:8px;border-radius:7px;background:#ffffff08;color:#7997b5;font-size:10px}.r4Outputs span.ready{color:#63e2d4}.r4Shell main{min-width:0}.r4Top{display:flex;justify-content:space-between;align-items:end}.r4Top small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.r4Top h1{margin:7px 0 4px;font-size:37px}.r4Top p{margin:0;color:#607890}.r4Top>b{text-transform:capitalize;color:#087c61}.r4Progress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.r4Progress i{display:block;height:100%;background:#315fe6}.r4Panel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.r4Intro{padding:20px;border-radius:12px;background:#eff5fa}.r4Intro b{font-size:17px}.r4Intro p{margin:7px 0 0;color:#60778e}.r4Grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.r4Grid label{font-size:12px;font-weight:850}.r4Grid input,.r4Grid select,.r4Grid textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.r4Grid textarea{min-height:75px}.r4Source{display:grid;gap:6px;margin-top:16px;padding:16px;border-left:5px solid #315fe6;border-radius:10px;background:#f2f6ff}.r4Source span,.r4Source small{color:#60778e}.r4Toolbar{display:flex;gap:9px;margin:16px 0}.r4Toolbar button,.r4Generate{padding:10px 13px;border:1px solid #b9cce0;border-radius:8px;background:#fff;color:#17436f;font-weight:850}.r4Generate{margin:16px 0;background:#315fe6;color:#fff}.r4Records{display:grid;gap:14px}.r4Card,.r4Assignment{padding:17px;border:1px solid #cfdae6;border-radius:12px}.r4Card.roleIncomplete{border:2px solid #e6a33a;background:#fffdf7}.r4Card.roleComplete{border-left:5px solid #11a786}.r4Card>header,.r4Assignment>header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.r4Card header div,.r4Assignment header div{display:grid;gap:3px;flex:1}.r4Card header small,.r4Assignment header small{color:#71869a}.r4Card header button,.r4Assignment header button{border:0;border-radius:7px;background:#fff0ed;color:#b42318;font-weight:850}.r4RoleStatus{padding:6px 9px;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap}.r4RoleStatus.ready{background:#daf5e9;color:#08745d}.r4RoleStatus.missing{background:#fff0d5;color:#8a5300}.r4RoleMissing{margin:12px 0 4px;padding:10px 12px;border-left:4px solid #e39a22;border-radius:7px;background:#fff4df;color:#704400;font-size:11px}.r4FieldMissing{padding:9px;border:1px solid #e5a13a;border-radius:9px;background:#fff8e9}.r4FieldMissing>em,.r4ChoiceMissing>em{float:right;color:#b45b00;font-size:9px;font-style:normal;text-transform:uppercase}.r4FieldMissing input,.r4FieldMissing select,.r4FieldMissing textarea{border-color:#dd8c22!important;background:#fff!important}.r4ChoiceMissing{margin-top:10px;padding:9px;border:1px solid #e5a13a;border-radius:9px;background:#fff8e9}.r4Label{display:block;margin:14px 0 7px;font-size:11px}.r4ChoiceMissing .r4Label{display:inline-block;margin-top:0}.r4Chips{display:flex;flex-wrap:wrap;gap:7px}.r4Chips button{padding:7px 9px;border:1px solid #c1d2e2;border-radius:999px;background:#fff;color:#31516f;font-size:10px}.r4Chips button.selected{border-color:#315fe6;background:#315fe6;color:#fff}.r4GapGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.r4GapGrid article{padding:15px;border:1px solid #d2deea;border-radius:10px;background:#f8fbfe}.r4GapGrid strong,.r4GapGrid span{display:block}.r4GapGrid strong{color:#315fe6;font-size:25px}.r4GapGrid span{font-size:10px;color:#60778e}.r4Gap{margin:16px 0;padding:16px;border:1px solid #e4cf9b;border-radius:11px;background:#fff9e9}.r4Gap header{display:flex;justify-content:space-between}.r4Gap li{margin:5px 0}.r4Register{margin-top:15px;padding:17px;border:1px solid #d1dce8;border-radius:12px;background:#fafdff}.r4Register h2{margin-top:0}.r4Register article{padding:11px 0;border-top:1px solid #e0e8ef}.r4Register article p{margin:6px 0}.r4Register article small,.r4Register article em{display:block;color:#687f94;font-size:10px}.r4Register article em{margin-top:4px}.r4Control{color:#60778e;font-size:11px}.r4Empty{padding:20px;border:1px dashed #c5d5e3;border-radius:10px}.r4Error{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.r4Shell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.r4Shell footer span{margin-left:auto;color:#6f8396;font-size:11px}.r4Shell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.r4Shell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.r4Shell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:950px){.r4Shell{grid-template-columns:80px 1fr}.r4Brand,.r4Shell>aside>small,.r4Shell nav span,.r4Outputs{display:none}.r4Shell nav button{justify-content:center}}@media(max-width:700px){.r4Shell{display:block}.r4Shell>aside{position:static;height:auto;margin-bottom:15px}.r4Shell nav{display:flex;overflow:auto}.r4Grid,.r4GapGrid{grid-template-columns:1fr}.r4Top h1{font-size:29px}.r4Shell footer{flex-wrap:wrap}.r4Shell footer span{display:none}.r4Toolbar{flex-wrap:wrap}.r4Card>header{flex-wrap:wrap}.r4RoleStatus{order:3;width:100%;text-align:center}}`;
+const styles = "*{box-sizing:border-box}.r4Shell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;color:#0a2342}.r4Shell>aside{position:sticky;top:20px;height:calc(100vh - 40px);padding:27px 20px;border-radius:18px;background:#0b2d56;color:#fff;overflow:auto}.r4Brand{font-size:21px;font-weight:950}.r4Brand span{font-weight:500}.r4Shell>aside>small{display:block;margin:8px 0 20px;color:#55e1d4;font-weight:900;letter-spacing:.14em}.r4Shell>aside>section{padding:16px;border-radius:12px;background:#ffffff0a}.r4Shell>aside>section strong{font-size:28px}.r4Shell>aside>section span{float:right;margin-top:10px;font-size:10px}.r4Shell>aside>section i{display:block;height:5px;clear:both;margin-top:12px;background:#ffffff20;border-radius:4px;overflow:hidden}.r4Shell>aside>section i b{display:block;height:100%;background:#55e1d4}.r4Shell nav{display:grid;gap:6px;margin-top:18px}.r4Shell nav button{display:flex;gap:10px;align-items:center;padding:11px;border:0;border-radius:9px;background:transparent;color:#dce8f5;text-align:left}.r4Shell nav button.active{background:#245d97}.r4Shell nav button>b{display:grid;place-items:center;width:26px;height:26px;border:1px solid #4b779f;border-radius:7px;color:#61dfd3}.r4Outputs{display:grid;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid #ffffff25}.r4Outputs span{padding:8px;border-radius:7px;background:#ffffff08;color:#7997b5;font-size:10px}.r4Outputs span.ready{color:#63e2d4}.r4Shell main{min-width:0}.r4Top{display:flex;justify-content:space-between;align-items:end}.r4Top small{color:#285fe1;font-size:11px;font-weight:950;letter-spacing:.12em}.r4Top h1{margin:7px 0 4px;font-size:37px}.r4Top p{margin:0;color:#607890}.r4Top>b{text-transform:capitalize;color:#087c61}.r4Progress{height:6px;margin:18px 0;background:#d6e2ee;border-radius:6px;overflow:hidden}.r4Progress i{display:block;height:100%;background:#315fe6}.r4Panel{padding:25px;border:1px solid #cddbe7;border-radius:17px;background:#fff}.r4Intro{padding:20px;border-radius:12px;background:#eff5fa}.r4Intro b{font-size:17px}.r4Intro p{margin:7px 0 0;color:#60778e}.r4Grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.r4Grid label{font-size:12px;font-weight:850}.r4Grid input,.r4Grid select,.r4Grid textarea{width:100%;margin-top:7px;padding:11px;border:1px solid #bfd0df;border-radius:8px;background:#fbfdff;color:#173b60;font:inherit}.r4Grid textarea{min-height:75px}.r4Source{display:grid;gap:6px;margin-top:16px;padding:16px;border-left:5px solid #315fe6;border-radius:10px;background:#f2f6ff}.r4Source span,.r4Source small{color:#60778e}.r4Toolbar{display:flex;gap:9px;margin:16px 0}.r4Toolbar button,.r4Generate{padding:10px 13px;border:1px solid #b9cce0;border-radius:8px;background:#fff;color:#17436f;font-weight:850}.r4Generate{margin:16px 0;background:#315fe6;color:#fff}.r4Records{display:grid;gap:14px}.r4Card,.r4Assignment{padding:17px;border:1px solid #cfdae6;border-radius:12px}.r4Card.roleIncomplete{border:2px solid #e6a33a;background:#fffdf7}.r4Card.roleComplete{border-left:5px solid #11a786}.r4Card>header,.r4Assignment>header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.r4Card header div,.r4Assignment header div{display:grid;gap:3px;flex:1}.r4Card header small,.r4Assignment header small{color:#71869a}.r4Card header button,.r4Assignment header button{border:0;border-radius:7px;background:#fff0ed;color:#b42318;font-weight:850}.r4RoleStatus{padding:6px 9px;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap}.r4RoleStatus.ready{background:#daf5e9;color:#08745d}.r4RoleStatus.missing{background:#fff0d5;color:#8a5300}.r4RoleMissing{margin:12px 0 4px;padding:10px 12px;border-left:4px solid #e39a22;border-radius:7px;background:#fff4df;color:#704400;font-size:11px}.r4FieldMissing{padding:9px;border:1px solid #e5a13a;border-radius:9px;background:#fff8e9}.r4FieldMissing>em,.r4ChoiceMissing>em{float:right;color:#b45b00;font-size:9px;font-style:normal;text-transform:uppercase}.r4FieldMissing input,.r4FieldMissing select,.r4FieldMissing textarea{border-color:#dd8c22!important;background:#fff!important}.r4ChoiceMissing{margin-top:10px;padding:9px;border:1px solid #e5a13a;border-radius:9px;background:#fff8e9}.r4Label{display:block;margin:14px 0 7px;font-size:11px}.r4ChoiceMissing .r4Label{display:inline-block;margin-top:0}.r4Chips{display:flex;flex-wrap:wrap;gap:7px}.r4Chips button{padding:7px 9px;border:1px solid #c1d2e2;border-radius:999px;background:#fff;color:#31516f;font-size:10px}.r4Chips button.selected{border-color:#315fe6;background:#315fe6;color:#fff}.r4GapGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.r4GapGrid article{padding:15px;border:1px solid #d2deea;border-radius:10px;background:#f8fbfe}.r4GapGrid strong,.r4GapGrid span{display:block}.r4GapGrid strong{color:#315fe6;font-size:25px}.r4GapGrid span{font-size:10px;color:#60778e}.r4Gap{margin:16px 0;padding:16px;border:1px solid #e4cf9b;border-radius:11px;background:#fff9e9}.r4Gap header{display:flex;justify-content:space-between}.r4Gap li{margin:5px 0}.r4Register{margin-top:15px;padding:17px;border:1px solid #d1dce8;border-radius:12px;background:#fafdff}.r4Register h2{margin-top:0}.r4Register article{padding:11px 0;border-top:1px solid #e0e8ef}.r4Register article p{margin:6px 0}.r4Register article small,.r4Register article em{display:block;color:#687f94;font-size:10px}.r4Register article em{margin-top:4px}.r4Control{color:#60778e;font-size:11px}.r4Empty{padding:20px;border:1px dashed #c5d5e3;border-radius:10px}.r4Error{grid-column:1/-1;display:grid;gap:4px;padding:13px;border:1px solid #f0b5ad;border-radius:10px;background:#fff1ef;color:#9c241a}.r4Shell footer{display:flex;gap:9px;align-items:center;margin-top:14px;padding:12px;border:1px solid #cfdae5;border-radius:13px;background:#fff}.r4Shell footer span{margin-left:auto;color:#6f8396;font-size:11px}.r4Shell footer button{padding:11px 14px;border:1px solid #c5d4e2;border-radius:8px;background:#fff;color:#183c61;font-weight:850}.r4Shell footer .primary{border-color:#315fe6;background:#315fe6;color:#fff}.r4Shell footer .danger{border-color:#efbcb5;background:#fff3f1;color:#b42318}@media(max-width:950px){.r4Shell{grid-template-columns:80px 1fr}.r4Brand,.r4Shell>aside>small,.r4Shell nav span,.r4Outputs{display:none}.r4Shell nav button{justify-content:center}}@media(max-width:700px){.r4Shell{display:block}.r4Shell>aside{position:static;height:auto;margin-bottom:15px}.r4Shell nav{display:flex;overflow:auto}.r4Grid,.r4GapGrid{grid-template-columns:1fr}.r4Top h1{font-size:29px}.r4Shell footer{flex-wrap:wrap}.r4Shell footer span{display:none}.r4Toolbar{flex-wrap:wrap}.r4Card>header{flex-wrap:wrap}.r4RoleStatus{order:3;width:100%;text-align:center}}";
