@@ -68,6 +68,11 @@ export default async function IncidentAdmin() {
         {!queue.length && <p>No reports waiting for triage.</p>}
       </section>
       <section className="incidentCard">
+        <h2>Critical cases awaiting Director approval</h2>
+        {reports.filter(r=>r.requires_director_approval&&!['closed','rejected','duplicate'].includes(r.status)&&(!r.director_approved_at||r.director_approved_version!==r.version)).map(r=><p key={r.id}><Link href={"/portal/incidents/"+r.id}>{r.reference} · {r.title}</Link><br /><small>{r.director_person_id?"Director appointed":"Appoint an authorised Director"} · {r.case_verified_at&&r.case_verified_version===r.version?"Independent case review complete":"Independent review pending"}</small></p>)}
+        <p className="incidentMuted">Approvals appear inside each assigned Director's authorised case. This queue does not send notifications.</p>
+      </section>
+      <section className="incidentCard">
         <h2>External reporting deadlines overdue · {overdue.length}</h2>
         {overdue.map((r) => (
           <p key={r.id}>
@@ -105,6 +110,11 @@ export default async function IncidentAdmin() {
                   "Accident / Incident Administrator",
                   "Triage, determine priorities, appoint teams, allocate / reallocate budget, time and equipment; decide CAPA / ISMS handoff and controlled reporter updates.",
                   "Incidents Admin + active Accident / Incident Administrator function",
+                ],
+                [
+                  "Director approver — critical cases only",
+                  "Review independently verified critical cases and approve closure. Revised facts, tasks or evidence invalidate the approval; lower-priority cases do not need Director sign-off.",
+                  "Incidents Approve / Admin + active Incident Director Approver or Site Director authorisation; assigned to the case, independent from investigator",
                 ],
                 [
                   "Investigator",
