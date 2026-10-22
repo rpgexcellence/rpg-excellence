@@ -1,5 +1,7 @@
+import { INSPECTION_RISK_BANDS, normaliseInspectionBand, integrationDateOnly } from "../../../../../lib/integration-policy.mjs";
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -8,6 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_STATUSES = new Set([
+  "draft",
   "planned",
   "due",
   "in_progress",
@@ -19,12 +22,7 @@ const ALLOWED_STATUSES = new Set([
   "cancelled",
 ]);
 
-const ALLOWED_RISK_BANDS = new Set([
-  "low",
-  "moderate",
-  "high",
-  "critical",
-]);
+const ALLOWED_RISK_BANDS = new Set(INSPECTION_RISK_BANDS);
 
 function boundedInteger(value, fallback, minimum, maximum) {
   const parsed = Number.parseInt(value || "", 10);
@@ -34,7 +32,7 @@ function boundedInteger(value, fallback, minimum, maximum) {
 }
 
 function validDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+  return integrationDateOnly(value);
 }
 
 function invalidFilter(message, requestId) {
@@ -45,7 +43,7 @@ function invalidFilter(message, requestId) {
   );
 }
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(
     request,
     "workplace_inspections:read",
@@ -57,7 +55,7 @@ export async function GET(request) {
   const page = boundedInteger(parameters.get("page"), 1, 1, 100000);
   const pageSize = boundedInteger(parameters.get("page_size"), 25, 1, 100);
   const status = parameters.get("status");
-  const riskBand = parameters.get("risk_band");
+  const riskBand = normaliseInspectionBand(parameters.get("risk_band"));
   const siteId = parameters.get("site_id");
   const programmeId = parameters.get("programme_id");
   const plannedFrom = parameters.get("planned_from");
@@ -65,13 +63,13 @@ export async function GET(request) {
 
   if (status && !ALLOWED_STATUSES.has(status)) {
     return invalidFilter(
-      "Use planned, due, in_progress, awaiting_review, actions_open, awaiting_verification, completed, closed or cancelled for status.",
+      "Use draft, planned, due, in_progress, awaiting_review, actions_open, awaiting_verification, completed, closed or cancelled for status.",
       requestId,
     );
   }
   if (riskBand && !ALLOWED_RISK_BANDS.has(riskBand)) {
     return invalidFilter(
-      "Use low, moderate, high or critical for risk_band.",
+      "Use routine, medium, high or critical for risk_band (legacy low/moderate aliases are accepted).",
       requestId,
     );
   }
@@ -110,7 +108,7 @@ export async function GET(request) {
   if (plannedFrom) query = query.gte("planned_start_at", plannedFrom + "T00:00:00.000Z");
   if (plannedTo) query = query.lte("planned_start_at", plannedTo + "T23:59:59.999Z");
 
-  const { data, count, error } = await query.range(firstRow, lastRow);
+  const { data, count, error } = await query.order("id", { ascending: true }).range(firstRow, lastRow);
   if (error) {
     await recordIntegrationEvent({
       admin,
@@ -166,4 +164,4 @@ export async function GET(request) {
     200,
     requestId,
   );
-}
+});
