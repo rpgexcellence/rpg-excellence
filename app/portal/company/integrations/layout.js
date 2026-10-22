@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { requirePlanAccess } from "../../../../lib/plan-access";
 import { createClient } from "../../../../lib/supabase/server";
 
 export default async function EnterpriseIntegrationLayout({ children }) {
@@ -12,7 +11,7 @@ export default async function EnterpriseIntegrationLayout({ children }) {
     redirect("/portal/login?next=/portal/company/integrations");
   }
 
-  await requirePlanAccess(user, "consultant", "Enterprise Integration");
+  // Company-admin authorisation is enforced by the page/actions. Revocation stays available after plan expiry.
 
   return children;
 }
