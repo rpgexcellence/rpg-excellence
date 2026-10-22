@@ -1,5 +1,6 @@
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -12,6 +13,7 @@ const ALLOWED_STATUSES = new Set([
   "open",
   "assigned",
   "in_progress",
+  "action_in_progress",
   "submitted",
   "returned",
   "closed",
@@ -24,7 +26,7 @@ function boundedInteger(value, fallback, minimum, maximum) {
     : fallback;
 }
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(request, "findings:read");
   if (authentication.error) return authentication.error;
 
@@ -53,15 +55,15 @@ export async function GET(request) {
   const firstRow = (page - 1) * pageSize;
   const lastRow = firstRow + pageSize - 1;
   let query = admin
-    .from("internal_audit_findings")
+    .from("integration_finding_export")
     .select(
       "id,audit_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,source_type,source_category,source_reference,detected_at,created_at,updated_at,closed_at,closure_verified_at",
       { count: "exact" }
     )
-    .eq("owner_id", client.owner_id)
+    .eq("organization_id", client.organization_id)
     .in("finding_type", ["major_nc", "minor_nc"])
     .order("created_at", { ascending: false })
-    .range(firstRow, lastRow);
+    .order("id", { ascending: true }).range(firstRow, lastRow);
 
   if (status) query = query.eq("status", status);
   if (findingType) query = query.eq("finding_type", findingType);
@@ -114,4 +116,4 @@ export async function GET(request) {
     200,
     requestId
   );
-}
+});
