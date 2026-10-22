@@ -48,19 +48,10 @@ export async function saveZone(_state,fd) {
  } catch(error) {if(error.digest)throw error;return {error:error.message};}
  redirect(destination);
 }
+// Historic sources are retained; all new response decisions belong in the unified register.
 export async function updateZoneConcern(_state,fd) {
- try {
-  const siteId=identifier(fd,'site_id'),zoneId=identifier(fd,'zone_id'),id=identifier(fd,'concern_id');
-  const {admin,access}=await siteZoneContext(siteId);
-  const zones=unwrap(await admin.from('organization_zones').select('id').eq('id',zoneId).eq('organization_id',access.organization.id).eq('site_id',siteId));
-  if(!zones.length)throw new Error('Zone not found.');
-  const status=text(fd,'status',20),resolution=text(fd,'resolution');
-  if(!['open','in_progress','closed'].includes(status))throw new Error('Invalid status.');
-  if(status==='closed'&&resolution.length<10)throw new Error('Record how the concern was addressed before closing it.');
-  const rows=unwrap(await admin.from('organization_zone_concerns').update({status,resolution,updated_at:new Date().toISOString(),updated_by:access.user.id}).eq('id',id).eq('zone_id',zoneId).eq('organization_id',access.organization.id).select('id'));
-  if(!rows.length)throw new Error('Concern not found.');
-  revalidatePath(`${zoneRoot(siteId)}/${zoneId}`);return {success:'Concern updated.'};
- }catch(error){if(error.digest)throw error;return {error:error.message};}
+ const siteId=identifier(fd,'site_id');await siteZoneContext(siteId);
+ return {error:'Historic concerns are read-only. Open the Accident, Incident & Near Misses register to manage the imported case.'};
 }
 
 export async function confirmZonePosterDisplayed(_state,fd) {
