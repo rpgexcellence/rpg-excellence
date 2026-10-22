@@ -1,14 +1,45 @@
-import Link from 'next/link';
-import {redirect,notFound} from 'next/navigation';
-import ZoneSmallForm from '../../../../components/ZoneSmallForm';
-import {requireZonePage} from '../../../../lib/site-zones';
-import {reportZoneConcern} from './actions';
-import '../../../portal/company/sites/zones.css';
-export const dynamic='force-dynamic';
-export const metadata={title:'Report an area concern | RPG Excellence',robots:{index:false,follow:false}};
-export default async function ConcernPage({params}) {
- const {token}=await params;const {zone,access}=await requireZonePage(token);
- if(!access.user)redirect('/portal/login?next='+encodeURIComponent(`/area/${token}/concerns`));
- if(access.organization?.id!==zone.organization_id)notFound();
- return <main className="zone-page"><div className="zone-employee"><header className="zone-brand">RPG EXCELLENCE · MY WORK AREA</header><Link href={`/area/${token}`}>← {zone.reference}</Link><h1>Report a concern</h1><h2>{zone.name}</h2><p className="zone-restriction">For immediate danger, follow site emergency procedures and contact your supervisor directly.</p><section className="zone-panel"><ZoneSmallForm action={reportZoneConcern} label="Submit concern"><input type="hidden" name="token" value={token}/><label>What have you noticed?<textarea name="description" required minLength={10} maxLength={3000} placeholder="Describe the location, condition and any immediate action taken. Avoid unnecessary personal information."/></label><p>Your report is associated with your company account and visible to company administrators. It is not anonymous. Photos and automatic notifications are not included in this release.</p></ZoneSmallForm></section></div></main>;
+import Link from "next/link";
+import IncidentIntakeForm from "../../../../components/IncidentForm";
+import { publicReportZone, issueReportTicket } from "../../../../lib/incidents";
+import { reportZoneConcern } from "./actions";
+import "../../../portal/incidents/incidents.css";
+export const dynamic = "force-dynamic";
+export const metadata = {
+  title: "Report an incident or concern | RPG Excellence",
+  robots: { index: false, follow: false },
+  referrer: "no-referrer",
+};
+export default async function ConcernPage({ params }) {
+  const { token } = await params;
+  const { zone, site } = await publicReportZone(token);
+  return (
+    <main className="incidentPage incidentPublic">
+      <header className="incidentHead">
+        <span className="incidentEyebrow">
+          RPG EXCELLENCE · SPEAK UP, PREVENT HARM
+        </span>
+        <h1>Report an incident or concern</h1>
+        <p>
+          {site.site_name} / {zone.reference} · {zone.name}
+        </p>
+        <p>No sign-in required. You can remain anonymous.</p>
+      </header>
+      <p className="incidentNotice">
+        <strong>Immediate danger or active security incident?</strong> Follow
+        site emergency procedures and contact the responsible team directly.
+        This form is not continuously monitored and does not summon emergency
+        assistance.
+      </p>
+      <section className="incidentCard">
+        <IncidentIntakeForm
+          action={reportZoneConcern}
+          token={token}
+          ticket={issueReportTicket(token)}
+        />
+      </section>
+      <Link href={`/area/${token}/concerns/status`}>
+        Already reported? Check progress with your private key →
+      </Link>
+    </main>
+  );
 }
