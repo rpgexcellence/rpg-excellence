@@ -340,3 +340,56 @@
     margin-bottom: 12px;
   }
 }
+/* Response overview and accessible analytical cards. */
+.incidentSeverityPanel{display:flex;justify-content:space-between;gap:28px;padding:25px 28px;margin:24px 0 18px;border:1px solid #cadbd7;border-left:7px solid #168375;border-radius:14px;background:#edf8f4;color:#16483d}
+.incidentSeverityPanel.critical{background:#fff0f1;border-color:#edb9bf;border-left-color:#b42335;color:#8e1d2c}
+.incidentSeverityPanel.high{background:#fff4e9;border-color:#ebc9a5;border-left-color:#d77618;color:#80430f}
+.incidentSeverityPanel.medium{background:#fffae7;border-color:#e6d8a5;border-left-color:#ae8613;color:#68500c}
+.incidentSeverityPanel>div:first-child>strong{display:block;font-size:34px;text-transform:capitalize;margin:8px 0}
+.incidentSeverityPanel p{margin:6px 0;max-width:780px}
+.incidentSeverityPanel>div:last-child{display:grid;gap:6px;align-content:center;min-width:180px}
+.incidentSeverityPanel>div:last-child span{font-size:12px;opacity:.85}
+.incidentSeverityPanel b{text-transform:capitalize;margin-bottom:10px}
+.incidentProgress{padding:24px;background:#fff;border:1px solid var(--line);border-radius:14px;margin:18px 0 24px}
+.incidentProgress ol{display:flex;gap:9px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.incidentProgress li{display:flex;align-items:center;gap:9px;flex:1 1 150px;padding:12px;border-radius:9px;background:#f0f3f7;color:#617285;font-size:12px;line-height:1.4}
+.incidentProgress li span{display:grid;place-items:center;flex-shrink:0;width:27px;height:27px;border-radius:50%;background:#dde5ed;font-weight:800}
+.incidentProgress li.done{background:#eaf6f1;color:#16654f}
+.incidentProgress li.done span{background:#ccebdc}
+.incidentProgress li.current{background:#12364b;color:#fff}
+.incidentProgress li.current span{background:#207681}
+.incidentProgress p{margin:12px 0 0}
+.incidentOptional{padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:#f8fafc}
+.incidentOptional[open]>summary{margin-bottom:15px}
+.incidentOptional fieldset+fieldset{margin-top:16px}
+.incidentInsightStrip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0 2px}
+.incidentInsightStrip article{display:flex;align-items:center;gap:15px;padding:20px;border-radius:12px;background:#e8f1f3;border:1px solid #ccdee4}
+.incidentInsightStrip strong{font-size:30px;color:#125762}
+.incidentInsightStrip span{font-size:13px;line-height:1.5;color:#345461}
+.incidentChart{margin:10px 0;overflow:hidden}
+.incidentChart h2{font-size:20px;margin-bottom:9px}
+.incidentChartRows{display:grid;gap:16px;margin-top:24px}
+.incidentChartRow>div:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:18px;font-size:13px;line-height:1.4;margin-bottom:7px}
+.incidentChartRow strong{font-size:16px;min-width:25px;text-align:right}
+.incidentChartRow a{color:#244859;text-decoration:none}
+.incidentChartRow a:hover{text-decoration:underline}
+.incidentChartTrack{height:9px;background:#edf2f6;border-radius:5px;overflow:hidden}
+.incidentChartTrack span{display:block;height:100%;border-radius:5px}
+.incidentDonutLayout{display:flex;align-items:center;justify-content:space-around;gap:28px;padding:23px 0}
+.incidentDonut{display:grid;place-items:center;width:190px;height:190px;border-radius:50%;flex-shrink:0}
+.incidentDonut>div{display:flex;flex-direction:column;align-items:center;justify-content:center;width:142px;height:142px;border-radius:50%;background:#fff}
+.incidentDonut strong{font-size:39px}
+.incidentDonut span{font-size:12px;color:var(--muted)}
+.incidentLegend{display:grid;gap:17px;padding:0;list-style:none;min-width:145px}
+.incidentLegend li{display:flex;align-items:center;gap:11px;font-size:13px}
+.incidentLegend i{width:11px;height:11px;border-radius:3px}
+.incidentLegend strong{margin-left:auto;padding-left:20px}
+.incidentTrend{display:block;width:100%;height:auto;max-height:280px;margin-top:18px}
+.incidentEmpty{padding:32px 18px;text-align:center;background:#f3f7fa;color:var(--muted);border-radius:10px}
+.incidentRegisterContext{font-size:12px;margin:7px 0!important;color:var(--muted)}
+.incidentBadge.low{background:#e0f3e9;color:#175a42}
+.incidentBadge.medium{background:#fff3cc;color:#6c520a}
+.incidentBadge.high{background:#ffecd8;color:#864710}
+.incidentBadge.critical{background:#b42335;color:#fff}
+@media(max-width:750px){.incidentSeverityPanel{flex-direction:column;padding:22px;gap:12px}.incidentSeverityPanel>div:last-child{grid-template-columns:1fr 1fr;min-width:0}.incidentInsightStrip{grid-template-columns:1fr}.incidentProgress li{flex-basis:135px}.incidentDonutLayout{flex-wrap:wrap;gap:15px}.incidentChart{padding:20px}.incidentLegend{width:100%}.incidentDonut{width:170px;height:170px}.incidentDonut>div{width:128px;height:128px}}
+@media(max-width:650px){.incidentForm input[type=datetime-local]{min-width:0;max-width:100%}.incidentForm fieldset{min-width:0}.incidentOptional{padding:12px}.incidentChoices{gap:13px 18px}.incidentChoices label{max-width:100%}.incidentProgress{padding:16px}.incidentProgress li{font-size:11px}}
