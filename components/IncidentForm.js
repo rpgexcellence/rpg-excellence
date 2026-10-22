@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState, useRef, useEffect } from "react";
+import { EVENT_CATEGORIES, EVENT_OUTCOMES, BODY_PARTS, contextualReportTypes, incidentStages } from "../lib/incident-reporting.mjs";
 import { INCIDENT_DOMAINS, INCIDENT_TYPES } from "../lib/incident-policy.mjs";
 // Keep entered evidence in memory when an action returns a validation error.
 // No drafts or personal details are written to browser storage.
@@ -61,6 +62,7 @@ export function IncidentActionForm({
       className={"incidentForm " + className}
     >
       {children}
+      {state?.progress && <IncidentProgress report={state.progress} />}
       {state?.error && (
         <p className="incidentError" role="alert">
           {state.error}
@@ -82,10 +84,15 @@ export default function IncidentIntakeForm({
   sites = [],
   zones = [],
 }) {
+  const [domains,setDomains] = useState([]);
+  const [categoryChoices,setCategoryChoices] = useState({});
+  const [reportType,setReportType] = useState("concern");
+  const [stopWork,setStopWork] = useState("unknown");
   const [named, setNamed] = useState(false),
     [site, setSite] = useState(sites[0]?.id || ""),
     [state, formAction, pending] = useActionState(action, null);
   const preserved = usePreservedForm(state);
+  useEffect(()=>{if(!contextualReportTypes(domains,INCIDENT_TYPES).some(([key])=>key===reportType)) setReportType("concern");},[domains,reportType]);
   if (state?.reference)
     return (
       <section className="incidentCard" aria-live="polite">
@@ -164,17 +171,29 @@ export default function IncidentIntakeForm({
         <div className="incidentChoices">
           {INCIDENT_DOMAINS.map(([k, v]) => (
             <label key={k}>
-              <input type="checkbox" name="domains" value={k} />
+              <input type="checkbox" name="domains" value={k} checked={domains.includes(k)}
+                onChange={e=>setDomains(current=>e.target.checked?[...current,k]:current.filter(x=>x!==k))} />
               {v}
             </label>
           ))}
         </div>
       </fieldset>
+      {domains.length>0 && <div className="incidentGrid">
+        {domains.map(domain=><label key={domain}>
+          {INCIDENT_DOMAINS.find(([k])=>k===domain)?.[1]} — event category
+          <select name={"category_"+domain} required value={categoryChoices[domain]||""}
+            onChange={e=>setCategoryChoices(c=>({...c,[domain]:e.target.value}))}>
+            <option value="">Choose the closest match</option>
+            {EVENT_CATEGORIES[domain].map(([k,label])=><option key={k} value={k}>{label}</option>)}
+          </select>
+          {categoryChoices[domain]==="other" && <input name={"other_"+domain} required minLength={3} maxLength={180} placeholder="Describe the event category" />}
+        </label>)}
+      </div>}
       <div className="incidentGrid">
         <label>
           Report type
-          <select name="report_type" defaultValue="concern">
-            {INCIDENT_TYPES.map(([k, v]) => (
+          <select name="report_type" value={reportType} onChange={e=>setReportType(e.target.value)}>
+            {contextualReportTypes(domains,INCIDENT_TYPES).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
               </option>
@@ -193,10 +212,30 @@ export default function IncidentIntakeForm({
           </select>
         </label>
       </div>
+      {reportType==="other" && <label>Other report type
+        <input name="report_type_other" required minLength={3} maxLength={180} />
+      </label>}
       <label className="incidentCheck">
         <input name="immediate_danger" type="checkbox" />
         There is immediate danger, active compromise or a major disruption
       </label>
+      <fieldset>
+        <legend>Safety now & stop-work authority</legend>
+        <p className="incidentMuted">Everyone has the right to stop work they believe is unsafe. Move to safety and inform the responsible person. This form does not authorise restarting work.</p>
+        <div className="incidentGrid">
+          <label>Is the situation now safe / contained?
+            <select name="situation_safe" defaultValue="unknown"><option value="unknown">Not known</option><option value="yes">Yes</option><option value="no">No — unsafe / not contained</option></select>
+          </label>
+          <label>Was stop-work authority exercised?
+            <select name="stop_work" value={stopWork} onChange={e=>setStopWork(e.target.value)}>
+              <option value="unknown">Not known</option><option value="yes">Yes — work stopped</option><option value="no">No</option><option value="not_applicable">Not applicable</option>
+            </select>
+          </label>
+        </div>
+        {stopWork==="yes" && <label>What was stopped, when and what remains unsafe? (optional)
+          <textarea name="stop_work_details" maxLength={1000} rows={2} />
+        </label>}
+      </fieldset>
       <label>
         Short title
         <input
@@ -232,14 +271,40 @@ export default function IncidentIntakeForm({
           placeholder="Describe the event, exact location, consequences and what might happen next. Do not enter passwords, access codes, payment details or unnecessary personal information."
         />
       </label>
+      {domains.length>0 && <details className="incidentOptional">
+        <summary>What happened / consequences observed (optional)</summary>
+        <p className="incidentMuted">Select what actually happened, not what might have happened. Leave unknown details for the investigator.</p>
+        {domains.map(domain=><fieldset key={domain}><legend>{INCIDENT_DOMAINS.find(([k])=>k===domain)?.[1]}</legend>
+          <div className="incidentChoices">{EVENT_OUTCOMES[domain].map(([key,label])=><label key={key}><input type="checkbox" name="outcomes" value={domain+":"+key} />{label}</label>)}</div>
+        </fieldset>)}
+        {domains.includes("health_safety") && <fieldset><legend>Part of body affected (optional)</legend>
+          <div className="incidentChoices">{BODY_PARTS.map(([key,label])=><label key={key}><input type="checkbox" name="body_parts" value={key} />{label}</label>)}</div>
+          <label>Other body part — describe if selected<input name="body_part_other" maxLength={180} /></label>
+        </fieldset>}
+        <label>Other consequence — describe if selected<input name="outcome_other" maxLength={500} /></label>
+      </details>}
       <label>
-        Who was informed and when? (optional)
+        Who was informed and when? If nobody, explain why (optional)
         <input name="manager_details" maxLength={500} />
       </label>
       <label>
         Immediate action taken (optional)
         <textarea name="immediate_action" maxLength={2000} rows={3} />
       </label>
+      <details className="incidentOptional">
+        <summary>Additional context & follow-up (optional)</summary>
+        <div className="incidentForm">
+          <label>Activity underway<input name="activity" maxLength={500} /></label>
+          <label>Equipment, asset or affected service<input name="asset" maxLength={500} /></label>
+          <label>Other useful details<textarea name="additional_details" maxLength={2000} rows={3}
+            placeholder={domains.includes("information_security")?"Suspected or confirmed? Affected systems, confidentiality, integrity or availability. Do not enter credentials or sensitive data.":domains.includes("business_continuity")?"Affected service, interruption and current recovery position.":"Injury or first aid, damaged equipment, witnesses or unusual conditions. Avoid unnecessary personal or medical information."} /></label>
+          <fieldset><legend>Suggest follow-up for administrator review</legend>
+            <div className="incidentChoices"><label><input type="checkbox" name="requested_workflows" value="capa_8d" />CAPA-8D</label><label><input type="checkbox" name="requested_workflows" value="moc" />Management of Change (MOC)</label></div>
+          </fieldset>
+          <label>Related assessment, permit, inspection or other reference<textarea name="reference_notes" maxLength={1000} rows={2} placeholder="Enter any reference you know. The administrator will confirm and link the record." /></label>
+          <p className="incidentMuted">These are requests for review. They do not create or approve changes automatically.</p>
+        </div>
+      </details>
       <fieldset>
         <legend>Photo evidence (optional)</legend>
         <label>
@@ -321,4 +386,14 @@ export default function IncidentIntakeForm({
       </button>
     </form>
   );
+}
+
+export function IncidentProgress({report}) {
+ const {steps,current,exception}=incidentStages(report);
+ if(exception) return <p className="incidentNotice">Report {exception}. See the authorised progress update for the next step.</p>;
+ return <nav className="incidentProgress" aria-label="Report progress"><ol>
+   {steps.map(([key,label],i)=><li key={key} className={i<current?"done":i===current?"current":""} aria-current={i===current?"step":undefined}>
+     <span>{i<current?"✓":i+1}</span><strong>{label}</strong>
+   </li>)}
+ </ol><p className="incidentMuted">Current stage: {steps[current][1]}. Stages show the workflow position; completion evidence is checked before closure.</p></nav>;
 }
