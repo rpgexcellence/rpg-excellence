@@ -10,10 +10,16 @@ import {
   checkResult,
   synchroniseIncidentPlanning,
 } from "../../../lib/incidents";
+import { validateOutcomes, validateBodyParts } from "../../../lib/incident-reporting.mjs";
 import { validateIncidentIntake, UUID } from "../../../lib/incident-policy.mjs";
 import { randomUUID } from "node:crypto";
 const allowed = new Set([
   "triage",
+  "approve_director",
+  "verify_case",
+  "link_records",
+  "create_moc",
+  "link_moc",
   "investigate",
   "allocate_task",
   "reallocate_task",
@@ -42,6 +48,31 @@ export async function incidentCommand(_state, fd) {
       "security_impacts",
     ])
       values[k] = fd.getAll(k);
+    values.investigation_details = Object.fromEntries(
+      [...fd].filter(([key]) => key.startsWith("investigation_") && key !== "investigation_summary")
+        .map(([key,value]) => [key.slice(14), String(value)])
+    );
+    if(command === "investigate" && fd.get("consequences_reviewed") === "on") {
+      const outcomes=validateOutcomes(fd.getAll("reviewed_outcomes"),context.report.domains);
+      if(!outcomes.length) throw Error("Choose the assessed consequences, including no harm where appropriate.");
+      values.investigation_details.reviewed_outcomes=outcomes;
+      values.investigation_details.outcome_other=String(fd.get("reviewed_outcome_other")||"").trim();
+      if(outcomes.some(x=>x.endsWith(":other"))&&values.investigation_details.outcome_other.length<3) throw Error("Describe the other assessed consequence.");
+    } else if(command === "investigate" && Array.isArray(context.report.investigation_details?.reviewed_outcomes)) {
+      values.investigation_details.reviewed_outcomes=context.report.investigation_details.reviewed_outcomes;
+      values.investigation_details.outcome_other=context.report.investigation_details.outcome_other||"";
+    }
+    if(command === "investigate" && fd.get("body_parts_reviewed") === "on") {
+      const parts=validateBodyParts(fd.getAll("reviewed_body_parts"));
+      if(!context.report.domains.includes("health_safety")) throw Error("Body parts apply only to H&S reports.");
+      if(!parts.length) throw Error("Choose the assessed body part or not known / not applicable.");
+      values.investigation_details.reviewed_body_parts=parts;
+      values.investigation_details.body_part_other=String(fd.get("reviewed_body_part_other")||"").trim();
+      if(parts.includes("other")&&values.investigation_details.body_part_other.length<3) throw Error("Describe the other assessed body part.");
+    } else if(command === "investigate" && Array.isArray(context.report.investigation_details?.reviewed_body_parts)) {
+      values.investigation_details.reviewed_body_parts=context.report.investigation_details.reviewed_body_parts;
+      values.investigation_details.body_part_other=context.report.investigation_details.body_part_other||"";
+    }
     values.personal_data_suspected = fd.get("personal_data_suspected") === "on";
     if (command !== "triage") delete values.domains;
     if (JSON.stringify(values).length > 50000)
@@ -99,6 +130,9 @@ export async function submitInternalIncident(_state, fd) {
     const { values, contact } = validateIncidentIntake({
       ...Object.fromEntries(fd),
       domains: fd.getAll("domains"),
+      requested_workflows: fd.getAll("requested_workflows"),
+      outcomes: fd.getAll("outcomes"),
+      body_parts: fd.getAll("body_parts"),
       anonymous: fd.get("anonymous") !== "false",
       immediate_danger: fd.get("immediate_danger") === "on",
       contact_consent: fd.get("contact_consent") === "on",
