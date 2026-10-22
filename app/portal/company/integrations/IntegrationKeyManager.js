@@ -1,36 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { INTEGRATION_PERMISSION_GROUPS } from "../../../../lib/integration-policy.mjs";
 import {
   createIntegrationApiKey,
   revokeIntegrationApiKey,
 } from "./actions";
 
-const PERMISSION_GROUPS = [
-  {
-    title: "Assurance records",
-    options: [
-      ["audits:read", "Read audits"],
-      ["audits:write", "Create or update audits"],
-      ["findings:read", "Read findings and nonconformities"],
-      ["findings:write", "Create or update findings"],
-      ["capa:read", "Read CAPA-8D records"],
-      ["capa:write", "Create or update CAPA-8D records"],
-    ],
-  },
-  {
-    title: "Operational registers",
-    options: [
-      ["assets:read", "Read assets"],
-      ["assets:write", "Create or update assets"],
-      ["suppliers:read", "Read suppliers"],
-      ["suppliers:write", "Create or update suppliers"],
-      ["people:read", "Read authorised company-user details"],
-      ["workplace_inspections:read", "Read Workplace Inspection programmes and records"],
-      ["webhooks:manage", "Manage webhook subscriptions"],
-    ],
-  },
-];
+const PERMISSION_GROUPS = INTEGRATION_PERMISSION_GROUPS;
 
 const initialState = { error: "", success: "", apiKey: "" };
 
@@ -83,8 +60,7 @@ export default function IntegrationKeyManager({ clients = [] }) {
             <span>CONTROLLED CREDENTIAL</span>
             <h2>Create an API key</h2>
             <p>
-              Begin with read-only access and grant write access only where the
-              connected system requires it.
+              Grant only the released read permissions needed by the connected system. Inbound writes and webhook delivery are not available in this release.
             </p>
           </div>
           <b>Enterprise</b>
@@ -98,13 +74,13 @@ export default function IntegrationKeyManager({ clients = [] }) {
               required
               minLength={3}
               maxLength={120}
-              placeholder="For example: SAP quality connector"
+              placeholder="For example: BI assurance export"
             />
           </label>
           <label>
             <span>Environment *</span>
-            <select name="environment" defaultValue="test">
-              <option value="test">Test — use during configuration</option>
+            <select name="environment" defaultValue="live">
+              <option value="test">Test — credential check only; no customer data</option>
               <option value="live">Live — production records</option>
             </select>
           </label>
@@ -116,6 +92,11 @@ export default function IntegrationKeyManager({ clients = [] }) {
             </small>
           </label>
 
+          <label style={{gridColumn:"1 / -1"}}>
+            <span>Allowed source IP addresses (optional)</span>
+            <textarea name="allowed_ips" rows={2} maxLength={1600} placeholder="Exact IPv4 / IPv6 addresses, separated by commas or spaces" />
+            <small>Leave blank for no IP restriction. Network ranges are not supported. Requires a hosting ingress header that is configured and overwritten by your trusted proxy.</small>
+          </label>
           <fieldset className="integrationPermissions">
             <legend>Permissions *</legend>
             <p>
@@ -179,7 +160,7 @@ export default function IntegrationKeyManager({ clients = [] }) {
             </p>
           </div>
           <b>
-            {clients.filter((client) => client.active && !client.revoked_at).length}
+            {clients.filter((client) => client.active && !client.revoked_at && (!client.expires_at || new Date(client.expires_at)>new Date())).length}
             {" "}active
           </b>
         </div>
@@ -187,6 +168,7 @@ export default function IntegrationKeyManager({ clients = [] }) {
           <div className="integrationClientList">
             {clients.map((client) => {
               const revoked = !client.active || Boolean(client.revoked_at);
+              const expired = client.expires_at && new Date(client.expires_at) <= new Date();
               return (
                 <article className="integrationClient" key={client.id}>
                   <div>
@@ -198,7 +180,7 @@ export default function IntegrationKeyManager({ clients = [] }) {
                   </div>
                   <div className="integrationClientMeta">
                     <span className={revoked ? "revoked" : "active"}>
-                      {revoked ? "Revoked" : client.environment}
+                      {revoked ? "Revoked" : expired ? "Expired" : client.environment}
                     </span>
                     <small>Expires: {dateLabel(client.expires_at)}</small>
                     <small>
