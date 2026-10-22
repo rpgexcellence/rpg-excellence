@@ -54,7 +54,7 @@ export async function GET(request,{params}) {
   page.drawImage(qr,{x:right+16,y:sy-165,width:163,height:163});sy-=190;
   draw('SCAN HERE',right+14,sy,22,bold);sy-=19;
   for(const l of lines('Open your phone camera and scan the code.',167,10.5)){draw(l,right+14,sy,10.5);sy-=14;}sy-=9;
-  for(const label of [zone.show_inspections?'Workplace inspections':null,zone.show_assessments?'Approved risk assessments':null,'Area safety information','Report a concern'].filter(Boolean)){
+  for(const label of [zone.show_inspections?'Workplace inspections':null,zone.show_assessments?'Approved risk assessments':null,'Area safety information','Report an incident or concern'].filter(Boolean)){
    draw('>',right+14,sy,11,bold,teal);for(const l of lines(label,149,10,bold)){draw(l,right+28,sy,10,bold);sy-=14;}sy-=5;
   }
   const accessLines=lines(zone.access_mode==='company'?'Company sign-in required.':'Published area information.',167,9);
@@ -120,7 +120,7 @@ export async function GET(request,{params}) {
  for(let i=0;i<pages.length;i++){
   page=pages[i];page.drawRectangle({x:0,y:0,width:W,height:95,color:navy});page.drawRectangle({x:0,y:91,width:W,height:4,color:teal});
   draw('See an issue? Report it here.',left,68,21,bold,white);
-  draw('Scan the QR code to report a concern.',left,51,10,regular,white);
+  draw('Scan to report. No sign-in required.',left,51,10,regular,white);
   draw('For immediate danger, follow site emergency procedures.',left,36,9,regular,white);
   draw(`Rev ${zone.poster_revision||1} | Issued ${new Date().toISOString().slice(0,10)} | Sheet ${i+1} of ${pages.length}`,left,16,8,bold,white);
   const review=((signs.length||ppeRequirements.length||zone.ppe_source_mode==='assessment')?`Review by ${zone.signs_review_date}. `:'')+(pages.length>1?'Display all sheets.':'Replace outdated copies.');draw(review,307,16,fit(review,258,8,6),regular,white);
