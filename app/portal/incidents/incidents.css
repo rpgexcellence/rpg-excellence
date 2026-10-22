@@ -1,0 +1,334 @@
+.incidentPage {
+  --ink: #142a43;
+  --muted: #526579;
+  --line: #d8e2eb;
+  --accent: #14665e;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 32px 26px 70px;
+  color: var(--ink);
+  font-family: Arial, sans-serif;
+  background: #f5f8fb;
+  min-height: 100vh;
+}
+.incidentPage * {
+  box-sizing: border-box;
+}
+.incidentPage h1 {
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.14;
+  letter-spacing: -0.03em;
+  margin: 12px 0;
+}
+.incidentPage h2 {
+  font-size: 21px;
+  margin: 0 0 17px;
+}
+.incidentPage h3 {
+  font-size: 16px;
+}
+.incidentPage p {
+  line-height: 1.6;
+}
+.incidentPage a {
+  color: #075c81;
+  text-underline-offset: 3px;
+}
+.incidentHead {
+  background: #102c44;
+  color: white;
+  padding: 30px;
+  border-radius: 18px;
+  margin-bottom: 24px;
+}
+.incidentHead a {
+  color: #c8f3eb;
+}
+.incidentEyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+.incidentHead p {
+  max-width: 840px;
+  color: #d4e4ee;
+  margin-bottom: 0;
+}
+.incidentNav {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.incidentNav a {
+  display: inline-block;
+  padding: 10px 15px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+}
+.incidentCard {
+  padding: 24px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  margin: 18px 0;
+  min-width: 0;
+}
+.incidentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 17px;
+}
+.incidentStats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.incidentStat {
+  padding: 18px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.incidentStat strong {
+  display: block;
+  font-size: 30px;
+  margin: 8px 0;
+}
+.incidentStat span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.incidentForm {
+  display: grid;
+  gap: 18px;
+}
+.incidentForm label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.incidentForm input:not([type="checkbox"]),
+.incidentForm select,
+.incidentForm textarea {
+  width: 100%;
+  border: 1px solid #aebfcd;
+  padding: 12px;
+  border-radius: 7px;
+  background: white;
+  color: #142a43;
+  font: inherit;
+  line-height: 1.4;
+}
+.incidentForm textarea {
+  resize: vertical;
+}
+.incidentForm :focus-visible,
+.incidentPage a:focus-visible {
+  outline: 3px solid #288fbc;
+  outline-offset: 3px;
+}
+.incidentForm fieldset {
+  border: 1px solid var(--line);
+  padding: 18px;
+  border-radius: 10px;
+  margin: 0;
+}
+.incidentForm legend {
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.incidentChoices {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.incidentChoices label,
+.incidentForm .incidentCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  line-height: 1.5;
+}
+.incidentForm input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  margin-top: 0;
+}
+.incidentForm button,
+.incidentButton {
+  justify-self: start;
+  padding: 13px 20px;
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  font-size: 14px;
+  min-height: 44px;
+}
+.incidentForm button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.incidentError {
+  border-left: 4px solid #bf3434;
+  background: #fff1f0;
+  padding: 14px;
+  color: #852626;
+}
+.incidentNotice {
+  border-left: 4px solid #a36c00;
+  background: #fff7df;
+  padding: 15px;
+  color: #674900;
+  line-height: 1.6;
+}
+.incidentMuted {
+  color: var(--muted);
+  font-size: 13px;
+}
+.incidentSecret {
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  background: #eaf4f2;
+  padding: 16px;
+}
+.incidentTrap {
+  position: absolute !important;
+  left: -9999px;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.incidentTableWrap {
+  overflow: auto;
+}
+.incidentPage table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.incidentPage th {
+  text-align: left;
+  background: #eef3f7;
+  padding: 12px;
+  white-space: nowrap;
+}
+.incidentPage td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e9f0;
+  vertical-align: top;
+}
+.incidentBadge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #eaf1f8;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.incidentBadge.critical,
+.incidentBadge.high {
+  background: #ffe9e5;
+  color: #9a2c20;
+}
+.incidentPre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.incidentBars {
+  display: grid;
+  gap: 14px;
+}
+.incidentBar {
+  display: grid;
+  grid-template-columns: minmax(100px, 160px) 1fr 35px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.incidentBar i {
+  display: block;
+  height: 13px;
+  border-radius: 3px;
+  background: #198578;
+  min-width: 2px;
+}
+.incidentBarTrack {
+  background: #edf3f5;
+  border-radius: 3px;
+}
+.incidentPublic {
+  max-width: 860px;
+}
+.incidentTask {
+  border-top: 1px solid var(--line);
+  padding: 22px 0;
+}
+.incidentPage details > summary {
+  cursor: pointer;
+  font-weight: 800;
+  padding: 12px 0;
+}
+.incidentTimeline {
+  padding-left: 20px;
+}
+.incidentTimeline li {
+  padding-bottom: 16px;
+}
+.incidentPage dl {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+}
+.incidentPage dt {
+  font-weight: 700;
+  font-size: 13px;
+}
+.incidentPage dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .incidentStats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 650px) {
+  .incidentPage {
+    padding: 18px 12px 50px;
+  }
+  .incidentHead {
+    padding: 23px 19px;
+  }
+  .incidentCard {
+    padding: 19px;
+  }
+  .incidentGrid {
+    grid-template-columns: 1fr;
+  }
+  .incidentStats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .incidentBar {
+    grid-template-columns: 110px 1fr 25px;
+  }
+  .incidentPage dl {
+    grid-template-columns: 1fr;
+  }
+  .incidentPage dd {
+    margin-bottom: 12px;
+  }
+}
