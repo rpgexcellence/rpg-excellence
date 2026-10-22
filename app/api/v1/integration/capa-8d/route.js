@@ -1,5 +1,6 @@
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -39,7 +40,7 @@ function validDate(value) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(request, "capa:read");
   if (authentication.error) return authentication.error;
 
@@ -99,9 +100,9 @@ export async function GET(request) {
        created_at,closed_at,updated_at`,
       { count: "exact" }
     )
-    .eq("owner_id", client.owner_id)
+    .eq("organization_id", client.organization_id)
     .order("updated_at", { ascending: false })
-    .range(firstRow, lastRow);
+    .order("id", { ascending: true }).range(firstRow, lastRow);
 
   if (caseType) query = query.eq("case_type", caseType);
   if (status) query = query.eq("status", status);
@@ -160,4 +161,4 @@ export async function GET(request) {
     200,
     requestId
   );
-}
+});
