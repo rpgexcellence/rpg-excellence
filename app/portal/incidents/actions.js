@@ -1,4 +1,8 @@
 "use server";
+import {
+  prepareIncidentPhoto,
+  storeIncidentPhoto,
+} from "../../../lib/incident-photo";
 import { revalidatePath } from "next/cache";
 import {
   incidentContext,
@@ -99,6 +103,7 @@ export async function submitInternalIncident(_state, fd) {
       immediate_danger: fd.get("immediate_danger") === "on",
       contact_consent: fd.get("contact_consent") === "on",
     });
+    const photoFile = fd.get("photo");
     const site = String(fd.get("site_id") || ""),
       zone = String(fd.get("zone_id") || "");
     if (!UUID.test(site) || (zone && !UUID.test(zone)))
@@ -114,7 +119,33 @@ export async function submitInternalIncident(_state, fd) {
       }),
     );
     revalidatePath("/portal/incidents");
-    return { reference: result.reference };
+    let photoAttached = false,
+      photoWarning = "";
+    if (photoFile?.size) {
+      try {
+        const photo = await prepareIncidentPhoto(photoFile);
+        await storeIncidentPhoto({
+          admin: context.admin,
+          organizationId: context.organization.id,
+          incidentId: result.id,
+          photo,
+          actorUserId: values.anonymous ? null : context.user.id,
+        });
+        photoAttached = true;
+      } catch (error) {
+        console.error(
+          "Internal report accepted; photo attachment failed:",
+          error.message,
+        );
+        photoWarning =
+          "Your report was received, but its photo could not be attached. Do not submit again. Ask the incident administrator to add the original photo to this case.";
+      }
+    }
+    return {
+      reference: result.reference,
+      photo_attached: photoAttached,
+      photo_warning: photoWarning,
+    };
   } catch (e) {
     if (e.digest) throw e;
     return { error: e.message };
@@ -177,31 +208,27 @@ export async function uploadIncidentEvidence(_state, fd) {
         .from("incident-evidence")
         .upload(path, b, { contentType: mime, upsert: false }),
     );
-    const result = await c.admin
-      .from("incident_evidence")
-      .insert({
-        organization_id: c.organization.id,
-        incident_id: c.report.id,
-        storage_path: path,
-        file_name: "Evidence." + ext,
-        mime_type: mime,
-        size_bytes: b.length,
-        uploaded_by: c.user.id,
-      });
+    const result = await c.admin.from("incident_evidence").insert({
+      organization_id: c.organization.id,
+      incident_id: c.report.id,
+      storage_path: path,
+      file_name: "Evidence." + ext,
+      mime_type: mime,
+      size_bytes: b.length,
+      uploaded_by: c.user.id,
+    });
     if (result.error) {
       await c.admin.storage.from("incident-evidence").remove([path]);
       throw Error("Evidence could not be registered. Try again.");
     }
     checkResult(
-      await c.admin
-        .from("incident_events")
-        .insert({
-          organization_id: c.organization.id,
-          incident_id: c.report.id,
-          actor_user_id: c.user.id,
-          event_type: "evidence_added",
-          summary: "Private supporting evidence added.",
-        }),
+      await c.admin.from("incident_events").insert({
+        organization_id: c.organization.id,
+        incident_id: c.report.id,
+        actor_user_id: c.user.id,
+        event_type: "evidence_added",
+        summary: "Private supporting evidence added.",
+      }),
     );
     revalidatePath("/portal/incidents/" + c.report.id);
     return { success: "Private evidence stored." };
