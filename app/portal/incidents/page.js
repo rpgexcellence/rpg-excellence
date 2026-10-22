@@ -1,4 +1,6 @@
 import Link from "next/link";
+import {incidentAnalytics, categoryLabel, outcomeLabel, BODY_PARTS} from "../../../lib/incident-reporting.mjs";
+import {IncidentBarChart, SeverityChart, IncidentTrend} from "../../../components/IncidentCharts";
 import { incidentRows } from "../../../lib/incident-data";
 import {
   incidentContext,
@@ -26,6 +28,11 @@ export default async function IncidentsPage({ searchParams }) {
       (!q?.site || r.site_id === q.site) &&
       (!q?.zone || r.zone_id === q.zone) &&
       (!q?.status || r.status === q.status) &&
+      (!q?.type || r.report_type===q.type) &&
+      (!q?.severity || r.criticality===q.severity) &&
+      (!q?.category || (r.intake_details?.categories||[]).some(item=>item.domain+":"+item.category===q.category)) &&
+      (!q?.outcome || (r.investigation_details?.reviewed_outcomes||[]).includes(q.outcome)) &&
+      (!q?.body || (r.investigation_details?.reviewed_body_parts||[]).includes(q.body)) &&
       (!q?.from || r.occurred_at.slice(0, 10) >= q.from) &&
       (!q?.to || r.occurred_at.slice(0, 10) <= q.to),
   );
@@ -36,6 +43,7 @@ export default async function IncidentsPage({ searchParams }) {
     "id,incident_id,status,due_at",
   );
   const s = incidentStatistics(reports, tasks);
+  const analytics=incidentAnalytics(reports);
   const sites = [
     ...new Map(
       all.map((r) => [r.site_id, r.location_label.split(" / ")[0]]),
@@ -102,6 +110,10 @@ export default async function IncidentsPage({ searchParams }) {
               </select>
             </label>
           </div>
+          <div className="incidentChoices">
+            {["type","severity","category","outcome","body"].filter(key=>q?.[key]).map(key=><label key={key}>{pretty(key)}: {pretty(q[key])}<input type="hidden" name={key} value={q[key]} /></label>)}
+            <Link href="/portal/incidents">Clear filters</Link>
+          </div>
           {q?.zone && <input type="hidden" name="zone" value={q.zone} />}
           <button>Apply filters</button>
         </form>
@@ -127,57 +139,19 @@ export default async function IncidentsPage({ searchParams }) {
         for urgent review. All figures respect your access scope and selected
         filters.
       </p>
+      <div className="incidentInsightStrip">
+        <article><strong>{analytics.stopWork}</strong><span>Stop-work interventions reported</span></article>
+        <article><strong>{analytics.awaitingDirector}</strong><span>Critical cases awaiting Director approval</span></article>
+        <article><strong>{analytics.consequencesPending}</strong><span>Triaged cases awaiting consequence assessment</span></article>
+      </div>
       <div className="incidentGrid">
-        <section className="incidentCard">
-          <h2>Confirmed events by area</h2>
-          <div className="incidentBars">
-            {INCIDENT_DOMAINS.map(([k, v]) => (
-              <div className="incidentBar" key={k}>
-                <span>{v}</span>
-                <div className="incidentBarTrack">
-                  <i
-                    style={{
-                      width:
-                        Math.max(
-                          1,
-                          (s.byDomain[k] / Math.max(1, s.confirmed)) * 100,
-                        ) + "%",
-                    }}
-                  />
-                </div>
-                <b>{s.byDomain[k]}</b>
-              </div>
-            ))}
-          </div>
-          <p className="incidentMuted">
-            A multi-area event appears in each relevant area. These counts
-            overlap.
-          </p>
-        </section>
-        <section className="incidentCard">
-          <h2>Six-month occurrence trend</h2>
-          <div className="incidentBars">
-            {s.months.map((m) => (
-              <div className="incidentBar" key={m.key}>
-                <span>{m.key}</span>
-                <div className="incidentBarTrack">
-                  <i
-                    style={{
-                      width:
-                        Math.max(
-                          1,
-                          (m.count /
-                            Math.max(1, ...s.months.map((x) => x.count))) *
-                            100,
-                        ) + "%",
-                    }}
-                  />
-                </div>
-                <b>{m.count}</b>
-              </div>
-            ))}
-          </div>
-        </section>
+        <SeverityChart rows={analytics.severity} />
+        <IncidentTrend months={s.months} />
+        <IncidentBarChart title="Confirmed events by area" description="One report may affect several areas; these counts overlap. Select a bar label to filter." rows={INCIDENT_DOMAINS.map(([key,label])=>({key,label,count:s.byDomain[key]}))} filter="domain" query={q} />
+        <IncidentBarChart title="Accidents, incidents & near misses" description="Confirmed classifications. Select a label to inspect the reports." rows={INCIDENT_TYPES.map(([key,label])=>({key,label,count:s.byType[key]}))} filter="type" query={q} />
+        <IncidentBarChart title="What happened / consequences" description="Investigator-assessed consequences in triaged cases. Multiple consequences may apply. Unassessed cases are excluded." rows={analytics.outcomes} filter="outcome" query={q} />
+        <IncidentBarChart title="Part of body affected" description="Assessed body locations only; not-known and no-injury entries are excluded. Counts refer to reports, not injured people; locations may overlap." rows={analytics.bodyParts} filter="body" query={q} />
+        <IncidentBarChart title="Reported event categories" description="Reporter-selected event categories within triaged cases. These remain observations, not confirmed causes. Multiple areas may overlap." rows={analytics.categories} filter="category" query={q} />
       </div>
       <section className="incidentCard">
         <h2>Accidents, incidents and prevention</h2>
@@ -242,6 +216,9 @@ export default async function IncidentsPage({ searchParams }) {
                       <br />
                       {r.title}
                     </Link>
+                    <p className="incidentRegisterContext">{(r.intake_details?.categories||[]).map(categoryLabel).join(" · ")}</p>
+                    <small>{(r.investigation_details?.reviewed_outcomes||r.intake_details?.outcomes||[]).map(outcomeLabel).join(" · ")||"Consequences not recorded"}{Array.isArray(r.investigation_details?.reviewed_outcomes)?" · assessed":" · reporter observation"}</small>
+                    {r.domains.includes("health_safety")&&<p className="incidentRegisterContext">{(r.investigation_details?.reviewed_body_parts||r.intake_details?.body_parts||[]).map(key=>BODY_PARTS.find(([k])=>k===key)?.[1]||key).join(" · ")}</p>}
                   </td>
                   <td>
                     {r.domains.map(pretty).join(" · ")}
@@ -255,7 +232,7 @@ export default async function IncidentsPage({ searchParams }) {
                   </td>
                   <td>
                     <IncidentBadge
-                      value={r.criticality || r.reported_criticality}
+                      value={r.immediate_danger ? "critical" : r.criticality || r.reported_criticality}
                     />
                     <br />
                     <small>
