@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { categoryLabel, outcomeLabel, BODY_PARTS, EVENT_OUTCOMES, INVESTIGATION_FIELDS, needsDirector, directorApproved } from "../../../../lib/incident-reporting.mjs";
 import {
   INCIDENT_DOMAINS,
   INCIDENT_TYPES,
@@ -17,7 +18,7 @@ import {
   dateTime,
   pretty,
 } from "../../../../components/IncidentUI";
-import { IncidentActionForm } from "../../../../components/IncidentForm";
+import { IncidentActionForm, IncidentProgress } from "../../../../components/IncidentForm";
 import {
   incidentCommand,
   uploadIncidentEvidence,
@@ -191,13 +192,39 @@ export default async function IncidentDetail({ params }) {
           .from("hs_risk_assessments")
           .select("id,title")
           .eq("organization_id", c.organization.id)
-          .eq("administration_location_id", String(r.site_id)),
+          .order("title"),
       ].map(async (q) => {
         const result = await q;
         return result.error ? [] : result.data || [];
       }),
     );
   }
+  let permits=[], inspections=[], mocs=[], directors=[];
+  if(c.incidentAdministrator) {
+    const results=await Promise.all([
+      c.admin.from("hs_permits").select("id,permit_reference,task_description").eq("organization_id",c.organization.id).order("updated_at",{ascending:false}).limit(500),
+      c.admin.from("hs_workplace_inspections").select("id,inspection_reference,title").eq("organization_id",c.organization.id).order("created_at",{ascending:false}).limit(500),
+      c.admin.from("hs_moc_changes").select("id,moc_reference,title").eq("organization_id",c.organization.id).order("created_at",{ascending:false}).limit(500),
+      c.admin.from("organization_person_authorizations").select("person_id,function_key,status,expires_at").in("person_id",people.map(p=>p.id)).in("function_key",["incident_director","site_director"]).eq("status","authorised"),
+      c.admin.from("organization_person_permissions").select("person_id,access_level").in("person_id",people.map(p=>p.id)).eq("module_key","incidents").in("access_level",["approve","admin"]),
+    ]);
+    [permits,inspections,mocs]=results.slice(0,3).map(result=>checkResult(result)||[]);
+    const authorisations=checkResult(results[3])||[], permissions=checkResult(results[4])||[];
+    const today=new Date().toISOString().slice(0,10);
+    directors=people.filter(p=>p.user_id&&authorisations.some(a=>a.person_id===p.id&&(!a.expires_at||a.expires_at>=today))&&permissions.some(m=>m.person_id===p.id));
+  }
+  if(c.incidentAdministrator) {
+    for(const [key,table,columns,rows] of [
+      ["linked_assessment_id","hs_risk_assessments","id,title",assessments],
+      ["linked_permit_id","hs_permits","id,permit_reference,task_description",permits],
+      ["linked_inspection_id","hs_workplace_inspections","id,inspection_reference,title",inspections],
+    ]) if(r[key]&&!rows.some(row=>row.id===r[key])) {
+      const selected=checkResult(await c.admin.from(table).select(columns).eq("organization_id",c.organization.id).eq("id",r[key]).maybeSingle());
+      if(selected) rows.push(selected);
+    }
+  }
+  const details=r.intake_details||{}, critical=needsDirector(r);
+  const bodyLabel=key=>BODY_PARTS.find(([k])=>k===key)?.[1]||key;
   return (
     <>
       <IncidentHeader
@@ -205,9 +232,17 @@ export default async function IncidentDetail({ params }) {
         description={r.location_label}
         admin={c.incidentAdministrator}
       />
+      <section className={"incidentSeverityPanel "+(r.immediate_danger?"critical":r.criticality||r.reported_criticality)} aria-label="Report severity">
+        <div><span className="incidentEyebrow">{r.triaged_at?"ASSESSED SEVERITY":"REPORTER URGENCY · AWAITING ASSESSMENT"}</span>
+          <strong>{pretty(r.immediate_danger?"critical":r.criticality||r.reported_criticality)}</strong>
+          <p>{r.immediate_danger?"Immediate danger / active compromise flagged. ":""}{critical?"Director approval required before closure.":"Independent verification required; Director approval is not required."}</p>
+        </div>
+        <div><span>Original reporter urgency</span><b>{pretty(r.reported_criticality)}</b><span>Stop-work authority</span><b>{details.stop_work==="yes"?"Exercised":pretty(details.stop_work||"Not recorded")}</b></div>
+      </section>
+      <IncidentProgress report={r} />
       <p>
         <IncidentBadge value={r.status} />{" "}
-        <IncidentBadge value={r.criticality || r.reported_criticality} /> ·{" "}
+        <IncidentBadge value={r.immediate_danger ? "critical" : r.criticality || r.reported_criticality} /> ·{" "}
         {r.triaged_at ? "Reviewed priority" : "Unconfirmed reporter urgency"} ·
         Version {r.version} ·{" "}
         <Link href={"/portal/incidents/" + id}>Refresh case</Link>
@@ -219,7 +254,15 @@ export default async function IncidentDetail({ params }) {
             <dt>Reporting areas</dt>
             <dd>{r.domains.map(pretty).join(" · ")}</dd>
             <dt>Event type</dt>
-            <dd>{pretty(r.report_type)}</dd>
+            <dd>{pretty(r.report_type)}{details.report_type_other?" · "+details.report_type_other:""}</dd>
+            <dt>Event categories</dt><dd>{(details.categories||[]).map(item=>categoryLabel(item)).join(" · ")||"Not recorded"}</dd>
+            <dt>Reported consequences</dt><dd>{(details.outcomes||[]).map(outcomeLabel).join(" · ")||"Not recorded"}{details.outcome_other?" · "+details.outcome_other:""}</dd>
+            {r.domains.includes("health_safety")&&<><dt>Reported body parts</dt><dd>{(details.body_parts||[]).map(bodyLabel).join(" · ")||"Not recorded"}{details.body_part_other?" · "+details.body_part_other:""}</dd></>}
+            <dt>Situation safe / contained</dt><dd>{pretty(details.situation_safe)}</dd>
+            <dt>Stop-work action</dt><dd>{pretty(details.stop_work)}{details.stop_work_details?" · "+details.stop_work_details:""}</dd>
+            <dt>Activity / equipment</dt><dd>{[details.activity,details.asset].filter(Boolean).join(" · ")||"Not recorded"}</dd>
+            <dt>Requested follow-up</dt><dd>{(details.requested_workflows||[]).map(x=>x==="capa_8d"?"CAPA-8D":"MOC").join(" · ")||"None requested"}</dd>
+            <dt>Reporter references</dt><dd>{details.reference_notes||"Not recorded"}</dd>
             <dt>Occurred</dt>
             <dd>{dateTime(r.occurred_at)}</dd>
             <dt>Received</dt>
@@ -241,6 +284,7 @@ export default async function IncidentDetail({ params }) {
             </dd>
           </dl>
           <p className="incidentPre">{r.description}</p>
+          {details.additional_details&&<><h3>Additional reporter context</h3><p className="incidentPre">{details.additional_details}</p></>}
           <h3>Immediate action</h3>
           <p className="incidentPre">{r.immediate_action || "None recorded"}</p>
           {contact && (
@@ -291,6 +335,9 @@ export default async function IncidentDetail({ params }) {
               {pretty(r.regulatory_decision)} ·{" "}
               {r.regulatory_reason || "Pending"}
             </dd>
+            {critical&&<><dt>Director approver</dt><dd>{name(r.director_person_id)}</dd><dt>Director approval</dt><dd>{directorApproved(r)?"Approved · "+dateTime(r.director_approved_at):"Pending current approval"}</dd></>}
+            <dt>Assessed consequences</dt><dd>{(r.investigation_details?.reviewed_outcomes||[]).map(outcomeLabel).join(" · ")||"Not yet assessed"}{r.investigation_details?.outcome_other?" · "+r.investigation_details.outcome_other:""}</dd>
+            {r.domains.includes("health_safety")&&<><dt>Assessed body parts</dt><dd>{(r.investigation_details?.reviewed_body_parts||[]).map(bodyLabel).join(" · ")||"Not yet assessed"}{r.investigation_details?.body_part_other?" · "+r.investigation_details.body_part_other:""}</dd></>}
             <dt>Continuity</dt>
             <dd>{pretty(r.continuity_decision)}</dd>
           </dl>
@@ -313,6 +360,12 @@ export default async function IncidentDetail({ params }) {
               </Link>
             </p>
           )}
+          {[
+            [r.linked_moc_id,"/portal/health-safety/moc/","Management of Change"],
+            [r.linked_assessment_id,"/portal/health-safety/risk-assessment/","Risk assessment"],
+            [r.linked_permit_id,"/portal/health-safety/permits/","Permit to work"],
+            [r.linked_inspection_id,"/portal/health-safety/workplace-inspections/","Workplace inspection"],
+          ].filter(([record])=>record).map(([record,path,label])=><p key={path}><Link href={path+record}>{label} →</Link></p>)}
           {r.linked_bcp_plan_id && (
             <p>
               <Link
@@ -423,6 +476,7 @@ export default async function IncidentDetail({ params }) {
                 required={false}
                 multiple
               />
+              <PersonSelect people={directors} name="director_person_id" label="Director approver (required for critical closure only)" value={r.director_person_id} required={false} />
               <label>
                 Duplicate of (report ID, if duplicate)
                 <input
@@ -543,6 +597,23 @@ export default async function IncidentDetail({ params }) {
                 value={r.investigation_summary}
                 rows={5}
               />
+              <details className="incidentOptional">
+                <summary>Structured investigation prompts (optional)</summary>
+                <p className="incidentMuted">Complete the relevant prompts. Record evidence and control weaknesses; avoid unsupported assumptions about individuals.</p>
+                <div className="incidentGrid">{INVESTIGATION_FIELDS.map(([key,label])=><Text key={key} name={"investigation_"+key} label={label} value={r.investigation_details?.[key]} />)}</div>
+              </details>
+              <fieldset><legend>Assessed consequences</legend>
+                <label className="incidentCheck"><input type="checkbox" name="consequences_reviewed" defaultChecked={Array.isArray(r.investigation_details?.reviewed_outcomes)} />I have assessed the consequences below</label>
+                {r.domains.map(domain=><fieldset key={domain}><legend>{INCIDENT_DOMAINS.find(([key])=>key===domain)?.[1]}</legend><div className="incidentChoices">
+                  {EVENT_OUTCOMES[domain].map(([key,label])=><label key={key}><input type="checkbox" name="reviewed_outcomes" value={domain+":"+key} defaultChecked={(r.investigation_details?.reviewed_outcomes||details.outcomes||[]).includes(domain+":"+key)} />{label}</label>)}
+                </div></fieldset>)}
+                <label>Other assessed consequence<input name="reviewed_outcome_other" maxLength={500} defaultValue={r.investigation_details?.outcome_other||details.outcome_other||""} /></label>
+              </fieldset>
+              {r.domains.includes("health_safety")&&<fieldset><legend>Part of body affected</legend>
+                <label className="incidentCheck"><input type="checkbox" name="body_parts_reviewed" defaultChecked={Array.isArray(r.investigation_details?.reviewed_body_parts)} />I have assessed the body parts below</label>
+                <div className="incidentChoices">{BODY_PARTS.map(([key,label])=><label key={key}><input type="checkbox" name="reviewed_body_parts" value={key} defaultChecked={(r.investigation_details?.reviewed_body_parts||details.body_parts||[]).includes(key)} />{label}</label>)}</div>
+                <label>Other assessed body part<input name="reviewed_body_part_other" maxLength={180} defaultValue={r.investigation_details?.body_part_other||details.body_part_other||""} /></label>
+              </fieldset>}
               <Text
                 name="cause_summary"
                 label="Immediate, underlying and systemic causes"
@@ -850,6 +921,31 @@ export default async function IncidentDetail({ params }) {
           </details>
         </section>
       )}
+      {!terminal&&c.incidentAdministrator&&<section className="incidentCard">
+        <h2>Related records & change control</h2>
+        <p>Confirm reporter references and select controlled records. Links do not authorise work or bypass module approvals.</p>
+        <IncidentActionForm action={incidentCommand} label="Save related records">
+          <CaseHidden report={r} command="link_records" />
+          <div className="incidentGrid">{[
+            ["linked_assessment_id","Risk assessment",assessments,x=>x.title],
+            ["linked_permit_id","Permit to work",permits,x=>x.permit_reference+" · "+x.task_description],
+            ["linked_inspection_id","Workplace inspection",inspections,x=>x.inspection_reference+" · "+x.title],
+          ].map(([key,label,rows,title])=><label key={key}>{label}<select name={key} defaultValue={r[key]||""}><option value="">None</option>{rows.map(row=><option key={row.id} value={row.id}>{title(row)}</option>)}</select></label>)}</div>
+          <p className="incidentMuted">Permit and inspection selectors show the 500 most recent company records. Module permissions still apply when opening a linked record.</p>
+        </IncidentActionForm>
+        {!r.linked_moc_id&&<details><summary>Initiate or link Management of Change</summary>
+          <p>A new MOC enters the full pathway awaiting screening confirmation at the HSE gate. The investigator becomes the change owner. This does not authorise implementation; risk review and functional approvals remain required.</p>
+          <IncidentActionForm action={incidentCommand} label="Initiate linked MOC for HSE review">
+            <CaseHidden report={r} command="create_moc" />
+            <Text name="change_description" label="Proposed change and why it is needed" required minLength={20} />
+            <label>Target date<input name="target_date" type="date" required /></label>
+          </IncidentActionForm>
+          <IncidentActionForm action={incidentCommand} label="Link existing MOC">
+            <CaseHidden report={r} command="link_moc" />
+            <label>Existing company MOC<select name="target_id" required><option value="">Select</option>{mocs.map(m=><option key={m.id} value={m.id}>{m.moc_reference+" · "+m.title}</option>)}</select></label>
+          </IncidentActionForm>
+        </details>}
+      </section>}
       <section className="incidentCard">
         {c.incidentAdministrator && r.triaged_at && (
           <IncidentActionForm
@@ -918,6 +1014,14 @@ export default async function IncidentDetail({ params }) {
       )}
       <section className="incidentCard">
         <h2>Controlled closure</h2>
+        {critical&&!terminal&&<div className="incidentNotice">
+          <strong>Critical case — independent review and Director approval required.</strong>
+          <p>Complete the investigation, verify actions and obtain independent case verification, then request the assigned Director's approval. Material changes invalidate approval. A critical case retains this gate after reassessment to a lower priority.</p>
+          {r.case_verified_at&&<p>Independent case review: {dateTime(r.case_verified_at)}</p>}
+          {r.director_approval_note&&<p className="incidentPre">Director decision: {r.director_approval_note}</p>}
+          {c.person?.id===r.verifier_person_id&&<IncidentActionForm action={incidentCommand} label="Verify case for Director review"><CaseHidden report={r} command="verify_case" /><Text name="note" label="Independent verification evidence" required minLength={10} /></IncidentActionForm>}
+          {c.person?.id===r.director_person_id&&<IncidentActionForm action={incidentCommand} label="Approve critical case closure"><CaseHidden report={r} command="approve_director" /><Text name="note" label="Director approval rationale" required minLength={10} /></IncidentActionForm>}
+        </div>}
         {terminal ? (
           <>
             <p>
