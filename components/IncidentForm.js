@@ -7,10 +7,29 @@ function usePreservedForm(state) {
   const ref = useRef(null),
     snapshot = useRef([]);
   useEffect(() => {
+    if (state?.reference || state?.success) {
+      snapshot.current = [];
+      return;
+    }
     if (!state?.error || !ref.current) return;
     const entries = snapshot.current;
     for (const el of ref.current.elements) {
-      if (!el.name || el.type === "file") continue;
+      if (!el.name) continue;
+      if (el.type === "file") {
+        const files = entries
+          .filter(
+            ([k, v]) => k === el.name && typeof v !== "string" && v.size > 0,
+          )
+          .map(([, v]) => v);
+        if (files.length && typeof DataTransfer !== "undefined") {
+          try {
+            const transfer = new DataTransfer();
+            files.forEach((file) => transfer.items.add(file));
+            el.files = transfer.files;
+          } catch {}
+        }
+        continue;
+      }
       const values = entries.filter(([k]) => k === el.name).map(([, v]) => v);
       if (el.type === "checkbox" || el.type === "radio")
         el.checked = values.includes(el.value);
@@ -76,6 +95,16 @@ export default function IncidentIntakeForm({
           Your report is waiting for review. This service is not an emergency
           dispatch channel.
         </p>
+        {state.photo_attached && (
+          <p className="incidentMuted">
+            Your photo has been attached privately to this report.
+          </p>
+        )}
+        {state.photo_warning && (
+          <p className="incidentNotice" role="alert">
+            {state.photo_warning}
+          </p>
+        )}
         {state.receipt ? (
           <>
             <p>
@@ -211,6 +240,26 @@ export default function IncidentIntakeForm({
         Immediate action taken (optional)
         <textarea name="immediate_action" maxLength={2000} rows={3} />
       </label>
+      <fieldset>
+        <legend>Photo evidence (optional)</legend>
+        <label>
+          Attach one photo
+          <input
+            type="file"
+            name="photo"
+            accept="image/jpeg,image/png,image/webp"
+            aria-describedby="incident-photo-help"
+          />
+        </label>
+        <p id="incident-photo-help" className="incidentMuted">
+          JPEG, PNG or WebP, up to 3 MB and 24 megapixels. Choose an existing
+          photo or use your device's camera where available. The photo is stored
+          privately for authorised case users. A resized copy is saved with
+          image metadata removed; the original file is not retained. The picture
+          itself may identify people or locations. Do not take a photo if it
+          puts you at risk.
+        </p>
+      </fieldset>
       <fieldset>
         <legend>Your choice</legend>
         <label className="incidentCheck">
