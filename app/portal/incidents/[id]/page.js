@@ -24,6 +24,21 @@ import {
   uploadIncidentEvidence,
   retryInspectionPlanning,
 } from "../actions";
+// Illustrative assessment guidance; numeric values retain the existing scoring rules.
+const CONSEQUENCE_SCALE = [
+  [1, "Negligible", "No injury or negligible impact; no meaningful damage, information loss or service interruption."],
+  [2, "Minor", "Minor injury / first aid, small contained damage or release, limited information exposure or brief local interruption."],
+  [3, "Moderate", "Injury requiring treatment, material repair or clean-up, meaningful information impact or disruption to a service."],
+  [4, "Major", "Serious injury or ill health, substantial damage or environmental impact, serious information compromise or major operational disruption."],
+  [5, "Catastrophic", "Fatality / life-changing harm, extensive environmental or asset loss, catastrophic information compromise or prolonged loss of critical services."],
+];
+const LIKELIHOOD_SCALE = [
+  [1, "Rare", "Exceptional circumstances; recurrence is not expected under current conditions."],
+  [2, "Unlikely", "Possible, but recurrence is not expected during normal operations."],
+  [3, "Possible", "Could recur; there is a credible opportunity for the event to happen again."],
+  [4, "Likely", "Recurrence is expected unless the current controls or conditions improve."],
+  [5, "Almost certain", "Recurring or persistent conditions make another event highly probable."],
+];
 const local = (value) =>
   value ? new Date(value).toISOString().slice(0, 16) : "";
 function Text({
@@ -388,12 +403,27 @@ export default async function IncidentDetail({ params }) {
         <details className="incidentCard" open={!r.triaged_at}>
           <summary>Triage, classification & escalation decisions</summary>
           <p className="incidentMuted">
-            Actual and potential consequence: 1 negligible, 2 minor, 3 moderate,
-            4 major, 5 catastrophic. Likelihood of recurrence: 1 rare to 5
-            almost certain. Priority = higher consequence × likelihood;
-            immediate danger overrides to critical. Apply the organisation's
-            approved assessment criteria.
+            Score actual consequences from the harm or loss that occurred.
+            Score potential consequences from the credible outcome that could
+            have occurred. Assess recurrence under the current controls and
+            conditions, using your organisation's approved assessment criteria.
           </p>
+          <details className="incidentOptional">
+            <summary>Scale descriptions & priority bands</summary>
+            <p className="incidentMuted">Illustrative guidance across QHSE, information security and continuity. Apply the most relevant consequence and use a consistent assessment period. These examples do not determine legal reportability.</p>
+            <div className="incidentTableWrap"><table>
+              <caption>Actual and potential consequence — same five-point scale</caption>
+              <thead><tr><th>Score</th><th>Level</th><th>Description / examples</th></tr></thead>
+              <tbody>{CONSEQUENCE_SCALE.map(([score,label,description])=><tr key={score}><td>{score}</td><td>{label}</td><td>{description}</td></tr>)}</tbody>
+            </table></div>
+            <div className="incidentTableWrap"><table>
+              <caption>Likelihood of recurrence — current conditions and controls</caption>
+              <thead><tr><th>Score</th><th>Level</th><th>Description</th></tr></thead>
+              <tbody>{LIKELIHOOD_SCALE.map(([score,label,description])=><tr key={score}><td>{score}</td><td>{label}</td><td>{description}</td></tr>)}</tbody>
+            </table></div>
+            <p><strong>Priority score = higher of actual or potential consequence × likelihood.</strong></p>
+            <p>1–4: Low · 5–11: Medium · 12–19: High · 20–25: Critical. Immediate danger overrides the calculated band to Critical.</p>
+          </details>
           <IncidentActionForm
             action={incidentCommand}
             label="Save triage decision"
@@ -435,9 +465,9 @@ export default async function IncidentDetail({ params }) {
                   {label}
                   <select name={k} defaultValue={r[k] || ""} required>
                     <option value="">Select 1–5</option>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
+                    {(k === "likelihood" ? LIKELIHOOD_SCALE : CONSEQUENCE_SCALE).map(([score,level]) => (
+                      <option key={score} value={score}>
+                        {score} — {level}
                       </option>
                     ))}
                   </select>
@@ -500,11 +530,17 @@ export default async function IncidentDetail({ params }) {
                 values={["not_assessed", "not_required", "required"]}
               />
               <label>
-                Authority / reporting channel
+                Authority / reporting channel (including RIDDOR — UK only)
                 <input
                   name="regulatory_authority"
                   defaultValue={r.regulatory_authority}
+                  list="incident-reporting-channels"
+                  placeholder="Choose RIDDOR — UK only, or enter another channel"
+                  aria-describedby="incident-riddor-help"
                 />
+                <datalist id="incident-reporting-channels">
+                  <option value="RIDDOR — UK only" />
+                </datalist>
               </label>
               <label>
                 Reporting deadline (UTC)
@@ -567,6 +603,15 @@ export default async function IncidentDetail({ params }) {
                 </select>
               </label>
             </div>
+            <p id="incident-riddor-help" className="incidentMuted">
+              <strong>RIDDOR — UK only:</strong> record whether reporting is required
+              in the External reporting assessment above. The responsible person
+              must assess the applicable reporting requirements separately from
+              this severity score. Record the relevant enforcing authority and
+              jurisdiction in the rationale. This form does not submit a RIDDOR report.
+              {" "}<a href="https://www.hse.gov.uk/riddor/" target="_blank" rel="noopener noreferrer">HSE guidance — Great Britain</a>
+              {" · "}<a href="https://www.hseni.gov.uk/articles/reporting-injuries-diseases-and-dangerous-occurrences-health-and-social-care" target="_blank" rel="noopener noreferrer">HSENI guidance — Northern Ireland</a>.
+            </p>
             <Text
               name="regulatory_reason"
               label="Reason, jurisdiction and assessment of reporting obligations"
