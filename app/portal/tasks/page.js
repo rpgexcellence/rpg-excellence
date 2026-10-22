@@ -1,4 +1,5 @@
 import Link from "next/link";
+import {loadIncidentTasks} from "../../../lib/incident-tasks";
 import { createAdminClient } from "../../../lib/supabase/admin";
 import { requireOrganizationAccess } from "../../../lib/organization-access";
 import { loadAssuranceTaskSources } from "../../../lib/assurance-task-sources";
@@ -229,7 +230,8 @@ export default async function TasksPage({ searchParams }) {
   const organisationOversight = Boolean(access.isOwner || access.isCompanyAdministrator || activeFunctions.has("ims_manager"));
   const siteOversight = activeFunctions.has("site_director");
   const reports = new Set(people.filter((person) => person.manager_person_id === me?.id || person.functional_manager_person_id === me?.id).map((person) => person.id));
-  const all = [...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
+  const incidentTasks = await loadIncidentTasks(admin,access);
+  const all = [...incidentTasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
     .filter((item) => item.title)
     .map((item) => ({ ...item, due: item.due ? String(item.due).slice(0,10) : "" }))
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
@@ -263,6 +265,7 @@ export default async function TasksPage({ searchParams }) {
   const verification = open.filter((item)=>needsDecision(item));
   const moduleOptions = [...new Map(baseScope.map((item)=>[item.source,item.module])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const workspaceCards = [
+    ["incident","Accident, Incident & Near Misses","INC","/portal/incidents"],
     ["audit","Internal Audit","AUD","/portal/internal-audits"],
     ["inspection","Workplace Inspections","WPI","/portal/health-safety/workplace-inspections"],
     ["rca","CAPA-8D","8D","/portal/rca"],
