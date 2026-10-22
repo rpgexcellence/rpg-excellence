@@ -1,6 +1,5 @@
 import {
   integrationJson,
-  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -41,7 +40,7 @@ function boundedInteger(value, fallback, minimum, maximum) {
     : fallback;
 }
 
-export const GET = withIntegrationRequest(async function GET(request) {
+export async function GET(request) {
   const authentication = await requireIntegrationClient(
     request,
     "security_incidents:read",
@@ -113,17 +112,13 @@ export const GET = withIntegrationRequest(async function GET(request) {
     );
   }
 
-  const detailValue=parameters.get("include_details");
-  if(detailValue&&!['true','false'].includes(detailValue)) return integrationJson({error:'invalid_filter',message:'include_details must be true or false.'},400,requestId);
-  const includeDetails=detailValue==='true';
-  if(includeDetails&&!(client.permissions||[]).includes('security_incidents:detail')) return integrationJson({error:'insufficient_scope',message:'Sensitive security narratives require security_incidents:detail in addition to security_incidents:read.'},403,requestId);
   const firstRow = (page - 1) * pageSize;
   const lastRow = firstRow + pageSize - 1;
 
   let query = admin
     .from("isms_security_incidents")
     .select(
-      includeDetails ? [
+      [
         "id",
         "incident_reference",
         "title",
@@ -173,14 +168,14 @@ export const GET = withIntegrationRequest(async function GET(request) {
         "closed_at",
         "created_at",
         "updated_at",
-      ].join(",") : ["id","incident_reference","title","incident_type","severity","status","detected_at","awareness_at","administration_location_id","verification_result","verified_at","closed_at","created_at","updated_at"].join(","),
+      ].join(","),
       { count: "exact" },
     )
-    .eq("organization_id", client.organization_id)
+    .eq("owner_id", client.owner_id)
     .order("created_at", {
       ascending: false,
     })
-    .order("id", { ascending: true }).range(firstRow, lastRow);
+    .range(firstRow, lastRow);
 
   if (status) {
     query = query.eq("status", status);
@@ -253,11 +248,10 @@ export const GET = withIntegrationRequest(async function GET(request) {
         severity: severity || null,
         verification_result:
           verificationResult || null,
-        include_details: includeDetails,
       },
       request_id: requestId,
     },
     200,
     requestId,
   );
-});
+}
