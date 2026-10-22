@@ -18,13 +18,18 @@ export async function reportZoneConcern(_state, fd) {
     const { admin, zone } = await publicReportZone(token);
     if (fd.get("website")) throw Error("Unable to accept this submission.");
     const ticket = verifyReportTicket(fd.get("ticket"), token);
-    const { values, contact } = validateIncidentIntake({
+    let validated;
+    try { validated = validateIncidentIntake({
       ...Object.fromEntries(fd),
       domains: fd.getAll("domains"),
+      requested_workflows: fd.getAll("requested_workflows"),
+      outcomes: fd.getAll("outcomes"),
+      body_parts: fd.getAll("body_parts"),
       anonymous: fd.get("anonymous") !== "false",
       immediate_danger: fd.get("immediate_danger") === "on",
       contact_consent: fd.get("contact_consent") === "on",
-    });
+    }); } catch(error) { return {error:error.message}; }
+    const {values,contact}=validated;
     const photoFile = fd.get("photo");
     const requestHeaders = await headers();
     const ip =
@@ -103,6 +108,7 @@ export async function checkReportProgress(_state, fd) {
     );
     if (!r) return { error: "Reference or access key not recognised." };
     return {
+      progress: {status:r.status},
       success: `${r.reference} · ${r.status.replaceAll("_", " ")}. ${r.public_update || "No public progress update has been published yet."}`,
     };
   } catch (e) {
