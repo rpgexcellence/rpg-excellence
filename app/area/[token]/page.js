@@ -1,3 +1,6 @@
+import {publicReportZone} from '../../../lib/incidents';
+import {getOrganizationAccess} from '../../../lib/organization-access';
+import {redirect} from 'next/navigation';
 import PPERequirements from '../../../components/PPERequirements';
 import {loadZonePPE} from '../../../lib/zone-ppe';
 import Link from 'next/link';
@@ -11,6 +14,9 @@ export const revalidate=0;
 export const metadata={title:'My Work Area | RPG Excellence',robots:{index:false,follow:false}};
 export default async function AreaPage({params,searchParams}) {
  const {token}=await params,query=await searchParams;
+ // Preserve existing QR addresses: anonymous visitors to a private area reach intake,
+ // while the area's internal assessments remain behind the original access controls.
+ if(query?.preview!=='1') {const location=await publicReportZone(token);const member=await getOrganizationAccess();if(location.zone.access_mode!=='link'&&member.organization?.id!==location.zone.organization_id)redirect(`/area/${token}/concerns`);}
  const {admin,zone,site,building,access,preview}=await requireZonePage(token,query?.preview==='1');
  const {programmes,inspections,assessments,actions}=await loadZoneSafety(admin,zone);
  const today=siteToday(site.timezone),completed=inspections.filter(i=>i.completed_at).sort((a,b)=>b.completed_at.localeCompare(a.completed_at));
@@ -26,7 +32,7 @@ export default async function AreaPage({params,searchParams}) {
  {(zone.safety_signs||[]).length>0&&<section className="zone-panel"><h2>Area signs &amp; PPE requirements</h2>{safetyReviewDue&&<p className="zone-review-warning">Safety-sign review required. Confirm these requirements and the applicable task assessment with the area owner before work starts.</p>}<ZoneSafetySigns signs={zone.safety_signs}/><small>Review due {displayDate(zone.signs_review_date)}. Follow the stated task and sub-area limits.</small></section>}
  {zone.ppe_source_mode==='assessment'&&<section className="zone-panel"><h2>PPE from approved assessments</h2>{safetyReviewDue&&<p className="zone-review-warning">PPE review required. The requirements below are the last confirmed instructions; sources have changed or review is due. Contact the area owner and check current task controls before work. A new poster is blocked until reviewed.</p>}<PPERequirements requirements={zone.ppe_snapshot?.requirements||[]}/><small>Follow task and sub-area limits. Zone PPE review due {displayDate(zone.signs_review_date)}.</small></section>}
  <div className="zone-stats">{zone.show_inspections&&<article className="zone-stat"><small>Last recorded completion</small><strong>{completed[0]?displayDate(completed[0].completed_at):'Not recorded'}</strong><span>{actions.length} actions open</span>{due>0&&<p className="zone-secondary">{due} inspection programme(s) overdue</p>}</article>}{zone.show_assessments&&<article className="zone-stat"><small>Approved / communicated assessments</small><strong>{assessments.length} available</strong><span>{assessments.filter(a=>assessmentDue(a,today)).length} review(s) due</span></article>}</div>
- <div className="zone-buttons"><Link className="zone-button" style={{width:'100%'}} href={`/area/${token}/concerns`}>Report a concern →</Link></div><p><small>Reporting requires company sign-in. For immediate danger, follow site emergency procedures.</small></p>
+ <div className="zone-buttons"><Link className="zone-button" style={{width:'100%'}} href={`/area/${token}/concerns`}>Report an incident or concern →</Link></div><p><small>Anonymous reporting is available without signing in. For immediate danger, follow site emergency procedures.</small></p>
  <nav className="zone-panel" aria-label="Safety information"><h2>Safety information</h2>{zone.show_assessments&&<a className="zone-preview-row" style={{display:'block'}} href="#assessments">Risk assessments →</a>}<a className="zone-preview-row" style={{display:'block'}} href="#controls">PPE &amp; key controls →</a><a className="zone-preview-row" style={{display:'block'}} href="#emergency">Emergency information →</a>{zone.show_inspections&&<a className="zone-preview-row" style={{display:'block'}} href="#inspections">Inspections &amp; action status →</a>}</nav>
  {zone.show_assessments&&<section className="zone-panel zone-section" id="assessments"><h2>Risk assessments</h2>{assessments.length?assessments.map(a=><article key={a.id} className="zone-card"><strong>{a.title}</strong><small>{a.assessment_reference} · Version {a.version} · {a.status}</small><p>Review: {displayDate(a.review_date)}{assessmentDue(a,today)?' — REVIEW DUE':''}</p><Link href={`/area/${token}/assessments/${a.id}${preview?'?preview=1':''}`}>Read hazards &amp; existing controls →</Link></article>):<p>No approved assessments have been made available for this zone. Ask the area owner before starting work that requires an assessment.</p>}</section>}
  <section className="zone-panel zone-section" id="controls"><h2>PPE &amp; key controls</h2><p className="zone-pre">{zone.key_controls||'No zone-specific controls have been published. Check the applicable approved task assessment before starting work.'}</p></section>
