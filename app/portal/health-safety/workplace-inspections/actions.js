@@ -1,5 +1,6 @@
 "use server";
 
+import { inspectionTimestamp } from "../../../../lib/workplace-inspection-policy.mjs";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -40,7 +41,7 @@ function positiveInteger(formData, name, fallback = 1) {
 }
 
 function validDate(value, label) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`)) || new Date(`${value}T00:00:00Z`).toISOString().slice(0,10) !== value) {
     throw new Error(`${label} must be a valid date.`);
   }
   return value;
@@ -300,6 +301,7 @@ export async function updateInspectionProgramme(previousState, formData) {
 
 export async function generateScheduledInspection(previousState, formData) {
   let inspectionId;
+  let scheduledProgrammeId;
   try {
     const context = await authorisedContext("contribute");
     const organizationId = context.organization.id;
@@ -336,7 +338,7 @@ export async function generateScheduledInspection(previousState, formData) {
       text(formData, "planned_date", 10) || programme.next_inspection_date,
       "Planned inspection date",
     );
-    const plannedStart = `${plannedDate}T${text(formData, "planned_start_time", 5) || "09:00"}:00.000Z`;
+    const plannedStart = inspectionTimestamp(`${plannedDate}T${text(formData, "planned_start_time", 5) || "09:00"}`);
     const durationMinutes = Math.min(720, Math.max(15, Number(formData.get("duration_minutes")) || 120));
     const plannedEnd = new Date(new Date(plannedStart).getTime() + durationMinutes * 60000).toISOString();
 
@@ -392,13 +394,18 @@ export async function generateScheduledInspection(previousState, formData) {
     }
 
     inspectionId = inspection.id;
+    scheduledProgrammeId = programme.id;
+    revalidatePath(`${ROOT}/programmes/${programme.id}`);
+    revalidatePath("/portal/health-safety");
+    revalidatePath("/portal/tasks");
+    revalidatePath("/portal");
     revalidatePath(ROOT);
     revalidatePath("/portal/health-safety/management-board");
   } catch (error) {
     if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
     return { error: error.message || "The scheduled inspection could not be created." };
   }
-  redirect(`${ROOT}/${inspectionId}`);
+  redirect(`${ROOT}/programmes/${scheduledProgrammeId}?scheduled=${inspectionId}#inspection-history`);
 }
 
 export async function refreshInspectionProgramme(previousState, formData) {
