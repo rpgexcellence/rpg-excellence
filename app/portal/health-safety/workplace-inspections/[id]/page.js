@@ -1,3 +1,6 @@
+import WorkplaceInspectionAdministration from "../../../../../components/WorkplaceInspectionAdministration";
+import { resolveInspectionAccess } from "../../../../../lib/workplace-inspection-access";
+import { canStartInspection, canEditInspectionFieldwork, inspectionStageTitle } from "../../../../../lib/workplace-inspection-policy.mjs";
 // VERIFIED_WPI_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../../../components/ControlledDeviceDrafts";
 import Link from "next/link";
@@ -9,7 +12,7 @@ import WorkplaceInspectionControlWorkflow from "../../../../../components/Workpl
 import { requireOrganizationAccess } from "../../../../../lib/organization-access";
 import { requirePlanAccess } from "../../../../../lib/plan-access";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
-import { updateInspectionAction, completeInspectionAction, reviewInspection, verifyInspectionAction, createInspectionAction, createInspectionFinding, saveInspectionFieldwork, submitInspectionForReview } from "./actions";
+import { startInspection, updateInspectionDetails, updateInspectionAction, completeInspectionAction, reviewInspection, verifyInspectionAction, createInspectionAction, createInspectionFinding, saveInspectionFieldwork, submitInspectionForReview } from "./actions";
 import "../workplace-inspections.css";
 export const dynamic = "force-dynamic";
 const ROOT = "/portal/health-safety/workplace-inspections";
@@ -38,16 +41,17 @@ export default async function WorkplaceInspectionRecordPage({
 }) {
   const route = await params;
   const inspectionId = route.id;
-  const access = await requireOrganizationAccess("risk_management", "view", ROOT + "/" + inspectionId);
-  await requirePlanAccess(access.user, "professional", "Health and Safety");
+  const baseAccess = await requireOrganizationAccess("risk_management", "view", ROOT + "/" + inspectionId);
+  await requirePlanAccess(baseAccess.user, "professional", "Health and Safety");
   const admin = createAdminClient();
+  const access = await resolveInspectionAccess(admin,baseAccess);
   const organizationId = access.organization.id;
-  const [inspectionResult, responsesResult, findingsResult, actionsResult, evidenceResult, peopleResult] = await Promise.all([admin.from("hs_workplace_inspections").select("*").eq("id", inspectionId).eq("organization_id", organizationId).maybeSingle(), admin.from("hs_workplace_inspection_responses").select("*").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("display_order"), admin.from("hs_workplace_inspection_findings").select("*").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("created_at"), admin.from("hs_workplace_inspection_actions").select("*").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("target_date"), admin.from("hs_workplace_inspection_evidence").select("id,response_id,finding_id,action_id,evidence_type,title,original_file_name,external_url,created_at").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("created_at", {
+  const [inspectionResult, responsesResult, findingsResult, actionsResult, evidenceResult, peopleResult, historyResult] = await Promise.all([admin.from("hs_workplace_inspections").select("*").eq("id", inspectionId).eq("organization_id", organizationId).maybeSingle(), admin.from("hs_workplace_inspection_responses").select("*").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("display_order"), admin.from("hs_workplace_inspection_findings").select("*").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("created_at"), admin.from("hs_workplace_inspection_actions").select("*").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("target_date"), admin.from("hs_workplace_inspection_evidence").select("id,response_id,finding_id,action_id,evidence_type,title,original_file_name,external_url,created_at").eq("inspection_id", inspectionId).eq("organization_id", organizationId).order("created_at", {
     "ascending": false
-  }), admin.from("organization_people").select("id,first_name,last_name,email,position,account_status").eq("organization_id", organizationId)]);
+  }), admin.from("organization_people").select("id,user_id,first_name,last_name,email,position,account_status").eq("organization_id", organizationId), admin.from("hs_workplace_inspection_history").select("id,event_type,actor_user_id,reason,before_values,after_values,created_at").eq("inspection_id",inspectionId).eq("organization_id",organizationId).order("created_at",{ascending:false}).limit(30)]);
   if (inspectionResult.error) throw new Error(inspectionResult.error.message);
   if (!inspectionResult.data) notFound();
-  for (const result of [responsesResult, findingsResult, actionsResult, evidenceResult, peopleResult]) {
+  for (const result of [responsesResult, findingsResult, actionsResult, evidenceResult, peopleResult, historyResult]) {
     if (result.error) throw new Error(result.error.message);
   }
   const inspection = inspectionResult.data;
@@ -63,7 +67,8 @@ export default async function WorkplaceInspectionRecordPage({
   const management = access.isOwner || access.isCompanyAdministrator || ["review", "approve", "admin", "owner"].includes(access.level);
   const assignedInspector = access.person?.id === inspection.lead_inspector_person_id;
   const lockedStatus = ["awaiting_review", "actions_open", "awaiting_verification", "completed", "cancelled"].includes(inspection.status);
-  const readOnly = lockedStatus || !(management || assignedInspector);
+  const readOnly = !canEditInspectionFieldwork(access,inspection);
+  const stageTitle=inspectionStageTitle(inspection.status);
   const assessed = responses.filter(item => item.response !== "not_assessed").length;
   const failed = responses.filter(item => item.response === "no").length;
   const openActions = actions.filter(item => !["closed", "cancelled"].includes(item.status));
@@ -89,12 +94,7 @@ export default async function WorkplaceInspectionRecordPage({
             })()}<Link className="wpiButton" href={ROOT + "/" + inspection.id + "/evidence"}>Evidence</Link></div>
     </header>
 
-    <section className="wpiHero"><div><h2>{(() => {
-                if (readOnly) {
-                  return "Controlled inspection record";
-                }
-                return "Fieldwork in progress";
-              })()}</h2><p>{inspection.planning_basis || "Complete each applicable question and record objective evidence."}</p></div><strong>{inspection.planning_risk_score}/100</strong></section>
+    <section className="wpiHero"><div><h2>{stageTitle}</h2><p>{inspection.planning_basis || "Complete each applicable question and record objective evidence."}</p></div><strong>{inspection.planning_risk_score}/100</strong></section>
 
     <section className="wpiMetrics">
       <div className="wpiMetric"><span>Planned fieldwork</span><strong>{displayDate(inspection.planned_start_at, true)}</strong><small>{(() => {
@@ -126,13 +126,14 @@ export default async function WorkplaceInspectionRecordPage({
       <div className="wpiGuidance"><strong>Independent reviewer</strong><p>{personLabel(peopleById.get(inspection.reviewer_person_id))}</p></div>
     </div>{(() => {
             if (readOnly && !lockedStatus) {
-              return <div className="wpiMessage error"><strong>View-only inspection</strong><span>Only the assigned inspector or authorised management can edit this fieldwork record.</span></div>;
+              return <div className="wpiMessage error"><strong>View-only inspection</strong><span>Fieldwork can be completed only by the assigned lead inspector after selecting Start inspection. Administrative access does not complete work on another person’s behalf.</span></div>;
             }
             return null;
           })()}</section>
 
     
 
+    <WorkplaceInspectionAdministration inspection={inspection} people={people} canAdminister={access.canAdministerInspection} canStart={canStartInspection(access,inspection)} startAction={startInspection} updateAction={updateInspectionDetails} stageTitle={stageTitle} leadName={personLabel(peopleById.get(inspection.lead_inspector_person_id))}/>
     <section id="inspection-review-actions" aria-label="Inspection review and action closure" style={{
           "marginTop": 20,
           "scrollMarginTop": 24
@@ -157,5 +158,6 @@ export default async function WorkplaceInspectionRecordPage({
             }
             return <div className="wpiEmpty">No supporting evidence has yet been added.</div>;
           })()}</section>
+    <section className="wpiPanel" style={{marginTop:14}}><h2>Inspection history</h2><p className="wpiLead">Latest 30 scheduling, appointment, status and fieldwork events. History starts when the scheduling upgrade is applied.</p>{(historyResult.data || []).length ? <div className="wpiList">{historyResult.data.map(event=><details className="wpiGuidance" key={event.id}><summary style={{cursor:'pointer'}}><strong>{event.event_type.replaceAll('_',' ')}</strong> · {displayDate(event.created_at,true)} · {personLabel(people.find(p=>p.user_id===event.actor_user_id))}</summary>{event.reason ? <p>{event.reason}</p> : null}<div className="wpiFormGrid">{['accountable_person_id','lead_inspector_person_id','reviewer_person_id','planned_start_at','planned_end_at','title','scope','status'].filter(key=>event.after_values && event.before_values?.[key] !== event.after_values[key]).map(key=>{ const label=value=>key.endsWith('_person_id') ? personLabel(peopleById.get(value)) : value || 'Not recorded';return <div key={key}><strong>{key.replaceAll('_',' ')}</strong><p>{label(event.before_values?.[key])} → {label(event.after_values[key])}</p></div>;})}</div></details>)}</div> : <div className="wpiEmpty">No changes have been recorded since this upgrade.</div>}</section>
   </div></main></ControlledDeviceDrafts>;
 }
