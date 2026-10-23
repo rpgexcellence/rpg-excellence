@@ -1,5 +1,6 @@
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -42,7 +43,7 @@ function ppmStatus(asset, today, dueLimit) {
   return "required";
 }
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(request, "assets:read");
   if (authentication.error) return authentication.error;
 
@@ -123,7 +124,7 @@ export async function GET(request) {
       .lt("next_maintenance_date", today);
   }
 
-  const { data, count, error } = await query.range(firstRow, lastRow);
+  const { data, count, error } = await query.order("id", { ascending: true }).range(firstRow, lastRow);
   if (error) {
     await recordIntegrationEvent({
       admin,
@@ -180,4 +181,4 @@ export async function GET(request) {
     200,
     requestId
   );
-}
+});
