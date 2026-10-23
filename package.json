@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --test tests/*.test.mjs && node scripts/verify-integration-api.cjs",
+    "test:integration:db": "npm run test:integration --prefix verification"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
