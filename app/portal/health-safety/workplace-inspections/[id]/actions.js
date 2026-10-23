@@ -1,5 +1,7 @@
 "use server";
 
+import { resolveInspectionAccess } from "../../../../../lib/workplace-inspection-access";
+import { assertInspectionFieldwork, canStartInspection, EDITABLE_APPOINTMENTS, inspectionTimestamp, validateAppointmentIndependence } from "../../../../../lib/workplace-inspection-policy.mjs";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
@@ -91,7 +93,7 @@ function reference(prefix) {
 async function context(minimumLevel = "contribute") {
   const access = await requireOrganizationAccess("risk_management", minimumLevel, ROOT);
   await requirePlanAccess(access.user, "professional", "Health and Safety");
-  return access;
+  return resolveInspectionAccess(createAdminClient(), access);
 }
 
 async function loadInspection(admin, organizationId, inspectionId) {
@@ -102,6 +104,12 @@ async function loadInspection(admin, organizationId, inspectionId) {
   return data;
 }
 
+async function historicalAssessorIds(admin, organizationId, inspectionId, responses = []) {
+  const history = await admin.from("hs_workplace_inspection_history").select("after_values").eq("organization_id",organizationId).eq("inspection_id",inspectionId).eq("event_type","fieldwork_saved");
+  if (history.error) throw new Error(history.error.message);
+  return [...new Set([...responses.map(row=>row.assessed_by_person_id),...(history.data || []).filter(row=>Number(row.after_values?.changed_responses)>0).map(row=>row.after_values?.assessor_person_id)].filter(Boolean))];
+}
+
 export async function saveInspectionFieldwork(previousState, formData) {
   try {
     const access = await context("contribute");
@@ -109,7 +117,7 @@ export async function saveInspectionFieldwork(previousState, formData) {
     const inspectionId = required(formData, "inspection_id", "Inspection", 80);
     const admin = createAdminClient();
     const inspection = await loadInspection(admin, organizationId, inspectionId);
-    if (["completed", "cancelled"].includes(inspection.status)) throw new Error("This inspection is read-only.");
+    assertInspectionFieldwork(access, inspection);
 
     let submitted;
     try {
@@ -151,32 +159,12 @@ export async function saveInspectionFieldwork(previousState, formData) {
       };
     });
 
-    const results = await Promise.all(rows.map((row) => admin
-      .from("hs_workplace_inspection_responses")
-      .update({
-        response: row.response,
-        comments_actions: row.comments_actions,
-        not_applicable_justification: row.not_applicable_justification,
-        finding_required: row.finding_required,
-        assessed_by_person_id: row.assessed_by_person_id,
-        assessed_at: row.assessed_at,
-        updated_at: row.updated_at,
-      })
-      .eq("id", row.id)
-      .eq("inspection_id", inspectionId)
-      .eq("organization_id", organizationId)));
-    const failed = results.find((result) => result.error);
-    if (failed?.error) throw new Error(failed.error.message);
-
-    const nextStatus = ["draft", "planned", "due"].includes(inspection.status) ? "in_progress" : inspection.status;
-    const { error: inspectionError } = await admin.from("hs_workplace_inspections").update({
-      status: nextStatus,
-      started_at: inspection.started_at || new Date().toISOString(),
-      updated_by_user_id: access.user.id,
-      updated_at: new Date().toISOString(),
-    }).eq("id", inspectionId).eq("organization_id", organizationId);
-    if (inspectionError) throw new Error(inspectionError.message);
-
+    const saved = await admin.rpc("save_workplace_inspection_fieldwork", {
+      p_org: organizationId, p_inspection: inspectionId, p_actor: access.user.id, p_responses: rows,
+    });
+    if (saved.error) throw new Error(saved.error.message);
+    if (saved.data !== true) throw new Error("The fieldwork could not be saved.");
+    refreshControlledViews(inspectionId);
     revalidatePath(ROOT + "/" + inspectionId);
     revalidatePath(ROOT);
     return { success: "Responses saved to the controlled inspection record." };
@@ -198,7 +186,8 @@ export async function createInspectionFinding(previousState, formData) {
     if (!PRIORITIES.includes(priority)) throw new Error("Select a valid priority.");
 
     const admin = createAdminClient();
-    await loadInspection(admin, organizationId, inspectionId);
+    const inspection = await loadInspection(admin, organizationId, inspectionId);
+    assertInspectionFieldwork(access, inspection);
     if (responseId) {
       const { data: response, error } = await admin.from("hs_workplace_inspection_responses")
         .select("id").eq("id", responseId).eq("inspection_id", inspectionId).eq("organization_id", organizationId).maybeSingle();
@@ -288,6 +277,7 @@ export async function submitInspectionForReview(previousState, formData) {
     const inspectionId = required(formData, "inspection_id", "Inspection", 80);
     const admin = createAdminClient();
     const inspection = await loadInspection(admin, organizationId, inspectionId);
+    assertInspectionFieldwork(access, inspection);
 
     const [{ data: responses, error: responseError }, { data: findings, error: findingError }] = await Promise.all([
       admin.from("hs_workplace_inspection_responses").select("id,response,finding_required").eq("inspection_id", inspectionId).eq("organization_id", organizationId),
@@ -295,18 +285,21 @@ export async function submitInspectionForReview(previousState, formData) {
     ]);
     if (responseError) throw new Error(responseError.message);
     if (findingError) throw new Error(findingError.message);
+    if (!(responses || []).length) throw new Error("This inspection has no questions to submit.");
     if ((responses || []).some((item) => item.response === "not_assessed")) throw new Error("Assess every question before submitting the inspection.");
     const findingResponseIds = new Set((findings || []).map((item) => item.response_id).filter(Boolean));
     const unresolved = (responses || []).filter((item) => item.finding_required && !findingResponseIds.has(item.id));
     if (unresolved.length) throw new Error("Create a finding for every response marked as requiring a finding.");
 
-    const { error } = await admin.from("hs_workplace_inspections").update({
+    const { data: submittedInspection, error } = await admin.from("hs_workplace_inspections").update({
       status: "awaiting_review",
       completed_at: inspection.completed_at || new Date().toISOString(),
       updated_by_user_id: access.user.id,
       updated_at: new Date().toISOString(),
-    }).eq("id", inspectionId).eq("organization_id", organizationId);
+    }).eq("id", inspectionId).eq("organization_id", organizationId).eq("status", "in_progress").eq("lead_inspector_person_id", access.person.id).eq("updated_at", inspection.updated_at).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+    if (!submittedInspection) throw new Error("The inspection changed. Refresh before submitting.");
+    refreshControlledViews(inspectionId);
 
     revalidatePath(ROOT + "/" + inspectionId);
     revalidatePath(ROOT);
@@ -327,6 +320,8 @@ function assignedPerson(access, personId, roleLabel) {
 function refreshControlledViews(inspectionId) {
   revalidatePath(ROOT + "/" + inspectionId);
   revalidatePath(ROOT);
+  revalidatePath("/portal/health-safety");
+  revalidatePath("/portal");
   revalidatePath("/portal/health-safety/management-board");
   revalidatePath("/portal/tasks");
   revalidatePath("/portal/management-oversight");
@@ -349,6 +344,11 @@ export async function reviewInspection(previousState, formData) {
     const admin = createAdminClient();
     const inspection = await loadInspection(admin, organizationId, inspectionId);
     assignedPerson(access, inspection.reviewer_person_id, "independent reviewer");
+    const assessorResult = await admin.from("hs_workplace_inspection_responses").select("assessed_by_person_id").eq("organization_id",organizationId).eq("inspection_id",inspectionId);
+    if (assessorResult.error) throw new Error(assessorResult.error.message);
+    const appointed = await admin.from("organization_people").select("id,user_id").eq("organization_id",organizationId);
+    if (appointed.error) throw new Error(appointed.error.message);
+    validateAppointmentIndependence(appointed.data || [],inspection.lead_inspector_person_id,inspection.reviewer_person_id,await historicalAssessorIds(admin,organizationId,inspectionId,assessorResult.data || []));
     if (inspection.status !== "awaiting_review") {
       throw new Error("This inspection is not awaiting independent review.");
     }
@@ -390,7 +390,7 @@ export async function reviewInspection(previousState, formData) {
         : hasActions
           ? "actions_open"
           : "completed";
-    const { error } = await admin
+    const { data: reviewed, error } = await admin
       .from("hs_workplace_inspections")
       .update({
         status: nextStatus,
@@ -406,8 +406,9 @@ export async function reviewInspection(previousState, formData) {
         updated_at: now,
       })
       .eq("id", inspectionId)
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId).eq("status","awaiting_review").eq("updated_at",inspection.updated_at).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+    if (!reviewed) throw new Error("The inspection changed. Refresh before reviewing.");
 
     refreshControlledViews(inspectionId);
     return {
@@ -611,5 +612,60 @@ export async function verifyInspectionAction(previousState, formData) {
     return {
       error: error.message || "The effectiveness decision could not be saved.",
     };
+  }
+}
+
+export async function startInspection(previousState, formData) {
+  try {
+    const access = await context("contribute");
+    const admin = createAdminClient();
+    const id = required(formData,"inspection_id","Inspection",80);
+    const inspection = await loadInspection(admin,access.organization.id,id);
+    if (!canStartInspection(access,inspection)) throw new Error("Only the assigned lead inspector can start a planned inspection. Administrators can change the assignment first if necessary.");
+    const result = await admin.from("hs_workplace_inspections").update({status:"in_progress",started_at:inspection.started_at || new Date().toISOString(),updated_at:new Date().toISOString(),updated_by_user_id:access.user.id,administration_change_reason:null})
+      .eq("id",id).eq("organization_id",access.organization.id).eq("lead_inspector_person_id",access.person.id).eq("updated_at",inspection.updated_at).in("status",["draft","planned","due"]).select("id").maybeSingle();
+    if (result.error) throw new Error(result.error.message);
+    if (!result.data) throw new Error("The inspection changed. Refresh before starting.");
+    refreshControlledViews(id);
+    if (inspection.programme_id) revalidatePath(ROOT + "/programmes/" + inspection.programme_id);
+    return {success:"Inspection started. You can now complete the assigned fieldwork."};
+  } catch(error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return {error:error.message || "The inspection could not be started."};
+  }
+}
+
+export async function updateInspectionDetails(previousState, formData) {
+  try {
+    const access = await context("contribute");
+    if (!access.canAdministerInspection) throw new Error("Only an authorised administrator can amend inspection appointments and scheduling.");
+    const admin=createAdminClient(), organizationId=access.organization.id;
+    const id=required(formData,"inspection_id","Inspection",80);
+    const inspection=await loadInspection(admin,organizationId,id);
+    if (!EDITABLE_APPOINTMENTS.includes(inspection.status)) throw new Error("This inspection has passed independent review or is closed. Its approved details are locked.");
+    const expected=required(formData,"expected_updated_at","Record version",80);
+    if (expected!==inspection.updated_at) throw new Error("This inspection changed. Refresh before editing.");
+    const lead=required(formData,"lead_inspector_person_id","Lead inspector",80), owner=required(formData,"accountable_person_id","Accountable owner",80), reviewer=required(formData,"reviewer_person_id","Independent reviewer",80);
+    await validateCompanyPeople(organizationId,[lead,owner,reviewer]);
+    const [people,responses]=await Promise.all([
+      admin.from("organization_people").select("id,user_id").eq("organization_id",organizationId),
+      admin.from("hs_workplace_inspection_responses").select("assessed_by_person_id").eq("organization_id",organizationId).eq("inspection_id",id),
+    ]);
+    if (people.error) throw new Error(people.error.message);
+    if (responses.error) throw new Error(responses.error.message);
+    validateAppointmentIndependence(people.data || [],lead,reviewer,await historicalAssessorIds(admin,organizationId,id,responses.data || []));
+    const start=inspectionTimestamp(required(formData,"planned_start","Planned start",16)),end=inspectionTimestamp(required(formData,"planned_end","Planned end",16));
+    if (end<=start) throw new Error("The planned end must be after the start.");
+    const reason=required(formData,"change_reason","Reason for change",2000);
+    const result=await admin.from("hs_workplace_inspections").update({title:required(formData,"title","Inspection title",180),scope:text(formData,"scope",3000) || null,...(inspection.status === "awaiting_review" ? {status:"in_progress",completed_at:null,review_decision:null,review_comment:null,reviewed_at:null,reviewed_by_user_id:null,reviewed_by_person_id:null} : {}),lead_inspector_person_id:lead,accountable_person_id:owner,reviewer_person_id:reviewer,planned_start_at:start,planned_end_at:end,administration_change_reason:reason,updated_by_user_id:access.user.id,updated_at:new Date().toISOString()})
+      .eq("id",id).eq("organization_id",organizationId).eq("updated_at",expected).in("status",EDITABLE_APPOINTMENTS).select("id").maybeSingle();
+    if (result.error) throw new Error(result.error.message);
+    if (!result.data) throw new Error("This inspection changed or was locked. Refresh before editing.");
+    refreshControlledViews(id);
+    if (inspection.programme_id) revalidatePath(ROOT + "/programmes/" + inspection.programme_id);
+    return {success:inspection.status === "awaiting_review" ? "Details updated and inspection returned to fieldwork for resubmission. Existing answers and evidence are preserved." : "Inspection details updated. Existing answers and evidence are preserved. Programme defaults are unchanged."};
+  } catch(error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    return {error:error.message || "Inspection details could not be updated."};
   }
 }
