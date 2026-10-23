@@ -1,5 +1,6 @@
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -21,7 +22,7 @@ function cleanFilter(value, maximum = 180) {
   return cleaned ? cleaned.slice(0, maximum) : null;
 }
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(request, "people:read");
   if (authentication.error) return authentication.error;
 
@@ -59,7 +60,7 @@ export async function GET(request) {
   if (site) query = query.ilike("site", site);
   if (department) query = query.ilike("department", department);
 
-  const { data, count, error } = await query.range(firstRow, lastRow);
+  const { data, count, error } = await query.order("id", { ascending: true }).range(firstRow, lastRow);
   if (error) {
     await recordIntegrationEvent({
       admin,
@@ -112,4 +113,4 @@ export async function GET(request) {
     200,
     requestId
   );
-}
+});
