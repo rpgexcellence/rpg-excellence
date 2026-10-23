@@ -1,5 +1,7 @@
+import { INTEGRATION_PERMISSIONS } from "../../../../../lib/integration-policy.mjs";
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -7,7 +9,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(request, null);
   if (authentication.error) return authentication.error;
 
@@ -25,7 +27,8 @@ export async function GET(request) {
     organisation: {
       id: client.organization_id,
     },
-    permissions: client.permissions || [],
+    permissions: (client.permissions || []).filter(value=>INTEGRATION_PERMISSIONS.includes(value)),
+    capabilities: {read_exports:client.environment==='live',inbound_writes:false,outbound_webhooks:false,sandbox_data:false},
     checked_at: new Date().toISOString(),
     request_id: requestId,
   };
@@ -41,4 +44,4 @@ export async function GET(request) {
   });
 
   return integrationJson(response, 200, requestId);
-}
+});
