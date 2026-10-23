@@ -1,5 +1,6 @@
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../lib/integration-api";
@@ -28,7 +29,7 @@ function dateOnly(date) {
   return date.toISOString().slice(0, 10);
 }
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(request, "suppliers:read");
   if (authentication.error) return authentication.error;
 
@@ -88,7 +89,7 @@ export async function GET(request) {
   }
   if (reviewStatus === "overdue") query = query.lt("next_review_date", today);
 
-  const { data, count, error } = await query.range(firstRow, lastRow);
+  const { data, count, error } = await query.order("id", { ascending: true }).range(firstRow, lastRow);
   if (error) {
     await recordIntegrationEvent({
       admin,
@@ -141,4 +142,4 @@ export async function GET(request) {
     200,
     requestId
   );
-}
+});
