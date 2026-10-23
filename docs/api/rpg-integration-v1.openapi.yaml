@@ -1,292 +1,895 @@
 openapi: 3.1.0
 info:
   title: RPG Excellence Enterprise Integration API
-  version: 1.0.0
-  description: |
-    Controlled, organisation-scoped read access to RPG Excellence assurance data.
-    Every request requires an active API key and is recorded in the integration event log.
+  version: 1.1.0
+  description: 'Organisation-bound read API. Live exports require an active scoped credential and current organisation-owner
+    Consultant entitlement (including protected RPG platform administrators). Test keys can call /health only;
+    they cannot read customer data. No inbound write API, sandbox dataset or outbound webhook service is released.
+    Default budgets: 60 requests per client and 300 per organisation per minute. Respect Retry-After on 429
+    responses. A required database or audit-write failure returns 503 without a successful data payload. Every
+    identified-key request is logged when the audit database is available; rejected unidentified credentials
+    and log-write failures are reported in hosting logs. Existing unassigned legacy findings are excluded until
+    their tenant is explicitly confirmed. Offset pagination uses a unique ID tie-breaker; it is not an incremental
+    change feed and does not guarantee a snapshot during concurrent updates.'
   contact:
     name: RPG Excellence
     url: https://www.rpgexcellence.com
 servers:
-  - url: https://www.rpgexcellence.com/api/v1/integration
-    description: RPG Excellence production service (use a test or live key as appropriate)
+- url: https://www.rpgexcellence.com/api/v1/integration
+  description: Production read API. Test credentials support /health only.
 security:
-  - bearerAuth: []
+- bearerAuth: []
 tags:
-  - name: Service
-  - name: Findings
-  - name: Audits
-  - name: CAPA-8D
-  - name: Assets
-  - name: Suppliers
-  - name: People
+- name: Service
+- name: Findings
+- name: Audits
+- name: CAPA-8D
+- name: Assets
+- name: Suppliers
+- name: People
+- name: Security incidents
+- name: Workplace inspections
 paths:
   /health:
     get:
-      tags: [Service]
+      tags:
+      - Service
       summary: Verify API availability and key authentication
       operationId: getIntegrationHealth
       responses:
-        "200":
+        '200':
           description: API key accepted and service available
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorised"
+                $ref: '#/components/schemas/HealthResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
   /findings:
     get:
-      tags: [Findings]
+      tags:
+      - Findings
       summary: List major and minor nonconformity findings
       operationId: listFindings
       x-required-permission: findings:read
       parameters:
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PageSize"
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [open, assigned, in_progress, submitted, returned, closed]
-        - name: finding_type
-          in: query
-          schema:
-            type: string
-            enum: [major_nc, minor_nc]
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - open
+          - assigned
+          - in_progress
+          - submitted
+          - returned
+          - closed
+          - action_in_progress
+      - name: finding_type
+        in: query
+        schema:
+          type: string
+          enum:
+          - major_nc
+          - minor_nc
       responses:
-        "200":
+        '200':
           description: Paginated findings
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingsResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorised"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/ServiceError"
+                $ref: '#/components/schemas/FindingsResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServiceError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
   /audits:
     get:
-      tags: [Audits]
+      tags:
+      - Audits
       summary: List internal and supplier audits
       operationId: listAudits
       x-required-permission: audits:read
       parameters:
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PageSize"
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [draft, active, in_progress, report_draft, report_approved, capa_monitoring, effectiveness_review, closed]
-        - name: audit_type
-          in: query
-          schema:
-            type: string
-            enum: [internal_system, internal_process, internal_compliance, supplier, second_party, follow_up, integrated]
-        - name: planned_from
-          in: query
-          description: Inclusive ISO 8601 lower date/time boundary.
-          schema:
-            type: string
-            format: date-time
-        - name: planned_to
-          in: query
-          description: Inclusive ISO 8601 upper date/time boundary.
-          schema:
-            type: string
-            format: date-time
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - draft
+          - active
+          - in_progress
+          - report_draft
+          - report_approved
+          - capa_monitoring
+          - effectiveness_review
+          - closed
+      - name: audit_type
+        in: query
+        schema:
+          type: string
+          enum:
+          - internal_system
+          - internal_process
+          - internal_compliance
+          - supplier
+          - second_party
+          - follow_up
+          - integrated
+      - name: planned_from
+        in: query
+        description: Inclusive ISO 8601 lower date/time boundary.
+        schema:
+          type: string
+          format: date-time
+      - name: planned_to
+        in: query
+        description: Inclusive ISO 8601 upper date/time boundary.
+        schema:
+          type: string
+          format: date-time
       responses:
-        "200":
+        '200':
           description: Paginated audits
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuditsResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorised"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/ServiceError"
+                $ref: '#/components/schemas/AuditsResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServiceError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
   /capa-8d:
     get:
-      tags: [CAPA-8D]
+      tags:
+      - CAPA-8D
       summary: List CAPA and 8D cases
       operationId: listCapa8dCases
       x-required-permission: capa:read
       parameters:
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PageSize"
-        - name: case_type
-          in: query
-          schema:
-            type: string
-            enum: [capa, 8d]
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [draft, active, effectiveness_review, closed, cancelled]
-        - name: severity
-          in: query
-          schema:
-            type: string
-            enum: [critical, high, medium, low]
-        - name: source_type
-          in: query
-          schema:
-            type: string
-            enum: [assessment_finding, audit, complaint, incident, defect, supplier, standalone]
-        - name: target_before
-          in: query
-          schema:
-            type: string
-            format: date-time
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: case_type
+        in: query
+        schema:
+          type: string
+          enum:
+          - capa
+          - 8d
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - draft
+          - active
+          - effectiveness_review
+          - closed
+          - cancelled
+      - name: severity
+        in: query
+        schema:
+          type: string
+          enum:
+          - critical
+          - high
+          - medium
+          - low
+      - name: source_type
+        in: query
+        schema:
+          type: string
+          enum:
+          - assessment_finding
+          - audit
+          - complaint
+          - incident
+          - defect
+          - supplier
+          - standalone
+      - name: target_before
+        in: query
+        schema:
+          type: string
+          format: date-time
       responses:
-        "200":
+        '200':
           description: Paginated CAPA-8D cases
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CapaResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorised"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/ServiceError"
+                $ref: '#/components/schemas/CapaResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServiceError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
   /assets:
     get:
-      tags: [Assets]
+      tags:
+      - Assets
       summary: List controlled organisation assets and PPM status
       operationId: listAssets
       x-required-permission: assets:read
       parameters:
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PageSize"
-        - name: asset_type
-          in: query
-          schema:
-            type: string
-            enum: [plant, equipment, room_area, electrical_system, process_system, vehicle, other]
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [active, out_of_service, retired]
-        - name: criticality
-          in: query
-          schema:
-            type: string
-            enum: [low, medium, high, critical]
-        - name: ppm_status
-          in: query
-          schema:
-            type: string
-            enum: [required, not_required, due_30_days, overdue]
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: asset_type
+        in: query
+        schema:
+          type: string
+          enum:
+          - plant
+          - equipment
+          - room_area
+          - electrical_system
+          - process_system
+          - vehicle
+          - other
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - active
+          - out_of_service
+          - retired
+      - name: criticality
+        in: query
+        schema:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+      - name: ppm_status
+        in: query
+        schema:
+          type: string
+          enum:
+          - required
+          - not_required
+          - due_30_days
+          - overdue
       responses:
-        "200":
+        '200':
           description: Paginated assets
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AssetsResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorised"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/ServiceError"
+                $ref: '#/components/schemas/AssetsResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServiceError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
   /suppliers:
     get:
-      tags: [Suppliers]
+      tags:
+      - Suppliers
       summary: List controlled suppliers
       operationId: listSuppliers
       x-required-permission: suppliers:read
       parameters:
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PageSize"
-        - name: approval_status
-          in: query
-          schema:
-            type: string
-            enum: [draft, pending_approval, approved, conditionally_approved, suspended]
-        - name: criticality
-          in: query
-          schema:
-            type: string
-            enum: [low, medium, high, critical]
-        - name: review_status
-          in: query
-          schema:
-            type: string
-            enum: [due_30_days, overdue]
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: approval_status
+        in: query
+        schema:
+          type: string
+          enum:
+          - draft
+          - pending_approval
+          - approved
+          - conditionally_approved
+          - suspended
+      - name: criticality
+        in: query
+        schema:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+      - name: review_status
+        in: query
+        schema:
+          type: string
+          enum:
+          - due_30_days
+          - overdue
       responses:
-        "200":
+        '200':
           description: Paginated suppliers
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuppliersResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorised"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/ServiceError"
+                $ref: '#/components/schemas/SuppliersResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServiceError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
   /people:
     get:
-      tags: [People]
+      tags:
+      - People
       summary: List Company Users
       operationId: listPeople
       x-required-permission: people:read
       parameters:
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PageSize"
-        - name: account_status
-          in: query
-          schema:
-            type: string
-            enum: [directory, invited, active, suspended, closed]
-        - name: site
-          in: query
-          schema:
-            type: string
-            maxLength: 180
-        - name: department
-          in: query
-          schema:
-            type: string
-            maxLength: 180
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: account_status
+        in: query
+        schema:
+          type: string
+          enum:
+          - directory
+          - invited
+          - active
+          - suspended
+          - closed
+      - name: site
+        in: query
+        schema:
+          type: string
+          maxLength: 180
+      - name: department
+        in: query
+        schema:
+          type: string
+          maxLength: 180
       responses:
-        "200":
+        '200':
           description: Paginated Company Users
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PeopleResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorised"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/ServiceError"
+                $ref: '#/components/schemas/PeopleResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServiceError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+  /security-incidents:
+    get:
+      tags:
+      - Security incidents
+      summary: List security incident summaries
+      operationId: ListsecurityincidentsummariesV11
+      x-required-permission: security_incidents:read
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - reported
+          - triage
+          - contained
+          - investigating
+          - recovery
+          - action_required
+          - awaiting_verification
+          - closed
+          - cancelled
+      - name: severity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+      - name: verification_result
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+          - effective
+          - not_effective
+      - name: include_details
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'true'
+          - 'false'
+      responses:
+        '200':
+          description: Organisation-scoped response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+      description: 'Default fields: id, incident_reference, title, incident_type, severity, status, detected_at,
+        awareness_at, administration_location_id, verification_result, verified_at, closed_at, created_at,
+        updated_at. include_details=true additionally requires security_incidents:detail and returns sensitive
+        investigation, notification and response narratives. No evidence file bytes are exposed. Minimise use
+        of the detail scope.'
+  /workplace-inspections:
+    get:
+      tags:
+      - Workplace inspections
+      summary: List workplace inspections
+      operationId: ListworkplaceinspectionsV11
+      x-required-permission: workplace_inspections:read
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - planned
+          - due
+          - in_progress
+          - awaiting_review
+          - actions_open
+          - awaiting_verification
+          - completed
+          - closed
+          - cancelled
+      - name: risk_band
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: &id001
+          - routine
+          - medium
+          - high
+          - critical
+          - low
+          - moderate
+      - name: site_id
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: programme_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: planned_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: planned_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Organisation-scoped response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        '413':
+          $ref: '#/components/responses/DetailTooLarge'
+      description: 'Canonical risk bands: routine, medium, high, critical. Legacy low/moderate query aliases
+        map to routine/medium. Response values remain canonical.'
+  /workplace-inspections/programmes:
+    get:
+      tags:
+      - Workplace inspections
+      summary: List workplace inspection programmes
+      operationId: ListworkplaceinspectionprogrammesV11
+      x-required-permission: workplace_inspections:read
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - active
+          - paused
+          - closed
+          - archived
+      - name: risk_band
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: *id001
+      - name: site_id
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: due
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - overdue
+          - due_30_days
+          - future
+      responses:
+        '200':
+          description: Organisation-scoped response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        '413':
+          $ref: '#/components/responses/DetailTooLarge'
+      description: 'Canonical risk bands: routine, medium, high, critical. Legacy low/moderate query aliases
+        map to routine/medium. Response values remain canonical.'
+  /workplace-inspections/{id}:
+    get:
+      tags:
+      - Workplace inspections
+      summary: Read one complete bounded workplace inspection
+      operationId: getWorkplaceInspection
+      x-required-permission: workplace_inspections:read
+      description: Returns inspection plus responses, findings, actions and evidence metadata. Responses use
+        comments_actions (the supplied database field), not comment. Child arrays are capped at 1000 each;
+        if an exact count shows truncation, returns 413 instead of incomplete data. Evidence bytes are not
+        returned. Unknown or foreign organisation IDs return 404.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Complete bounded inspection detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - counts
+                - request_id
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - inspection
+                    - responses
+                    - findings
+                    - actions
+                    - evidence
+                    properties:
+                      inspection:
+                        type: object
+                      responses:
+                        type: array
+                        items:
+                          type: object
+                      findings:
+                        type: array
+                        items:
+                          type: object
+                      actions:
+                        type: array
+                        items:
+                          type: object
+                      evidence:
+                        type: array
+                        items:
+                          type: object
+                  counts:
+                    type: object
+                    properties:
+                      responses:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000
+                      findings:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000
+                      actions:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000
+                      evidence:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000
+                  request_id:
+                    type: string
+                    format: uuid
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        '413':
+          $ref: '#/components/responses/DetailTooLarge'
+        '404':
+          description: Inspection not found in the API credential organisation.
+  /openapi:
+    get:
+      tags:
+      - Service
+      summary: Download the public OpenAPI contract
+      operationId: getOpenApi
+      security: []
+      responses:
+        '200':
+          description: OpenAPI 3.1 YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
 components:
   securitySchemes:
     bearerAuth:
@@ -317,29 +920,48 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
     Unauthorised:
       description: Missing, invalid, expired or revoked API key
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
     Forbidden:
       description: Missing permission or source IP not permitted
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
     ServiceError:
       description: Register temporarily unavailable
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: Client or organisation minute budget exhausted. Retry after the indicated delay.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+            description: Unix seconds at the next UTC minute boundary
+    DependencyUnavailable:
+      description: A required authentication, budget, database or audit dependency failed. No successful data
+        response is released. Retry later using the server-generated X-Request-ID.
+    DetailTooLarge:
+      description: A bounded inspection child collection would be incomplete. No partial detail response is
+        returned. Reduce programme page_size or use the portal for the complete record.
   schemas:
     Error:
       type: object
-      required: [error, message]
+      required:
+      - error
+      - message
       properties:
         error:
           type: string
@@ -349,7 +971,11 @@ components:
           type: string
     Pagination:
       type: object
-      required: [page, page_size, total, total_pages]
+      required:
+      - page
+      - page_size
+      - total
+      - total_pages
       properties:
         page:
           type: integer
@@ -361,7 +987,11 @@ components:
           type: integer
     RegisterResponse:
       type: object
-      required: [data, pagination, filters, request_id]
+      required:
+      - data
+      - pagination
+      - filters
+      - request_id
       properties:
         data:
           type: array
@@ -369,27 +999,36 @@ components:
             type: object
             additionalProperties: true
         pagination:
-          $ref: "#/components/schemas/Pagination"
+          $ref: '#/components/schemas/Pagination'
         filters:
           type: object
           additionalProperties: true
         request_id:
           type: string
     FindingsResponse:
-      $ref: "#/components/schemas/RegisterResponse"
+      $ref: '#/components/schemas/RegisterResponse'
     AuditsResponse:
-      $ref: "#/components/schemas/RegisterResponse"
+      $ref: '#/components/schemas/RegisterResponse'
     CapaResponse:
-      $ref: "#/components/schemas/RegisterResponse"
+      $ref: '#/components/schemas/RegisterResponse'
     AssetsResponse:
-      $ref: "#/components/schemas/RegisterResponse"
+      $ref: '#/components/schemas/RegisterResponse'
     SuppliersResponse:
-      $ref: "#/components/schemas/RegisterResponse"
+      $ref: '#/components/schemas/RegisterResponse'
     PeopleResponse:
-      $ref: "#/components/schemas/RegisterResponse"
+      $ref: '#/components/schemas/RegisterResponse'
     HealthResponse:
       type: object
-      required: [status, service, api_version, environment, client, organisation, permissions, checked_at, request_id]
+      required:
+      - status
+      - service
+      - api_version
+      - environment
+      - client
+      - organisation
+      - permissions
+      - checked_at
+      - request_id
       properties:
         status:
           type: string
@@ -401,10 +1040,14 @@ components:
           const: v1
         environment:
           type: string
-          enum: [test, live]
+          enum:
+          - test
+          - live
         client:
           type: object
-          required: [id, name]
+          required:
+          - id
+          - name
           properties:
             id:
               type: string
@@ -413,7 +1056,8 @@ components:
               type: string
         organisation:
           type: object
-          required: [id]
+          required:
+          - id
           properties:
             id:
               type: string
