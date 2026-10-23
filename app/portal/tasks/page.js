@@ -160,7 +160,7 @@ function inspectionTasks(sources) {
     const review = inspection.status === "awaiting_review";
     if (!review && !["draft", "planned", "due", "in_progress"].includes(inspection.status)) continue;
     tasks.push({ id: `inspection-record:${inspection.id}`, source: "inspection", module: "Workplace Inspections / " + (review ? "Independent review" : "Fieldwork"),
-      title: `${review ? "Review fieldwork" : "Complete fieldwork"}: ${inspection.title}`,
+      title: `${review ? "Review fieldwork" : ["draft", "planned", "due"].includes(inspection.status) ? "Scheduled inspection" : "Complete fieldwork"}: ${inspection.title}`,
       due: value(inspection.planned_end_at, inspection.planned_start_at),
       assignee: review ? inspection.reviewer_person_id : inspection.lead_inspector_person_id,
       href: `${root}/${inspection.id}${review ? "#inspection-review-actions" : ""}`,
