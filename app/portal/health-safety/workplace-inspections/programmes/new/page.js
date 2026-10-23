@@ -49,6 +49,7 @@ export default async function NewWorkplaceInspectionProgrammePage() {
       people={options.people}
       templates={options.templates}
       profileFields={AREA_PROFILE_FIELDS}
+      questionCatalog={options.questionCatalog}
     /> : null}
   </div></main>;
 }
