@@ -1,5 +1,6 @@
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../../lib/integration-api";
@@ -27,7 +28,7 @@ async function recordFailure(authentication, request, inspectionId, status, mess
   });
 }
 
-export async function GET(request, { params }) {
+export const GET = withIntegrationRequest(async function GET(request, { params }) {
   const authentication = await requireIntegrationClient(
     request,
     "workplace_inspections:read",
@@ -113,41 +114,45 @@ export async function GET(request, { params }) {
         .from("hs_workplace_inspection_responses")
         .select(
           "id,question_code,section_code,section_title,question_text," +
-          "legislation_guidance,inspector_guidance,response,comment," +
+          "legislation_guidance,inspector_guidance,response,comments_actions," +
           "not_applicable_justification,finding_required,display_order,updated_at",
+          { count: "exact" },
         )
         .eq("organization_id", client.organization_id)
         .eq("inspection_id", inspectionId)
-        .order("display_order"),
+        .order("display_order").order("id").limit(1000),
       admin
         .from("hs_workplace_inspection_findings")
         .select(
           "id,response_id,finding_reference,title,description,finding_type,priority," +
           "severity,likelihood,risk_score,immediate_action_taken,stop_work_applied," +
           "status,created_at,updated_at",
+          { count: "exact" },
         )
         .eq("organization_id", client.organization_id)
         .eq("inspection_id", inspectionId)
-        .order("created_at"),
+        .order("created_at").order("id").limit(1000),
       admin
         .from("hs_workplace_inspection_actions")
         .select(
           "id,finding_id,action_reference,action_text,priority,status," +
           "responsible_person_id,verifier_person_id,target_date,completed_at," +
           "verified_at,effectiveness_result,created_at,updated_at",
+          { count: "exact" },
         )
         .eq("organization_id", client.organization_id)
         .eq("inspection_id", inspectionId)
-        .order("target_date"),
+        .order("target_date").order("id").limit(1000),
       admin
         .from("hs_workplace_inspection_evidence")
         .select(
           "id,response_id,finding_id,action_id,evidence_type,title," +
           "original_file_name,external_url,created_at",
+          { count: "exact" },
         )
         .eq("organization_id", client.organization_id)
         .eq("inspection_id", inspectionId)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false }).order("id").limit(1000),
     ]);
 
   const relatedResults = [
@@ -176,6 +181,7 @@ export async function GET(request, { params }) {
     );
   }
 
+  if(relatedResults.some(result=>result.count!==null&&result.count>(result.data||[]).length)) return integrationJson({error:'inspection_detail_too_large',message:'This record exceeds the bounded detail export. Use the portal to retrieve the complete record; no partial export is returned.'},413,requestId);
   await recordIntegrationEvent({
     admin,
     client,
@@ -207,4 +213,4 @@ export async function GET(request, { params }) {
     200,
     requestId,
   );
-}
+});
