@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import WorkplaceInspectionChecklistSummary from "./WorkplaceInspectionChecklistSummary";
+import {compileInspectionChecklist,inspectionPackCodes,INSPECTION_PROFILE_PACKS} from "../lib/workplace-inspection-checklist.mjs";
 
 const FREQUENCY_UNITS = [
   ["days", "Days"],
@@ -17,16 +19,24 @@ export default function WorkplaceInspectionProgrammeForm({
   people = [],
   templates = [],
   profileFields = [],
+  questionCatalog = null,
+  connectedPackCodes = [],
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const [siteId, setSiteId] = useState(programme?.administration_location_id || "");
   const [zoneId, setZoneId] = useState(programme?.zone_id || "");
-  const [profile, setProfile] = useState(() => programme?.area_profile || {});
+  const [templateId, setTemplateId] = useState(programme?.template_id || templates[0]?.id || "");
+  const [profile, setProfile] = useState(() => Object.fromEntries(profileFields.map(([key]) => [key, [true,"true"].includes(programme?.area_profile?.[key])])) );
 
   const selectedCount = useMemo(
     () => Object.values(profile).filter(Boolean).length,
     [profile],
   );
+
+  const checklist = useMemo(() => questionCatalog && templateId ? compileInspectionChecklist({
+    ...questionCatalog, organizationId: questionCatalog.organizationId, templateId,
+    packCodes: inspectionPackCodes(profile, connectedPackCodes),
+  }) : null, [questionCatalog, templateId, profile, connectedPackCodes]);
 
   function toggleProfile(key, checked) {
     setProfile((current) => ({ ...current, [key]: checked }));
@@ -490,7 +500,8 @@ export default function WorkplaceInspectionProgrammeForm({
               <select
                 name="template_id"
                 required
-                defaultValue={programme?.template_id || templates[0]?.id || ""}
+                value={templateId}
+                onChange={event => setTemplateId(event.target.value)}
               >
                 <option value="">Select template</option>
                 {templates.map((template) => (
@@ -670,7 +681,7 @@ export default function WorkplaceInspectionProgrammeForm({
                   <strong>{label}</strong>
                   <small>
                     {profile[key]
-                      ? "Included in the generated inspection"
+                      ? (checklist?.packs.find(pack => pack.pack_code === INSPECTION_PROFILE_PACKS[key]) ? `${checklist.packs.find(pack => pack.pack_code === INSPECTION_PROFILE_PACKS[key]).questionCount} questions in selected template` : "Selected — review checklist availability below")
                       : "Select if applicable"}
                   </small>
                 </span>
@@ -688,6 +699,8 @@ export default function WorkplaceInspectionProgrammeForm({
             </p>
           </div>
         </section>
+
+        <WorkplaceInspectionChecklistSummary checklist={checklist} preview />
 
         {state?.plan ? (
           <section className="wpiPlanResult">
@@ -712,7 +725,7 @@ export default function WorkplaceInspectionProgrammeForm({
             Saving recalculates the checklist, priority and next inspection date.
             Existing administrator access is not changed.
           </p>
-          <button type="submit" disabled={pending}>
+          <button type="submit" disabled={pending || Boolean(checklist && !checklist.ready)}>
             {pending
               ? "Saving…"
               : programme?.id
