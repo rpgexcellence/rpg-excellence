@@ -1,3 +1,4 @@
+import { loadInspectionDashboard } from "../../../lib/workplace-inspection-dashboard";
 import { redirect } from "next/navigation";
 import HealthSafetyHubDashboard from "../../../components/HealthSafetyHubDashboard";
 import { createAdminClient } from "../../../lib/supabase/admin";
@@ -29,7 +30,9 @@ export default async function HealthSafetyDashboard() {
     if (result.error) throw new Error(result.error.message);
   }
 
+  const inspectionDashboard = await loadInspectionDashboard(admin,organisation.id,user.id);
   return <HealthSafetyHubDashboard
+    inspectionDashboard={inspectionDashboard}
     organisationName={organisation?.name}
     assessments={assessmentsResult.data || []}
     hazards={hazardsResult.data || []}
