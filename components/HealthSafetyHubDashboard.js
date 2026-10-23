@@ -1,3 +1,4 @@
+import WorkplaceInspectionDashboard from "./WorkplaceInspectionDashboard";
 import Link from "next/link";
 
 const openStatuses = [
@@ -19,6 +20,7 @@ const navItems = [
   ["⚑", "POWRA", "/portal/health-safety/powra"],
   ["◆", "Permit to Work", "/portal/health-safety/permits"],
   ["↻", "Management of Change", "/portal/health-safety/moc"],
+  ["WPI", "Workplace Inspections", "/portal/health-safety/workplace-inspections"],
   ["☷", "Actions", "/portal/health-safety/actions"],
   ["◇", "Training Academy", "/portal/health-safety/training"],
   ["▥", "Reports", "/portal/health-safety/management-board"],
@@ -53,6 +55,7 @@ function Metric({ icon, title, value, tone, detail, href }) {
 
 export default function HealthSafetyHubDashboard({
   organisationName,
+  inspectionDashboard,
   assessments = [],
   hazards = [],
   actions = [],
@@ -178,6 +181,7 @@ export default function HealthSafetyHubDashboard({
                 </Link>
               </div>
             </header>
+            {inspectionDashboard ? <WorkplaceInspectionDashboard {...inspectionDashboard}/> : null}
             <section className="hsvCommand">
               <div>
                 <small>LIVE RISK CONTROL INTELLIGENCE</small>
