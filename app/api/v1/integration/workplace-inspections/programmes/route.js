@@ -1,5 +1,7 @@
+import { INSPECTION_RISK_BANDS, normaliseInspectionBand, integrationDateOnly } from "../../../../../../lib/integration-policy.mjs";
 import {
   integrationJson,
+  withIntegrationRequest,
   recordIntegrationEvent,
   requireIntegrationClient,
 } from "../../../../../../lib/integration-api";
@@ -8,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_STATUSES = new Set(["active", "paused", "closed", "archived"]);
-const ALLOWED_RISK_BANDS = new Set(["low", "moderate", "high", "critical"]);
+const ALLOWED_RISK_BANDS = new Set(INSPECTION_RISK_BANDS);
 const ALLOWED_DUE = new Set(["overdue", "due_30_days", "future"]);
 
 function boundedInteger(value, fallback, minimum, maximum) {
@@ -30,7 +32,7 @@ function invalidFilter(message, requestId) {
   );
 }
 
-export async function GET(request) {
+export const GET = withIntegrationRequest(async function GET(request) {
   const authentication = await requireIntegrationClient(
     request,
     "workplace_inspections:read",
@@ -42,7 +44,7 @@ export async function GET(request) {
   const page = boundedInteger(parameters.get("page"), 1, 1, 100000);
   const pageSize = boundedInteger(parameters.get("page_size"), 25, 1, 100);
   const status = parameters.get("status");
-  const riskBand = parameters.get("risk_band");
+  const riskBand = normaliseInspectionBand(parameters.get("risk_band"));
   const siteId = parameters.get("site_id");
   const due = parameters.get("due");
 
@@ -54,7 +56,7 @@ export async function GET(request) {
   }
   if (riskBand && !ALLOWED_RISK_BANDS.has(riskBand)) {
     return invalidFilter(
-      "Use low, moderate, high or critical for risk_band.",
+      "Use routine, medium, high or critical for risk_band (legacy low/moderate aliases are accepted).",
       requestId,
     );
   }
@@ -95,7 +97,7 @@ export async function GET(request) {
   }
   if (due === "future") query = query.gt("next_inspection_date", dueLimit);
 
-  const { data, count, error } = await query.range(firstRow, lastRow);
+  const { data, count, error } = await query.order("id", { ascending: true }).range(firstRow, lastRow);
   if (error) {
     await recordIntegrationEvent({
       admin,
@@ -127,9 +129,10 @@ export async function GET(request) {
       .select(
         "programme_id,selection_source,selection_reason," +
         "pack:hs_inspection_question_packs(pack_code)",
+        {count:"exact"},
       )
       .eq("organization_id", client.organization_id)
-      .in("programme_id", programmeIds);
+      .in("programme_id", programmeIds).order("programme_id").order("pack_id").limit(1000);
     if (packResult.error) {
       await recordIntegrationEvent({
         admin,
@@ -151,6 +154,7 @@ export async function GET(request) {
         requestId,
       );
     }
+    if(packResult.count!==null&&packResult.count>(packResult.data||[]).length) return integrationJson({error:'inspection_packs_too_large',message:'Checklist pack selections exceed the bounded export. Reduce page_size; no partial pack list is returned.'},413,requestId);
     packLinks = packResult.data || [];
   }
 
@@ -199,4 +203,4 @@ export async function GET(request) {
     200,
     requestId,
   );
-}
+});
