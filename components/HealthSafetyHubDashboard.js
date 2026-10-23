@@ -1,4 +1,3 @@
-import WorkplaceInspectionDashboard from "./WorkplaceInspectionDashboard";
 import Link from "next/link";
 
 const openStatuses = [
@@ -55,7 +54,6 @@ function Metric({ icon, title, value, tone, detail, href }) {
 
 export default function HealthSafetyHubDashboard({
   organisationName,
-  inspectionDashboard,
   assessments = [],
   hazards = [],
   actions = [],
@@ -181,7 +179,6 @@ export default function HealthSafetyHubDashboard({
                 </Link>
               </div>
             </header>
-            {inspectionDashboard ? <WorkplaceInspectionDashboard {...inspectionDashboard}/> : null}
             <section className="hsvCommand">
               <div>
                 <small>LIVE RISK CONTROL INTELLIGENCE</small>
