@@ -66,6 +66,7 @@ export default async function EditWorkplaceInspectionProgrammePage({ params }) {
       people={options.people}
       templates={options.templates}
       profileFields={AREA_PROFILE_FIELDS}
+      questionCatalog={options.questionCatalog}
     />
   </div></main>;
 }
