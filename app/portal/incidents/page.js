@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {incidentAnalytics, incidentExplorerRows, categoryLabel, outcomeLabel, BODY_PARTS} from "../../../lib/incident-reporting.mjs";
+import {incidentAnalytics, incidentExplorerRows, incidentCurrentClassification, categoryLabel, outcomeLabel, BODY_PARTS} from "../../../lib/incident-reporting.mjs";
 import {IncidentBarChart, SeverityChart, IncidentTrend, IncidentExplorer, IncidentExecutiveReport} from "../../../components/IncidentCharts";
 import { incidentRows } from "../../../lib/incident-data";
 import {
@@ -32,10 +32,10 @@ export default async function IncidentsPage({ searchParams }) {
       (!q?.zone || r.zone_id === q.zone) &&
       (!q?.status || r.status === q.status) &&
       (!q?.type || r.report_type===q.type) &&
-      (!q?.severity || r.criticality===q.severity) &&
+      (!q?.severity || incidentCurrentClassification(r).severity===q.severity) &&
       (!q?.category || (r.intake_details?.categories||[]).some(item=>item.domain+":"+item.category===q.category)) &&
-      (!q?.outcome || (r.investigation_details?.reviewed_outcomes||[]).includes(q.outcome)) &&
-      (!q?.body || (r.investigation_details?.reviewed_body_parts||[]).includes(q.body)) &&
+      (!q?.outcome || incidentCurrentClassification(r).outcomes.includes(q.outcome)) &&
+      (!q?.body || incidentCurrentClassification(r).bodyParts.includes(q.body)) &&
       (!q?.from || (r.occurred_at || "").slice(0, 10) >= q.from) &&
       (!q?.to || (r.occurred_at || "").slice(0, 10) <= q.to),
   );
@@ -157,10 +157,13 @@ export default async function IncidentsPage({ searchParams }) {
         ))}
       </div>
       <p className="incidentMuted">
-        Confirmed statistics exclude untriaged, rejected and duplicate
-        submissions. Critical / immediate includes unconfirmed reporter alerts
-        for urgent review. All figures respect your access scope and selected
-        filters.
+        Received includes every submission. Confirmed case indicators require
+        triage. Graphs include {analytics.included} current reports: {analytics.assessed} triaged
+        and {analytics.provisional} awaiting triage. Reporter selections remain provisional
+        until the relevant fields are assessed; saved assessed values replace them.
+        Rejected and duplicate submissions are excluded from graphs. Critical /
+        immediate alerts remain visible for urgent review. All figures respect
+        your access scope and selected filters.
       </p>
       <div className="incidentInsightStrip">
         <article><strong>{analytics.stopWork}</strong><span>Stop-work interventions reported</span></article>
@@ -168,20 +171,20 @@ export default async function IncidentsPage({ searchParams }) {
         <article><strong>{analytics.consequencesPending}</strong><span>Triaged cases awaiting consequence assessment</span></article>
       </div>
       <div className="incidentGrid">
-        <SeverityChart rows={analytics.severity} />
-        <IncidentTrend months={s.months} />
-        <IncidentBarChart title="Confirmed events by area" description="One report may affect several areas; these counts overlap. Select a bar label to filter." rows={INCIDENT_DOMAINS.map(([key,label])=>({key,label,count:s.byDomain[key]}))} filter="domain" query={q} />
-        <IncidentBarChart title="Accidents, incidents & near misses" description="Confirmed classifications. Select a label to inspect the reports." rows={INCIDENT_TYPES.map(([key,label])=>({key,label,count:s.byType[key]}))} filter="type" query={q} />
-        <IncidentBarChart title="What happened / consequences" description="Investigator-assessed consequences in triaged cases. Multiple consequences may apply. Unassessed cases are excluded." rows={analytics.outcomes} filter="outcome" query={q} />
+        <SeverityChart rows={analytics.severity} query={q} />
+        <IncidentTrend months={analytics.months} />
+        <IncidentBarChart title="Current events by area" description="Reported and assessed cases. One report may affect several areas; counts overlap. Select a label to filter." rows={INCIDENT_DOMAINS.map(([key,label])=>({key,label,count:analytics.byDomain[key]}))} filter="domain" query={q} />
+        <IncidentBarChart title="Accidents, incidents & near misses" description="Includes new reports immediately, using the current saved event type. Assessor amendments update the counts. Rejected and duplicate reports are excluded." rows={INCIDENT_TYPES.map(([key,label])=>({key,label,count:analytics.byType[key]}))} filter="type" query={q} />
+        <IncidentBarChart title="What happened / consequences" description="Reporter consequences appear immediately. Assessed consequences replace them when saved; an explicitly empty assessment removes the earlier observations. Counts can overlap." rows={analytics.outcomes} filter="outcome" query={q} />
         <IncidentExplorer rows={explorerRows} />
-        <IncidentBarChart title="Reported event categories" description="Reporter-selected event categories within triaged cases. These remain observations, not confirmed causes. Multiple areas may overlap." rows={analytics.categories} filter="category" query={q} />
+        <IncidentBarChart title="Reported event categories" description="Reporter-selected categories across current reports. These are observations, not confirmed causes. Multiple areas may overlap." rows={analytics.categories} filter="category" query={q} />
       </div>
       <section className="incidentCard">
         <h2>Accidents, incidents and prevention</h2>
         <div className="incidentChoices">
           {INCIDENT_TYPES.map(([k, v]) => (
             <span className="incidentBadge" key={k}>
-              {v}: {s.byType[k]}
+              {v}: {analytics.byType[k]}
             </span>
           ))}
         </div>
@@ -255,11 +258,11 @@ export default async function IncidentsPage({ searchParams }) {
                   </td>
                   <td>
                     <IncidentBadge
-                      value={r.immediate_danger ? "critical" : r.criticality || r.reported_criticality}
+                      value={r.immediate_danger ? "critical" : incidentCurrentClassification(r).severity}
                     />
                     <br />
                     <small>
-                      {r.triaged_at ? "Confirmed" : "Reporter alert"}
+                      {incidentCurrentClassification(r).severitySource === "assessed" ? "Assessed severity" : "Reporter alert"}
                     </small>
                   </td>
                   <td>
