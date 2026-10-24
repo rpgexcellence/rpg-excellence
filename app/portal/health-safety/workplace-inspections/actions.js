@@ -1,5 +1,6 @@
 "use server";
 
+import { requireInspectionChecklist } from "../../../../lib/workplace-inspection-checklist.mjs";
 import { inspectionTimestamp } from "../../../../lib/workplace-inspection-policy.mjs";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -13,7 +14,8 @@ import {
   AREA_PROFILE_FIELDS,
   buildInspectionPlan,
   loadProgrammeRiskSignals,
-  loadQuestionsForPacks,
+  loadChecklistForPacks,
+  loadProgrammeInspectionChecklist,
   validateAdministrationSite,
   validateCompanyPeople,
 } from "../../../../lib/workplace-inspections";
@@ -67,18 +69,9 @@ async function authorisedContext(minimumLevel = "contribute") {
   return context;
 }
 
-async function replaceProgrammePacks(admin, organizationId, programmeId, plan) {
-  const { data: packs, error: packError } = await admin
-    .from("hs_inspection_question_packs")
-    .select("id,pack_code")
-    .in("pack_code", plan.packCodes)
-    .or(`organization_id.is.null,organization_id.eq.${organizationId}`)
-    .eq("active", true);
-  if (packError) throw new Error(packError.message);
-
-  const packByCode = new Map((packs || []).map((pack) => [pack.pack_code, pack]));
-  const missing = plan.packCodes.filter((code) => !packByCode.has(code));
-  if (missing.length) throw new Error(`The following inspection packs are unavailable: ${missing.join(", ")}.`);
+async function replaceProgrammePacks(admin, organizationId, programmeId, plan, templateId) {
+  const checklist = requireInspectionChecklist(await loadChecklistForPacks(organizationId, plan.packCodes, {templateId}));
+  const packByCode = new Map(checklist.packs.map(pack => [pack.pack_code, pack]));
 
   const { error: deleteError } = await admin
     .from("hs_inspection_programme_packs")
@@ -169,6 +162,8 @@ async function programmeInput(formData, context, existingProgrammeId = null) {
     lastInspectionDate,
   });
 
+  requireInspectionChecklist(await loadChecklistForPacks(organizationId, plan.packCodes, {templateId: template.id}));
+
   return {
     admin,
     plan,
@@ -241,9 +236,9 @@ export async function createInspectionProgramme(previousState, formData) {
         .eq("id", data.id)
         .eq("organization_id", context.organization.id);
       if (planError) throw new Error(planError.message);
-      await replaceProgrammePacks(admin, context.organization.id, data.id, synchronisedPlan);
+      await replaceProgrammePacks(admin, context.organization.id, data.id, synchronisedPlan, values.template_id);
     } catch (error) {
-      await admin.from("hs_inspection_programmes").delete().eq("id", data.id);
+      await admin.from("hs_inspection_programmes").delete().eq("id", data.id).eq("organization_id", context.organization.id);
       throw error;
     }
 
@@ -284,6 +279,7 @@ export async function updateInspectionProgramme(previousState, formData) {
       context.organization.id,
       programmeId,
       prepared.plan,
+      prepared.values.template_id,
     );
 
     revalidatePath(ROOT);
@@ -324,15 +320,8 @@ export async function generateScheduledInspection(previousState, formData) {
     ]);
     await validateAdministrationSite(organizationId, programme.administration_location_id);
 
-    const { data: links, error: linkError } = await admin
-      .from("hs_inspection_programme_packs")
-      .select("pack:hs_inspection_question_packs(pack_code)")
-      .eq("organization_id", organizationId)
-      .eq("programme_id", programmeId);
-    if (linkError) throw new Error(linkError.message);
-    const packCodes = (links || []).map((item) => item.pack?.pack_code).filter(Boolean);
-    const questions = await loadQuestionsForPacks(organizationId, packCodes);
-    if (!questions.length) throw new Error("No active questions were found for this programme.");
+    const checklist = requireInspectionChecklist(await loadProgrammeInspectionChecklist(organizationId, programme));
+    const questions = checklist.questions;
 
     const plannedDate = validDate(
       text(formData, "planned_date", 10) || programme.next_inspection_date,
@@ -364,7 +353,7 @@ export async function generateScheduledInspection(previousState, formData) {
         reviewer_person_id: programme.reviewer_person_id,
         planning_risk_score: programme.risk_score,
         planning_risk_band: programme.risk_band,
-        planning_basis: programme.planning_basis,
+        planning_basis: [programme.planning_basis, `Checklist snapshot: ${checklist.questionCount} distinct questions from ${checklist.packs.map(pack => pack.pack_code).join(", ")}.`].filter(Boolean).join(" "),
         scope: text(formData, "scope", 3000) || null,
         created_by_user_id: context.user.id,
         updated_by_user_id: context.user.id,
@@ -389,7 +378,7 @@ export async function generateScheduledInspection(previousState, formData) {
       .from("hs_workplace_inspection_responses")
       .insert(responseRows);
     if (responseError) {
-      await admin.from("hs_workplace_inspections").delete().eq("id", inspection.id);
+      await admin.from("hs_workplace_inspections").delete().eq("id", inspection.id).eq("organization_id", organizationId);
       throw new Error(responseError.message);
     }
 
@@ -434,6 +423,7 @@ export async function refreshInspectionProgramme(previousState, formData) {
       frequencyUnit: programme.frequency_unit,
       lastInspectionDate: programme.last_inspection_date,
     });
+    requireInspectionChecklist(await loadChecklistForPacks(context.organization.id, plan.packCodes, {templateId: programme.template_id}));
     const { error: updateError } = await admin
       .from("hs_inspection_programmes")
       .update({
@@ -447,7 +437,7 @@ export async function refreshInspectionProgramme(previousState, formData) {
       .eq("id", programmeId)
       .eq("organization_id", context.organization.id);
     if (updateError) throw new Error(updateError.message);
-    await replaceProgrammePacks(admin, context.organization.id, programmeId, plan);
+    await replaceProgrammePacks(admin, context.organization.id, programmeId, plan, programme.template_id);
 
     revalidatePath(ROOT);
     revalidatePath(`${ROOT}/programmes/${programmeId}`);
