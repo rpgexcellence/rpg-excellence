@@ -1,11 +1,10 @@
 import Link from "next/link";
-import {incidentAnalytics, categoryLabel, outcomeLabel, BODY_PARTS} from "../../../lib/incident-reporting.mjs";
-import {IncidentBarChart, SeverityChart, IncidentTrend} from "../../../components/IncidentCharts";
+import {incidentAnalytics, incidentExplorerRows, categoryLabel, outcomeLabel, BODY_PARTS} from "../../../lib/incident-reporting.mjs";
+import {IncidentBarChart, SeverityChart, IncidentTrend, IncidentExplorer, IncidentExecutiveReport} from "../../../components/IncidentCharts";
 import { incidentRows } from "../../../lib/incident-data";
 import {
   incidentContext,
   loadIncidentRegister,
-  checkResult,
 } from "../../../lib/incidents";
 import {
   incidentStatistics,
@@ -19,8 +18,12 @@ import {
   pretty,
 } from "../../../components/IncidentUI";
 export default async function IncidentsPage({ searchParams }) {
-  const c = await incidentContext(),
-    q = await searchParams;
+  const c = await incidentContext();
+  const requested = await searchParams;
+  // Only scalar search parameters cross the client boundary or enter filters.
+  const q = Object.fromEntries(
+    Object.entries(requested || {}).filter(([, value]) => typeof value === "string"),
+  );
   const all = await loadIncidentRegister(c);
   const reports = all.filter(
     (r) =>
@@ -33,8 +36,8 @@ export default async function IncidentsPage({ searchParams }) {
       (!q?.category || (r.intake_details?.categories||[]).some(item=>item.domain+":"+item.category===q.category)) &&
       (!q?.outcome || (r.investigation_details?.reviewed_outcomes||[]).includes(q.outcome)) &&
       (!q?.body || (r.investigation_details?.reviewed_body_parts||[]).includes(q.body)) &&
-      (!q?.from || r.occurred_at.slice(0, 10) >= q.from) &&
-      (!q?.to || r.occurred_at.slice(0, 10) <= q.to),
+      (!q?.from || (r.occurred_at || "").slice(0, 10) >= q.from) &&
+      (!q?.to || (r.occurred_at || "").slice(0, 10) <= q.to),
   );
   const tasks = await incidentRows(
     c.admin,
@@ -46,15 +49,35 @@ export default async function IncidentsPage({ searchParams }) {
   const analytics=incidentAnalytics(reports);
   const sites = [
     ...new Map(
-      all.map((r) => [r.site_id, r.location_label.split(" / ")[0]]),
+      all.filter((r) => r.site_id).map((r) => [
+        r.site_id,
+        (r.location_label || "Site not labelled").split(" / ")[0],
+      ]),
     ).entries(),
   ];
+  // loadIncidentRegister has already applied organisation and case permissions.
+  // Share only the graph projection; contacts, evidence and investigation text
+  // remain server-side. Report filters receive location facets, not raw cases.
+  const explorerRows = incidentExplorerRows(reports);
+  const reportSites = sites.map(([id, label]) => ({ id, label }));
+  const reportZones = [...new Map(incidentExplorerRows(all).map((row) => [
+    row.zoneKey,
+    { id: row.zoneKey, siteId: row.siteId, label: row.zoneLabel },
+  ])).values()].sort((a, b) => a.label.localeCompare(b.label));
+  const canExecutiveReport = ["consultant", "platform_admin"].includes(
+    c.incidentEntitlement?.plan,
+  );
   return (
     <>
       <IncidentHeader
         title="Accident, Incident & Near Misses"
         description="One location-aware report, a coordinated response across QHSE, security and continuity, and independently verified learning."
         admin={c.incidentAdministrator}
+      />
+      <IncidentExecutiveReport
+        canGenerate={canExecutiveReport}
+        sites={reportSites}
+        zones={reportZones}
       />
       <section className="incidentCard">
         <form className="incidentForm" method="get">
@@ -150,7 +173,7 @@ export default async function IncidentsPage({ searchParams }) {
         <IncidentBarChart title="Confirmed events by area" description="One report may affect several areas; these counts overlap. Select a bar label to filter." rows={INCIDENT_DOMAINS.map(([key,label])=>({key,label,count:s.byDomain[key]}))} filter="domain" query={q} />
         <IncidentBarChart title="Accidents, incidents & near misses" description="Confirmed classifications. Select a label to inspect the reports." rows={INCIDENT_TYPES.map(([key,label])=>({key,label,count:s.byType[key]}))} filter="type" query={q} />
         <IncidentBarChart title="What happened / consequences" description="Investigator-assessed consequences in triaged cases. Multiple consequences may apply. Unassessed cases are excluded." rows={analytics.outcomes} filter="outcome" query={q} />
-        <IncidentBarChart title="Part of body affected" description="Assessed body locations only; not-known and no-injury entries are excluded. Counts refer to reports, not injured people; locations may overlap." rows={analytics.bodyParts} filter="body" query={q} />
+        <IncidentExplorer rows={explorerRows} />
         <IncidentBarChart title="Reported event categories" description="Reporter-selected event categories within triaged cases. These remain observations, not confirmed causes. Multiple areas may overlap." rows={analytics.categories} filter="category" query={q} />
       </div>
       <section className="incidentCard">
