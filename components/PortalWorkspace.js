@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import {PortalAccountBar,useAccountSession} from "./AccountMenu";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { navigationForAccess, portalGroupActive, portalActiveChild, portalStandalone } from "../lib/portalNavigation";
@@ -11,11 +12,19 @@ function Sidebar({path,search="",onNavigate,navigation}) {
   return <><Link className="rpgPortalBrand" href="/portal" onClick={onNavigate}><b>RPG</b> Excellence</Link><small className="rpgPortalCaption">ASSURANCE WORKSPACE</small><nav className="rpgPortalNav" aria-label="Assurance workspace navigation">{navigation.map((group)=>{const active=portalGroupActive(group,path),child=portalActiveChild(group,path,search),open=expanded[group.id];return <div className="rpgPortalGroup" key={group.id}><div className={`rpgPortalGroupHeading ${active?"active":""}`}><Link className="rpgPortalMainLink" href={group.href} aria-current={active?"location":undefined} onClick={onNavigate}><i aria-hidden="true"/><span>{group.label}</span></Link>{group.children&&<button type="button" className="rpgPortalExpand" aria-expanded={Boolean(open)} aria-controls={`portal-group-${group.id}`} aria-label={`${open?"Collapse":"Expand"} ${group.label}`} onClick={()=>setExpanded((old)=>({...old,[group.id]:!old[group.id]}))}><span aria-hidden="true">{open?"−":"+"}</span></button>}</div>{group.children&&<div id={`portal-group-${group.id}`} className="rpgPortalSub" hidden={!open}>{group.children.map((entry)=><Link key={entry.href} href={entry.href} ref={child===entry.href&&active?currentLink:undefined} aria-current={child===entry.href&&active?"page":undefined} className={child===entry.href&&active?"current":""} onClick={onNavigate}>{entry.label}</Link>)}</div>}</div>;})}</nav><div className="rpgPortalSideFoot"><strong>RPG Excellence</strong><span>Connected assurance workspace</span><form action="/auth/signout" method="post"><button type="submit">Sign out</button></form></div></>;
 }
 function QuerySidebar(props){const search=useSearchParams();return <Sidebar {...props} search={search?.toString()||""}/>;}
-export default function PortalWorkspace({children,access}) {
+export default function PortalWorkspace({children,access,currentUserId=null}) {
   const path=usePathname()||"/portal",[open,setOpen]=useState(false),toggle=useRef(null);
   const navigation=navigationForAccess(access);
+  const session=useAccountSession(),standalone=portalStandalone(path);
+  const verifiedMismatch=!standalone&&Boolean(currentUserId)&&((session.status==='signed_in'&&session.identity.id!==currentUserId)||(Boolean(currentUserId)&&session.status==='signed_out'));
+  const pendingMismatch=!standalone&&Boolean(currentUserId)&&session.status==='loading'&&session.pendingUserId&&session.pendingUserId!==currentUserId;
+  useEffect(()=>{
+    if(verifiedMismatch)window.location.replace(session.status==='signed_out'?'/portal/login':'/portal');
+  },[verifiedMismatch,session.status]);
+  const roleLabel=access?.platformAdministrator?'Platform administrator':access?.companyAdministrator?'Company administrator':'';
   useEffect(()=>setOpen(false),[path]);
-  if(portalStandalone(path))return <>{children}</>;
+  if(standalone)return <>{children}</>;
+  if(verifiedMismatch||pendingMismatch)return <div className="rpgAccountChange" role="status" style={{padding:30,color:"#12385f",background:"#eef5fc"}}><h2>Updating your account</h2><p>Your browser account changed. Reloading the platform for the current account.</p><a href="/portal">Reload platform</a></div>;
   const close=()=>{setOpen(false);toggle.current?.focus();};
-  return <div className="rpgPortalShell"><a href="#rpg-portal-content" className="rpgPortalSkip">Skip to workspace</a><header className="rpgPortalMobile"><Link href="/portal"><b>RPG</b> Excellence</Link><button ref={toggle} type="button" aria-controls="rpg-portal-sidebar" aria-expanded={open} onClick={()=>setOpen((v)=>!v)}>{open?"Close navigation":"Menu"}<span aria-hidden="true">{open?" ×":" ☰"}</span></button></header><aside id="rpg-portal-sidebar" className={`rpgPortalSidebar ${open?"mobileOpen":""}`} onKeyDown={(e)=>{if(e.key==="Escape"){e.preventDefault();close();}}}><Suspense fallback={<Sidebar path={path} navigation={navigation} onNavigate={()=>setOpen(false)}/>}><QuerySidebar path={path} navigation={navigation} onNavigate={()=>setOpen(false)}/></Suspense></aside><div id="rpg-portal-content" tabIndex={-1} className="rpgPortalContent">{children}</div></div>;
+  return <div className="rpgPortalShell"><a href="#rpg-portal-content" className="rpgPortalSkip">Skip to workspace</a><header className="rpgPortalMobile"><Link href="/portal"><b>RPG</b> Excellence</Link><button ref={toggle} type="button" aria-controls="rpg-portal-sidebar" aria-expanded={open} onClick={()=>setOpen((v)=>!v)}>{open?"Close navigation":"Menu"}<span aria-hidden="true">{open?" ×":" ☰"}</span></button></header><aside id="rpg-portal-sidebar" className={`rpgPortalSidebar ${open?"mobileOpen":""}`} onKeyDown={(e)=>{if(e.key==="Escape"){e.preventDefault();close();}}}><Suspense fallback={<Sidebar path={path} navigation={navigation} onNavigate={()=>setOpen(false)}/>}><QuerySidebar path={path} navigation={navigation} onNavigate={()=>setOpen(false)}/></Suspense></aside><div id="rpg-portal-content" tabIndex={-1} className="rpgPortalContent"><PortalAccountBar roleLabel={roleLabel}/>{children}</div></div>;
 }
