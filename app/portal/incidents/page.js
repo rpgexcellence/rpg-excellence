@@ -10,7 +10,7 @@ import {
 import { IncidentIntelligenceDashboard } from "../../../components/IncidentCharts";
 import { incidentRows } from "../../../lib/incident-data";
 import { incidentContext, loadIncidentRegister } from "../../../lib/incidents";
-import { INCIDENT_TYPES, INCIDENT_STATUSES } from "../../../lib/incident-policy.mjs";
+import { INCIDENT_TYPES, INCIDENT_STATUSES, INCIDENT_DOMAINS } from "../../../lib/incident-policy.mjs";
 import { IncidentBadge, dateTime, pretty } from "../../../components/IncidentUI";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ function Navigation({ administrator, query }) {
   params.set("view", "register");
   return <nav className="incidentNav" aria-label="Incident navigation">
     <Link href="/portal/incidents">Dashboard</Link>
-    <Link href={"/portal/incidents?" + params + "#register"}>Report register</Link>
+    <Link href={"/portal/incidents?" + params}>Report register</Link>
     <Link href="/portal/incidents/new">New report</Link>
     {administrator && <Link href="/portal/incidents/admin">Incident administration</Link>}
   </nav>;
@@ -43,6 +43,7 @@ export default async function IncidentsPage({ searchParams }) {
   const query = Object.fromEntries(Object.entries(requested || {}).filter(
     ([key, value]) => FILTERS.has(key) && typeof value === "string" && value.length <= 250,
   ));
+  const registerView = query.view === "register";
   const dateError = !validDay(query.from) || !validDay(query.to) ||
     (query.from && query.to && query.from > query.to);
   if (dateError) return <>
@@ -82,7 +83,7 @@ export default async function IncidentsPage({ searchParams }) {
   }, snapshot);
 
   const activeIds = new Set(rows.filter(row => !["rejected", "duplicate"].includes(row.status)).map(row => row.id));
-  const tasks = activeIds.size ? await incidentRows(
+  const tasks = !registerView && activeIds.size ? await incidentRows(
     context.admin, "incident_tasks", context.organization.id,
     "id,incident_id,status,due_at",
   ) : [];
@@ -105,17 +106,24 @@ export default async function IncidentsPage({ searchParams }) {
 
   return <>
     <Navigation administrator={context.incidentAdministrator} query={query} />
-    <IncidentIntelligenceDashboard
+    {registerView ? <header className="incidentHead" id="register"><span className="incidentEyebrow">RPG EXCELLENCE · RESPONSE & LEARNING</span><h1>Report register</h1><p>Review, filter and open authorised accident, incident and near-miss reports.</p></header> : <IncidentIntelligenceDashboard
       key={JSON.stringify(query)} rows={rows} performance={performance}
       metrics={metrics} query={query} sites={sites} zones={zones}
       canGenerate={canGenerate} administrator={context.incidentAdministrator}
       snapshot={snapshot}
-    />
-    <details className="incidentCard" open={Boolean(query.status || query.type || query.severity || query.category || query.outcome || query.body)}>
-      <summary style={{ cursor: "pointer", fontWeight: 800 }}>Additional report filters</summary>
+    />}
+    <details className="incidentCard" open={Boolean(registerView || query.status || query.type || query.severity || query.category || query.outcome || query.body)}>
+      <summary style={{ cursor: "pointer", fontWeight: 800 }}>{registerView ? "Register filters" : "Additional report filters"}</summary>
       <form className="incidentForm" method="get" action="/portal/incidents" style={{ marginTop: 16 }}>
-        {Object.entries(query).filter(([key]) => !["status", "type", "severity", "category", "outcome", "body"].includes(key)).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
+        {Object.entries(query).filter(([key]) => !["status", "type", "severity", "category", "outcome", "body", ...(registerView ? ["from", "to", "site", "zone", "domain"] : [])].includes(key)).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
         <div className="incidentGrid">
+          {registerView && <>
+            <label>Occurrence from (UTC)<input type="date" name="from" defaultValue={query.from || ""} /></label>
+            <label>To (UTC)<input type="date" name="to" defaultValue={query.to || ""} /></label>
+            <label>Site<select name="site" defaultValue={query.site || ""}><option value="">All authorised sites</option>{sites.map(site => <option key={site.id} value={site.id}>{site.label}</option>)}</select></label>
+            <label>Zone<select name="zone" defaultValue={query.zone || ""}><option value="">All zones</option>{zones.map(zone => <option key={zone.id} value={zone.id}>{zone.label}</option>)}</select></label>
+            <label>Reporting area<select name="domain" defaultValue={query.domain || ""}><option value="">All reporting areas</option>{INCIDENT_DOMAINS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+          </>}
           <label>Status<select name="status" defaultValue={query.status || ""}><option value="">All statuses</option>{actualStatuses.map(status => <option key={status} value={status}>{pretty(status)}</option>)}</select></label>
           <label>Event type<select name="type" defaultValue={query.type || ""}><option value="">All event types</option>{INCIDENT_TYPES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
           <label>Current severity<select name="severity" defaultValue={query.severity || ""}><option value="">All severities</option>{["critical", "high", "medium", "low", "unknown"].map(key => <option key={key} value={key}>{pretty(key)}</option>)}</select></label>
@@ -123,10 +131,10 @@ export default async function IncidentsPage({ searchParams }) {
           <label>Body part<select name="body" defaultValue={query.body || ""}><option value="">All body parts</option>{BODY_PARTS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
           <label>Reporter category<select name="category" defaultValue={query.category || ""}><option value="">All categories</option>{[...new Map(all.flatMap(report => (report.intake_details?.categories || []).map(item => [item.domain + ":" + item.category, categoryLabel(item)]))).entries()].map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
         </div>
-        <div className="incidentActions"><button className="incidentButton" type="submit">Apply additional filters</button><Link href="/portal/incidents">Clear all filters</Link></div>
+        <div className="incidentActions"><button className="incidentButton" type="submit">{registerView ? "Apply register filters" : "Apply additional filters"}</button><Link href={registerView ? "/portal/incidents?view=register" : "/portal/incidents"}>Clear all filters</Link></div>
       </form>
     </details>
-    {query.view === "register" && <section className="incidentCard" id="register">
+    {registerView && <section className="incidentCard" id="incident-register-records">
       <h2>Report register · {rows.length}</h2>
       <p className="incidentMuted">Current classifications replace initial observations when assessed. Rejected and duplicate submissions remain visible here for traceability.</p>
       <div className="incidentTableWrap"><table><thead><tr><th>Reference / event</th><th>Area & location</th><th>Occurrence</th><th>Priority</th><th>Status</th></tr></thead><tbody>
