@@ -247,6 +247,11 @@ export default async function IncidentDetail({ params }) {
         description={r.location_label}
         admin={c.incidentAdministrator}
       />
+      {!c.incidentEntitlement.advanced && <aside className="incidentNotice" aria-label="Incident plan coverage">
+        <strong>Starter · reporting and triage</strong>
+        <p>Includes reporting, classification, response-team assignment and reporter updates. Professional and Consultant add investigation, resource allocation, linked workflows, independent verification and controlled closure. Existing case history remains readable.</p>
+        <Link href="/en/pricing?upgrade=professional&feature=Incident+investigation#subscriptions">Compare plans →</Link>
+      </aside>}
       <section className={"incidentSeverityPanel "+(r.immediate_danger?"critical":r.criticality||r.reported_criticality)} aria-label="Report severity">
         <div><span className="incidentEyebrow">{r.triaged_at?"ASSESSED SEVERITY":"REPORTER URGENCY · AWAITING ASSESSMENT"}</span>
           <strong>{pretty(r.immediate_danger?"critical":r.criticality||r.reported_criticality)}</strong>
@@ -477,14 +482,7 @@ export default async function IncidentDetail({ params }) {
                 name="status"
                 label="Workflow status"
                 value={r.triaged_at ? r.status : "triaged"}
-                values={[
-                  "triaged",
-                  "investigating",
-                  "actions_open",
-                  "awaiting_verification",
-                  "rejected",
-                  "duplicate",
-                ]}
+                values={c.incidentEntitlement.advanced ? ["triaged", "investigating", "actions_open", "awaiting_verification", "rejected", "duplicate"] : [...new Set(["triaged", "rejected", "duplicate", ...(r.triaged_at ? [r.status] : [])])]}
               />
               <PersonSelect
                 people={people}
@@ -581,6 +579,7 @@ export default async function IncidentDetail({ params }) {
                 Linked continuity plan
                 <select
                   name="linked_bcp_plan_id"
+                  disabled={!c.incidentEntitlement.advanced}
                   defaultValue={r.linked_bcp_plan_id || ""}
                 >
                   <option value="">None</option>
@@ -593,7 +592,7 @@ export default async function IncidentDetail({ params }) {
               </label>
               <label>
                 Inspection question pack to reconsider
-                <select name="pack_code" defaultValue={r.pack_code || ""}>
+                <select name="pack_code" disabled={!c.incidentEntitlement.advanced} defaultValue={r.pack_code || ""}>
                   <option value="">Core / current programme packs</option>
                   {packs.map((p) => (
                     <option key={p.pack_code} value={p.pack_code}>
@@ -631,7 +630,7 @@ export default async function IncidentDetail({ params }) {
           c.person?.id === r.investigator_person_id) && (
           <section className="incidentCard">
             <h2>Investigation & learning</h2>
-            <IncidentActionForm
+            <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
               action={incidentCommand}
               label="Save investigation"
             >
@@ -788,7 +787,7 @@ export default async function IncidentDetail({ params }) {
               ["open", "in_progress"].includes(t.status) &&
               (c.incidentAdministrator ||
                 c.person?.id === t.owner_person_id) && (
-                <IncidentActionForm
+                <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
                   action={incidentCommand}
                   label="Submit action evidence"
                 >
@@ -805,7 +804,7 @@ export default async function IncidentDetail({ params }) {
             {!terminal &&
               t.status === "awaiting_verification" &&
               c.person?.id === t.verifier_person_id && (
-                <IncidentActionForm
+                <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
                   action={incidentCommand}
                   label="Record independent review"
                 >
@@ -830,7 +829,7 @@ export default async function IncidentDetail({ params }) {
               ["open", "in_progress"].includes(t.status) && (
                 <details>
                   <summary>Reallocate people, budget or due date</summary>
-                  <IncidentActionForm
+                  <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
                     action={incidentCommand}
                     label="Save resource allocation"
                   >
@@ -851,7 +850,7 @@ export default async function IncidentDetail({ params }) {
               !["verified", "cancelled"].includes(t.status) && (
                 <details>
                   <summary>Cancel action with rationale</summary>
-                  <IncidentActionForm
+                  <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
                     action={incidentCommand}
                     label="Cancel action"
                   >
@@ -871,7 +870,7 @@ export default async function IncidentDetail({ params }) {
         {!terminal && c.incidentAdministrator && r.triaged_at && (
           <details>
             <summary>Allocate a new action & resources</summary>
-            <IncidentActionForm
+            <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
               action={incidentCommand}
               label="Allocate action"
             >
@@ -919,7 +918,7 @@ export default async function IncidentDetail({ params }) {
           </p>
           <div className="incidentGrid">
             {!r.linked_rca_case_id && (
-              <IncidentActionForm
+              <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
                 action={incidentCommand}
                 label="Create linked CAPA-8D case"
               >
@@ -929,7 +928,7 @@ export default async function IncidentDetail({ params }) {
             )}
             {!r.linked_security_incident_id &&
               r.domains.includes("information_security") && (
-                <IncidentActionForm
+                <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
                   action={incidentCommand}
                   label="Create linked ISMS incident"
                 >
@@ -943,7 +942,7 @@ export default async function IncidentDetail({ params }) {
           </div>
           <details>
             <summary>Link an existing CAPA / ISMS case</summary>
-            <IncidentActionForm
+            <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
               action={incidentCommand}
               label="Link existing case"
             >
@@ -969,7 +968,7 @@ export default async function IncidentDetail({ params }) {
       {!terminal&&c.incidentAdministrator&&<section className="incidentCard">
         <h2>Related records & change control</h2>
         <p>Confirm reporter references and select controlled records. Links do not authorise work or bypass module approvals.</p>
-        <IncidentActionForm action={incidentCommand} label="Save related records">
+        <IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Save related records">
           <CaseHidden report={r} command="link_records" />
           <div className="incidentGrid">{[
             ["linked_assessment_id","Risk assessment",assessments,x=>x.title],
@@ -980,12 +979,12 @@ export default async function IncidentDetail({ params }) {
         </IncidentActionForm>
         {!r.linked_moc_id&&<details><summary>Initiate or link Management of Change</summary>
           <p>A new MOC enters the full pathway awaiting screening confirmation at the HSE gate. The investigator becomes the change owner. This does not authorise implementation; risk review and functional approvals remain required.</p>
-          <IncidentActionForm action={incidentCommand} label="Initiate linked MOC for HSE review">
+          <IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Initiate linked MOC for HSE review">
             <CaseHidden report={r} command="create_moc" />
             <Text name="change_description" label="Proposed change and why it is needed" required minLength={20} />
             <label>Target date<input name="target_date" type="date" required /></label>
           </IncidentActionForm>
-          <IncidentActionForm action={incidentCommand} label="Link existing MOC">
+          <IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Link existing MOC">
             <CaseHidden report={r} command="link_moc" />
             <label>Existing company MOC<select name="target_id" required><option value="">Select</option>{mocs.map(m=><option key={m.id} value={m.id}>{m.moc_reference+" · "+m.title}</option>)}</select></label>
           </IncidentActionForm>
@@ -993,7 +992,7 @@ export default async function IncidentDetail({ params }) {
       </section>}
       <section className="incidentCard">
         {c.incidentAdministrator && r.triaged_at && (
-          <IncidentActionForm
+          <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
             action={retryInspectionPlanning}
             label="Refresh inspection planning"
           >
@@ -1015,7 +1014,7 @@ export default async function IncidentDetail({ params }) {
           </p>
         ))}
         {!terminal && (
-          <IncidentActionForm
+          <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
             action={uploadIncidentEvidence}
             label="Upload private evidence"
           >
@@ -1064,8 +1063,8 @@ export default async function IncidentDetail({ params }) {
           <p>Complete the investigation, verify actions and obtain independent case verification, then request the assigned Director's approval. Material changes invalidate approval. A critical case retains this gate after reassessment to a lower priority.</p>
           {r.case_verified_at&&<p>Independent case review: {dateTime(r.case_verified_at)}</p>}
           {r.director_approval_note&&<p className="incidentPre">Director decision: {r.director_approval_note}</p>}
-          {c.person?.id===r.verifier_person_id&&<IncidentActionForm action={incidentCommand} label="Verify case for Director review"><CaseHidden report={r} command="verify_case" /><Text name="note" label="Independent verification evidence" required minLength={10} /></IncidentActionForm>}
-          {c.person?.id===r.director_person_id&&<IncidentActionForm action={incidentCommand} label="Approve critical case closure"><CaseHidden report={r} command="approve_director" /><Text name="note" label="Director approval rationale" required minLength={10} /></IncidentActionForm>}
+          {c.person?.id===r.verifier_person_id&&<IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Verify case for Director review"><CaseHidden report={r} command="verify_case" /><Text name="note" label="Independent verification evidence" required minLength={10} /></IncidentActionForm>}
+          {c.person?.id===r.director_person_id&&<IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Approve critical case closure"><CaseHidden report={r} command="approve_director" /><Text name="note" label="Director approval rationale" required minLength={10} /></IncidentActionForm>}
         </div>}
         {terminal ? (
           <>
@@ -1073,7 +1072,7 @@ export default async function IncidentDetail({ params }) {
               {pretty(r.status)} · {dateTime(r.closed_at)}
             </p>
             {c.incidentAdministrator && (
-              <IncidentActionForm action={incidentCommand} label="Reopen case">
+              <IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Reopen case">
                 <CaseHidden report={r} command="reopen" />
                 <Text
                   name="note"
@@ -1094,7 +1093,7 @@ export default async function IncidentDetail({ params }) {
               higher can close it.
             </p>
             {c.person?.id === r.verifier_person_id && (
-              <IncidentActionForm
+              <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
                 action={incidentCommand}
                 label="Independently verify & close"
               >
