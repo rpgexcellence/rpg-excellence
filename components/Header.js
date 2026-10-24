@@ -1,3 +1,4 @@
+import AccountMenu from "./AccountMenu";
 import Link from "next/link";
 import ISO9001ReleaseBar from "./ISO9001ReleaseBar";
 const ISO_AT_A_GLANCE = [
@@ -18,7 +19,7 @@ export default function Header({ locale, nav, variant = "default" }) {
             (variant === "home" ? "#6783a5" : "#d2dce7") +
             ";border-radius:11px;background:" +
             (variant === "home" ? "#ffffff12" : "#fff") +
-            ';color:inherit;list-style:none;cursor:pointer}\n          .mobileNav>summary::-webkit-details-marker{display:none}\n          .mobileNavIcon,.mobileNavIcon:before,.mobileNavIcon:after{display:block;width:20px;height:2px;border-radius:3px;background:currentColor;content:""}\n          .mobileNavIcon{position:relative}\n          .mobileNavIcon:before{position:absolute;top:-6px}\n          .mobileNavIcon:after{position:absolute;top:6px}\n          .mobileNav[open] .mobileNavIcon{background:transparent}\n          .mobileNav[open] .mobileNavIcon:before{top:0;transform:rotate(45deg)}\n          .mobileNav[open] .mobileNavIcon:after{top:0;transform:rotate(-45deg)}\n          .mobileNavPanel{position:fixed;z-index:200;top:72px;left:12px;right:12px;max-height:calc(100vh - 88px);overflow:auto;padding:12px;border:1px solid #d6e1ec;border-radius:16px;background:#fff;color:#0a2342;box-shadow:0 24px 65px #03152d40}\n          .mobileNavPanel>a,.mobileIso>summary{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:12px 13px;border-radius:10px;color:#12385f;font-size:14px;font-weight:850;cursor:pointer;list-style:none}\n          .mobileNavPanel>a:after,.mobileIso>summary:after{content:"→";color:#1761e8}\n          .mobileNavPanel>a:hover,.mobileNavPanel>a:focus,.mobileIso>summary:hover{background:#edf4ff;outline:0}\n          .mobileIso>summary::-webkit-details-marker{display:none}\n          .mobileIsoLinks{display:grid;gap:3px;padding:4px 7px 9px 17px;border-left:2px solid #dbe7f4;margin-left:13px}\n          .mobileIsoLinks>a{padding:9px 10px;border-radius:8px;color:#365570;font-size:13px;font-weight:750}\n          .mobileIsoLinks>a:hover{background:#f1f6fc}\n          .mobileNavActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px;padding-top:12px;border-top:1px solid #e2e9f0}\n          .mobileNavActions a{min-height:44px;padding:11px;border-radius:10px;text-align:center;font-size:13px;font-weight:900}\n          .mobileSignIn{border:1px solid #cad7e4;color:#12385f}\n          .mobileStart{background:#1761e8;color:#fff}\n          .mobileYouTube{grid-column:1/-1;background:#fff1f3;color:#c70028}\n          @media(max-width:900px){\n            .isoAtGlanceMenu{left:auto;right:0;transform:translate(0,-7px)}\n            .isoAtGlance:hover .isoAtGlanceMenu,.isoAtGlance:focus-within .isoAtGlanceMenu,.isoAtGlance[open] .isoAtGlanceMenu{transform:translate(0,0)}\n          }\n          @media(min-width:1401px) and (max-width:1500px){\n            .header:not(.homeHeader) .brand,.header:not(.homeHeader) .brand img{width:220px!important}\n          }\n          @media(max-width:1400px){\n            .header .nav{display:none!important}\n            .mobileNav{display:block}\n            .headerActions{display:none!important}\n            .header .brand{width:190px!important;height:60px!important}\n            .header .brand img{width:190px!important;height:60px!important}\n          }\n        '}
+            ';color:inherit;list-style:none;cursor:pointer}\n          .mobileNav>summary::-webkit-details-marker{display:none}\n          .mobileNavIcon,.mobileNavIcon:before,.mobileNavIcon:after{display:block;width:20px;height:2px;border-radius:3px;background:currentColor;content:""}\n          .mobileNavIcon{position:relative}\n          .mobileNavIcon:before{position:absolute;top:-6px}\n          .mobileNavIcon:after{position:absolute;top:6px}\n          .mobileNav[open] .mobileNavIcon{background:transparent}\n          .mobileNav[open] .mobileNavIcon:before{top:0;transform:rotate(45deg)}\n          .mobileNav[open] .mobileNavIcon:after{top:0;transform:rotate(-45deg)}\n          .mobileNavPanel{position:fixed;z-index:200;top:72px;left:12px;right:12px;max-height:calc(100vh - 88px);overflow:auto;padding:12px;border:1px solid #d6e1ec;border-radius:16px;background:#fff;color:#0a2342;box-shadow:0 24px 65px #03152d40}\n          .mobileNavPanel>a,.mobileIso>summary{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:12px 13px;border-radius:10px;color:#12385f;font-size:14px;font-weight:850;cursor:pointer;list-style:none}\n          .mobileNavPanel>a:after,.mobileIso>summary:after{content:"→";color:#1761e8}\n          .mobileNavPanel>a:hover,.mobileNavPanel>a:focus,.mobileIso>summary:hover{background:#edf4ff;outline:0}\n          .mobileIso>summary::-webkit-details-marker{display:none}\n          .mobileIsoLinks{display:grid;gap:3px;padding:4px 7px 9px 17px;border-left:2px solid #dbe7f4;margin-left:13px}\n          .mobileIsoLinks>a{padding:9px 10px;border-radius:8px;color:#365570;font-size:13px;font-weight:750}\n          .mobileIsoLinks>a:hover{background:#f1f6fc}\n          .mobileNavActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px;padding-top:12px;border-top:1px solid #e2e9f0}\n          .mobileNavActions a{min-height:44px;padding:11px;border-radius:10px;text-align:center;font-size:13px;font-weight:900}\n          .mobileSignIn{border:1px solid #cad7e4;color:#12385f}\n          .mobileStart{background:#1761e8;color:#fff}\n          .mobileYouTube{grid-column:1/-1;background:#fff1f3;color:#c70028}\n          @media(max-width:900px){\n            .isoAtGlanceMenu{left:auto;right:0;transform:translate(0,-7px)}\n            .isoAtGlance:hover .isoAtGlanceMenu,.isoAtGlance:focus-within .isoAtGlanceMenu,.isoAtGlance[open] .isoAtGlanceMenu{transform:translate(0,0)}\n          }\n          @media(min-width:1401px) and (max-width:1500px){\n            .header:not(.homeHeader) .brand,.header:not(.homeHeader) .brand img{width:220px!important}\n          }\n          @media(max-width:1800px){\n            .header .nav{display:none!important}\n            .mobileNav{display:block}\n            .headerActions{display:none!important}\n            .header .brand{width:190px!important;height:60px!important}\n            .header .brand img{width:190px!important;height:60px!important}\n          }\n        '}
         </style>
 
         <Link
@@ -83,6 +84,14 @@ export default function Header({ locale, nav, variant = "default" }) {
           <Link href={"/" + locale + "/contact"}>{nav.contact}</Link>
         </nav>
 
+        <div className="headerAccount"><AccountMenu tone={variant === "home" ? "dark" : "light"}/></div>
+        <style>{`
+          .headerAccount{flex:0 0 auto;margin-left:auto;margin-right:10px}
+          .header .mobileNav{margin-left:0}
+          @media(min-width:1801px){.headerAccount{margin-left:12px}.header .homeNav{gap:15px}}
+          @media(max-width:600px){.header{gap:8px}.headerAccount{margin-right:0}.header .brand,.header .brand img{width:130px!important;height:50px!important}.header .rpgAccountTrigger{max-width:145px}}
+          @media(max-width:380px){.header .brand,.header .brand img{width:105px!important}.header .rpgAccountTrigger{max-width:110px}}
+        `}</style>
         <details className="mobileNav">
           <summary aria-label="Open website menu">
             <span className="mobileNavIcon" />
@@ -113,8 +122,8 @@ export default function Header({ locale, nav, variant = "default" }) {
             <Link href={"/" + locale + "/contact"}>{nav.contact}</Link>
 
             <div className="mobileNavActions">
-              <a className="mobileSignIn" href="/portal/login">
-                Sign in
+              <a className="mobileSignIn" href="/portal">
+                My platform
               </a>
 
               <a className="mobileStart" href="/portal">
@@ -152,24 +161,6 @@ export default function Header({ locale, nav, variant = "default" }) {
 
               <path className="youtubePlay" d="m9.6 15.6 6.2-3.6-6.2-3.6v7.2Z" />
             </svg>
-          </a>
-
-          <a
-            href="/portal/login"
-            className={
-              "button buttonSmall " + (variant === "home" ? "headerSignIn" : "")
-            }
-            style={
-              variant === "home"
-                ? undefined
-                : {
-                    background: "transparent",
-                    color: "#071A33",
-                    border: "1px solid #d8e0ea",
-                  }
-            }
-          >
-            Sign in
           </a>
 
           <a
