@@ -4,33 +4,33 @@ import {createPortal} from "react-dom";
 import {incidentDrilldown} from "../lib/incident-reporting.mjs";
 import {generateIncidentExecutiveReport} from "../app/portal/incidents/actions";
 import Link from "next/link";
-const colors={critical:"#b42335",high:"#d77618",medium:"#ae8613",low:"#178273"};
+const colors={critical:"#b42335",high:"#d77618",medium:"#ae8613",low:"#178273",unknown:"#788899"};
 export function IncidentBarChart({title,rows,description,filter,query={}}) {
  const max=Math.max(1,...rows.map(r=>r.count));
  return <section className="incidentCard incidentChart"><h2>{title}</h2><p className="incidentMuted">{description}</p>
-  {!rows.length?<p className="incidentEmpty">No assessed data yet. New reports will appear after review.</p>:<div className="incidentChartRows">{rows.map(row=>{
+  {!rows.length?<p className="incidentEmpty">No reports match this selection yet.</p>:<div className="incidentChartRows">{rows.map(row=>{
     const params=new URLSearchParams(Object.entries(query).filter(([,v])=>typeof v==="string"));
     if(filter) params.set(filter,row.key);
     return <div className="incidentChartRow" key={row.key}>
-      <div>{filter?<Link href={"/portal/incidents?"+params}>{row.label}</Link>:<span>{row.label}</span>}<strong>{row.count}</strong></div>
+      <div>{filter?<Link href={"/portal/incidents?"+params}>{row.label}</Link>:<span>{row.label}</span>}<strong>{row.count}</strong></div>{Number.isFinite(row.assessed)&&<small className="incidentMuted">{row.assessed} assessed · {row.reported} reporter observations</small>}
       <div className="incidentChartTrack"><span style={{width:(row.count/max*100)+"%",background:colors[row.key]||"#177d83"}} /></div>
     </div>;
   })}</div>}
  </section>;
 }
-export function SeverityChart({rows}) {
+export function SeverityChart({rows,query={}}) {
  const total=rows.reduce((sum,r)=>sum+r.count,0);
  let start=0;
  const segments=rows.map(r=>{const from=start;start+=total?r.count/total*100:0;return `${colors[r.key]} ${from}% ${start}%`;}).join(",");
- return <section className="incidentCard incidentChart"><h2>Assessed severity</h2><p className="incidentMuted">Reviewed cases only. Reporter urgency remains separate.</p><div className="incidentDonutLayout">
-  <div className="incidentDonut" role="img" aria-label={rows.map(r=>r.label+": "+r.count).join(", ")} style={{background:total?`conic-gradient(${segments})`:"#e7edf2"}}><div><strong>{total}</strong><span>assessed</span></div></div>
-  <ul className="incidentLegend">{rows.map(r=><li key={r.key}><i style={{background:colors[r.key]}} /><span>{r.label}</span><strong>{r.count}</strong></li>)}</ul>
+ return <section className="incidentCard incidentChart"><h2>Current severity</h2><p className="incidentMuted">All current reports. Reporter urgency is provisional until replaced by assessed severity. Rejected and duplicate reports are excluded.</p><div className="incidentDonutLayout">
+  <div className="incidentDonut" role="img" aria-label={rows.map(r=>r.label+": "+r.count).join(", ")} style={{background:total?`conic-gradient(${segments})`:"#e7edf2"}}><div><strong>{total}</strong><span>reports</span></div></div>
+  <ul className="incidentLegend">{rows.map(r=><li key={r.key}><i style={{background:colors[r.key]}} /><span>{r.key==='unknown'?r.label:<Link href={"/portal/incidents?"+new URLSearchParams({...Object.fromEntries(Object.entries(query).filter(([,v])=>typeof v==='string')),severity:r.key})}>{r.label}</Link>}<small style={{display:"block",fontSize:11,color:"#526579"}}>{r.assessed||0} assessed · {r.reported||0} provisional</small></span><strong>{r.count}</strong></li>)}</ul>
  </div></section>;
 }
 export function IncidentTrend({months}) {
  const max=Math.max(1,...months.map(m=>m.count));
  const points=months.map((m,i)=>[44+i*96,170-m.count/max*128]);
- return <section className="incidentCard incidentChart"><h2>Six-month occurrence trend</h2><p className="incidentMuted">Confirmed events by occurrence month. The current month may be incomplete; selected filters apply.</p>
+ return <section className="incidentCard incidentChart"><h2>Six-month occurrence trend</h2><p className="incidentMuted">Reported and assessed events by occurrence month. Rejected and duplicate reports are excluded. The current month may be incomplete; selected filters apply.</p>
   <svg className="incidentTrend" viewBox="0 0 568 224" role="img" aria-label={months.map(m=>m.key+": "+m.count).join(", ")}>
     {[0,1,2].map(i=><line key={i} x1="36" y1={42+i*64} x2="536" y2={42+i*64} stroke="#dce5ec" strokeDasharray="4 5" />)}
     <path d={"M "+points.map(p=>p.join(",")).join(" L ")+" L 524,170 L 44,170 Z"} fill="#e3f3f1" />
@@ -53,18 +53,18 @@ export function IncidentExplorer({rows=[]}) {
  const chart=useMemo(()=>incidentDrilldown(rows,selection),[rows,JSON.stringify(selection)]);
  const max=Math.max(1,...chart.groups.map(g=>g.count));
  const go=(group)=>{setPath(previous=>[...previous,{key:group.key,label:group.label}]);setExpanded(true);};
- const label=g=>g.key==="body:unknown"?"Body part not assessed":g.key==="body:not_applicable"?"No injury / not applicable":g.label;
+ const label=g=>g.key==="body:unknown"?"Body part not recorded":g.key==="body:not_applicable"?"No injury / not applicable":g.label;
  return <section className={"incidentCard ixExplorer "+(expanded?"ixExpanded":"")} aria-label="Interactive incident explorer">
   <style>{EXPLORER_CSS}</style>
   <div className="ixHead"><div><h2>Explore events</h2><p className="ixNote">Select a bar to explore zone → event → consequence → body part or asset → reports.</p></div><button type="button" className="ixButton" onClick={()=>setExpanded(v=>!v)} aria-expanded={expanded}>{expanded?"Collapse graph":"Expand graph"}</button></div>
   <nav className="ixCrumbs" aria-label="Graph drill-down"><button type="button" onClick={()=>setPath([])} aria-current={!path.length?"step":undefined}>All zones</button>{path.map((p,i)=><button type="button" key={i} onClick={()=>setPath(path.slice(0,i+1))} aria-current={i===path.length-1?"step":undefined}>{p.label}</button>)}</nav>
-  <div aria-live="polite"><h3>{chart.title}</h3><p className="ixNote">{chart.count} confirmed reports in this selection. {chart.untriaged>0?`${chart.untriaged} reports in the dashboard scope await triage and are excluded from these graphs.`:""}</p></div>
-  {chart.stage==="reports"?<div className="ixRecords">{chart.rows.map(r=><Link key={r.id} href={"/portal/incidents/"+encodeURIComponent(r.id)}><strong>{r.reference} · {r.title}</strong><small>{r.location} · {r.occurredAt?String(r.occurredAt).slice(0,10):"Date not recorded"} · {r.status.replaceAll("_"," ")} → Open report</small></Link>)}</div>:chart.groups.length?<div className="ixBars">{chart.groups.map(g=>{
+  <div aria-live="polite"><h3>{chart.title}</h3><p className="ixNote">{chart.count} reports in this selection: {chart.assessed} triaged · {chart.provisional} awaiting triage.</p></div>
+  {chart.stage==="reports"?<div className="ixRecords">{chart.rows.map(r=><Link key={r.id} href={"/portal/incidents/"+encodeURIComponent(r.id)}><strong>{r.reference} · {r.title}</strong><small>{r.location} · {r.occurredAt?String(r.occurredAt).slice(0,10):"Date not recorded"} · {r.status.replaceAll("_"," ")} · {r.confirmed?"Triaged":"Awaiting triage"} · Consequences: {r.outcomeSource==="assessed"?"assessed":"reporter / not reviewed"} · Body parts: {r.bodyPartSource==="assessed"?"assessed":"reporter / not reviewed"} → Open report</small></Link>)}</div>:chart.groups.length?<div className="ixBars">{chart.groups.map(g=>{
    const scoped=chart.stage==="zones"?chart.rows.filter(r=>r.zoneKey===g.key):[];
    return <button type="button" className="ixBar" key={g.key} onClick={()=>go({...g,label:label(g)})} aria-label={`${label(g)}: ${g.count} reports. Explore next level`}><span className="ixBarTop"><span>{label(g)}</span><strong>{g.count} <small aria-hidden="true">›</small></strong></span><span className="ixTrack" aria-hidden="true">{chart.stage==="zones"?chart.types.map(([key])=>{const count=scoped.filter(r=>r.type===key).length;return count?<span key={key} style={{width:(count/max*100)+"%",background:EVENT_COLORS[key]||EVENT_COLORS.other}}/>:null;}):<span style={{width:(g.count/max*100)+"%",background:EVENT_COLORS[g.key]||"#247f9e"}}/>}</span></button>;
-  })}</div>:<p className="incidentEmpty">No confirmed reports match this selection. Use the breadcrumbs to return.</p>}
+  })}</div>:<p className="incidentEmpty">No reports match this selection. Use the breadcrumbs to return.</p>}
   {chart.stage==="zones"&&<div className="ixLegend">{chart.types.map(([key,name])=><span key={key}><i style={{background:EVENT_COLORS[key]}}/>{name}</span>)}</div>}
-  <p className="ixNote">Dashboard filters apply. Counts represent reports, not injured people. {chart.overlap?"One report may appear in multiple consequence or impact groups. ":""}Missing assessments remain visible; injury and cause are never inferred.</p>
+  <p className="ixNote">Dashboard filters apply. Counts represent reports, not injured people. {chart.overlap?"One report may appear in multiple consequence or impact groups. ":""}Reporter selections appear immediately and remain provisional until an assessor reviews the relevant fields. Assessed values replace them, including explicit empty assessments. Rejected and duplicate reports are excluded. Injury and cause are never inferred.</p>
  </section>;
 }
 
@@ -123,7 +123,7 @@ function ExecutiveBuilder({onClose,sites,zones}) {
    <h2>Leadership position</h2><p>{report.summary}</p>
    <div className="ixReportKpis">{[["Received",report.received],["Confirmed",report.confirmed],["Awaiting triage",report.pending],["Open confirmed",report.open],["Critical / danger alerts",report.urgent],["Overdue actions",report.overdueActions]].map(([label,value])=><div key={label}><strong>{value}</strong><span>{label}</span></div>)}</div>
    <h2>Decisions and accountability</h2><ol>{report.decisions.map((text,i)=><li key={i}>{text}</li>)}</ol><p>Confirmed cases awaiting required director approval: <strong>{report.awaitingDirector}</strong>. Agree accountable owners, resources and review dates through the existing case and action controls.</p>
-   <ReportTable title="Confirmed event types" rows={report.counts}/><ReportTable title="Confirmed events by zone" rows={report.zoneCounts}/><ReportTable title="Assessed injuries and consequences" rows={report.outcomeCounts}/><ReportTable title="Assessed body parts" rows={report.bodyCounts}/>
+   <h2>Current reporting picture</h2><p>Charts include {report.included} reports, including cases awaiting triage. Assessor-reviewed values replace reporter observations. {report.outcomesReported} reports contribute provisional consequences and {report.bodyPartsReported} contribute provisional body-part selections. Rejected and duplicate reports are excluded.</p><ReportTable title="Current event types" rows={report.counts}/><ReportTable title="Current events by zone" rows={report.zoneCounts}/><ReportTable title="Current injuries and consequences" rows={report.outcomeCounts}/><ReportTable title="Current body parts" rows={report.bodyCounts}/>
    <h2>Recorded operational impact</h2><p>Lost working days recorded: <strong>{report.lostDays}</strong>; {report.lostDaysMissing} confirmed reports have no recorded value. Business disruption recorded: <strong>{report.disruptionMinutes} minutes</strong>; {report.disruptionMissing} confirmed reports have no recorded value. Missing values are not evidence of zero impact.</p>
    <h2>Basis and limitations</h2><ul>{report.limitations.map((text,i)=><li key={i}>{text}</li>)}</ul>
    <footer className="ixReportFooter">Confidential · Leadership review draft · Review accuracy, scope and approval before circulation. Generated from authorised RPG Excellence records.</footer>
