@@ -145,6 +145,7 @@ export default async function Pricing({ params }) {
             not VAT registered; the displayed price is the amount charged.
           </p>
 
+          <p className="muted">Public reporters do not need an account or subscription to submit a concern through a published area QR code. Starter includes incident intake and triage; Professional and Consultant include investigation and controlled closure. Company permissions and independent approval rules still apply.</p>
           <div className="pricingGrid">
             <div className="priceCard">
               <span>Starter</span>
@@ -161,6 +162,9 @@ export default async function Pricing({ params }) {
                 </li>
                 <li>Business Continuity planning workspace</li>
                 <li>Health &amp; Safety risk and action control</li>
+                <li>Accident, Incident &amp; Near Miss reporting and triage</li>
+                <li>Anonymous area QR reporting, photo intake, dashboard and report register</li>
+                <li>Incident classification, response-team assignment and reporter updates</li>
                 <li>Action ownership and effectiveness verification</li>
                 <li>Controlled evidence and reports</li>
                 <li>Email support</li>
@@ -189,6 +193,9 @@ export default async function Pricing({ params }) {
 
               <ul>
                 <li>Everything in Starter</li>
+                <li>Incident investigation through controlled closure</li>
+                <li>Incident resources, budgets, actions and independent verification</li>
+                <li>Critical-case Director approval and connected CAPA-8D, MOC and security workflows</li>
                 <li>Internal Audit programme and execution</li>
                 <li>Auditor verification and NC control</li>
                 <li>RCA–8D corrective-action workflow</li>
@@ -199,7 +206,7 @@ export default async function Pricing({ params }) {
                 <li>
                   Risk-based Workplace Inspection programmes, fieldwork and actions
                 </li>
-                <li>Online and offline mobile inspection evidence capture</li>
+                <li>Mobile inspection evidence capture and temporary device drafts</li>
                 <li>Statement of Applicability workspace</li>
                 <li>Priority support</li>
               </ul>
