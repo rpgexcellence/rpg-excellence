@@ -1,4 +1,5 @@
 "use server";
+import { assertIncidentCommand } from "../../../lib/incident-policy.mjs";
 import {
   prepareIncidentPhoto,
   storeIncidentPhoto,
@@ -73,6 +74,12 @@ export async function incidentCommand(_state, fd) {
       values.investigation_details.reviewed_body_parts=context.report.investigation_details.reviewed_body_parts;
       values.investigation_details.body_part_other=context.report.investigation_details.body_part_other||"";
     }
+    if (command === "triage" && !context.incidentEntitlement.advanced) {
+      for (const key of ["linked_bcp_plan_id", "pack_code"]) {
+        if (!fd.has(key)) values[key] = context.report[key] || "";
+      }
+    }
+    assertIncidentCommand(context.incidentEntitlement, command, values, context.report);
     values.personal_data_suspected = fd.get("personal_data_suspected") === "on";
     if (command !== "triage") delete values.domains;
     if (JSON.stringify(values).length > 50000)
@@ -91,7 +98,7 @@ export async function incidentCommand(_state, fd) {
       }),
     );
     let warning = "";
-    if (["triage", "close", "reopen"].includes(command)) {
+    if (context.incidentEntitlement.advanced && ["triage", "close", "reopen"].includes(command)) {
       try {
         const report = checkResult(
           await context.admin
@@ -188,6 +195,7 @@ export async function submitInternalIncident(_state, fd) {
 export async function retryInspectionPlanning(_state, fd) {
   try {
     const c = await incidentCase(String(fd.get("id") || ""));
+    if (!c.incidentEntitlement.advanced) throw Error("Professional access is required for inspection planning integration.");
     if (!c.incidentAdministrator)
       throw Error("Incident administrator authority required.");
     await synchroniseIncidentPlanning(c, c.report);
@@ -201,6 +209,7 @@ export async function retryInspectionPlanning(_state, fd) {
 export async function uploadIncidentEvidence(_state, fd) {
   try {
     const c = await incidentCase(String(fd.get("id") || ""));
+    if (!c.incidentEntitlement.advanced) throw Error("Professional access is required for investigation evidence. Photos can still be submitted with a new report.");
     if (["closed", "rejected", "duplicate"].includes(c.report.status))
       throw Error("Reopen this case before adding evidence.");
     if (
