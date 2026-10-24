@@ -1,4 +1,5 @@
 "use client";
+import { INCIDENT_UPGRADE_URL } from "../lib/incident-policy.mjs";
 import { useActionState, useState, useRef, useEffect } from "react";
 import { EVENT_CATEGORIES, EVENT_OUTCOMES, BODY_PARTS, contextualReportTypes, incidentStages } from "../lib/incident-reporting.mjs";
 import { INCIDENT_DOMAINS, INCIDENT_TYPES } from "../lib/incident-policy.mjs";
@@ -52,6 +53,7 @@ export function IncidentActionForm({
   children,
   label = "Save",
   className = "",
+  planAllowed = true,
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const preserved = usePreservedForm(state);
@@ -61,7 +63,11 @@ export function IncidentActionForm({
       action={formAction}
       className={"incidentForm " + className}
     >
-      {children}
+      {!planAllowed && <p className="incidentNotice">
+        Professional or Consultant access is required for this workflow. Existing case history remains available.
+        {" "}<a href={INCIDENT_UPGRADE_URL}>View plans →</a>
+      </p>}
+      {planAllowed ? children : <fieldset disabled aria-label="Professional incident workflow" style={{minWidth:0,margin:0,padding:0,border:0}}>{children}</fieldset>}
       {state?.progress && <IncidentProgress report={state.progress} />}
       {state?.error && (
         <p className="incidentError" role="alert">
@@ -73,7 +79,7 @@ export function IncidentActionForm({
           {state.success}
         </p>
       )}
-      <button disabled={pending}>{pending ? "Saving…" : label}</button>
+      <button disabled={pending || !planAllowed}>{pending ? "Saving…" : label}</button>
     </form>
   );
 }
