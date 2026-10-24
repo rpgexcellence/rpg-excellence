@@ -25,16 +25,6 @@ function validDay(value) {
   const timestamp = Date.parse(value + "T00:00:00.000Z");
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value;
 }
-function Navigation({ administrator, query }) {
-  const params = new URLSearchParams(query);
-  params.set("view", "register");
-  return <nav className="incidentNav" aria-label="Incident navigation">
-    <Link href="/portal/incidents">Dashboard</Link>
-    <Link href={"/portal/incidents?" + params}>Report register</Link>
-    <Link href="/portal/incidents/new">New report</Link>
-    {administrator && <Link href="/portal/incidents/admin">Incident administration</Link>}
-  </nav>;
-}
 
 export default async function IncidentsPage({ searchParams }) {
   // Retain the existing account, subscription, organisation and case checks.
@@ -47,7 +37,6 @@ export default async function IncidentsPage({ searchParams }) {
   const dateError = !validDay(query.from) || !validDay(query.to) ||
     (query.from && query.to && query.from > query.to);
   if (dateError) return <>
-    <Navigation administrator={context.incidentAdministrator} query={{}} />
     <section className="incidentCard" role="alert"><h1>Check the reporting period</h1><p>Use valid dates with the start date on or before the end date.</p><Link href="/portal/incidents">Clear filters</Link></section>
   </>;
 
@@ -105,7 +94,6 @@ export default async function IncidentsPage({ searchParams }) {
   const actualStatuses = [...new Set([...INCIDENT_STATUSES, ...history.map(row => row.status)])];
 
   return <>
-    <Navigation administrator={context.incidentAdministrator} query={query} />
     {registerView ? <header className="incidentHead" id="register"><span className="incidentEyebrow">RPG EXCELLENCE · RESPONSE & LEARNING</span><h1>Report register</h1><p>Review, filter and open authorised accident, incident and near-miss reports.</p></header> : <IncidentIntelligenceDashboard
       key={JSON.stringify(query)} rows={rows} performance={performance}
       metrics={metrics} query={query} sites={sites} zones={zones}
