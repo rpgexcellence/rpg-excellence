@@ -7,9 +7,10 @@ import {canStartInspection,assertInspectionFieldwork,EDITABLE_APPOINTMENTS,inspe
 const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirname,'..'),swc=require('next/dist/build/swc');
 await swc.loadBindings();
 const originalLoad=Module._load,originalExtension=Module._extensions['.js'];
-let access,data,queries,paths;
+let access,data,queries,paths,checklistFailure;
 const org='org',uid='rafal-user';
 function reset(){
+ checklistFailure=false;
  access={user:{id:uid,email:'owner@example.test'},organization:{id:org,owner_id:uid},isOwner:true,person:{id:'rafal'},level:'owner',canAdministerInspection:true};
  data={hs_inspection_programmes:[{id:'programme',organization_id:org,status:'active',lead_inspector_person_id:'igor',accountable_person_id:'igor',reviewer_person_id:'rafal',next_inspection_date:'2027-01-19',template_id:'template'}],hs_inspection_programme_packs:[{organization_id:org,programme_id:'programme',pack:{pack_code:'CORE_WORKPLACE'}}],hs_workplace_inspections:[{id:'inspection',organization_id:org,programme_id:'programme',status:'planned',lead_inspector_person_id:'igor',accountable_person_id:'igor',reviewer_person_id:'rafal',updated_at:'v1',title:'Original'}],organization_people:[{id:'igor',organization_id:org,user_id:'igor-user',account_status:'active'},{id:'rafal',organization_id:org,user_id:uid,account_status:'active'}],hs_workplace_inspection_responses:[{id:'response',organization_id:org,inspection_id:'inspection',response:'yes',assessed_by_person_id:'igor'}]};queries=[];paths=[];
 }
@@ -34,8 +35,9 @@ Module._load=function(request,parent,...rest){
   if(request.endsWith('/plan-access'))return {requirePlanAccess:async()=>{}};
   if(request.endsWith('/supabase/admin'))return {createAdminClient:()=>admin};
   if(request.endsWith('/workplace-inspection-access'))return {resolveInspectionAccess:async()=>access};
+  if(request.endsWith('/workplace-inspection-checklist.mjs'))return {requireInspectionChecklist:c=>{if(!c?.ready)throw Error('Checklist unavailable');return c;}};
   if(request.endsWith('/workplace-inspection-policy.mjs'))return {canStartInspection,assertInspectionFieldwork,EDITABLE_APPOINTMENTS,inspectionTimestamp,validateAppointmentIndependence};
-  if(request.endsWith('/workplace-inspections'))return {validateCompanyPeople:async(_,ids)=>{if(ids.some(id=>!data.organization_people.some(p=>p.id===id&&p.account_status==='active')))throw Error('Invalid Company User');},validateAdministrationSite:async()=>{},loadQuestionsForPacks:async()=>[{id:'question',question_code:'A1',question_text:'Check',display_order:1}]};
+  if(request.endsWith('/workplace-inspections'))return {validateCompanyPeople:async(_,ids)=>{if(ids.some(id=>!data.organization_people.some(p=>p.id===id&&p.account_status==='active')))throw Error('Invalid Company User');},validateAdministrationSite:async()=>{},loadProgrammeInspectionChecklist:async()=>{if(checklistFailure)throw Error('BIOLOGICAL has no active questions for this template');return {ready:true,questionCount:1,packs:[{pack_code:'CORE_WORKPLACE'}],questions:[{id:'question',question_code:'A1',question_text:'Check',display_order:1}]};}};
   if(request.endsWith('/workplace-inspection-signal-sync'))return {};
  }
  return originalLoad.call(this,request,parent,...rest);
@@ -74,4 +76,10 @@ test('non-administrators, foreign records, self-review and approved records fail
  reset();data.hs_workplace_inspections[0].organization_id='other';assert.match((await actions.updateInspectionDetails(null,edit({}))).error,/not found/);
  reset();assert.match((await actions.updateInspectionDetails(null,edit({reviewer_person_id:'igor'}))).error,/independent/);
  reset();data.hs_workplace_inspections[0].status='completed';assert.match((await actions.updateInspectionDetails(null,edit({}))).error,/locked/);
+});
+
+test('an incomplete selected pack blocks scheduling before any record is inserted',async()=>{
+ reset();checklistFailure=true;const before=JSON.stringify(data.hs_workplace_inspection_responses);
+ const result=await schedule.generateScheduledInspection(null,form({programme_id:'programme',title:'Scheduled',planned_date:'2027-01-19'}));
+ assert.match(result.error,/BIOLOGICAL/);assert.equal(queries.some(q=>q.insert),false);assert.equal(JSON.stringify(data.hs_workplace_inspection_responses),before);
 });
