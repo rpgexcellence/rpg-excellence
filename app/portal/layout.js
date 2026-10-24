@@ -10,7 +10,7 @@ export default async function PortalLayout({ children }) {
   const access = await getPortalAccess(user);
   return (
     <>
-      <PortalWorkspace access={access}>{children}</PortalWorkspace>
+      <PortalWorkspace access={access} currentUserId={user?.id || null}>{children}</PortalWorkspace>
       <PortalQuickNav />
       <style>{`
         .rpgQuickNav{
