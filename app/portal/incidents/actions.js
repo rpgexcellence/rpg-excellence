@@ -7,13 +7,15 @@ import {
 import { revalidatePath } from "next/cache";
 import {
   incidentContext,
+  loadIncidentRegister,
   incidentCase,
   checkResult,
   synchroniseIncidentPlanning,
 } from "../../../lib/incidents";
-import { validateOutcomes, validateBodyParts } from "../../../lib/incident-reporting.mjs";
+import { incidentExecutiveBrief, validateOutcomes, validateBodyParts } from "../../../lib/incident-reporting.mjs";
 import { validateIncidentIntake, UUID } from "../../../lib/incident-policy.mjs";
 import { randomUUID } from "node:crypto";
+import { incidentRows } from "../../../lib/incident-data";
 const allowed = new Set([
   "triage",
   "approve_director",
@@ -278,5 +280,56 @@ export async function uploadIncidentEvidence(_state, fd) {
   } catch (e) {
     if (e.digest) throw e;
     return { error: e.message };
+  }
+}
+
+// Read-only report generation. Case scope and subscription are rechecked here,
+// independently of the dashboard button and every client-supplied filter.
+export async function generateIncidentExecutiveReport(_state, fd) {
+  try {
+    const context = await incidentContext();
+    if (!["consultant", "platform_admin"].includes(context.incidentEntitlement?.plan)) {
+      throw Error("Executive reports are included in Consultant access. Your existing incident dashboard remains available under its current plan.");
+    }
+    const selection = (name, maximum) => {
+      const values = fd.getAll(name);
+      if (values.length > maximum || values.some(value => typeof value !== "string" || value.length > 180)) {
+        throw Error("The report selection is too large or invalid.");
+      }
+      return [...new Set(values.map(value => value.trim()).filter(Boolean))];
+    };
+    const areas = selection("areas", 10);
+    if (!areas.length) throw Error("Select at least one reporting area.");
+    const options = {
+      from: String(fd.get("from") || ""),
+      to: String(fd.get("to") || ""),
+      areas,
+      sites: selection("sites", 1000),
+      zones: selection("zones", 2000),
+    };
+    // Validate dates and domains before loading case data. An empty selection
+    // on sites/zones means all locations within the caller's authorised scope.
+    incidentExecutiveBrief([], [], options);
+    const reports = await loadIncidentRegister(context);
+    const authorisedIds = new Set(reports.map(report => report.id));
+    const tasks = (await incidentRows(
+      context.admin,
+      "incident_tasks",
+      context.organization.id,
+      "id,incident_id,status,due_at",
+    )).filter(task => authorisedIds.has(task.incident_id));
+    const brief = incidentExecutiveBrief(reports, tasks, options);
+    return {
+      report: {
+        ...brief,
+        companyName: context.organization.name || context.organization.legal_name || "Organisation",
+        status: "Draft for leadership review",
+      },
+      success: "Executive report generated from your authorised records. Review the draft before circulation.",
+    };
+  } catch (error) {
+    if (error?.digest) throw error;
+    console.error("Incident executive report generation failed:", error?.message);
+    return { error: error?.message || "The executive report could not be generated." };
   }
 }
