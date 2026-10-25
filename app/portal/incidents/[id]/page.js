@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { categoryLabel, outcomeLabel, BODY_PARTS, EVENT_OUTCOMES, INVESTIGATION_FIELDS, needsDirector, directorApproved } from "../../../../lib/incident-reporting.mjs";
+import { categoryLabel, outcomeLabel, BODY_PARTS, EVENT_OUTCOMES, INVESTIGATION_FIELDS, needsDirector, directorApproved, incidentStages } from "../../../../lib/incident-reporting.mjs";
 import {
   INCIDENT_DOMAINS,
   INCIDENT_TYPES,
@@ -10,7 +10,6 @@ import {
   checkResult,
 } from "../../../../lib/incidents";
 import {
-  IncidentHeader,
   IncidentBadge,
   PersonSelect,
   CaseHidden,
@@ -18,7 +17,7 @@ import {
   dateTime,
   pretty,
 } from "../../../../components/IncidentUI";
-import { IncidentActionForm, IncidentProgress } from "../../../../components/IncidentForm";
+import { IncidentActionForm } from "../../../../components/IncidentForm";
 import {
   incidentCommand,
   uploadIncidentEvidence,
@@ -154,6 +153,10 @@ function Resources({ people, task = {} }) {
     </>
   );
 }
+
+const CASE_SECTIONS=[['report','Original report'],['triage','Triage & assignment'],['investigation','Investigation'],['actions','Actions & resources'],['closure','Verification & closure'],['links','Linked records'],['evidence','Evidence'],['updates','Reporter update'],['audit','Audit trail']];
+const STAGE_SECTIONS={reported:'report',triaged:'triage',investigating:'investigation',actions_open:'actions',awaiting_verification:'closure',director_approval:'closure',closed:'closure'};
+function CasePanel({name,current,children}){return <div id={'case-'+name} className="icSection" data-default={current===name} role="region" aria-label={CASE_SECTIONS.find(([key])=>key===name)?.[1]}>{children}</div>;}
 export default async function IncidentDetail({ params }) {
   const { id } = await params;
   const c = await incidentCase(id),
@@ -240,34 +243,28 @@ export default async function IncidentDetail({ params }) {
   }
   const details=r.intake_details||{}, critical=needsDirector(r);
   const bodyLabel=key=>BODY_PARTS.find(([k])=>k===key)?.[1]||key;
-  return (
-    <>
-      <IncidentHeader
-        title={r.reference + " · " + r.title}
-        description={r.location_label}
-        admin={c.incidentAdministrator}
-      />
-      {!c.incidentEntitlement.advanced && <aside className="incidentNotice" aria-label="Incident plan coverage">
-        <strong>Starter · reporting and triage</strong>
-        <p>Includes reporting, classification, response-team assignment and reporter updates. Professional and Consultant add investigation, resource allocation, linked workflows, independent verification and controlled closure. Existing case history remains readable.</p>
-        <Link href="/en/pricing?upgrade=professional&feature=Incident+investigation#subscriptions">Compare plans →</Link>
-      </aside>}
-      <section className={"incidentSeverityPanel "+(r.immediate_danger?"critical":r.criticality||r.reported_criticality)} aria-label="Report severity">
-        <div><span className="incidentEyebrow">{r.triaged_at?"ASSESSED SEVERITY":"REPORTER URGENCY · AWAITING ASSESSMENT"}</span>
-          <strong>{pretty(r.immediate_danger?"critical":r.criticality||r.reported_criticality)}</strong>
-          <p>{r.immediate_danger?"Immediate danger / active compromise flagged. ":""}{critical?"Director approval required before closure.":"Independent verification required; Director approval is not required."}</p>
-        </div>
-        <div><span>Original reporter urgency</span><b>{pretty(r.reported_criticality)}</b><span>Stop-work authority</span><b>{details.stop_work==="yes"?"Exercised":pretty(details.stop_work||"Not recorded")}</b></div>
-      </section>
-      <IncidentProgress report={r} />
-      <p>
-        <IncidentBadge value={r.status} />{" "}
-        <IncidentBadge value={r.immediate_danger ? "critical" : r.criticality || r.reported_criticality} /> ·{" "}
-        {r.triaged_at ? "Reviewed priority" : "Unconfirmed reporter urgency"} ·
-        Version {r.version} ·{" "}
-        <Link href={"/portal/incidents/" + id}>Refresh case</Link>
-      </p>
-      <div className="incidentGrid">
+
+const CASE_FOCUS_CSS=".incidentCaseFocus{--ic-navy:#11354e;--ic-line:#d8e4ed;--ic-muted:#577085;min-width:0;color:#17344d}\n.incidentCaseFocus .icHeader{display:flex;align-items:start;justify-content:space-between;gap:20px;margin:0 0 15px;padding:22px 24px;background:#10334c;color:white;border-radius:12px}\n.incidentCaseFocus .icReference{font-size:11px;font-weight:800;letter-spacing:.08em;color:#bfd7e7}\n.incidentCaseFocus .icHeader h1{font-size:clamp(21px,2.4vw,29px);line-height:1.25;margin:8px 0;overflow-wrap:anywhere}\n.incidentCaseFocus .icHeader p{margin:0;color:#cfe0eb;font-size:13px}\n.incidentCaseFocus .icHeader a{border:1px solid #8aa8bc;padding:9px 12px;border-radius:6px;color:white;text-decoration:none;font-size:12px;white-space:nowrap}\n.incidentCaseFocus .icSummary{display:flex;gap:10px 22px;align-items:center;flex-wrap:wrap;background:white;border:1px solid var(--ic-line);border-left:5px solid #178e8b;border-radius:9px;padding:12px 16px;margin-bottom:14px;font-size:12px}\n.incidentCaseFocus .icSummary.critical{border-left-color:#bd233c;background:#fff5f6}\n.incidentCaseFocus .icSummary span{display:flex;gap:7px;align-items:center}\n.incidentCaseFocus .icSummary p{margin:0;color:#8f2738;font-size:12px;flex-basis:100%}\n.incidentCaseFocus .icSummary small{color:var(--ic-muted)}\n.incidentCaseFocus .icWorkflow{display:flex;gap:6px;overflow-x:auto;padding:0 0 9px;margin-bottom:4px;scrollbar-width:thin}\n.incidentCaseFocus .icWorkflow a{display:flex;align-items:center;gap:8px;flex:1;min-width:130px;text-decoration:none;padding:10px;border-radius:7px;background:#eaf0f5;color:#4e687f;font-size:11px;font-weight:650;border:1px solid transparent}\n.incidentCaseFocus .icWorkflow i{font-style:normal;border-radius:50%;background:#d9e4ed;width:23px;height:23px;display:grid;place-items:center;flex-shrink:0;font-size:10px}\n.incidentCaseFocus .icWorkflow a.done{background:#e7f5ef;color:#157564}\n.incidentCaseFocus .icWorkflow a.current{background:#123d54;color:#fff}\n.incidentCaseFocus .icWorkflow a.current i{background:#1f7d8a}\n.incidentCaseFocus .icHint{font-size:11px;color:var(--ic-muted);margin:3px 0 14px}\n.incidentCaseFocus .icTabs{position:sticky;top:82px;z-index:30;display:flex;gap:6px;overflow-x:auto;background:#f3f7fa;border-bottom:1px solid #cfdee9;padding:10px 0;margin:0 0 16px;scrollbar-width:thin}\n.incidentCaseFocus .icTabs>a{padding:10px 13px;border-radius:6px;text-decoration:none;color:#36566f;background:#fff;border:1px solid var(--ic-line);font-weight:650;font-size:12px;white-space:nowrap;min-height:40px}\n.incidentCaseFocus a:focus-visible,.incidentCaseFocus summary:focus-visible{outline:3px solid #dea92d;outline-offset:3px}\n.incidentCaseFocus .icSection{display:none;min-width:0;scroll-margin-top:154px}\n.incidentCaseFocus .icSection:target{display:block}\n.incidentCaseFocus:not(:has(.icSection:target)) .icSection[data-default=true]{display:block}\n.incidentCaseFocus .icSection>.incidentCard{margin:0 0 15px}\n.incidentCaseFocus .icSection .incidentCard h2{font-size:20px}\n.incidentCaseFocus .icSection .incidentCard dl{grid-template-columns:minmax(130px,210px) 1fr}\n.incidentCaseFocus .icPlanNote{border:1px solid var(--ic-line);border-radius:7px;background:#fff;padding:10px 14px;margin:10px 0;font-size:12px}\n.incidentCaseFocus .icPlanNote summary{cursor:pointer;font-weight:700}\n.incidentCaseFocus .icSection .icSectionNote{font-size:13px;color:var(--ic-muted);margin:0 0 12px}\n@media(max-width:700px){.incidentCaseFocus .icHeader{padding:17px;gap:12px;flex-wrap:wrap}.incidentCaseFocus .icHeader h1{font-size:22px}.incidentCaseFocus .icSummary{gap:10px 15px}.incidentCaseFocus .icWorkflow a{min-width:130px}.incidentCaseFocus .icTabs{top:74px}.incidentCaseFocus .icSection{scroll-margin-top:140px}.incidentCaseFocus .icSection .incidentCard dl{grid-template-columns:1fr}.incidentCaseFocus .icSection .incidentCard dd{margin:0 0 9px}.incidentCaseFocus .icSection .incidentCard{padding:17px}.incidentCaseFocus .icSummary span{flex-wrap:wrap}}\n.incidentCaseFocus .icSection .incidentCard dl{display:grid;gap:10px 18px;align-items:start}\n.incidentCaseFocus .icSection .incidentCard dt{font-size:13px;font-weight:700;line-height:1.45}\n.incidentCaseFocus .icSection .incidentCard dd{margin:0;font-size:14px;line-height:1.45;overflow-wrap:anywhere}\n@media(max-width:700px){.incidentCaseFocus .icSection .incidentCard dl{gap:4px}.incidentCaseFocus .icSection .incidentCard dd{margin-bottom:11px}.incidentCaseFocus .icSection .incidentCard dt{font-size:12px}}\n\n.incidentCaseFocus:has(#case-report:target) .icTabs>a[href=\"#case-report\"],.incidentCaseFocus[data-default=\"report\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-report\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-triage:target) .icTabs>a[href=\"#case-triage\"],.incidentCaseFocus[data-default=\"triage\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-triage\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-investigation:target) .icTabs>a[href=\"#case-investigation\"],.incidentCaseFocus[data-default=\"investigation\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-investigation\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-actions:target) .icTabs>a[href=\"#case-actions\"],.incidentCaseFocus[data-default=\"actions\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-actions\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-closure:target) .icTabs>a[href=\"#case-closure\"],.incidentCaseFocus[data-default=\"closure\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-closure\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-links:target) .icTabs>a[href=\"#case-links\"],.incidentCaseFocus[data-default=\"links\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-links\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-evidence:target) .icTabs>a[href=\"#case-evidence\"],.incidentCaseFocus[data-default=\"evidence\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-evidence\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-updates:target) .icTabs>a[href=\"#case-updates\"],.incidentCaseFocus[data-default=\"updates\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-updates\"]{background:#113b53;color:#fff;border-color:#113b53}\n\n.incidentCaseFocus:has(#case-audit:target) .icTabs>a[href=\"#case-audit\"],.incidentCaseFocus[data-default=\"audit\"]:not(:has(.icSection:target)) .icTabs>a[href=\"#case-audit\"]{background:#113b53;color:#fff;border-color:#113b53}\n";
+
+  const workflow=incidentStages(r);
+  const defaultSection=workflow.exception?'report':STAGE_SECTIONS[workflow.steps[workflow.current]?.[0]]||'report';
+  return <main className="incidentCaseFocus" data-default={defaultSection}>
+    <style>{CASE_FOCUS_CSS}</style>
+    <header className="icHeader"><div><span className="icReference">{r.reference}</span><h1>{r.title}</h1><p>{r.location_label}</p></div><Link href="/portal/incidents?view=register">Back to register</Link></header>
+    <div className={'icSummary '+(critical?'critical':'')} aria-label="Case summary">
+      <span><small>{r.triaged_at?'Assessed severity':'Reporter urgency'}</small><IncidentBadge value={r.immediate_danger?'critical':r.criticality||r.reported_criticality}/></span>
+      <span><small>Status</small><IncidentBadge value={r.status}/></span>
+      <span><small>Investigator</small><strong>{name(r.investigator_person_id)}</strong></span>
+      <span><small>Stop-work authority</small><strong>{details.stop_work==='yes'?'Exercised':pretty(details.stop_work||'Not recorded')}</strong></span>
+      <span><small>Version {r.version}</small></span>
+      {(critical||r.immediate_danger)&&<p>{r.immediate_danger?'Immediate danger / active compromise flagged. ':''}{critical?'Director approval is required before closure.':''}</p>}
+    </div>
+    <nav className="icWorkflow" aria-label="Case workflow">{workflow.steps.map(([key,label],i)=><a key={key} href={'#case-'+STAGE_SECTIONS[key]} className={i<workflow.current?'done':i===workflow.current?'current':''} aria-current={i===workflow.current?'step':undefined}><i>{i<workflow.current?'✓':i+1}</i><span>{label}</span></a>)}</nav>
+    <p className="icHint">{workflow.exception?'Report '+workflow.exception+'.':'Current stage: '+workflow.steps[workflow.current][1]+'.'} Select a stage or section to view its details. Viewing a section does not advance the case or submit changes.</p>
+    <nav className="icTabs" aria-label="Case sections">{CASE_SECTIONS.map(([key,label])=><a key={key} href={'#case-'+key}>{label}</a>)}</nav>
+    {!c.incidentEntitlement.advanced&&<details className="icPlanNote"><summary>Plan coverage · Starter reporting and triage</summary><p>Investigation, resource allocation, linked workflows, verification and controlled closure require Professional or Consultant access. Existing history remains readable.</p><Link href="/en/pricing?upgrade=professional&feature=Incident+investigation#subscriptions">Compare plans</Link></details>}
+
+<CasePanel name="report" current={defaultSection}>
         <section className="incidentCard">
           <h2>Original report</h2>
           <dl>
@@ -323,6 +320,10 @@ export default async function IncidentDetail({ params }) {
             </details>
           )}
         </section>
+
+</CasePanel>
+
+<CasePanel name="triage" current={defaultSection}>
         <section className="incidentCard">
           <h2>Response & accountability</h2>
           {r.planning_sync_status !== "not_applicable" && (
@@ -361,51 +362,9 @@ export default async function IncidentDetail({ params }) {
             <dt>Continuity</dt>
             <dd>{pretty(r.continuity_decision)}</dd>
           </dl>
-          {r.linked_rca_case_id && (
-            <p>
-              <Link href={"/portal/rca/" + r.linked_rca_case_id}>
-                Linked CAPA-8D case →
-              </Link>
-            </p>
-          )}
-          {r.linked_security_incident_id && (
-            <p>
-              <Link
-                href={
-                  "/portal/information-security/incidents/" +
-                  r.linked_security_incident_id
-                }
-              >
-                Linked security incident →
-              </Link>
-            </p>
-          )}
-          {[
-            [r.linked_moc_id,"/portal/health-safety/moc/","Management of Change"],
-            [r.linked_assessment_id,"/portal/health-safety/risk-assessment/","Risk assessment"],
-            [r.linked_permit_id,"/portal/health-safety/permits/","Permit to work"],
-            [r.linked_inspection_id,"/portal/health-safety/workplace-inspections/","Workplace inspection"],
-          ].filter(([record])=>record).map(([record,path,label])=><p key={path}><Link href={path+record}>{label} →</Link></p>)}
-          {r.linked_bcp_plan_id && (
-            <p>
-              <Link
-                href={
-                  "/portal/business-continuity/plans?id=" + r.linked_bcp_plan_id
-                }
-              >
-                Linked continuity plan →
-              </Link>
-            </p>
-          )}
-          <p className="incidentMuted">
-            Linked modules retain their own permissions and approval gates.
-            Continuity activation and regulatory notifications require a
-            competent human decision.
-          </p>
         </section>
-      </div>
       {!terminal && c.incidentAdministrator && (
-        <details className="incidentCard" open={!r.triaged_at}>
+        <details className="incidentCard" open>
           <summary>Triage, classification & escalation decisions</summary>
           <p className="incidentMuted">
             Score actual consequences from the harm or loss that occurred.
@@ -625,6 +584,10 @@ export default async function IncidentDetail({ params }) {
           </IncidentActionForm>
         </details>
       )}
+
+</CasePanel>
+
+<CasePanel name="investigation" current={defaultSection}>
       {!terminal &&
         (c.incidentAdministrator ||
           c.person?.id === r.investigator_person_id) && (
@@ -754,6 +717,10 @@ export default async function IncidentDetail({ params }) {
           </p>
         </section>
       )}
+
+</CasePanel>
+
+<CasePanel name="actions" current={defaultSection}>
       <section className="incidentCard">
         <h2>Actions, resources & independent verification</h2>
         {!tasks.length && <p>No actions allocated yet.</p>}
@@ -908,6 +875,67 @@ export default async function IncidentDetail({ params }) {
           </details>
         )}
       </section>
+
+</CasePanel>
+
+<CasePanel name="closure" current={defaultSection}>
+      <section className="incidentCard">
+        <h2>Controlled closure</h2>
+        {critical&&!terminal&&<div className="incidentNotice">
+          <strong>Critical case — independent review and Director approval required.</strong>
+          <p>Complete the investigation, verify actions and obtain independent case verification, then request the assigned Director's approval. Material changes invalidate approval. A critical case retains this gate after reassessment to a lower priority.</p>
+          {r.case_verified_at&&<p>Independent case review: {dateTime(r.case_verified_at)}</p>}
+          {r.director_approval_note&&<p className="incidentPre">Director decision: {r.director_approval_note}</p>}
+          {c.person?.id===r.verifier_person_id&&<IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Verify case for Director review"><CaseHidden report={r} command="verify_case" /><Text name="note" label="Independent verification evidence" required minLength={10} /></IncidentActionForm>}
+          {c.person?.id===r.director_person_id&&<IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Approve critical case closure"><CaseHidden report={r} command="approve_director" /><Text name="note" label="Director approval rationale" required minLength={10} /></IncidentActionForm>}
+        </div>}
+        {terminal ? (
+          <>
+            <p>
+              {pretty(r.status)} · {dateTime(r.closed_at)}
+            </p>
+            {c.incidentAdministrator && (
+              <IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Reopen case">
+                <CaseHidden report={r} command="reopen" />
+                <Text
+                  name="note"
+                  label="Reason for reopening"
+                  required
+                  minLength={10}
+                />
+              </IncidentActionForm>
+            )}
+          </>
+        ) : (
+          <>
+            <p>
+              Before closure: complete investigation and causes, verify all
+              actions, assess external reporting and continuity, and close
+              linked CAPA / ISMS cases. Set the case to awaiting verification.
+              Only the assigned independent case verifier with Review access or
+              higher can close it.
+            </p>
+            {c.person?.id === r.verifier_person_id && (
+              <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
+                action={incidentCommand}
+                label="Independently verify & close"
+              >
+                <CaseHidden report={r} command="close" />
+                <Text
+                  name="note"
+                  label="Verification evidence and closure rationale"
+                  required
+                  minLength={10}
+                />
+              </IncidentActionForm>
+            )}
+          </>
+        )}
+      </section>
+
+</CasePanel>
+
+<CasePanel name="links" current={defaultSection}>
       {!terminal && c.incidentAdministrator && r.triaged_at && (
         <section className="incidentCard">
           <h2>Controlled handoffs</h2>
@@ -990,8 +1018,8 @@ export default async function IncidentDetail({ params }) {
           </IncidentActionForm>
         </details>}
       </section>}
-      <section className="incidentCard">
-        {c.incidentAdministrator && r.triaged_at && (
+
+<section className="incidentCard"><h2>Linked records & planning</h2><p>Inspection planning and linked modules retain their own permissions and approval gates.</p>        {c.incidentAdministrator && r.triaged_at && (
           <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
             action={retryInspectionPlanning}
             label="Refresh inspection planning"
@@ -999,6 +1027,22 @@ export default async function IncidentDetail({ params }) {
             <input type="hidden" name="id" value={r.id} />
           </IncidentActionForm>
         )}
+{[
+ [r.linked_rca_case_id,"/portal/rca/","CAPA-8D"],
+ [r.linked_security_incident_id,"/portal/information-security/incidents/","Security incident"],
+ [r.linked_moc_id,"/portal/health-safety/moc/","Management of Change"],
+ [r.linked_assessment_id,"/portal/health-safety/risk-assessment/","Risk assessment"],
+ [r.linked_permit_id,"/portal/health-safety/permits/","Permit to work"],
+ [r.linked_inspection_id,"/portal/health-safety/workplace-inspections/","Workplace inspection"],
+ ].filter(([record])=>record).map(([record,path,label])=><p key={path}><Link href={path+record}>{label} →</Link></p>)}
+ {r.linked_bcp_plan_id&&<p><Link href={"/portal/business-continuity/plans?id="+r.linked_bcp_plan_id}>Continuity plan →</Link></p>}
+ {r.planning_sync_message&&<p className="incidentMuted">Inspection planning: {pretty(r.planning_sync_status)} · {r.planning_sync_message}</p>}
+ </section>
+
+</CasePanel>
+
+<CasePanel name="evidence" current={defaultSection}>
+      <section className="incidentCard">
         <h2>Private evidence</h2>
         <p className="incidentMuted">
           Files are restricted to authorised case readers and downloaded as
@@ -1031,6 +1075,11 @@ export default async function IncidentDetail({ params }) {
           </IncidentActionForm>
         )}
       </section>
+
+</CasePanel>
+
+<CasePanel name="updates" current={defaultSection}>
+{(!c.incidentAdministrator||terminal)&&<section className="incidentCard"><h2>Reporter progress update</h2><p>{r.public_update||"No public update is recorded."}</p><p className="incidentMuted">Only authorised administrators can publish an update while the case is active.</p></section>}
       {c.incidentAdministrator && !terminal && (
         <section className="incidentCard">
           <h2>Reporter progress update</h2>
@@ -1056,59 +1105,10 @@ export default async function IncidentDetail({ params }) {
           </IncidentActionForm>
         </section>
       )}
-      <section className="incidentCard">
-        <h2>Controlled closure</h2>
-        {critical&&!terminal&&<div className="incidentNotice">
-          <strong>Critical case — independent review and Director approval required.</strong>
-          <p>Complete the investigation, verify actions and obtain independent case verification, then request the assigned Director's approval. Material changes invalidate approval. A critical case retains this gate after reassessment to a lower priority.</p>
-          {r.case_verified_at&&<p>Independent case review: {dateTime(r.case_verified_at)}</p>}
-          {r.director_approval_note&&<p className="incidentPre">Director decision: {r.director_approval_note}</p>}
-          {c.person?.id===r.verifier_person_id&&<IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Verify case for Director review"><CaseHidden report={r} command="verify_case" /><Text name="note" label="Independent verification evidence" required minLength={10} /></IncidentActionForm>}
-          {c.person?.id===r.director_person_id&&<IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Approve critical case closure"><CaseHidden report={r} command="approve_director" /><Text name="note" label="Director approval rationale" required minLength={10} /></IncidentActionForm>}
-        </div>}
-        {terminal ? (
-          <>
-            <p>
-              {pretty(r.status)} · {dateTime(r.closed_at)}
-            </p>
-            {c.incidentAdministrator && (
-              <IncidentActionForm planAllowed={c.incidentEntitlement.advanced} action={incidentCommand} label="Reopen case">
-                <CaseHidden report={r} command="reopen" />
-                <Text
-                  name="note"
-                  label="Reason for reopening"
-                  required
-                  minLength={10}
-                />
-              </IncidentActionForm>
-            )}
-          </>
-        ) : (
-          <>
-            <p>
-              Before closure: complete investigation and causes, verify all
-              actions, assess external reporting and continuity, and close
-              linked CAPA / ISMS cases. Set the case to awaiting verification.
-              Only the assigned independent case verifier with Review access or
-              higher can close it.
-            </p>
-            {c.person?.id === r.verifier_person_id && (
-              <IncidentActionForm planAllowed={c.incidentEntitlement.advanced}
-                action={incidentCommand}
-                label="Independently verify & close"
-              >
-                <CaseHidden report={r} command="close" />
-                <Text
-                  name="note"
-                  label="Verification evidence and closure rationale"
-                  required
-                  minLength={10}
-                />
-              </IncidentActionForm>
-            )}
-          </>
-        )}
-      </section>
+
+</CasePanel>
+
+<CasePanel name="audit" current={defaultSection}>
       <section className="incidentCard">
         <h2>Audit trail</h2>
         <ol className="incidentTimeline">
@@ -1136,6 +1136,7 @@ export default async function IncidentDetail({ params }) {
           ))}
         </ol>
       </section>
-    </>
-  );
+</CasePanel>
+
+</main>;
 }
