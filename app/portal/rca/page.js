@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
-import { createRcaCase } from "./actions";
+import { createRcaCase, getRcaManagementSnapshot } from "./actions";
+import RcaManagementBoard from "../../../components/RcaManagementBoard";
 
 import RcaCaseCreateForm from "../../../components/RcaCaseCreateForm";
 import {loadRcaCompanyLinks} from "../../../lib/rcaCompanyLinks";
@@ -39,6 +40,13 @@ export default async function RcaRegister({ searchParams }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/rca");
+
+  // The management board owns its graphical view. Register and creation
+  // controls remain below, without adding a second board or navigation shell.
+  if (managementView) {
+    const snapshot = await getRcaManagementSnapshot();
+    return <RcaManagementBoard snapshot={snapshot}/>;
+  }
 
   const [organizationsResult, casesResult] = await Promise.all([
     supabase.from("organizations").select("*").eq("owner_id", user.id).order("name"),
