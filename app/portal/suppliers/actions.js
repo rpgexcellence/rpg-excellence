@@ -8,6 +8,10 @@ import {
   calculateSupplierAssurance,
 } from "../../../lib/supplier-assurance";
 
+import { getUserSubscription, hasPlanAccess } from "../../../lib/subscription";
+import { getOrganizationAccess } from "../../../lib/organization-access";
+import { buildSupplierAnalytics, buildSupplierExecutiveBrief } from "../../../lib/supplier-reporting.mjs";
+
 const clean = (value) => String(value ?? "").trim();
 
 const json = (fd, name, fallback) => {
@@ -537,4 +541,127 @@ export async function generateSupplierCodeOfConduct(fd) {
   redirect(
     `/portal/suppliers/${supplier.id}/code-of-conduct?document=${document.id}`
   );
+}
+
+// Read-only board/report access. Existing supplier mutation actions above are
+// intentionally retained, including approval authorisations and evidence checks.
+async function supplierReportingContext() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) redirect('/portal/login?next=/portal/suppliers?view=board');
+  const [subscription, access] = await Promise.all([
+    getUserSubscription(user.id), getOrganizationAccess('supplier_assurance', 'view'),
+  ]);
+  if (!hasPlanAccess(subscription, 'professional')) {
+    redirect('/en/pricing?upgrade=professional&feature=Supplier%20Assurance#subscriptions');
+  }
+  if (!access.allowed || !access.organization || access.user?.id !== user.id) {
+    throw new Error('You do not have access to this organisation’s supplier assurance records.');
+  }
+  if (subscription?.access_source === 'organization_subscription' &&
+      subscription.organization_id !== access.organization.id) {
+    throw new Error('The company subscription does not match the supplier organisation.');
+  }
+  return { user, organization: access.organization, subscription };
+}
+
+async function supplierReadAll(makeQuery, label) {
+  const rows = [];
+  let offset = 0, previousLast = null;
+  for (;;) {
+    const { data, error } = await makeQuery().order('id', { ascending: true }).range(offset, offset + 499);
+    if (error) {
+      console.error('SUPPLIER_BOARD_READ_FAILED', { source: label, code: error.code || 'query_failed' });
+      throw new Error(`Supplier ${label} could not be loaded. No incomplete totals have been displayed.`);
+    }
+    if (!Array.isArray(data)) throw new Error(`Supplier ${label} returned an invalid result.`);
+    if (!data.length) break;
+    const last = data[data.length - 1]?.id;
+    if (!last || last === previousLast) throw new Error(`Supplier ${label} pagination could not be completed.`);
+    rows.push(...data);
+    previousLast = last;
+    // Advance by the actual returned size: a server may cap below 500 rows.
+    offset += data.length;
+  }
+  return rows;
+}
+
+async function loadSupplierReportingSnapshot(ctx) {
+  // Admin reads occur only after signed-in identity, company module permission
+  // and commercial access checks. Every read is constrained to this company’s
+  // owner AND to its authorised supplier IDs; no client-provided owner is used.
+  const admin = createAdminClient();
+  const org = ctx.organization;
+  if (!org.id || !org.owner_id) throw new Error('Supplier organisation ownership is unavailable.');
+  const suppliers = await supplierReadAll(() => admin.from('suppliers')
+    .select('id,legal_name,trading_name,organization_id,supplier_types,applicable_standards,criticality,risk_result,assurance_result,approval_status,approval_expiry,next_review_date,updated_at')
+    .eq('organization_id', org.id).eq('owner_id', org.owner_id), 'register');
+  const ids = suppliers.map(s => s.id);
+  const child = async (table, columns, label, hasOrganization = false) => {
+    const result = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      result.push(...await supplierReadAll(() => {
+        let query = admin.from(table).select(columns).eq('owner_id', org.owner_id).in('supplier_id', batch);
+        if (hasOrganization) query = query.eq('organization_id', org.id);
+        return query;
+      }, label));
+    }
+    return result;
+  };
+  const [reviews, actions, findings, subtiers, audits] = await Promise.all([
+    child('supplier_quarterly_business_reviews', 'id,supplier_id,qbr_reference,quarter,review_date,next_qbr_date,status,scorecard,recommended_decision,updated_at', 'completed reviews', true),
+    child('supplier_qbr_actions', 'id,supplier_id,qbr_id,action_reference,action_required,due_date,status,closed_at', 'QBR actions', true),
+    child('internal_audit_findings', 'id,supplier_id,finding_reference,title,status,linked_rca_case_id,closure_verified,created_at', 'findings'),
+    child('supplier_subtier_suppliers', 'id,supplier_id,legal_name,approval_status,certification_standard,certificate_expiry', 'sub-tier assurance'),
+    child('internal_audits', 'id,supplier_id,audit_reference,title,status,current_gate,planned_start_at,planned_end_at', 'audits'),
+  ]);
+  return {
+    asOf: new Date().toISOString().slice(0, 10), fetchedAt: new Date().toISOString(),
+    organization: { id: org.id, name: org.name || 'Organisation', country: org.country || null },
+    suppliers, reviews, actions, findings, subtiers, audits, warnings: [],
+    canExecutiveReport: hasPlanAccess(ctx.subscription, 'consultant'),
+  };
+}
+
+export async function getSupplierManagementBoardSnapshot() {
+  const ctx = await supplierReportingContext();
+  return loadSupplierReportingSnapshot(ctx);
+}
+
+function supplierReportFilters(fd, snapshot) {
+  if (!fd || typeof fd.get !== 'function' || typeof fd.getAll !== 'function') throw new Error('Invalid report options.');
+  const supplierIds = [...new Set(fd.getAll('supplier_id').map(clean).filter(Boolean))];
+  const allowedIds = new Set(snapshot.suppliers.map(s => s.id));
+  if (supplierIds.some(id => !allowedIds.has(id))) throw new Error('A selected supplier is outside your authorised portfolio.');
+  const risk = clean(fd.get('risk')) || 'all';
+  if (!['all','critical','high','medium','low','unassessed'].includes(risk)) throw new Error('Invalid supplier risk filter.');
+  const category = clean(fd.get('category')) || 'all';
+  const standard = clean(fd.get('standard')) || 'all';
+  const values = key => new Set(snapshot.suppliers.flatMap(s => Array.isArray(s[key]) ? s[key] : []));
+  if (category !== 'all' && !values('supplier_types').has(category)) throw new Error('Invalid supplier category filter.');
+  if (standard !== 'all' && !values('applicable_standards').has(standard)) throw new Error('Invalid supplier standard filter.');
+  return { from: clean(fd.get('from')), to: clean(fd.get('to')), supplierIds, risk, category, standard };
+}
+
+export async function createSupplierExecutiveReport(fd) {
+  // Server actions can be called directly, so authorisation is repeated here.
+  const ctx = await supplierReportingContext();
+  if (!hasPlanAccess(ctx.subscription, 'consultant')) {
+    return { error: 'Executive reporting requires Consultant access or an RPG platform-administrator entitlement.' };
+  }
+  try {
+    const snapshot = await loadSupplierReportingSnapshot(ctx);
+    const filters = supplierReportFilters(fd, snapshot);
+    const analytics = buildSupplierAnalytics(snapshot, filters);
+    return {
+      report: {
+        reference: `SUP-${crypto.randomUUID()}`,
+        generatedAt: new Date().toISOString(), organization: snapshot.organization,
+        analytics, brief: buildSupplierExecutiveBrief(analytics),
+      },
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'The supplier executive report could not be prepared.' };
+  }
 }
