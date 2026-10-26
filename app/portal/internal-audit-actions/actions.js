@@ -13,7 +13,7 @@ import { buildNonconformityAnalytics, buildNonconformityExecutiveBrief, nonconfo
 const clean = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
 
 const MANUAL_NC_TYPES = new Set(["major_nc", "minor_nc"]);
-const MANUAL_NC_SOURCES = new Set(["operations", "supplier", "customer_complaint", "product_service", "process_monitoring", "incident", "management_review", "external_audit", "other"]);
+const MANUAL_NC_SOURCES = new Set(["operations", "internal_audit", "supplier", "customer_complaint", "product_service", "process_monitoring", "incident", "management_review", "external_audit", "other"]);
 const MANUAL_NC_RISKS = new Set(["low", "medium", "high", "critical"]);
 const MAX_MANUAL_EVIDENCE_BYTES = 10 * 1024 * 1024;
 
@@ -141,6 +141,8 @@ export async function submitPortalAuditAction(formData) {
 const NC_ROOT = '/portal/internal-audit-actions';
 const NC_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NC_SHA256 = /^[0-9a-f]{64}$/;
+const NC_REQUIREMENT_SOURCES = new Set(['management_system_standard','legal_regulatory','customer_contractual','policy_procedure','certification_scheme','other_criteria']);
+const NC_EVIDENCE_SOURCES = new Set(['document_record','interview','observation','system_record','photograph_screenshot','measurement_test','external_confirmation','multiple_sources','other']);
 const NC_EVIDENCE_TYPES = new Map([
   ['image/jpeg', 'jpg'], ['image/png', 'png'], ['image/webp', 'webp'],
   ['application/pdf', 'pdf'], ['text/plain', 'txt'], ['text/csv', 'csv'],
@@ -193,7 +195,7 @@ async function ncLoadSnapshot(ctx) {
   const admin = createAdminClient();
   const org = ctx.organization;
   const findings = await ncReadAll(() => {
-    let q = admin.from('internal_audit_findings').select('id,organization_id,audit_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,objective_evidence,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,created_at,closed_at,closure_verified_at,updated_at,source_type,source_category,source_reference,detected_at')
+    let q = admin.from('internal_audit_findings').select('id,organization_id,audit_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,requirement_source,requirement_standard_id,clause,objective_evidence,evidence_source,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,created_at,closed_at,closure_verified_at,updated_at,source_type,source_category,source_reference,detected_at')
       .eq('owner_id', ctx.ownerId).in('finding_type', ['major_nc','minor_nc']);
     // Legacy unassigned records remain visible to their original owner. Company
     // users receive only findings explicitly assigned to their organisation.
@@ -201,6 +203,8 @@ async function ncLoadSnapshot(ctx) {
     return q;
   }, 'register');
   const findingIds = findings.map(f => f.id);
+  const standardIds=[...new Set(findings.map(f=>f.requirement_standard_id).filter(Boolean))],requirementStandards=[];
+  for(let i=0;i<standardIds.length;i+=100)requirementStandards.push(...await ncReadAll(()=>ctx.client.from('internal_audit_standard_catalogue').select('id,standard_code,display_name,edition_label').in('id',standardIds.slice(i,i+100)),'requirement standard references'));
   const byIds = async (table, columns, ids, key = 'id') => {
     const result = [];
     for (let i = 0; i < ids.length; i += 100) result.push(...await ncReadAll(() => admin.from(table).select(columns).eq('owner_id', ctx.ownerId).in(key, ids.slice(i,i+100)), table));
@@ -224,13 +228,43 @@ async function ncLoadSnapshot(ctx) {
   return {
     asOf: new Date().toISOString().slice(0,10), fetchedAt: new Date().toISOString(), currentUserId: ctx.user.id,
     organization: { id: org.id, name: org.name || 'Organisation' },
-    findings, access, audits, capaCases, myResponses, suppliers, contacts: contacts.filter(c=>supplierIds.has(c.supplier_id)), people,
+    findings, access, audits, capaCases, myResponses, suppliers, contacts: contacts.filter(c=>supplierIds.has(c.supplier_id)), people, requirementStandards,
     canCreate: ctx.canCreate, canExecutiveReport: hasPlanAccess(ctx.subscription,'consultant'),
     legacyUnassigned: findings.filter(f=>!f.organization_id).length,
   };
 }
 export async function getNonconformityWorkspaceSnapshot() {
   return ncLoadSnapshot(await ncContext('view'));
+}
+
+// Reuse the same active catalogue and scope-link clause records as Audit
+// Planning. These are reference definitions, not another company's audit data.
+export async function getNonconformityRequirementOptions() {
+  try {
+    const ctx=await ncContext('view');
+    const referenceClient=ctx.client;
+    const standards=await ncReadAll(()=>referenceClient.from('internal_audit_standard_catalogue').select('id,standard_code,display_name,edition_label').eq('active',true),'standards catalogue');
+    const ids=standards.map(s=>s.id),links=[];
+    for(let i=0;i<ids.length;i+=100){
+      let offset=0,lastKey=null;
+      for(;;){
+        const {data,error}=await referenceClient.from('internal_audit_question_scope_links').select('question_id,standard_id,scope_key,clause,requirement_summary').in('standard_id',ids.slice(i,i+100)).order('standard_id').order('question_id').order('scope_key').range(offset,offset+499);
+        if(error||!Array.isArray(data))throw ncFailure('records_unavailable','The Audit Planning clause catalogue could not be loaded completely. Choose Other to enter a manual requirement, or retry the search.',true);
+        if(!data.length)break;
+        const tail=data[data.length-1],key=JSON.stringify([tail.standard_id,tail.question_id,tail.scope_key]);
+        if(key===lastKey)throw ncFailure('pagination_failed','The Audit Planning clause catalogue could not be read completely. Retry while connected.',true);
+        links.push(...data);offset+=data.length;lastKey=key;
+      }
+    }
+    const byId=new Map(standards.map(s=>[s.id,s])),byClause=new Map();
+    for(const row of links){
+      const clause=clean(row.clause),standard=byId.get(row.standard_id);if(!clause||!standard)continue;
+      const key=`${row.standard_id}|${clause}`;
+      if(!byClause.has(key))byClause.set(key,{standardId:standard.id,standardCode:standard.standard_code,standardName:standard.display_name,edition:standard.edition_label||'',clause,summaries:[]});
+      const summary=clean(row.requirement_summary),item=byClause.get(key);if(summary&&!item.summaries.includes(summary))item.summaries.push(summary);
+    }
+    return {ok:true,standards:standards.sort((a,b)=>(a.display_name||a.standard_code).localeCompare(b.display_name||b.standard_code)),clauses:[...byClause.values()].map(item=>({...item,summary:item.summaries.join(' · ')})).sort((a,b)=>a.standardCode.localeCompare(b.standardCode)||a.clause.localeCompare(b.clause,'en',{numeric:true}))};
+  }catch(error){return ncErrorResponse(error);}
 }
 
 function ncText(input, key, max, required = false) {
@@ -262,6 +296,20 @@ function ncSubmission(input, ctx) {
   if (payload.responsible_owner_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.responsible_owner_email)) throw ncFailure('invalid_email','Check the responsible owner’s email address.');
   if (payload.source_category !== 'supplier') { payload.supplier_id=null; payload.supplier_contact_id=null; }
   else { payload.responsible_person_id=null; payload.responsible_owner_name=null; payload.responsible_owner_email=null; }
+  // Old saved attempts retain their exact version-1 digest. Only submissions
+  // that explicitly include these existing finding fields add them to identity.
+  const documents=['requirement_source','requirement_standard_id','clause','evidence_source'];
+  if(documents.some(key=>Object.hasOwn(input,key))){
+    payload.requirement_source=ncText(input,'requirement_source',60,true);
+    payload.requirement_standard_id=ncText(input,'requirement_standard_id',36);
+    payload.clause=ncText(input,'clause',300);
+    payload.evidence_source=ncText(input,'evidence_source',60,true);
+    if(!NC_REQUIREMENT_SOURCES.has(payload.requirement_source)||!NC_EVIDENCE_SOURCES.has(payload.evidence_source))throw ncFailure('invalid_requirement','Choose the source of requirement and source of evidence.');
+    if(payload.requirement_standard_id&&!NC_UUID.test(payload.requirement_standard_id))throw ncFailure('invalid_requirement','The selected standard is invalid.');
+    if(payload.requirement_source!=='management_system_standard')payload.requirement_standard_id=null;
+    else if(!payload.requirement_standard_id||!payload.clause)throw ncFailure('invalid_requirement','Select a standard and its planning clause, or choose Other to enter the requirement manually.');
+    if(payload.requirement_source==='other_criteria'&&!payload.clause)throw ncFailure('invalid_requirement','Enter the source or reference for the manually specified requirement.');
+  }
   let evidence = null;
   if (input.evidence !== undefined && input.evidence !== null) {
     const file = input.evidence;
@@ -345,6 +393,12 @@ async function ncProcessSubmission(input,allowCreate) {
   let finding=await ncExisting(admin,ctx,submission),replayed=Boolean(finding);
   if (!finding) {
     if (!allowCreate) throw ncFailure('submission_not_found','The NC has not yet been registered. Submit the original draft first.');
+    if(submission.payload.requirement_standard_id){
+      const {data:standard,error:standardError}=await ctx.client.from('internal_audit_standard_catalogue').select('id').eq('id',submission.payload.requirement_standard_id).eq('active',true).maybeSingle();
+      const {data:clauses,error:clauseError}=await ctx.client.from('internal_audit_question_scope_links').select('standard_id').eq('standard_id',submission.payload.requirement_standard_id).eq('clause',submission.payload.clause).limit(1);
+      if(standardError||clauseError)throw ncFailure('requirement_check_failed','The selected planning clause could not be checked. Retain the draft and retry.',true);
+      if(!standard||!clauses?.length)throw ncFailure('invalid_requirement','The selected clause is no longer available in Audit Planning. Review the requirement or choose Other.');
+    }
     const owner=await ncResolveOwner(admin,ctx,submission.payload);
     const { responsible_person_id,responsible_owner_name,responsible_owner_email,...fields }=submission.payload;
     const day=new Date().toISOString().slice(0,10).replaceAll('-','');
@@ -353,7 +407,7 @@ async function ncProcessSubmission(input,allowCreate) {
       finding_reference:`MNC-${day}-${randomUUID().slice(0,8).toUpperCase()}`,
       responsible_owner_name:owner.name,responsible_owner_email:owner.email,
       source_type:'manual',status:'response_due',closure_verified:false,
-      requirement_source:'other_criteria',evidence_source:'multiple_sources',
+      requirement_source:fields.requirement_source||'other_criteria',evidence_source:fields.evidence_source||'multiple_sources',
       client_submission_id:submission.requestId,client_submission_digest:submission.digest,
     }).select('id,finding_reference,organization_id,status,closure_verified,client_submission_digest,evidence_attachment_path').single();
     if (error?.code==='23505') { finding=await ncExisting(admin,ctx,submission);replayed=true; }
