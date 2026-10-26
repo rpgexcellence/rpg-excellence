@@ -195,7 +195,7 @@ async function ncLoadSnapshot(ctx) {
   const admin = createAdminClient();
   const org = ctx.organization;
   const findings = await ncReadAll(() => {
-    let q = admin.from('internal_audit_findings').select('id,organization_id,audit_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,requirement_source,requirement_standard_id,clause,objective_evidence,evidence_source,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,created_at,closed_at,closure_verified_at,updated_at,source_type,source_category,source_reference,detected_at')
+    let q = admin.from('internal_audit_findings').select('id,organization_id,audit_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,requirement_source,requirement_standard_id,clause,source_audit_id,source_audit_reference,source_audit_title,objective_evidence,evidence_source,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,created_at,closed_at,closure_verified_at,updated_at,source_type,source_category,source_reference,detected_at')
       .eq('owner_id', ctx.ownerId).in('finding_type', ['major_nc','minor_nc']);
     // Legacy unassigned records remain visible to their original owner. Company
     // users receive only findings explicitly assigned to their organisation.
@@ -213,7 +213,7 @@ async function ncLoadSnapshot(ctx) {
   const [access, audits, capaCases, suppliers, contacts, people] = await Promise.all([
     // Select no access tokens, secret hashes or external response credentials.
     byIds('internal_audit_action_access', 'id,finding_id,assignee_user_id,assignee_name,status,created_at,updated_at', findingIds, 'finding_id'),
-    byIds('internal_audits', 'id,audit_reference,title', [...new Set(findings.map(f=>f.audit_id).filter(Boolean))]),
+    byIds('internal_audits', 'id,audit_reference,title', [...new Set(findings.flatMap(f=>[f.audit_id,f.source_audit_id]).filter(Boolean))]),
     byIds('rca_cases', 'id,status', [...new Set(findings.map(f=>f.linked_rca_case_id).filter(Boolean))]),
     ncReadAll(() => admin.from('suppliers').select('id,legal_name,supplier_reference,approval_status').eq('organization_id', org.id).eq('owner_id',ctx.ownerId), 'supplier options'),
     ncReadAll(() => admin.from('supplier_contacts').select('id,supplier_id,first_name,last_name,business_title,is_active').eq('organization_id', org.id).eq('owner_id',ctx.ownerId).eq('is_active',true), 'supplier contacts'),
@@ -237,6 +237,15 @@ export async function getNonconformityWorkspaceSnapshot() {
   return ncLoadSnapshot(await ncContext('view'));
 }
 
+// Audit references are scoped to the same authorised company as the NC.
+export async function getNonconformityAuditOptions() {
+  try {
+    const ctx=await ncContext('view'),admin=createAdminClient();
+    const audits=await ncReadAll(()=>admin.from('internal_audits').select('id,audit_reference,title,audit_type,status,current_gate,planned_start_at').eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id),'audit source register');
+    return {ok:true,audits:audits.sort((a,b)=>(b.planned_start_at||'').localeCompare(a.planned_start_at||'')||(a.audit_reference||'').localeCompare(b.audit_reference||''))};
+  }catch(error){return ncErrorResponse(error);}
+}
+
 // Reuse the same active catalogue and scope-link clause records as Audit
 // Planning. These are reference definitions, not another company's audit data.
 export async function getNonconformityRequirementOptions() {
@@ -244,8 +253,9 @@ export async function getNonconformityRequirementOptions() {
     const ctx=await ncContext('view');
     const referenceClient=ctx.client;
     const standards=await ncReadAll(()=>referenceClient.from('internal_audit_standard_catalogue').select('id,standard_code,display_name,edition_label').eq('active',true),'standards catalogue');
-    const ids=standards.map(s=>s.id),links=[];
+    const ids=standards.map(s=>s.id),links=[],questions=[];
     for(let i=0;i<ids.length;i+=100){
+      questions.push(...await ncReadAll(()=>referenceClient.from('internal_audit_questions').select('id,standard_id,clause,process_area,question_code').in('standard_id',ids.slice(i,i+100)).eq('active',true),'detailed audit clauses'));
       let offset=0,lastKey=null;
       for(;;){
         const {data,error}=await referenceClient.from('internal_audit_question_scope_links').select('question_id,standard_id,scope_key,clause,requirement_summary').in('standard_id',ids.slice(i,i+100)).order('standard_id').order('question_id').order('scope_key').range(offset,offset+499);
@@ -257,7 +267,7 @@ export async function getNonconformityRequirementOptions() {
       }
     }
     const byId=new Map(standards.map(s=>[s.id,s])),byClause=new Map();
-    for(const row of links){
+    for(const row of [...questions.map(q=>({...q,requirement_summary:q.process_area})),...links]){
       const clause=clean(row.clause),standard=byId.get(row.standard_id);if(!clause||!standard)continue;
       const key=`${row.standard_id}|${clause}`;
       if(!byClause.has(key))byClause.set(key,{standardId:standard.id,standardCode:standard.standard_code,standardName:standard.display_name,edition:standard.edition_label||'',clause,summaries:[]});
@@ -309,6 +319,13 @@ function ncSubmission(input, ctx) {
     if(payload.requirement_source!=='management_system_standard')payload.requirement_standard_id=null;
     else if(!payload.requirement_standard_id||!payload.clause)throw ncFailure('invalid_requirement','Select a standard and its planning clause, or choose Other to enter the requirement manually.');
     if(payload.requirement_source==='other_criteria'&&!payload.clause)throw ncFailure('invalid_requirement','Enter the source or reference for the manually specified requirement.');
+  }
+  if(Object.hasOwn(input,'source_audit_id')){
+    payload.source_audit_id=ncText(input,'source_audit_id',36);
+    if(!['internal_audit','external_audit'].includes(payload.source_category))payload.source_audit_id=null;
+    if(payload.source_audit_id&&!NC_UUID.test(payload.source_audit_id))throw ncFailure('invalid_audit_source','Select a valid audit register record.');
+    if(payload.source_category==='internal_audit'&&!payload.source_audit_id)throw ncFailure('invalid_audit_source','Select the applicable audit from this company’s register.');
+    if(payload.source_category==='external_audit'&&!payload.source_reference)throw ncFailure('invalid_audit_source','Enter the external auditor or organisation and report reference.');
   }
   let evidence = null;
   if (input.evidence !== undefined && input.evidence !== null) {
@@ -396,8 +413,16 @@ async function ncProcessSubmission(input,allowCreate) {
     if(submission.payload.requirement_standard_id){
       const {data:standard,error:standardError}=await ctx.client.from('internal_audit_standard_catalogue').select('id').eq('id',submission.payload.requirement_standard_id).eq('active',true).maybeSingle();
       const {data:clauses,error:clauseError}=await ctx.client.from('internal_audit_question_scope_links').select('standard_id').eq('standard_id',submission.payload.requirement_standard_id).eq('clause',submission.payload.clause).limit(1);
-      if(standardError||clauseError)throw ncFailure('requirement_check_failed','The selected planning clause could not be checked. Retain the draft and retry.',true);
-      if(!standard||!clauses?.length)throw ncFailure('invalid_requirement','The selected clause is no longer available in Audit Planning. Review the requirement or choose Other.');
+      const {data:questions,error:questionError}=await ctx.client.from('internal_audit_questions').select('id').eq('standard_id',submission.payload.requirement_standard_id).eq('clause',submission.payload.clause).eq('active',true).limit(1);
+      if(standardError||clauseError||questionError)throw ncFailure('requirement_check_failed','The selected planning clause could not be checked. Retain the draft and retry.',true);
+      if(!standard||(!clauses?.length&&!questions?.length))throw ncFailure('invalid_requirement','The selected clause is no longer available in Audit Planning. Review the requirement or choose Other.');
+    }
+    let sourceAudit=null;
+    if(submission.payload.source_audit_id){
+      const {data,error}=await admin.from('internal_audits').select('id,audit_reference,title').eq('id',submission.payload.source_audit_id).eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).maybeSingle();
+      if(error)throw ncFailure('audit_source_check_failed','The source audit could not be checked. Keep the draft and retry.',true);
+      if(!data)throw ncFailure('invalid_audit_source','The selected audit is no longer available in this company. Review the source before submitting.');
+      sourceAudit=data;
     }
     const owner=await ncResolveOwner(admin,ctx,submission.payload);
     const { responsible_person_id,responsible_owner_name,responsible_owner_email,...fields }=submission.payload;
@@ -407,6 +432,7 @@ async function ncProcessSubmission(input,allowCreate) {
       finding_reference:`MNC-${day}-${randomUUID().slice(0,8).toUpperCase()}`,
       responsible_owner_name:owner.name,responsible_owner_email:owner.email,
       source_type:'manual',status:'response_due',closure_verified:false,
+      ...(sourceAudit?{source_audit_reference:sourceAudit.audit_reference,source_audit_title:sourceAudit.title}:{}),
       requirement_source:fields.requirement_source||'other_criteria',evidence_source:fields.evidence_source||'multiple_sources',
       client_submission_id:submission.requestId,client_submission_digest:submission.digest,
     }).select('id,finding_reference,organization_id,status,closure_verified,client_submission_digest,evidence_attachment_path').single();
