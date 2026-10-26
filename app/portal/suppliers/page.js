@@ -3,7 +3,8 @@ import ControlledDeviceDrafts from "../../../components/ControlledDeviceDrafts";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import SupplierAssuranceWorkspace from "../../../components/SupplierAssuranceWorkspace";
-import { saveSupplier, generateSupplierCodeOfConduct } from "./actions";
+import SupplierManagementBoard from "../../../components/SupplierManagementBoard";
+import { saveSupplier, generateSupplierCodeOfConduct, getSupplierManagementBoardSnapshot } from "./actions";
 export const metadata = {
   "title": "Supplier Assurance Hub | RPG Excellence"
 };
@@ -21,6 +22,32 @@ export default async function SuppliersPage({
   } = await supabase.auth.getUser();
   if (!user) {
     redirect("/portal/login?next=/portal/suppliers");
+  }
+  // Keep portfolio reporting separate from the editable supplier worksheet.
+  // The server loader repeats identity, company-module and subscription checks.
+  if (managementBoard) {
+    const snapshot = await getSupplierManagementBoardSnapshot();
+    return (
+      <ControlledDeviceDrafts
+        userId={user.id}
+        organizationId={snapshot.organization.id}
+        recordKey="supplier:management-board"
+        label="Supplier management board"
+        baseline={{
+          organization: snapshot.organization,
+          suppliers: snapshot.suppliers,
+          reviews: snapshot.reviews,
+          actions: snapshot.actions,
+          findings: snapshot.findings,
+          subtiers: snapshot.subtiers,
+          audits: snapshot.audits,
+        }}
+      >
+        <div data-device-draft-exclude="true">
+          <SupplierManagementBoard snapshot={snapshot} />
+        </div>
+      </ControlledDeviceDrafts>
+    );
   }
   const {
     data: organization,
