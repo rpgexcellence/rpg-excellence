@@ -203,6 +203,36 @@ export default function HealthSafetyLanding({ locale = "en" }) {
       </div>
     </section>
 
+    <section className={`${styles.container} ${styles.employeeReporting}`} aria-labelledby="hs-reporting-title">
+      <div className={styles.reportingCopy}>
+        <p className={styles.eyebrow}>ACCIDENT, INCIDENT &amp; NEAR MISS REPORTING</p>
+        <h2 id="hs-reporting-title">The next safety concern shouldn’t wait for a laptop.</h2>
+        <p className={styles.reportingLead}>Put the right information—and a clear reporting route—in your people’s hands.</p>
+        <p>Turn your work-area poster into a practical connection between employees and your safety system. Scan the zone QR code, check available local controls and report an accident, incident, near miss or concern from a phone browser.</p>
+        <ul className={styles.reportingValue}>
+          <li><strong>Make it easier to speak up.</strong><span>No sign-in needed to submit a zone report. Contact details are optional.</span></li>
+          <li><strong>Give every concern its context.</strong><span>Connect reports to the work area, with optional photo evidence to support review.</span></li>
+          <li><strong>Bring controls closer to the work.</strong><span>Give employees access to available published risk assessments, hazards, PPE and inspection information.</span></li>
+        </ul>
+        <div className={styles.reportingBenefits}><span>Phone camera + browser</span><span>Zone-linked reporting</span><span>Optional photo evidence</span></div>
+        <div className={styles.actions}><Link className={styles.primary} href={`/${locale}/pricing`}>View plans &amp; get started <span aria-hidden="true">→</span></Link><Link className={styles.textLink} href={`/${locale}/contact`}>Discuss your workplace needs <span aria-hidden="true">→</span></Link></div>
+        <Link className={styles.reportingWorkspace} href="/portal/incidents?domain=health_safety">Already using RPG? Open incident management <span aria-hidden="true">→</span></Link>
+        <p className={styles.reportingAccess}>Safety records follow your organisation’s publication and access settings. The poster shows an illustrative product preview.</p>
+      </div>
+      <figure className={styles.reportingPoster}>
+        <a href="/hs-journey/scan-check-report-poster.png" target="_blank" rel="noopener noreferrer" aria-label="View the Scan Check Report promotional poster in full size">
+          <Image src="/hs-journey/scan-check-report-poster.png" width={1055} height={1491} sizes="(max-width:950px) 90vw, 42vw" alt="RPG Excellence Scan Check Report poster showing mobile access to work-area safety information and incident reporting" />
+        </a>
+        <figcaption>Scan. Check. Report. Your work area. Your safety. One connection.</figcaption>
+      </figure>
+      <div className={styles.reportingProof} aria-label="Value for your organisation">
+        <div><strong>For your people</strong><p>A straightforward way to find local information and raise a concern where work happens.</p></div>
+        <div><strong>For your managers</strong><p>Work-area context and supporting information to help authorised teams review what needs attention.</p></div>
+        <div><strong>For your business</strong><p>Less friction between noticing a concern and bringing it into your management process.</p></div>
+      </div>
+      <p className={styles.reportingEmergency}>For immediate danger, follow site emergency procedures. The reporting form does not summon emergency assistance.</p>
+    </section>
+
     <section className={`${styles.container} ${styles.explore}`} aria-labelledby="hs-explore-title">
       <div className={styles.commercialHeading}><p className={styles.eyebrow}>START WITH YOUR PRIORITY</p><h2 id="hs-explore-title">Where do you want to start?</h2><p>Choose one starting point. Explore the detail when you need it.</p></div>
       <div className={styles.priorityGrid}>
