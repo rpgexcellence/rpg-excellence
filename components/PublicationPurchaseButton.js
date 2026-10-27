@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 
-const VALID_PUBLICATIONS = new Set([
-  "ISO9001-2026-GUIDE",
-  "ISO14001-2026-GUIDE",
-  "ISO17025-2017-GUIDE",
-]);
+import { getPublication } from "../lib/publications.mjs";
 
 // Legacy ISO 14001 product page does not pass a publication prop.
 // Defaulting to its existing product code preserves that checkout.
@@ -15,7 +11,8 @@ export default function PublicationPurchaseButton({ publication = "ISO14001-2026
 
   async function buy() {
     if (loading) return;
-    if (!VALID_PUBLICATIONS.has(publication)) {
+    const product = getPublication(publication);
+    if (!product) {
       window.alert("This publication is not configured for purchase.");
       return;
     }
@@ -50,7 +47,7 @@ export default function PublicationPurchaseButton({ publication = "ISO14001-2026
 
   return (
     <button className="button" type="button" disabled={loading} onClick={buy}>
-      {loading ? "Opening secure checkout…" : "Buy PDF — £29.99"}
+      {loading ? "Opening secure checkout…" : `Buy ${publication === "ISO9001-2026-INSIGHTS" ? "collection" : "PDF"} — £${((getPublication(publication)?.unitAmount ?? 0) / 100).toFixed(2)}`}
     </button>
   );
 }
