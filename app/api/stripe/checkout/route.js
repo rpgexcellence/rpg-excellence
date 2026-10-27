@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { getPublication } from "../../../../lib/publications.mjs";
 import { createClient } from "../../../../lib/supabase/server";
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -72,7 +73,7 @@ export async function POST(request) {
     if (userError || !user) {
       return Response.json(
         {
-          error: "Please sign in before starting a subscription.",
+          error: "Please sign in before starting checkout.",
         },
         {
           status: 401,
@@ -97,7 +98,7 @@ export async function POST(request) {
       typeof body?.publication === "string" ? body.publication.trim() : "";
     if (
       purchaseType === "digital_publication" &&
-      !["ISO14001-2026-GUIDE", "ISO9001-2026-GUIDE", "ISO17025-2017-GUIDE"].includes(publicationCode)
+      !getPublication(publicationCode)
     ) {
       return Response.json(
         {
@@ -257,24 +258,7 @@ export async function POST(request) {
     const trainingPaths = trainingCourse
       ? getTrainingPaths(trainingCourse.course_code)
       : null;
-    const publication =
-      publicationCode === "ISO17025-2017-GUIDE"
-        ? {
-            slug: "decoding-iso-17025-2017",
-            name: "Decoding ISO/IEC 17025:2017 — Technical Laboratory Competence Guide",
-            description: "RPG Excellence independent 52-page PDF publication.",
-          }
-        : publicationCode === "ISO9001-2026-GUIDE"
-          ? {
-              slug: "decoding-iso-9001-2026",
-              name: "Decoding ISO 9001:2026 — A Practical Guide to Quality Decisions",
-              description: "RPG Excellence independent 33-page PDF publication.",
-            }
-          : {
-              slug: "decoding-iso-14001-2026",
-              name: "Decoding ISO 14001:2026 — A Practical Reference and Pocket Guide",
-              description: "RPG Excellence independent 24-page PDF publication.",
-            };
+    const publication = getPublication(publicationCode);
     const session =
       purchaseType === "digital_publication"
         ? await stripe.checkout.sessions.create({
@@ -296,7 +280,7 @@ export async function POST(request) {
               {
                 price_data: {
                   currency: "gbp",
-                  unit_amount: 2999,
+                  unit_amount: publication.unitAmount,
                   product_data: {
                     name: publication.name,
                     description: publication.description,
