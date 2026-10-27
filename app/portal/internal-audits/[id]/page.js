@@ -8,15 +8,16 @@ import { createClient } from "../../../../lib/supabase/server";
 import { loadAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
 import AuditTeamAssignmentForm from "./AuditTeamAssignmentForm";
 import OfflineAuditDraft from "../../../../components/OfflineAuditDraft";
+import FindingConclusionFields from "../../assessments/[id]/FindingConclusionFields";
 import {
   addAuditScheduleItem,
   approveAuditPlan,
   approveAuditTeam,
   addAuditEvidence,
-  addAuditFinding,
+  openAuditFinding,
+  getAuditFieldworkSnapshot,
   completeAuditFieldwork,
   completeAuditClosure,
-  linkAuditFindingToAnswer,
   saveAuditAnswer,
   saveAuditNotification,
   saveAuditScope,
@@ -24,10 +25,6 @@ import {
   generateAuditReportGuidedDraft,
   approveAuditReport,
   issueAuditReport,
-  assignAuditActionOwner,
-  reviewAuditActionResponse,
-  verifyD6CorrectiveAction,
-  verifyAuditFindingEffectiveness,
 } from "./actions";
 
 const GATES = [
@@ -160,137 +157,34 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
     .eq("verification_status", "verified").gte("verified_until", today).order("full_name");
   if (eligibleAuditorsResult.error) throw new Error(`${eligibleAuditorsResult.error.message}. Run internal-auditor-verification.sql in Supabase before assigning the team.`);
   const eligibleAuditors = eligibleAuditorsResult.data ?? [];
-  const selectedProcessPairs = new Set((selectedProcessesResult.data ?? [])
-    .map((item) => `${item.standard_id}:${item.scope_key}`));
-  const questionLinksResult = standardIds.length
-    ? await supabase.from("internal_audit_question_scope_links")
-        .select("question_id, standard_id, scope_key, clause, requirement_summary, internal_audit_standard_catalogue(standard_code, display_name)")
-        .in("standard_id", standardIds)
-    : { data: [], error: null };
-  if (questionLinksResult.error) throw new Error(questionLinksResult.error.message);
-  const scopedQuestionLinks = (questionLinksResult.data ?? []).filter((link) =>
-    selectedProcessPairs.size === 0 ||
-    selectedProcessPairs.has(`${link.standard_id}:${link.scope_key}`)
-  );
-  const linkedQuestionIds = [...new Set(scopedQuestionLinks.map((link) => link.question_id).filter(Boolean))];
-  const [questionsResult, answersResult, evidenceResult, findingsResult] = await Promise.all([
-    standardIds.length
-      ? supabase.from("internal_audit_questions").select("*").in("standard_id", standardIds).eq("active", true).order("display_order")
-      : Promise.resolve({ data: [], error: null }),
-    supabase.from("internal_audit_answers").select("*").eq("audit_id", id).eq("owner_id", user.id),
-    supabase.from("internal_audit_evidence").select("*").eq("audit_id", id).eq("owner_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("internal_audit_findings").select("*").eq("audit_id", id).eq("owner_id", user.id).order("created_at", { ascending: false }),
-  ]);
-  if (questionsResult.error) throw new Error(questionsResult.error.message);
-  if (answersResult.error) throw new Error(answersResult.error.message);
-  if (evidenceResult.error) throw new Error(evidenceResult.error.message);
-  if (findingsResult.error) throw new Error(findingsResult.error.message);
-  const linksByQuestion = new Map();
-  for (const link of scopedQuestionLinks) {
-    const current = linksByQuestion.get(link.question_id) ?? [];
-    current.push(link);
-    linksByQuestion.set(link.question_id, current);
-  }
-  const questions = (questionsResult.data ?? [])
-    .filter((question) => linkedQuestionIds.includes(question.id))
-    .map((question) => ({
-    ...question,
-    criteria_links: linksByQuestion.get(question.id) ?? [],
-  }));
-  const answers = answersResult.data ?? [];
-  const evidence = evidenceResult.data ?? [];
-  const findings = findingsResult.data ?? [];
-  const [reportControlResult, actionAccessResult] = await Promise.all([
-    supabase.from("internal_audit_report_controls").select("*")
-      .eq("audit_id", id).eq("owner_id", user.id).maybeSingle(),
-    supabase.from("internal_audit_action_access").select("*")
-      .eq("audit_id", id).eq("owner_id", user.id).order("created_at"),
-  ]);
-  if (reportControlResult.error) throw new Error(reportControlResult.error.message);
-  if (actionAccessResult.error) throw new Error(actionAccessResult.error.message);
-  const reportControl = reportControlResult.data;
-  const actionAccess = actionAccessResult.data ?? [];
-  const actionAccessByFinding = new Map(actionAccess.map((item) => [item.finding_id, item]));
-  const actionAccessIds = actionAccess.map((item) => item.id);
-  const actionEvidenceResult = actionAccessIds.length
-    ? await supabase.from("internal_audit_action_evidence").select("*")
-        .in("action_access_id", actionAccessIds).eq("owner_id", user.id).order("created_at")
-    : { data: [], error: null };
-  if (actionEvidenceResult.error) throw new Error(actionEvidenceResult.error.message);
-  const actionEvidence = actionEvidenceResult.data ?? [];
-  const actionEvidenceUrls = new Map();
-  if (actionEvidence.length) {
-    const { data: signedActionEvidence } = await supabase.storage.from("internal-audit-evidence")
-      .createSignedUrls(actionEvidence.map((item) => item.storage_path), 3600);
-    for (const item of signedActionEvidence ?? []) if (item.path && item.signedUrl) actionEvidenceUrls.set(item.path, item.signedUrl);
-  }
-  const actionEvidenceByAccess = new Map();
-  for (const item of actionEvidence) {
-    const current = actionEvidenceByAccess.get(item.action_access_id) ?? [];
-    current.push(item);
-    actionEvidenceByAccess.set(item.action_access_id, current);
-  }
-  const findingAttachmentPaths = findings.map((finding) => finding.evidence_attachment_path).filter(Boolean);
-  const findingAttachmentUrls = new Map();
-  if (findingAttachmentPaths.length > 0) {
-    const { data: signedAttachments } = await supabase.storage
-      .from("internal-audit-evidence")
-      .createSignedUrls(findingAttachmentPaths, 3600);
-    for (const attachment of signedAttachments ?? []) {
-      if (attachment.path && attachment.signedUrl) findingAttachmentUrls.set(attachment.path, attachment.signedUrl);
-    }
-  }
+  const fieldworkState = await getAuditFieldworkSnapshot(audit.id);
+  if(fieldworkState.ownerId!==user.id || fieldworkState.organizationId!==audit.organization_id)throw new Error("The authenticated audit context changed. Refresh before continuing.");
+  const questions = fieldworkState.scope.questions;
+  const answers = fieldworkState.answers;
+  const evidence = fieldworkState.evidence;
+  const findings = fieldworkState.findings.filter(finding=>finding.audit_id===audit.id);
+  const coverage = fieldworkState.coverage;
+  const coverageByQuestion = new Map(coverage.rows.map(row=>[row.questionId,row]));
+  const standardLabels = new Map(fieldworkState.scope.standards.map(standard=>[standard.standardId,standard.standardLabel]));
+  const dataScopeIssues = fieldworkState.scope.issues.filter(issue=>issue.blocking && issue.code!=="reference_inventory_unverified");
+  for(const standard of fieldworkState.scope.standards)if(!standard.referenceClauses)dataScopeIssues.push({code:"reference_inventory_missing_preview",standardId:standard.standardId,blocking:true,message:"No controlled reference clauses resolve to this selected scope. Review its criterion inventory before completing Fieldwork.",details:[]});
+  const fieldworkLocked = !audit.plan_approved || audit.current_gate!=="fieldwork" || audit.status==="closed";
+  const completionDataReady = coverage.required>0 && coverage.outstanding===0 && dataScopeIssues.length===0;
+  const standardFilter = standardLabels.has(query?.standard) ? query.standard : "";
+  const outstandingOnly = query?.criteria==="outstanding";
+  const visibleQuestions = questions.filter(question=>(!standardFilter || question.criteria_links.some(link=>link.standard_id===standardFilter)) && (!outstandingOnly || !coverageByQuestion.get(question.id)?.complete));
+  const {data:reportControl,error:reportControlError}=await supabase.from("internal_audit_report_controls").select("*").eq("audit_id",id).eq("owner_id",user.id).maybeSingle();
+  if(reportControlError)throw new Error(reportControlError.message);
   const evidenceAttachmentPaths = evidence.map((item) => item.attachment_path).filter(Boolean);
   const evidenceAttachmentUrls = new Map();
   if (evidenceAttachmentPaths.length > 0) {
     const { data: signedEvidenceAttachments } = await supabase.storage.from("internal-audit-evidence").createSignedUrls(evidenceAttachmentPaths, 3600);
     for (const attachment of signedEvidenceAttachments ?? []) if (attachment.path && attachment.signedUrl) evidenceAttachmentUrls.set(attachment.path, attachment.signedUrl);
   }
-  const linkedRcaIds = [...new Set(findings.map((finding) => finding.linked_rca_case_id).filter(Boolean))];
-  const [rcaCasesResult, rcaActionsResult, rcaD6EvidenceResult] = linkedRcaIds.length
-    ? await Promise.all([
-        supabase.from("rca_cases").select("id, case_reference, status, current_discipline, target_close_date, closed_at").in("id", linkedRcaIds).eq("owner_id", user.id),
-        supabase.from("rca_actions").select("*").in("case_id", linkedRcaIds).eq("owner_id", user.id),
-        supabase.from("rca_evidence").select("*").in("case_id", linkedRcaIds).eq("owner_id", user.id).eq("discipline", 6).order("created_at", { ascending: false }),
-      ])
-    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
-  if (rcaCasesResult.error) throw new Error(rcaCasesResult.error.message);
-  if (rcaActionsResult.error) throw new Error(rcaActionsResult.error.message);
-  if (rcaD6EvidenceResult.error) throw new Error(rcaD6EvidenceResult.error.message);
-  const rcaCasesById = new Map((rcaCasesResult.data ?? []).map((rcaCase) => [rcaCase.id, rcaCase]));
-  const rcaActionsByCase = new Map();
-  for (const action of rcaActionsResult.data ?? []) {
-    const current = rcaActionsByCase.get(action.case_id) ?? [];
-    current.push(action);
-    rcaActionsByCase.set(action.case_id, current);
-  }
-  const d6EvidenceUrls = new Map();
-  const d6EvidenceByCase = new Map();
-  const d6Evidence = rcaD6EvidenceResult.data ?? [];
-  if (d6Evidence.length) {
-    const { data: signedD6Evidence } = await supabase.storage.from("rca-evidence").createSignedUrls(d6Evidence.map((item) => item.storage_path), 3600);
-    for (const item of signedD6Evidence ?? []) if (item.path && item.signedUrl) d6EvidenceUrls.set(item.path, item.signedUrl);
-  }
-  for (const item of d6Evidence) {
-    const current = d6EvidenceByCase.get(item.case_id) ?? [];
-    current.push(item);
-    d6EvidenceByCase.set(item.case_id, current);
-  }
-  const nonconformities = findings.filter((finding) => ["major_nc", "minor_nc"].includes(finding.finding_type));
-  const advisoryFindings = findings.filter((finding) => !["major_nc", "minor_nc"].includes(finding.finding_type));
-  const unresolvedNonconformities = nonconformities.filter((finding) => !finding.linked_rca_case_id || finding.status !== "closed" || !finding.closure_verified);
-  const firstVerificationFinding = nonconformities.find((finding) => actionAccessByFinding.get(finding.id)?.d6_verification_requested_at);
-  const createdOwnerAccess = query?.access ? actionAccess.find((item) => item.id === query.access) : null;
-  const createdOwnerFinding = createdOwnerAccess ? findings.find((item) => item.id === createdOwnerAccess.finding_id) : null;
-  const secureOwnerLink = query?.action_token ? `${applicationOrigin}/audit-actions/${query.action_token}` : null;
-  const ownerEmailHref = createdOwnerAccess && secureOwnerLink ? createMailtoHref({
-    recipients: [createdOwnerAccess.assignee_email],
-    ccRecipients: [],
-    subject: `Action required: ${createdOwnerFinding?.finding_reference || "internal audit corrective action"}`,
-    body: `Dear ${createdOwnerAccess.assignee_name},\n\nPlease follow the secure link below to review the nonconformity and complete the required corrective-action response and associated CAPA–8D record.\n\n${secureOwnerLink}\n\nThis link is restricted to the named action owner and expires on ${displayDate(createdOwnerAccess.secure_token_expires_at)}. Please do not forward it.\n\nIf you have any questions about the finding or required response, please contact the audit team.\n\nKind regards,\nAudit Team`,
-  }) : null;
+  const nonconformities=findings.filter(finding=>["major_nc","minor_nc"].includes(finding.finding_type));
+  const unresolvedNonconformities=nonconformities.filter(finding=>!finding.linked_rca_case_id || finding.status!=="closed" || !finding.closure_verified);
   const answersByQuestion = new Map(answers.map((answer) => [answer.question_id, answer]));
-  const assessedCount = answers.filter((answer) => answer.result && answer.result !== "not_assessed").length;
+  const assessedCount = coverage.accountedFor;
   const inheritedProcesses = splitControlledList(audit.processes);
   const inheritedSites = splitControlledList(audit.sites);
   const defaultProcess = inheritedProcesses[0] ?? audit.scope_statement ?? "";
@@ -380,6 +274,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   return (
     <main className="workspacePage">
       <style>{`
+          .afwScopeBody{padding:22px;display:grid;gap:16px}.afwScope progress{width:100%;height:10px;accent-color:#0b818b}.afwHint{margin:0;color:#617087;font-size:13px;line-height:1.7}.afwCoverageDetails>summary,.afwReference>summary,.afwExtra>summary{cursor:pointer;font-weight:750;color:#126c7b;padding:12px 0}.afwStandardCoverage{display:grid;gap:14px;padding-top:10px}.afwStandardCoverage>section{padding:15px;border:1px solid #dce6ef;border-radius:10px}.afwStandardCoverage h4{margin:0 0 7px}.afwStandardCoverage p{margin:5px 0;color:#617087;font-size:12px}.afwClauseLinks{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.afwClauseLinks>a{display:flex;gap:12px;align-items:center;padding:8px 10px;border:1px solid #d6e4ee;border-radius:8px;text-decoration:none;color:#184c72;font-size:12px}.afwClauseLinks span{background:#eaf2fa;padding:3px 5px;border-radius:5px;font-weight:750}.afwFilter{display:flex;align-items:end;flex-wrap:wrap;gap:10px;padding:18px 22px;border-bottom:1px solid #e1e8ef;background:#f8fafc}.afwFilter label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#47637d;flex:1;min-width:180px}.afwFilter select{padding:10px;border:1px solid #cfddea;border-radius:8px;background:#fff;min-width:0;width:100%;color:#173b55}.afwFilter small{width:100%;color:#617087}.afwQuestions{padding:0 26px}.afwQuestion{padding:28px 0;border-bottom:1px solid #e0e8ef;scroll-margin-top:80px}.afwQuestion:last-child{border-bottom:0}.afwQuestionHeading{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.afwQuestionHeading h3{margin:0;font-size:20px}.afwControl{padding:5px 9px;background:#eef3ff;color:#1759dd;font-size:11px;font-weight:800;border-radius:999px;overflow-wrap:anywhere}.afwStatus{margin-left:auto;font-size:11px;background:#fff4dc;color:#835c15;padding:6px 9px;border-radius:6px}.afwStatus.complete{background:#e9f7f0;color:#17684a}.afwCriteria{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0;color:#526e85;font-size:11px}.afwCriteria>span{padding:4px 7px;background:#f4f7fa;border-radius:5px}.afwPrompt{font-size:16px;line-height:1.6;margin:12px 0;color:#092340}.afwGuidance{border:1px solid #dbe5ef;border-radius:9px;overflow:hidden;margin:15px 0 20px}.afwGuidance>summary{padding:14px;background:#f5f8fc;cursor:pointer;font-weight:800;color:#102d4b}.afwGuidanceBody{padding:13px;display:grid;gap:12px}.afwGuideStack{display:grid;gap:10px}.afwGuideStack>p{font-size:13px;line-height:1.7;margin:0;color:#526b83}.afwGuideBlock{background:#f5f8fc;padding:12px 14px;border-radius:7px;color:#617087;font-size:13px;line-height:1.7;overflow-wrap:anywhere}.afwGuideBlock strong{color:#16324d}.afwGuideBlock ul{margin:7px 0 0;padding-left:20px}.afwGuideBlock.blue{background:#eef4ff;border-left:3px solid #225cdb}.afwGuideBlock.teal{background:#f0faf7;border-left:3px solid #18818a}.afwGuideBlock.amber{background:#fff9eb;color:#795c20}.afwGuideBlock.red{background:#fff3f1;color:#9c382d}.afwGuideBlock.purple{background:#f7f4fd}.afwGuideBlock.green{background:#f0fbf4;border-left:3px solid #259d61}.afwGuideGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.afwGuideGrid:empty{display:none}.afwReference{border:1px solid #e2e9f0;border-radius:8px;padding:0 12px 12px}.afwAnswer{margin:0!important;padding:0!important}.afwAnswer>.field>span{display:block;margin-bottom:8px;font-weight:750}.afwAnswer textarea{min-height:110px}.afwExtra{margin-top:12px}.afwExtra fieldset{padding:12px 0 0;border:0;min-width:0}.afwProgressHead{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.afwProgressActions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.afwScope li{margin:8px 0;overflow-wrap:anywhere}@media(max-width:650px){.mainPanel .fieldworkLayout{margin-left:8px;margin-right:8px}.mainPanel .afwQuestions{padding-left:12px;padding-right:12px}.afwQuestions{padding:0 15px}.afwQuestion{padding:22px 0}.afwGuideGrid{grid-template-columns:1fr}.afwGuidanceBody{padding:9px}.afwFilter{padding:15px}.afwFilter label{min-width:100%}.afwFilter select,.afwAnswer input,.afwAnswer select,.afwAnswer textarea{font-size:16px}.afwStatus{margin-left:0}.afwScopeBody{padding:15px}.afwProgressActions .button{width:100%}.afwGuideBlock{padding:11px}.afwQuestionHeading h3{font-size:18px}}
+
         :root{--navy:#061a35;--blue:#1761e8;--cyan:#35d7d0;--muted:#667990;--line:#dbe5f0;--soft:#f4f7fb;--green:#087a4b}
         *{box-sizing:border-box}.workspacePage{min-height:100vh;padding:25px clamp(16px,4vw,64px) 80px;background:linear-gradient(180deg,#eef4fb,#f8fafc 520px);color:var(--navy)}.workspaceShell{max-width:1720px;margin:auto}
         .workspaceTop{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px}.workspaceLogo{display:block;object-fit:contain}.workspaceBack{padding:12px 17px;border:1px solid #cfdae7;border-radius:12px;background:#fff;color:var(--navy);font-weight:900;text-decoration:none}
@@ -449,6 +345,8 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
         {query?.fieldwork_error === "assessment" ? <div className="notice error" role="alert"><strong>Assessment required.</strong> <Link href="#criteria-workbench">Assess at least one audit criterion</Link> before completing Fieldwork.</div> : null}
         {query?.fieldwork_error === "evidence" ? <div className="notice error" role="alert"><strong>Objective evidence required.</strong> <Link href="#evidence-register">Add at least one evidence record</Link> before completing Fieldwork.</div> : null}
 
+        {query?.fieldwork_error==="scope_coverage" ? <div className="notice error" role="alert">The selected scope or criterion inventory needs review. Resolve the coverage warnings in Fieldwork before opening Report.</div> : null}
+        {query?.fieldwork_error==="outstanding_questions" ? <div className="notice error" role="alert">Some in-scope questions still lack a supported conclusion, controlled finding or justified N/A. Review the outstanding-question view.</div> : null}
         <nav className="gateNav" aria-label="Audit lifecycle">
           {GATES.map(([key, number, label], index) => {
             const unlocked = index === 0 || (index === 1 && scopeComplete) || (index === 2 && teamComplete) || (index === 3 && planComplete) || (index === 4 && fieldworkComplete) || (index === 5 && reportComplete) || (index === 6 && reportComplete);
@@ -605,89 +503,51 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
             </> : null}
 
             {gate === "fieldwork" ? <>
-              <div className="panelKicker">Gate 04 · Evidence-led fieldwork</div>
-              <h2>Execute the approved audit plan</h2>
-              <p className="panelLead">Test the approved criteria, preserve objective evidence and convert verified conclusions into controlled findings. Every conclusion remains traceable to its criterion, auditor and evidence trail.</p>
-
+              <div className="panelKicker">Gate 04 · Evidence-led fieldwork</div><h2>Assess the approved audit criteria</h2>
+              <p className="panelLead">Work through the selected scope, record objective evidence and reach a supported conclusion. Raise findings directly in Findings &amp; Actions; their status remains visible against the originating question.</p>
               <OfflineAuditDraft auditId={id} userId={user.id} scopeId="audit-fieldwork-offline-scope" />
-
               <div className="fieldworkMetrics">
-                <a className="fieldworkMetric criteria" href="#criteria-workbench"><b>{assessedCount}/{questions.length}</b><span>Criteria assessed ↓</span></a>
-                <a className="fieldworkMetric evidence" href="#evidence-register"><b>{evidence.length}</b><span>Evidence records ↓</span></a>
-                <a className="fieldworkMetric findings" href="#finding-register"><b>{findings.length}</b><span>Controlled findings ↓</span></a>
-                <Link className="fieldworkMetric activities" href={`/portal/internal-audits/${id}?gate=plan#audit-agenda`}><b>{schedule.length}</b><span>Approved activities →</span></Link>
+                <a className="fieldworkMetric criteria" href="#criteria-workbench"><b>{coverage.accountedFor}/{coverage.required}</b><span>Questions accounted for</span><small>{coverage.justifiedNotApplicable} justified N/A · one count per question</small></a>
+                <a className="fieldworkMetric activities" href="#criteria-workbench"><b>{coverage.outstanding}</b><span>Questions outstanding</span><small>{coverage.unableToVerify} unable to verify</small></a>
+                <a className="fieldworkMetric evidence" href="#evidence-register"><b>{evidence.length}</b><span>Evidence register</span><small>Saved question notes also support conclusions</small></a>
+                <a className="fieldworkMetric findings" href="#finding-register"><b>{findings.length}</b><span>Controlled findings</span><small>Major · Minor · Observation · OFI</small></a>
               </div>
-
               <div className="fieldworkLayout" id="audit-fieldwork-offline-scope">
-                <section className="fieldworkModule criteriaWorkbench" id="criteria-workbench">
-                  <div className="fieldworkHead"><div><span className="panelKicker">01 · Criteria execution</span><h3>Audit question workbench</h3><p>Use the approved question bank as a guide—not a checklist substitute. Record what was tested, what the evidence demonstrates and any remaining uncertainty.</p></div><span className="countBadge">{questions.length} criteria</span></div>
-                  {questions.length ? <div className="questionList">{questions.map((question, questionIndex) => {
-                    const answer = answersByQuestion.get(question.id);
-                    const probes = Array.isArray(question.suggested_probes) ? question.suggested_probes : [];
-                    const expected = Array.isArray(question.expected_evidence) ? question.expected_evidence : [];
-                    return <details id={`question-${question.id}`} className={`questionCard ${answer?.result && answer.result !== "not_assessed" ? "answered" : ""}`} key={question.id} open={(questionIndex === 0 && !answer) || query?.question === question.id}>
-                      <summary><span className="questionNumber">{String(questionIndex + 1).padStart(2, "0")}</span><span className="questionSummary"><strong>{question.question_code || question.clause || `Criterion ${questionIndex + 1}`}</strong><small>{question.process_area || "Approved audit criteria"}</small></span><span className="questionState">{answer?.result ? answer.result.replaceAll("_", " ") : "Not assessed"}</span></summary>
-                      <div className="questionBody">
-                        <div className="questionPrompt"><h4>{question.question_text}</h4>{question.criteria_links?.length ? <p><b>Applicable criteria</b>{question.criteria_links.map((link) => `${link.internal_audit_standard_catalogue?.standard_code ?? "Standard"}${link.clause ? ` ${link.clause}` : ""}`).join(" · ")}</p> : null}{question.requirement_summary ? <p><b>Requirement</b>{question.requirement_summary}</p> : null}{question.auditor_intent ? <p><b>Audit intent</b>{question.auditor_intent}</p> : null}{question.auditor_guidance ? <p><b>Auditor guidance</b>{question.auditor_guidance}</p> : null}{question.evidence_examples ? <p><b>Evidence to sample</b>{question.evidence_examples}</p> : null}{question.analysis_focus ? <p><b>Quality-analysis focus</b>{question.analysis_focus}</p> : null}</div>
-                        <div className="probeGrid"><div><b>Suggested probes</b>{probes.length ? <ul>{probes.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Follow the process trail and test implementation.</p>}</div><div><b>Expected evidence</b>{expected.length ? <ul>{expected.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Retain sufficient, relevant and reliable objective evidence.</p>}</div></div>
-                        <form action={saveAuditAnswer} className="answerForm"><input type="hidden" name="audit_id" value={id} /><input type="hidden" name="question_id" value={question.id} /><div className="grid3">
-                          <label className="field"><span>Audit conclusion *</span><select name="result" defaultValue={answer?.result ?? "not_assessed"}><option value="not_assessed">Not assessed</option><option value="conformity">Conformity</option><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option><option value="not_applicable">Not applicable</option></select></label>
-                          <label className="field"><span>Evidence confidence</span><select name="confidence_level" defaultValue={answer?.confidence_level ?? "medium"}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
-                          <label className="field"><span>Risk significance</span><select name="risk_level" defaultValue={answer?.risk_level ?? "medium"}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
-                          <label className="field"><span>Assigned auditor</span><select name="assigned_team_member_id" defaultValue={answer?.assigned_team_member_id ?? ""}><option value="">Unassigned</option>{team.map((member) => <option value={member.id} key={member.id}>{member.member_name}</option>)}</select></label>
-                          <label className="field span2"><span>Evidence-based conclusion</span><textarea name="conclusion" defaultValue={answer?.conclusion ?? ""} placeholder="State what the sampled evidence demonstrates against the criterion." /></label>
-                          <label className="field"><span>Auditor notes</span><textarea name="auditor_notes" defaultValue={answer?.auditor_notes ?? ""} /></label>
-                          <label className="field"><span>N/A justification — required when “Not applicable” is selected</span><textarea name="not_applicable_justification" defaultValue={answer?.not_applicable_justification ?? ""} placeholder="Explain why the criterion is outside the audit scope or does not apply to the organisation, site, process or activity." /></label>
-                        </div><div className="compactAction"><button className="button primary">Save Criterion Assessment</button></div></form>
-                      </div>
-                    </details>;
-                  })}</div> : <div className="emptyState"><strong>Fieldwork cannot begin because the approved plan contains no audit questions.</strong><br />Return to the <Link href={`/portal/internal-audits/${id}?gate=plan`}>Internal Audit Plan</Link> and register the question bank before execution.</div>}
+                <section className="fieldworkModule afwScope" aria-label="Approved audit coverage">
+                  <div className="fieldworkHead"><div><span className="panelKicker">Scope &amp; coverage</span><h3>{coverage.percentage === null ? "Coverage unavailable" : `${coverage.percentage}% of questions accounted for`}</h3><p>Coverage is calculated against the complete selected scope, including questions outside the current view. A justified N/A requires lead-auditor review.</p></div></div>
+                  <div className="afwScopeBody">
+                    <progress max="100" value={coverage.percentage || 0} aria-label="Questions accounted for"/>
+                    {dataScopeIssues.length ? <div className="notice error" role="alert"><strong>Scope coverage needs review before Report can open.</strong><ul>{dataScopeIssues.map((issue,index)=><li key={`${issue.code}-${index}`}>{standardLabels.get(issue.standardId) ? <strong>{standardLabels.get(issue.standardId)}: </strong> : null}{issue.message}{issue.details?.length ? <details><summary>Review affected references</summary><ul>{issue.details.map((item,itemIndex)=><li key={itemIndex}>{typeof item === "string" ? item : [item.code,item.clause].filter(Boolean).join(" · ") || item.id || "Mapping requires review"}</li>)}</ul></details> : null}</li>)}</ul></div> : <p className="afwHint">The loaded mappings resolve to the selected scope. The lead auditor must still review the criterion inventory for the correct edition before completing Fieldwork.</p>}
+                    <details className="afwCoverageDetails"><summary>Selected standards, clauses and coverage</summary><div className="afwStandardCoverage">{fieldworkState.scope.standards.map(standard=><section key={standard.standardId}><h4>{standard.standardLabel}</h4><p>{standard.full ? "Full selected standard" : "Approved partial scope"} · {standard.scopedQuestions} questions · {standard.referenceClauses} reference clauses</p>{standard.included.length ? <p>Included: {standard.included.join(", ")}</p> : null}{standard.excluded.length ? <p>Excluded: {standard.excluded.join(", ")}</p> : null}<div className="afwClauseLinks">{coverage.clauses.filter(clause=>clause.standardId===standard.standardId).map(clause=><Link key={clause.key} href={`/portal/internal-audits/${id}?gate=fieldwork&standard=${encodeURIComponent(standard.standardId)}&question=${encodeURIComponent(clause.questionIds[0])}#question-${clause.questionIds[0]}`}>Clause {clause.clause}<span>{clause.accountedFor}/{clause.required}</span></Link>)}</div></section>)}</div></details>
+                  </div>
                 </section>
-
+                <section className="fieldworkModule criteriaWorkbench" id="criteria-workbench">
+                  <div className="fieldworkHead"><div><span className="panelKicker">01 · Audit questions</span><h3>Requirement, evidence and conclusion</h3><p>Use the guidance to test implementation and effectiveness. Every approved question remains in the coverage total.</p></div><span className="countBadge">{coverage.required} scope questions</span></div>
+                  <form action={`/portal/internal-audits/${id}`} method="get" className="afwFilter" data-device-draft-exclude><input type="hidden" name="gate" value="fieldwork"/><label>Standard<select name="standard" defaultValue={standardFilter}><option value="">All selected standards</option>{fieldworkState.scope.standards.map(standard=><option value={standard.standardId} key={standard.standardId}>{standard.standardLabel}</option>)}</select></label><label>Question view<select name="criteria" defaultValue={outstandingOnly ? "outstanding" : "all"}><option value="all">All scope questions</option><option value="outstanding">Outstanding only</option></select></label><button className="button secondary" type="submit">Apply view</button><Link className="button secondary" href={`/portal/internal-audits/${id}?gate=fieldwork`}>Show all</Link><small>Showing {visibleQuestions.length} of {coverage.required} questions.</small></form>
+                  <div className="afwQuestions">{visibleQuestions.map((question,index)=>{
+                    const row=coverageByQuestion.get(question.id),answer=row?.answer||answersByQuestion.get(question.id);
+                    return <article className={`afwQuestion ${row?.complete ? "complete" : ""}`} id={`question-${question.id}`} key={question.id}>
+                      <div className="afwQuestionHeading"><h3>Clause {question.clause || "Reference pending"}</h3><span className="afwControl">{question.question_code || "Audit criterion"}</span><span className={`afwStatus ${row?.complete ? "complete" : ""}`}>{row?.complete ? row.justifiedNotApplicable ? "Justified N/A" : "Accounted for" : "Outstanding"}</span></div>
+                      <div className="afwCriteria">{[...new Set((question.criteria_links||[]).map(link=>`${link.standard_label||standardLabels.get(link.standard_id)||"Selected standard"} · ${link.clause}`))].map(label=><span key={label}>{label}</span>)}</div>
+                      <h4 className="afwPrompt">{question.question_text}</h4>
+                      <details className="afwGuidance" open={index===0 || query?.question===question.id}><summary>Audit guidance, evidence and conformity criteria</summary><div className="afwGuidanceBody"><AuditQuestionGuidance question={question}/></div></details>
+                      <form action={saveAuditAnswer} className="afwAnswer">
+                        <label className="field"><span>Objective evidence / auditor notes</span><textarea name="conclusion" rows={4} maxLength={16000} defaultValue={answer?.conclusion||""} disabled={fieldworkLocked || Boolean(row?.linkedFindings.length)} placeholder="Record sampled documents, records, interviews, observations, data, references and identified gaps."/></label>
+                        {!!row?.linkedFindings.length && <p className="afwHint">The originating note is retained here. Amend finding evidence and follow-up through its controlled record below.</p>}
+                        <details className="afwExtra"><summary>Auditor working notes and assessment details</summary><fieldset disabled={fieldworkLocked || Boolean(row?.linkedFindings.length)}><div className="grid3"><label className="field"><span>Assigned auditor</span><select name="assigned_team_member_id" defaultValue={answer?.assigned_team_member_id||""}><option value="">Unassigned</option>{team.map(member=><option key={member.id} value={member.id}>{member.member_name}</option>)}</select></label><label className="field"><span>Evidence confidence</span><select name="confidence_level" defaultValue={answer?.confidence_level||"medium"}>{["low","medium","high"].map(value=><option key={value} value={value}>{value}</option>)}</select></label><label className="field"><span>Risk significance</span><select name="risk_level" defaultValue={answer?.risk_level||"medium"}>{["low","medium","high","critical"].map(value=><option key={value} value={value}>{value}</option>)}</select></label><label className="field span2"><span>Additional working notes</span><textarea name="auditor_notes" defaultValue={answer?.auditor_notes||""} maxLength={16000}/></label></div></fieldset></details>
+                        <FindingConclusionFields mode="audit" auditId={id} questionId={question.id} savedAnswer={answer} linkedFindings={row?.linkedFindings||[]} locked={fieldworkLocked} saveAction={saveAuditAnswer} openFindingAction={openAuditFinding}/>
+                      </form>
+                      {!!row?.evidence.length && <details className="afwExtra"><summary>Linked evidence records ({row.evidence.length})</summary><ul>{row.evidence.map(item=><li key={item.id}><a href="#evidence-register">{item.evidence_reference||item.title||"Evidence record"}</a></li>)}</ul></details>}
+                    </article>;
+                  })}</div>
+                  {!visibleQuestions.length && <div className="emptyState">{coverage.required ? "No questions match this view. Show all to review the complete approved scope." : "No active questions resolve to the approved scope. Review the coverage issues above before continuing."}</div>}
+                </section>
                 <section className="fieldworkModule" id="evidence-register"><div className="fieldworkHead"><div><span className="panelKicker">02 · Objective evidence</span><h3>Evidence register</h3><p>Preserve provenance, relevance, reliability and confidentiality for every material item reviewed.</p></div><span className="countBadge">{evidence.length} records</span></div>
                   {evidence.length ? <div className="evidenceList">{evidence.map((item) => <article className="evidenceCard" key={item.id}><div><b>{item.evidence_reference}</b><h4>{item.title}</h4><p>{item.description || "No description recorded."}</p>{item.external_url ? <p><a href={item.external_url} target="_blank" rel="noopener noreferrer">Open controlled external link ↗</a></p> : null}{item.attachment_path ? <p><a href={evidenceAttachmentUrls.get(item.attachment_path) ?? "#"} target="_blank" rel="noopener noreferrer">Download {item.attachment_name || "evidence file"} ↓</a></p> : null}</div><span>{item.evidence_type?.replaceAll("_", " ")} · {item.reliability || "unrated"}</span></article>)}</div> : <div className="emptyState">No objective evidence recorded yet.</div>}
-                  <form action={addAuditEvidence}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Linked criterion</span><select name="answer_id"><option value="">General audit evidence</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label><label className="field"><span>Evidence type *</span><select name="evidence_type" defaultValue="document"><option value="document">Document</option><option value="record">Record</option><option value="interview">Interview</option><option value="observation">Observation</option><option value="photograph">Photograph</option><option value="screenshot">Screenshot</option><option value="system_record">System record</option><option value="measurement">Measurement</option><option value="test_result">Test result</option><option value="external_confirmation">External confirmation</option><option value="other">Other</option></select></label><label className="field"><span>Evidence title *</span><input name="title" required /></label><label className="field span2"><span>Description and relevance</span><textarea name="description" /></label><label className="field"><span>Source type *</span><select name="source_type" required defaultValue="document"><option value="interview">Interview</option><option value="recording">Recording</option><option value="document">Document</option><option value="controlled_record">Controlled record</option><option value="system">System</option><option value="observation">Observation</option><option value="external_confirmation">External confirmation</option><option value="other">Other</option></select></label>{audit.audit_type === "supplier" ? <label className="field"><span>Source / interviewee — supplier contact</span><select name="source_supplier_contact_id"><option value="">Select linked supplier contact</option>{supplierContacts.map((person) => <option value={person.id} key={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.email}</option>)}</select></label> : <label className="field"><span>Source / interviewee — Company User</span><select name="source_person_id"><option value="">Select Company User or record manually</option>{companyPeople.map((person) => <option value={person.id} key={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select></label>}<label className="field"><span>Other source details</span><input name="source_name" placeholder="Reference only when no controlled person applies" /></label><label className="field"><span>Source date</span><input name="source_date" type="date" defaultValue={today} /></label><label className="field"><span>Evidence owner</span><input name="evidence_owner" defaultValue={loggedActorName} readOnly /></label><label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label><label className="field"><span>Secure external link</span><input name="external_url" type="url" placeholder="https://…" /></label><label className="field span2"><span>Upload evidence file</span><input name="evidence_file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx" /><small>Stored privately. PDF, image, text, CSV, Word or Excel; maximum 10 MB.</small></label><label className="field"><span>Confidentiality</span><select name="confidentiality" defaultValue="internal"><option value="public">Public</option><option value="internal">Internal</option><option value="confidential">Confidential</option><option value="restricted">Restricted</option></select></label><label className="field"><span>Reliability</span><select name="reliability" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label></div><div className="compactAction"><button className="button primary">Add Objective Evidence</button></div></form>
+                  <form action={addAuditEvidence}><fieldset disabled={fieldworkLocked} style={{border:0,padding:0,minWidth:0}}><input type="hidden" name="audit_id" value={id} /><div className="grid3"><label className="field"><span>Linked criterion</span><select name="answer_id"><option value="">General audit evidence</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label><label className="field"><span>Evidence type *</span><select name="evidence_type" defaultValue="document"><option value="document">Document</option><option value="record">Record</option><option value="interview">Interview</option><option value="observation">Observation</option><option value="photograph">Photograph</option><option value="screenshot">Screenshot</option><option value="system_record">System record</option><option value="measurement">Measurement</option><option value="test_result">Test result</option><option value="external_confirmation">External confirmation</option><option value="other">Other</option></select></label><label className="field"><span>Evidence title *</span><input name="title" required /></label><label className="field span2"><span>Description and relevance</span><textarea name="description" /></label><label className="field"><span>Source type *</span><select name="source_type" required defaultValue="document"><option value="interview">Interview</option><option value="recording">Recording</option><option value="document">Document</option><option value="controlled_record">Controlled record</option><option value="system">System</option><option value="observation">Observation</option><option value="external_confirmation">External confirmation</option><option value="other">Other</option></select></label>{audit.audit_type === "supplier" ? <label className="field"><span>Source / interviewee — supplier contact</span><select name="source_supplier_contact_id"><option value="">Select linked supplier contact</option>{supplierContacts.map((person) => <option value={person.id} key={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.email}</option>)}</select></label> : <label className="field"><span>Source / interviewee — Company User</span><select name="source_person_id"><option value="">Select Company User or record manually</option>{companyPeople.map((person) => <option value={person.id} key={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select></label>}<label className="field"><span>Other source details</span><input name="source_name" placeholder="Reference only when no controlled person applies" /></label><label className="field"><span>Source date</span><input name="source_date" type="date" defaultValue={today} /></label><label className="field"><span>Evidence owner</span><input name="evidence_owner" defaultValue={loggedActorName} readOnly /></label><label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label><label className="field"><span>Secure external link</span><input name="external_url" type="url" placeholder="https://…" /></label><label className="field span2"><span>Upload evidence file</span><input name="evidence_file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx" /><small>Stored privately. PDF, image, text, CSV, Word or Excel; maximum 10 MB.</small></label><label className="field"><span>Confidentiality</span><select name="confidentiality" defaultValue="internal"><option value="public">Public</option><option value="internal">Internal</option><option value="confidential">Confidential</option><option value="restricted">Restricted</option></select></label><label className="field"><span>Reliability</span><select name="reliability" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label></div><div className="compactAction"><button className="button primary">Add Objective Evidence</button></div></fieldset></form>
                 </section>
-
-                <section className="fieldworkModule" id="finding-register"><div className="fieldworkHead"><div><span className="panelKicker">03 · Controlled findings</span><h3>Finding register</h3><p>Separate criterion, objective evidence and the conclusion. Nonconformities require an explicit failure statement.</p></div><span className="countBadge">{findings.length} findings</span></div>
-                  {findings.length ? <div className="findingList">{findings.map((item) => {
-                    const linkedAnswer = answers.find((answer) => answer.id === item.answer_id);
-                    const linkedQuestion = linkedAnswer ? questions.find((question) => question.id === linkedAnswer.question_id) : null;
-                    return <article className={`findingCard ${item.finding_type}`} key={item.id}>
-                      <div><b>{item.finding_reference}</b><h4>{item.title}</h4><p>{item.objective_evidence}</p>{item.evidence_attachment_path ? <p><strong>Supporting evidence:</strong> <a href={findingAttachmentUrls.get(item.evidence_attachment_path) ?? "#"} target="_blank" rel="noreferrer">{item.evidence_attachment_name || "Open attachment"}</a></p> : null}
-                        {linkedQuestion ? <p><strong>Linked criterion:</strong> {linkedQuestion.question_code || linkedQuestion.clause}</p> : (
-                          <form action={linkAuditFindingToAnswer} style={{marginTop:12}}>
-                            <input type="hidden" name="audit_id" value={id} />
-                            <input type="hidden" name="finding_id" value={item.id} />
-                            <div style={{display:"flex",gap:10,alignItems:"end",flexWrap:"wrap"}}>
-                              <label className="field" style={{minWidth:280,flex:1}}><span>Link assessed criterion</span><select name="answer_id" required defaultValue=""><option value="" disabled>Select assessed criterion</option>{answers.map((answer) => { const q = questions.find((question) => question.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"} · {answer.result?.replaceAll("_", " ")}</option>; })}</select></label>
-                              <button className="button primary" type="submit">Link Finding</button>
-                            </div>
-                          </form>
-                        )}
-                      </div><span>{item.finding_type?.replaceAll("_", " ")}</span>
-                    </article>;
-                  })}</div> : <div className="emptyState">No findings recorded. Conformity and positive practice can still be documented in the criteria workbench.</div>}
-                  <form action={addAuditFinding}><input type="hidden" name="audit_id" value={id} /><div className="grid3">
-                    <label className="field"><span>Linked assessment</span><select name="answer_id"><option value="">Select assessed criterion</option>{answers.map((answer) => { const q = questions.find((item) => item.id === answer.question_id); return <option key={answer.id} value={answer.id}>{q?.question_code || q?.clause || "Assessed criterion"}</option>; })}</select></label>
-                    <label className="field"><span>Finding type *</span><select name="finding_type" defaultValue="minor_nc"><option value="major_nc">Major nonconformity</option><option value="minor_nc">Minor nonconformity</option><option value="observation">Observation</option><option value="ofi">Opportunity for improvement</option><option value="positive_practice">Positive practice</option><option value="unable_to_verify">Unable to verify</option></select></label>
-                    <label className="field"><span>Risk level</span><select name="risk_level" defaultValue="medium"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
-                    <label className="field span2"><span>Finding headline *</span><input name="title" required placeholder="Concise description of the issue" /></label>
-                    <label className="field"><span>Process area</span><input name="process_area" list="approved-processes" /></label>
-                    <label className="field span2"><span>Statement of nonconformity</span><textarea name="failure_statement" placeholder="State clearly what failed to conform. Required for major and minor nonconformities." /></label>
-                    <label className="field"><span>Source of requirement *</span><select name="requirement_source" required defaultValue="management_system_standard"><option value="management_system_standard">Applicable management system standard</option><option value="legal_regulatory">Legal or regulatory requirement</option><option value="customer_contractual">Customer or contractual requirement</option><option value="policy_procedure">Organisation policy or procedure</option><option value="certification_scheme">Certification or accreditation scheme</option><option value="other_criteria">Other specified audit criteria</option></select></label>
-                    <label className="field"><span>Applicable standard</span><select name="requirement_standard_id" defaultValue=""><option value="">Not applicable / select standard</option>{selectedStandardOptions.map((standard) => <option key={standard.id} value={standard.id}>{standard.label}</option>)}</select></label>
-                    <label className="field"><span>Clause / requirement reference</span><input name="clause" placeholder="e.g. ISO 45001 clause 8.2" /></label>
-                    <label className="field span2"><span>Requirement *</span><textarea name="criteria" required placeholder="State the applicable requirement accurately and specifically." /></label>
-                    <label className="field"><span>Source of evidence *</span><select name="evidence_source" required defaultValue="document_record"><option value="document_record">Document or controlled record</option><option value="interview">Interview or testimony</option><option value="observation">Physical or process observation</option><option value="system_record">System or transactional record</option><option value="photograph_screenshot">Photograph or screenshot</option><option value="measurement_test">Measurement or test result</option><option value="external_confirmation">External confirmation</option><option value="multiple_sources">Multiple corroborating sources</option><option value="other">Other evidence source</option></select></label>
-                    <label className="field span2"><span>Evidence *</span><textarea name="objective_evidence" required placeholder="Record the factual, verifiable evidence demonstrating the extent of conformity or failure." /></label>
-                    <label className="field" style={{gridColumn:"1 / -1"}}><span>Attach supporting evidence</span><input name="evidence_file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx" /><small>PDF, image, text, CSV, Word or Excel; maximum 10 MB.</small></label>
-                    {audit.audit_type === "supplier" ? <label className="field span2"><span>Responsible owner — supplier contact *</span><select name="responsible_owner_supplier_contact_id" required><option value="">Select from linked supplier contacts</option>{supplierContacts.map((person) => <option value={person.id} key={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.email}</option>)}</select></label> : <label className="field span2"><span>Responsible owner — Company User *</span><select name="responsible_owner_person_id" required><option value="">Select active Company User</option>{companyPeople.map((person) => <option value={person.id} key={person.id}>{[person.first_name,person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select></label>}
-                    <label className="field"><span>Agreed date</span><input name="agreed_date" type="date" /></label>
-                  </div><div className="compactAction"><button className="button primary">Create Controlled Finding</button></div></form>
-                </section>
-
-                <section className="fieldworkGate" id="fieldwork-requirements"><div><span className="panelKicker">Gate 04 decision</span><h3>Complete fieldwork and unlock Report</h3><p>Confirm that the approved agenda has been executed, evidence is sufficient and relevant, conclusions are supportable, and draft findings have been reviewed with the audit team.</p></div><form action={completeAuditFieldwork}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="fieldwork_confirmation" required /><span><strong>Human fieldwork completion</strong><br />I confirm the audit trail is sufficient for report preparation and controlled review.</span></label><div className="compactAction"><button className="button approve">Complete Fieldwork & Unlock Report →</button></div></form></section>
+                <section className="fieldworkModule" id="finding-register"><div className="fieldworkHead"><div><span className="panelKicker">03 · Linked findings</span><h3>Finding status and progress</h3><p>Raise a finding from its question above. Manage classification, ownership, corrective action and verification in Findings &amp; Actions.</p></div><span className="countBadge">{findings.length} findings</span></div><AuditFindingProgress findings={findings}/></section>
+                <section className="fieldworkGate" id="fieldwork-requirements"><div><span className="panelKicker">Gate 04 decision</span><h3>Complete fieldwork and unlock Report</h3><p>Account for every in-scope question with supported conformity, a controlled finding or a justified N/A. Resolve mapping gaps and any unable-to-verify conclusions before completing Fieldwork.</p>{!completionDataReady && <p>{coverage.outstanding} question(s) outstanding · {dataScopeIssues.length} scope issue(s).</p>}</div><form action={completeAuditFieldwork}><input type="hidden" name="audit_id" value={id}/><label className="check"><input type="checkbox" name="fieldwork_confirmation" required disabled={fieldworkLocked || !completionDataReady}/><span><strong>Lead-auditor scope and evidence review</strong><br/>I have checked the selected scope against the controlled criterion inventory for the correct edition, reviewed the N/A justifications, and confirmed sufficient evidence and supported conclusions for report preparation.</span></label><div className="compactAction"><button className="button approve" disabled={fieldworkLocked || !completionDataReady}>Complete Fieldwork &amp; Unlock Report →</button></div></form></section>
               </div>
             </> : null}
 
@@ -721,26 +581,10 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
             </> : null}
 
             {gate === "actions" ? <>
-              <div className="panelKicker">Gate 06 · Nonconformity response and corrective action</div><h2>Manage action-owner responses</h2>
-              <p className="panelLead">Action owners may respond through a portal account or a restricted, expiring link. The original finding statement, classification, requirement and objective evidence remain auditor-controlled.</p>
-              {query?.action_error === "d6_verification_required" ? <div className="notice error"><strong>Final acceptance is blocked.</strong><br />Every selected corrective action must first be assessed in D6 and recorded as Effective—verified by the auditor. Open the D6 verification panel below and complete each outstanding assessment.</div> : null}
-              {secureOwnerLink ? <section className="ownerDispatch" role="status"><div><div className="ownerDispatchHead"><span className="ownerDispatchIcon">✉</span><div><h3>Owner notification ready</h3><p><strong>{createdOwnerAccess?.assignee_name || "Action owner"}</strong>{createdOwnerAccess?.assignee_email ? ` · ${createdOwnerAccess.assignee_email}` : ""}<br />Secure access expires {createdOwnerAccess?.secure_token_expires_at ? displayDate(createdOwnerAccess.secure_token_expires_at) : "after 14 days"}.</p></div></div><code className="ownerLink">{secureOwnerLink}</code></div><div className="ownerDispatchActions">{ownerEmailHref ? <a className="button approve emailAction" href={ownerEmailHref}>Email action owner</a> : null}<a className="button secondary" href={secureOwnerLink} target="_blank" rel="noopener noreferrer">Open secure link ↗</a></div></section> : null}
-              <div className="fieldworkMetrics" aria-label="Gate 06 action summary">
-                <a className="fieldworkMetric criteria" href="#action-owner-register"><b>{nonconformities.length}</b><span>Controlled NCs</span><small>View assigned nonconformities →</small></a>
-                <a className="fieldworkMetric evidence" href="#action-owner-register"><b>{actionAccess.length}</b><span>Assigned owners</span><small>Review owner access →</small></a>
-                <a className="fieldworkMetric activities" href={firstVerificationFinding ? `#d6-register-${firstVerificationFinding.id}` : "#action-owner-register"}><b>{actionAccess.filter((item) => item.status === "submitted" || (item.d6_verification_requested_at && !item.d6_verification_completed_at)).length}</b><span>Auditor notifications</span><small>Open verification queue →</small></a>
-                <a className="fieldworkMetric findings" href="#action-owner-register"><b>{unresolvedNonconformities.length}</b><span>Awaiting effectiveness</span><small>Review closure blockers →</small></a>
-              </div>
-              <section id="action-owner-register" className="fieldworkModule" style={{scrollMarginTop:24}}><div className="fieldworkHead"><div><span className="panelKicker">01 · Assigned nonconformities</span><h3>Action-owner register</h3><p>Assign access, review submitted responses and continue detailed root-cause work in the linked CAPA–8D case.</p></div><span className="countBadge">{nonconformities.length} NCs</span></div>
-                {nonconformities.length ? <div className="findingList">{nonconformities.map((finding) => { const access = actionAccessByFinding.get(finding.id); const ownerEvidence = access?.status === "submitted" ? actionEvidenceByAccess.get(access.id) ?? [] : []; const rcaCase = rcaCasesById.get(finding.linked_rca_case_id); const d6Actions = (rcaActionsByCase.get(finding.linked_rca_case_id) ?? []).filter((action) => action.discipline === 5 && action.selection_status === "selected"); const d6Ready = d6Actions.length > 0 && d6Actions.every((action) => ["effective", "effective_verified"].includes(action.effectiveness_result) && action.status === "verified" && action.verified_by && action.verified_at); const d6EvidenceForCase = d6EvidenceByCase.get(finding.linked_rca_case_id) ?? []; return <article id={`action-${finding.id}`} className={`findingCard ${finding.finding_type}`} key={finding.id} style={{display:"block"}}><div><b>{finding.finding_reference}</b><h4>{finding.title}</h4><p>{finding.failure_statement || finding.objective_evidence}</p></div>
-                  {access ? <div className="coming"><strong>{access.assignee_name}</strong> · {access.assignee_email}<br />Response status: {access.status.replaceAll("_", " ")}{access.submitted_at ? ` · submitted ${displayDate(access.submitted_at)}` : ""}<br />{access.correction_and_containment ? <><strong>Correction / containment:</strong> {access.correction_and_containment}<br /></> : null}{access.root_cause_response ? <><strong>Root cause:</strong> {access.root_cause_response}<br /></> : null}{access.corrective_action_plan ? <><strong>Corrective-action plan:</strong> {access.corrective_action_plan}<br /></> : null}{ownerEvidence.length ? <><strong>Implementation evidence:</strong> {ownerEvidence.map((item, index) => <span key={item.id}>{index ? " · " : ""}<a href={actionEvidenceUrls.get(item.storage_path) || "#"} target="_blank" rel="noreferrer">{item.original_file_name}</a></span>)}</> : null}</div> : null}
-                  <form action={assignAuditActionOwner} style={{marginTop:16}}><input type="hidden" name="audit_id" value={id} /><input type="hidden" name="finding_id" value={finding.id} /><div className="grid2"><label className="field"><span>Action-owner name *</span><input name="assignee_name" required defaultValue={access?.assignee_name || finding.responsible_owner_name || ""} /></label><label className="field"><span>Action-owner email *</span><input name="assignee_email" type="email" required defaultValue={access?.assignee_email || finding.responsible_owner_email || ""} /><small>If this email belongs to a portal account, the action appears automatically in My Internal Audit Actions. The secure link works for external owners.</small></label></div><div className="compactAction"><button className="button secondary">{access ? "Refresh Access & Secure Link" : "Assign Owner & Create Secure Link"}</button></div></form>
-                  {access?.d6_verification_requested_at ? <D6AuditorVerificationPanel auditId={id} finding={finding} access={access} actions={d6Actions} evidence={d6EvidenceForCase} evidenceUrls={d6EvidenceUrls} /> : null}
-                  {access?.status === "submitted" ? <><div className={d6Ready ? "notice" : "notice error"} style={{marginTop:14}}><strong>{d6Ready ? "Final D0–D8 response ready for review." : "Final acceptance awaiting D6 effectiveness verification."}</strong> {d6Ready ? "Review the validated root cause, corrective-action plan and consolidated objective evidence in this record and the linked controlled CAPA–8D case." : "Assess every selected corrective action below. The response may be returned for revision now, but it cannot be accepted until all actions are Effective—verified."}</div><form action={reviewAuditActionResponse} style={{marginTop:16}}><input type="hidden" name="audit_id" value={id}/><input type="hidden" name="action_access_id" value={access.id}/><div className="grid3"><label className="field"><span>Auditor decision</span><select name="decision" defaultValue={d6Ready ? "accepted" : "returned"}><option value="accepted" disabled={!d6Ready}>Accept final RCA and corrective-action plan</option><option value="returned">Return complete 8D for revision</option></select></label><label className="field span2"><span>Auditor decision and rationale *</span><textarea name="auditor_response" required placeholder="Record the evidence reviewed, adequacy conclusion and any conditions for effectiveness verification."/></label></div><div className="compactAction"><button className="button approve">Record Final 8D Decision</button></div></form></> : null}
-                  {rcaCase && access?.status === "submitted" ? <div style={{marginTop:14}}><Link className="button primary" href={`/portal/rca/${rcaCase.id}`}>Review Final Controlled CAPA–8D →</Link></div> : rcaCase && access ? <div className="coming" style={{marginTop:14}}><strong>8D investigation in progress.</strong><br />The final root cause, corrective-action plan and objective evidence will be released for auditor review after the action owner submits D8.</div> : null}
-                </article>; })}</div> : <div className="emptyState">No Major or Minor nonconformities require action-owner assignment.</div>}
-              </section>
-              <div className="actionBar"><Link className="button approve" href={`/portal/internal-audits/${id}?gate=closing`}>Open Auditor Verification & Close →</Link></div>
+              <div className="panelKicker">Gate 06 · Finding follow-up</div><h2>Finding status and action progress</h2>
+              <p className="panelLead">Ownership, responses, CAPA and independent verification are controlled in Findings &amp; Actions. This audit displays the linked records and their current progress.</p>
+              <AuditFindingProgress findings={findings}/>
+              <div className="actionBar"><Link className="button secondary" href="/portal/internal-audit-actions">Open Findings &amp; Actions →</Link><Link className="button approve" href={`/portal/internal-audits/${id}?gate=closing`}>Review Audit Closure →</Link></div>
             </> : null}
 
             {gate === "closing" ? <>
@@ -755,12 +599,7 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
                 <a className="fieldworkMetric activities" href={nonconformities.find((item) => item.closure_verified) ? `#closure-${nonconformities.find((item) => item.closure_verified).id}` : "#capa-effectiveness-register"}><b>{nonconformities.filter((item) => item.closure_verified).length}</b><span>Effectiveness verified</span><small>View verified records →</small></a>
                 <a className="fieldworkMetric findings" href={unresolvedNonconformities[0] ? `#closure-${unresolvedNonconformities[0].id}` : "#gate-07-decision"}><b>{unresolvedNonconformities.length}</b><span>Blocking closure</span><small>{unresolvedNonconformities.length ? "Open first closure blocker →" : "Proceed to closure decision →"}</small></a>
               </div>
-              <section id="capa-effectiveness-register" className="fieldworkModule" style={{scrollMarginTop:24}}><div className="fieldworkHead"><div><span className="panelKicker">01 · Nonconformity follow-up</span><h3>CAPA–8D effectiveness register</h3><p>Review the linked investigation, corrective actions and verification evidence. Recording an action as complete does not itself prove effectiveness.</p></div><span className="countBadge">{nonconformities.length} NCs</span></div>
-                {nonconformities.length ? <div className="findingList">{nonconformities.map((finding) => { const rcaCase = rcaCasesById.get(finding.linked_rca_case_id); const correctiveActions = rcaActionsByCase.get(finding.linked_rca_case_id) ?? []; const isClosed = finding.status === "closed" && finding.closure_verified; return <article id={`closure-${finding.id}`} className={`findingCard ${finding.finding_type}`} key={finding.id} style={{ display: "block", scrollMarginTop: 24 }}><div style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-start" }}><div><b>{finding.finding_reference}</b><h4>{finding.title}</h4><p>{finding.failure_statement || finding.objective_evidence}</p></div><span className="countBadge">{isClosed ? "Effectiveness verified" : "Verification required"}</span></div>
-                  {rcaCase ? <div className="coming" style={{ marginTop: 16 }}><strong>Linked CAPA–8D: {rcaCase.case_reference}</strong><br />Status: {rcaCase.status?.replaceAll("_", " ")} · Current discipline: D{rcaCase.current_discipline ?? 0} · Controlled actions: {correctiveActions.length}<div style={{ marginTop: 12 }}><Link className="button" href={`/portal/rca/${rcaCase.id}`}>Open CAPA–8D Case →</Link></div></div> : <div className="coming" style={{ marginTop: 16 }}><strong>CAPA–8D link missing.</strong><br />This nonconformity cannot be closed until its controlled RCA case exists.</div>}
-                  {!isClosed && rcaCase ? <form id={`verify-${finding.id}`} action={verifyAuditFindingEffectiveness} style={{ marginTop: 18 }}><input type="hidden" name="audit_id" value={id} /><input type="hidden" name="finding_id" value={finding.id} /><div className="grid3"><label className="field"><span>Effectiveness result *</span><select name="effectiveness_result" defaultValue="effective"><option value="effective">Effective — close finding</option><option value="partially_effective">Partially effective — keep open</option><option value="ineffective">Ineffective — return for action</option></select></label><label className="field"><span>Verification method *</span><textarea name="verification_method" required placeholder="e.g. site verification, record sample, interview, performance trend review" /></label><label className="field"><span>Auditor verification conclusion *</span><textarea name="effectiveness_conclusion" required placeholder="State the objective evidence sampled, result obtained and why recurrence risk is acceptably controlled—or why further action is required." /></label></div><label className="check"><input type="checkbox" name="human_verification" required /><span><strong>Independent human verification</strong><br />I reviewed the linked CAPA–8D record and verified this conclusion against objective evidence.</span></label><div className="compactAction"><button className="button approve">Record Effectiveness Decision</button></div></form> : null}</article>; })}</div> : <div className="emptyState">No Major or Minor nonconformities were raised during this audit.</div>}
-              </section>
-              {advisoryFindings.length ? <section className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">02 · Advisory findings</span><h3>Observations, OFIs and positive practice</h3><p>These remain in the audit record and do not require CAPA–8D unless management formally promotes them.</p></div><span className="countBadge">{advisoryFindings.length} items</span></div><div className="findingList">{advisoryFindings.map((finding) => <article className={`findingCard ${finding.finding_type}`} key={finding.id}><div><b>{finding.finding_reference}</b><h4>{finding.title}</h4><p>{finding.objective_evidence}</p></div><span>{finding.finding_type?.replaceAll("_", " ")}</span></article>)}</div></section> : null}
+              <section id="capa-effectiveness-register" className="fieldworkModule"><div className="fieldworkHead"><div><span className="panelKicker">Linked controlled records</span><h3>Finding follow-up and verification</h3><p>Complete the required independent verification in Findings &amp; Actions. The audit closure gate continues to check the saved finding and CAPA records.</p></div></div><AuditFindingProgress findings={findings}/></section>
               <section id="gate-07-decision" className="fieldworkGate" style={{scrollMarginTop:24}}><div><span className="panelKicker">Gate 07 decision</span><h3>Close the controlled audit</h3><p>{!reportIssued ? "The controlled report must be issued before closure." : unresolvedNonconformities.length ? `${unresolvedNonconformities.length} nonconformity record(s) still block closure. Complete and verify their linked CAPA–8D cases first.` : "The report is issued and all Major and Minor nonconformities have verified effective CAPA. The audit may now be formally closed."}</p></div><form action={completeAuditClosure}><input type="hidden" name="audit_id" value={id} /><label className="check"><input type="checkbox" name="closure_confirmation" required disabled={!reportIssued || unresolvedNonconformities.length > 0} /><span><strong>Accountable audit closure</strong><br />I confirm the report is issued, conclusions are supported, required follow-up is complete, and the audit record is ready for controlled closure.</span></label><div className="compactAction"><button className="button approve" disabled={!reportIssued || unresolvedNonconformities.length > 0}>Close Audit</button></div></form></section>
             </> : null}
           </section>
@@ -770,41 +609,40 @@ export default async function InternalAuditWorkspace({ params, searchParams }) {
   );
 }
 
-function D6AuditorVerificationPanel({ auditId, finding, access, actions, evidence, evidenceUrls }) {
-  const isEffective = (action) => ["effective", "effective_verified"].includes(action.effectiveness_result);
-  const closedActions = actions.filter(isEffective);
-  const workingActions = actions.filter((action) => !isEffective(action));
-  const requestedActions = workingActions.filter((action) => action.d6_submitted_at && (!action.effectiveness_result || action.effectiveness_result === "awaiting_verification"));
-  const furtherActions = workingActions.filter((action) => ["partially_effective", "not_effective"].includes(action.effectiveness_result));
-  const unableActions = workingActions.filter((action) => action.effectiveness_result === "unable_to_verify");
-  const firstTarget = (items, fallback) => items.length ? `#d6-action-${items[0].id}` : fallback;
-  const metricStyle = { display: "flex", flexDirection: "column", gap: 7, padding: "16px 18px", border: "1px solid #d7e3ef", borderRadius: 14, background: "#fff", color: "#102a4c", textDecoration: "none", boxShadow: "0 8px 22px #0b23420b" };
-  return <section id={`d6-register-${finding.id}`} className="fieldworkModule" style={{ marginTop: 18 }}>
-    <div className="fieldworkHead"><div><span className="panelKicker">D6 · Auditor effectiveness register</span><h3>{finding.finding_reference}</h3><p>A focused queue of corrective actions requiring independent verification. Verified-effective actions leave the working queue automatically and remain available in the closed archive.</p></div><span className="countBadge">{workingActions.length} open</span></div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, padding: "18px 22px", background: "#f4f8fc", borderBottom: "1px solid #dce6f0" }}>
-      <a href={firstTarget(requestedActions, `#d6-register-${finding.id}`)} style={{ ...metricStyle, borderColor: "#9bbcff", background: "#edf4ff" }}><strong style={{ fontSize: 25 }}>{requestedActions.length}</strong><span>Verification requested</span></a>
-      <a href={firstTarget(furtherActions, `#d6-register-${finding.id}`)} style={{ ...metricStyle, borderColor: "#f4c46b", background: "#fff8e7" }}><strong style={{ fontSize: 25 }}>{furtherActions.length}</strong><span>Further action required</span></a>
-      <a href={firstTarget(unableActions, `#d6-register-${finding.id}`)} style={{ ...metricStyle, borderColor: "#f2aaaa", background: "#fff1f1" }}><strong style={{ fontSize: 25 }}>{unableActions.length}</strong><span>Unable to verify</span></a>
-      <a href={`#d6-closed-${finding.id}`} style={{ ...metricStyle, borderColor: "#9ed8bd", background: "#effaf4" }}><strong style={{ fontSize: 25 }}>{closedActions.length}</strong><span>Closed · effective</span></a>
-    </div>
-    {workingActions.length ? <div className="findingList">{workingActions.map((action) => {
-      const actionEvidence = evidence.filter((item) => item.action_id === action.id);
-      const statusLabel = action.d6_submitted_at && (!action.effectiveness_result || action.effectiveness_result === "awaiting_verification") ? "Verification requested" : (action.effectiveness_result || "Awaiting owner submission").replaceAll("_", " ");
-      return <article id={`d6-action-${action.id}`} className="findingCard" key={action.id} style={{ display: "block", scrollMarginTop: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}><strong style={{ fontSize: 20 }}>{finding.finding_reference}</strong><span className="countBadge">{statusLabel}</span></div>
-      <div className="coming" style={{ marginTop: 12 }}><strong>D5 acceptance criterion:</strong> {action.effectiveness_criteria || "Not defined"}<br /><strong>Owner implementation result:</strong> {action.implementation_result || "Not submitted"}{action.d6_submitted_at ? <><br /><strong>Verification requested:</strong> {displayDate(action.d6_submitted_at)}</> : null}</div>
-      <div className={actionEvidence.length ? "coming" : "notice error"} style={{ marginTop: 12 }}>
-        <strong>Objective evidence for this action ({actionEvidence.length})</strong>
-        {actionEvidence.length ? <div style={{ display: "grid", gap: 10, marginTop: 10 }}>{actionEvidence.map((item) => { const evidenceUrl = evidenceUrls.get(item.storage_path); return <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", padding: 12, border: "1px solid #d7e3ef", borderRadius: 12, background: "#fff" }}><div><strong>{item.reference || "Objective evidence"}</strong>{item.description ? <div>{item.description}</div> : null}{item.evidence_date ? <small>{displayDate(item.evidence_date)}</small> : null}</div>{evidenceUrl ? <a className="button secondary" href={evidenceUrl} target="_blank" rel="noopener noreferrer">Open objective evidence ↗</a> : <span className="countBadge">File unavailable</span>}</div>; })}</div> : <div style={{ marginTop: 6 }}>No evidence is linked to this action. Select “Unable to verify—insufficient evidence” unless the action owner supplies an adequate record.</div>}
-      </div>
-      {action.d6_submitted_at ? <form action={verifyD6CorrectiveAction} style={{ marginTop: 16 }}>
-        <input type="hidden" name="audit_id" value={auditId} /><input type="hidden" name="finding_id" value={finding.id} /><input type="hidden" name="action_access_id" value={access.id} /><input type="hidden" name="action_id" value={action.id} />
-        <div className="grid2"><label className="field"><span>Auditor effectiveness decision *</span><select name="effectiveness_result" required defaultValue=""><option value="" disabled>Select decision</option><option value="effective_verified">Effective—verified</option><option value="partially_effective">Partially effective—further action required</option><option value="not_effective">Not effective—reopen corrective action</option><option value="unable_to_verify">Unable to verify—insufficient evidence</option></select></label><label className="field"><span>Verification method *</span><textarea name="effectiveness_verification_method" required defaultValue={action.effectiveness_verification_method || ""} placeholder="Record sample, observation, test, interview or performance-trend review" /></label></div>
-        <label className="field"><span>Auditor conclusion and objective result *</span><textarea name="effectiveness_verification_conclusion" required defaultValue={action.effectiveness_verification_conclusion || ""} placeholder="Compare the evidence and actual result with the D5 acceptance criteria; explain the decision and required follow-up." /></label>
-        <label className="check"><input type="checkbox" name="independent_verification" required /><span><strong>Independent auditor verification</strong><br />I reviewed the implementation record and objective evidence and take responsibility for this action-level conclusion.</span></label><div className="compactAction"><button className="button approve">Record D6 Effectiveness Decision</button></div>
-      </form> : <div className="notice" style={{ marginTop: 12 }}>Waiting for the action owner to submit implementation and evidence.</div>}
-    </article>;
-    })}</div> : <div className="notice" style={{ margin: 22 }}><strong>No actions require assessment.</strong> All submitted corrective actions for this NC have been verified effective.</div>}
-    <details id={`d6-closed-${finding.id}`} style={{ margin: 22, padding: 16, border: "1px solid #9ed8bd", borderRadius: 14, background: "#f4fbf7", scrollMarginTop: 24 }}><summary style={{ cursor: "pointer", fontWeight: 900 }}>Closed effectiveness decisions ({closedActions.length})</summary>{closedActions.length ? <div style={{ display: "grid", gap: 8, marginTop: 12 }}>{closedActions.map((action) => <div key={action.id} style={{ display: "flex", justifyContent: "space-between", padding: 12, borderRadius: 10, background: "#fff" }}><strong>{finding.finding_reference}</strong><span>Effective—verified {action.verified_at ? `· ${displayDate(action.verified_at)}` : ""}</span></div>)}</div> : <p>No closed actions recorded.</p>}</details>
-  </section>;
+function AuditQuestionGuidance({question}) {
+  const references=question.assessment_guidance||[];
+  const lines=value=>Array.isArray(value)?value:String(value||"").split("|").map(item=>item.trim()).filter(Boolean);
+  function block(label,value,tone="",list=false){if(!value || Array.isArray(value)&&!value.length)return null;return <div className={`afwGuideBlock ${tone}`} key={label}><strong>{label}:</strong>{list?<ul>{lines(value).map((item,index)=><li key={index}>{item}</li>)}</ul>:<span> {Array.isArray(value)?value.join(" · "):value}</span>}</div>;}
+  function referenceContent(reference){return <div className="afwGuideStack">
+    {reference.question && reference.question!==question.question_text && <p><strong>Assessment reference question:</strong> {reference.question}</p>}
+    {block("Requirement summary",reference.requirement_summary,"blue")}
+    {block("Practical application",reference.practical_application)}
+    {block("Applicability guidance",reference.applicability_guidance)}
+    {block("Documented information",reference.documented_information_guidance)}
+    {block("Connected requirements",reference.related_requirements,"purple")}
+    {block("Auditor guidance",reference.assessor_guidance)}
+    {block("Interview questions",reference.interview_questions,"",true)}
+    {block("Objective evidence to seek",reference.objective_evidence,"teal")}
+    {block("Sampling guidance",reference.sampling_guidance,"amber")}
+    {block("Conformity criteria",reference.conformity_criteria)}
+    <div className="afwGuideGrid">{block("Minor NC guidance",reference.minor_nc_guidance,"amber")}{block("Major NC guidance",reference.major_nc_guidance,"red")}</div>
+    {block("Management focus",reference.management_focus,"purple")}
+    {block("Transition / amendment guidance",reference.transition_guidance,"blue")}
+    {block("Maturity guidance",reference.maturity_guidance,"green")}
+  </div>;}
+  return references.length?<>
+    <p className="afwHint">Guidance from the existing Assessment bank. Use the controlled standard and selected audit criteria when reaching your conclusion.</p>
+    {references.length===1?referenceContent(references[0]):references.map(reference=><details className="afwReference" key={reference.id}><summary>Clause {reference.clause_reference||reference.question_number} · {reference.control_id||reference.standard||"Assessment guidance"}</summary>{referenceContent(reference)}</details>)}
+  </>:<div className="afwGuideStack"><p className="afwHint">No matching Assessment guidance was resolved for this question. Existing Audit bank guidance is shown below; review any coverage warnings before completing Fieldwork.</p>
+    {block("Requirement summary",question.requirement_summary,"blue")}{block("Audit intent",question.auditor_intent)}{block("Auditor guidance",question.auditor_guidance)}{block("Suggested probes",question.suggested_probes,"",true)}{block("Expected evidence",question.expected_evidence,"teal",true)}{block("Evidence examples",question.evidence_examples,"teal")}{block("Analysis focus",question.analysis_focus,"purple")}
+  </div>;
+}
+
+function AuditFindingProgress({findings=[]}) {
+  return findings.length?<div className="findingList">{findings.map(finding=><article id={`closure-${finding.id}`} className={`findingCard ${finding.finding_type}`} key={finding.id} style={{display:"block"}}>
+    <div className="afwProgressHead"><div><b>{finding.finding_reference||"Controlled finding"}</b><h4>{finding.title||"Linked finding"}</h4></div><span className="countBadge">{String(finding.finding_type||"Classification unavailable").replaceAll("_"," ")}</span></div>
+    <p>{String(finding.status||"Status unavailable").replaceAll("_"," ")} · {finding.responsible_owner_name||"Awaiting assignment"}{finding.agreed_date?` · Target ${displayDate(finding.agreed_date)}`:""}</p>
+    <p>{finding.source_audit_question_code?`Originating question: ${finding.source_audit_question_code}`:finding.answer_id?"Originating assessment retained":"Historical finding — question reference unavailable"}</p>
+    <div className="afwProgressActions"><Link className="button primary" href={`/portal/internal-audit-actions?record=${encodeURIComponent(finding.id)}`}>Open finding &amp; progress →</Link>{finding.linked_rca_case_id&&<Link className="button secondary" href={`/portal/rca/${finding.linked_rca_case_id}`}>Linked CAPA–8D →</Link>}</div>
+  </article>)}</div>:<div className="emptyState">No controlled findings are linked to this audit. Raise a finding from its question when the evidence supports one.</div>;
 }
