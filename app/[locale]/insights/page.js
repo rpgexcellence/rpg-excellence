@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "031",
+      title: "Scan. Check. Report. Safety at the Point of Work",
+      description: "Zone-linked mobile access to workplace safety information and accident, incident and near-miss reporting, with optional photo evidence and contact details.",
+      href: "scan-check-report-workplace-safety",
+    },
+    {
       number: "030",
       title: "Decoding ISO/IEC 17025:2017: From Requirements to Reliable Laboratory Results",
       description: "Introducing the RPG Excellence 52-page technical guide, with worked laboratory examples, risk controls, audit evidence, templates and posters.",
