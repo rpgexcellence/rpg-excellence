@@ -30,6 +30,7 @@ export default function sitemap() {
     "/privacy",
     "/cookies",
     "/insights",
+    "/insights/scan-check-report-workplace-safety",
     "/insights/offline-audit-fieldwork",
     "/insights/enterprise-integration-controlled-access",
     "/insights/beyond-the-asset-register",
