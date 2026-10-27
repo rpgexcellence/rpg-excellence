@@ -85,7 +85,23 @@ const stages = [
     "records": "Review decisions, management oversight and training evidence.",
     "href": "/portal/health-safety/management-board",
     "action": "Explore management insight"
-  }
+  },
+  {
+    "id": "inspect",
+    "title": "Workplace inspections",
+    "benefit": "Check that workplace controls work in practice.",
+    "tint": "#eef8f1",
+    "accent": "#247a51",
+    "steps": [
+        "Plan risk-based inspections for your sites, zones and work areas.",
+        "Use location-specific checklists to record observations and supporting evidence.",
+        "Assign findings to accountable owners and verify actions before closure."
+    ],
+    "value": "Identify deteriorating conditions and control gaps before they become incidents. Connect routine inspections with clear ownership, due dates and evidence of improvement.",
+    "records": "Inspection programmes, completed checklists, findings, action owners and verification evidence.",
+    "href": "/portal/health-safety/workplace-inspections",
+    "action": "Explore Workplace Inspections"
+}
 ];
 
 const capabilities = [
@@ -167,7 +183,7 @@ export default function HealthSafetyLanding({ locale = "en" }) {
     </section>
 
     <section className={`${styles.container} ${styles.journey}`} aria-labelledby="hs-journey-title">
-      <div className={styles.sectionHeading}><p className={styles.eyebrow}>WORKPLACE RISK JOURNEY</p><h2 id="hs-journey-title">Five stages. One practical route to safer work.</h2><p>Explore five connected stages. Tap a card to see the practical steps.</p></div>
+      <div className={styles.sectionHeading}><p className={styles.eyebrow}>WORKPLACE RISK JOURNEY</p><h2 id="hs-journey-title">Six stages. One practical route to safer work.</h2><p>Explore six connected stages. Tap a card to see the practical steps.</p></div>
       <div className={styles.cards}>
         {stages.map((stage, index) => <article key={stage.id} className={styles.card} style={{ "--card-tint": stage.tint, "--card-accent": stage.accent }} aria-label={`${index + 1}. ${stage.title}`} onKeyDown={event => { if (event.key === "Escape" && flipped[index]) { event.preventDefault(); turnCard(index, false); } }}>
           <div className={`${styles.cardInner} ${flipped[index] ? styles.isFlipped : ""}`}>
