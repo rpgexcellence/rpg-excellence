@@ -6,6 +6,8 @@ export default function sitemap() {
     "/about",
     "/contact",
     "/pricing",
+    "/publications",
+    "/publications/iso-9001-2026-technical-insights",
     "/ai-tools",
     "/hs-hub",
     "/hs-hub/training",
