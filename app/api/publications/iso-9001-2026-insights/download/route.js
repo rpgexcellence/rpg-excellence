@@ -11,7 +11,6 @@ export const dynamic = "force-dynamic";
 const CODE = "ISO9001-2026-INSIGHTS";
 const FILES = {
   pdf: { name: "RPG_ISO9001_2026_Collected_Technical_Insights.pdf", type: "application/pdf" },
-  bundle: { name: "RPG_ISO9001_2026_Customer_Download.zip", type: "application/zip" },
 };
 
 export async function GET(request) {
@@ -35,7 +34,7 @@ export async function GET(request) {
     }
     const file = FILES[format];
     const handle = await open(path.join(process.cwd(), "private-assets", file.name), "r");
-    // Stream private artwork after verification; do not buffer large downloads.
+    // Stream the private PDF after verification; do not buffer large downloads.
     const stream = Readable.toWeb(handle.createReadStream());
     return new Response(stream, { headers: {
       "Content-Type": file.type,
