@@ -115,6 +115,10 @@ export default async function Pricing({ params }) {
             }}
           >
             <span className="kicker">DIGITAL PUBLICATIONS</span>
+            <h2>ISO 9001:2026 Technical Insights &amp; Poster Collection — £9.99</h2>
+            <p>53-page collected edition with seven articles, seven chapter covers and 21 supporting posters. One-off purchase with PDF and individual artwork downloads.</p>
+            <p><Link className="button" href={"/" + locale + "/publications/iso-9001-2026-technical-insights"}>View the £9.99 collection</Link></p>
+            <p><Link href={"/" + locale + "/publications"}>Browse all publications</Link></p>
             <h2>Decoding ISO 14001:2026 — £29.99</h2>
             <p>
               Independent practitioner reference and seven clause-linked Pocket Guides.
