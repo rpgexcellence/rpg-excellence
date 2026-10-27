@@ -513,6 +513,16 @@ export default function StandardGuide({ guide, locale }) {
                 : "Open RPG Intelligence →"}
             </Link>
           </div>
+          {guide.assessmentStandard === "ISO 9001:2026" && (
+            <div className="assessmentLinkBox">
+              <div><span>RPG EXCELLENCE COLLECTED EDITION</span>
+                <strong>ISO 9001:2026 Technical Insights &amp; Poster Collection</strong>
+                <p>Seven articles and 21 supporting posters on Clauses 4–10. A 53-page collected edition with individual artwork.</p>
+                <small>PDF and artwork · £9.99 one-off</small>
+              </div>
+              <Link href={"/" + locale + "/publications/iso-9001-2026-technical-insights"}>Explore the collection →</Link>
+            </div>
+          )}
           {guide.code === "ISO 14001:2026" && (
             <div className="assessmentLinkBox">
               <div>
