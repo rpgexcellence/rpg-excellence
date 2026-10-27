@@ -46,6 +46,22 @@ const stages = [
     records: "Management oversight, performance measures and review evidence.",
     href: "/portal/soa/management-board", action: "Open management oversight",
   },
+  {
+    "id": "incidents",
+    "title": "Report and manage incidents",
+    "benefit": "Coordinate response, recovery and verified closure.",
+    "tint": "#eef8f1",
+    "accent": "#247a51",
+    "steps": [
+        "Report suspected or confirmed security events and assess severity and ownership.",
+        "Coordinate containment, investigation and recovery; retain decisions and supporting evidence.",
+        "Verify recovery and closure, capture lessons and link any further improvement actions."
+    ],
+    "value": "Give teams a controlled route from first report to verified recovery. Keep responsibilities, response decisions and evidence connected so management can review the response and reduce recurrence.",
+    "records": "Incident reports, containment and recovery records, evidence, accountable owners and verification decisions.",
+    "href": "/portal/information-security/incidents",
+    "action": "Open security incidents"
+},
 ];
 
 const capabilities = [
@@ -109,7 +125,7 @@ export default function InformationSecurityLanding({ locale = "en" }) {
     </section>
 
     <section className={`${styles.container} ${styles.journey}`} aria-labelledby="isms-journey-title">
-      <div className={styles.sectionHeading}><p className={styles.eyebrow}>ISMS JOURNEY</p><h2 id="isms-journey-title">From uncertainty to accountable assurance.</h2><p>Explore five connected stages. Tap a card to see the practical steps.</p></div>
+      <div className={styles.sectionHeading}><p className={styles.eyebrow}>ISMS JOURNEY</p><h2 id="isms-journey-title">From uncertainty to accountable assurance.</h2><p>Explore six connected stages. Tap a card to see the practical steps.</p></div>
       <div className={styles.cards}>
         {stages.map((stage, index) => <article key={stage.id} className={styles.card} style={{ "--card-tint": stage.tint, "--card-accent": stage.accent }} aria-label={`${index + 1}. ${stage.title}`} onKeyDown={event => { if (event.key === "Escape" && flipped[index]) { event.preventDefault(); turnCard(index, false); } }}>
           <div className={`${styles.cardInner} ${flipped[index] ? styles.isFlipped : ""}`}>
