@@ -517,8 +517,8 @@ export default function StandardGuide({ guide, locale }) {
             <div className="assessmentLinkBox">
               <div><span>RPG EXCELLENCE COLLECTED EDITION</span>
                 <strong>ISO 9001:2026 Technical Insights &amp; Poster Collection</strong>
-                <p>Seven articles and 21 supporting posters on Clauses 4–10. A 53-page collected edition with individual artwork.</p>
-                <small>PDF and artwork · £9.99 one-off</small>
+                <p>Seven articles and 21 supporting posters on Clauses 4–10. A 53-page collected edition with the posters included inside the PDF.</p>
+                <small>PDF · £9.99 one-off</small>
               </div>
               <Link href={"/" + locale + "/publications/iso-9001-2026-technical-insights"}>Explore the collection →</Link>
             </div>
