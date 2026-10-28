@@ -260,15 +260,47 @@ export async function getNonconformityAuditOptions() {
 // Read the same approved scope through the existing shared coverage engine.
 // Browser query strings identify a source; they never authorise it or supply
 // trusted audit labels, question references, reporter identities or evidence.
+// Give source-load failures a precise, server-side diagnostic without sending
+// query text, stack traces, company identifiers or record contents to the browser.
+function ncAuditSourceError(stage,error) {
+  const reference=`NC-${randomUUID().slice(0,8).toUpperCase()}`;
+  console.error('NC_AUDIT_SOURCE_CHECK_FAILED',{
+    reference,stage,code:typeof error?.code==='string'?error.code:'unexpected_error',
+    name:typeof error?.name==='string'?error.name:'Error',
+    message:typeof error?.message==='string'?error.message.slice(0,600):'No error message supplied',
+  });
+  return ncFailure('audit_source_check_failed',`${stage} could not be checked. Reference ${reference}. Keep your device draft and retry; if this continues, give this reference to the administrator.`,true);
+}
+async function ncAuditSourceStep(stage,work) {
+  try{return await work();}
+  catch(error){if(error?.ncCode)throw error;throw ncAuditSourceError(stage,error);}
+}
+async function ncReadAuditSourceRows(factory,label,orderKeys) {
+  return ncAuditSourceStep(label,()=>readCompleteAuditRows(()=>{
+    let query=factory();
+    // Retain the shared pagination engine. Observe its query result before it
+    // converts a database error into its deliberately generic coverage message.
+    const checked={
+      order(...args){query=query.order(...args);return checked;},
+      async range(...args){
+        const result=await query.range(...args);
+        if(result?.error)throw ncAuditSourceError(label,result.error);
+        return result;
+      },
+    };
+    return checked;
+  },{label,orderKeys}));
+}
+
 async function ncAuditQuestionSource(ctx,admin,auditId,questionId,{requireOpen=true}={}) {
   if(!NC_UUID.test(auditId||'')||!NC_UUID.test(questionId||''))throw ncFailure('invalid_audit_source','Select a valid audit and originating question.');
   const {data:audit,error:auditError}=await admin.from('internal_audits')
     .select('id,audit_reference,title,organization_id,plan_approved,current_gate,status,exclusion_justification,administration_location_label,processes')
     .eq('id',auditId).eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).maybeSingle();
-  if(auditError)throw ncFailure('audit_source_check_failed','The source audit could not be checked. Keep the draft and retry.',true);
+  if(auditError)throw ncAuditSourceError('Source audit record',auditError);
   if(!audit)throw ncFailure('invalid_audit_source','The source audit is unavailable in this company.');
   if(requireOpen&&(!audit.plan_approved||audit.current_gate!=='fieldwork'||audit.status==='closed'))throw ncFailure('audit_fieldwork_locked','New findings require approved, open audit fieldwork. Retain your draft and ask the audit administrator to review the audit stage.');
-  const read=(factory,label,orderKeys)=>readCompleteAuditRows(factory,{label,orderKeys});
+  const read=ncReadAuditSourceRows;
   const [selectedStandards,selectedProcesses]=await Promise.all([
     read(()=>admin.from('internal_audit_selected_standards').select('*,internal_audit_standard_catalogue(*)').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit criteria'),
     read(()=>admin.from('internal_audit_selected_processes').select('*').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit processes'),
@@ -285,7 +317,7 @@ async function ncAuditQuestionSource(ctx,admin,auditId,questionId,{requireOpen=t
     const rows=await read(()=>admin.from('internal_audit_questions').select('*').in('id',missing.slice(start,start+100)),'Mapped source audit questions');
     rows.forEach(row=>questions.set(row.id,row));
   }
-  const scope=buildAuditFieldworkScope({selectedStandards,selectedProcesses,links,questions:[...questions.values()],exclusionJustification:audit.exclusion_justification});
+  const scope=await ncAuditSourceStep('Approved audit scope',()=>buildAuditFieldworkScope({selectedStandards,selectedProcesses,links,questions:[...questions.values()],exclusionJustification:audit.exclusion_justification}));
   const question=scope.questions.find(row=>row.id===questionId);
   // The database guard also requires a real mapping to a selected standard.
   // Retained unmapped questions remain visible for audit coverage diagnosis,
@@ -294,7 +326,7 @@ async function ncAuditQuestionSource(ctx,admin,auditId,questionId,{requireOpen=t
   const {data:answer,error:answerError}=await admin.from('internal_audit_answers')
     .select('id,conclusion,auditor_notes,risk_level,question_id')
     .eq('audit_id',auditId).eq('owner_id',ctx.ownerId).eq('question_id',questionId).maybeSingle();
-  if(answerError)throw ncFailure('audit_source_check_failed','The source evidence note could not be checked. Keep the draft and retry.',true);
+  if(answerError)throw ncAuditSourceError('Source evidence note',answerError);
   const standards=new Map(selectedStandards.map(row=>[row.standard_id,Array.isArray(row.internal_audit_standard_catalogue)?row.internal_audit_standard_catalogue[0]:row.internal_audit_standard_catalogue]));
   const requirements=(question.criteria_links||[]).map(link=>{
     const standard=standards.get(link.standard_id);
@@ -305,10 +337,10 @@ async function ncAuditQuestionSource(ctx,admin,auditId,questionId,{requireOpen=t
 
 export async function getNonconformityAuditQuestionSource(input={}) {
   try {
-    const ctx=await ncContext('contribute');
+    const ctx=await ncAuditSourceStep('Authorised company access',()=>ncContext('contribute'));
     if(!ctx.canCreate)throw ncFailure('module_access_required','Contribute access is required to raise an audit finding.');
     const admin=createAdminClient();
-    const source=await ncAuditQuestionSource(ctx,admin,clean(input.audit_id),clean(input.question_id));
+    const source=await ncAuditSourceStep('Source audit preparation',()=>ncAuditQuestionSource(ctx,admin,clean(input.audit_id),clean(input.question_id)));
     const findingType=MANUAL_NC_TYPES.has(input.finding_type)?input.finding_type:'minor_nc';
     const existingFindings=await ncReadAll(()=>admin.from('internal_audit_findings')
       .select('id,finding_reference,finding_type,status,responsible_owner_name,agreed_date')
@@ -325,7 +357,7 @@ export async function getNonconformityAuditQuestionSource(input={}) {
         criteria:source.requirements.map(row=>[row.standardName,row.clause&&`clause ${row.clause}`,row.summary].filter(Boolean).join(' · ')).join('\n')||source.question.requirement_summary||'',
       },
     }};
-  }catch(error){return ncErrorResponse(error);}
+  }catch(error){return ncErrorResponse(error?.ncCode?error:ncAuditSourceError('Audit finding form preparation',error));}
 }
 
 // Reuse the same active catalogue and scope-link clause records as Audit
