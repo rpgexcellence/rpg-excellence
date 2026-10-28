@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 
 import { createClient } from "../../../../lib/supabase/server";
-import { buildAuditFieldworkScope, buildAuditFieldworkCoverage, readCompleteAuditRows, auditClauseMatches, parseAuditClauseScope } from "../../../../lib/nonconformity-reporting.mjs";
+import { buildAuditFieldworkScope, buildAuditFieldworkCoverage, readCompleteAuditRows, auditClauseMatches, parseAuditClauseScope, auditClauseScopesOverlap, auditReferenceBankCandidates, resolveAuditReferenceBank } from "../../../../lib/nonconformity-reporting.mjs";
 import { loadAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
 
 const clean = (value) =>
@@ -1204,15 +1204,10 @@ const CONFIDENCE_LEVELS = [
 ];
 
 // Reuse the controlled Assessment bank for guidance and clause references.
-// No edition is inferred from a generic ISO number: exact catalogue labels or
-// a catalogue edition value must resolve to one existing Assessment bank.
+// Prefer the explicit catalogue edition. A same-base-edition bank may be used
+// only with a separately recorded human review of the catalogue amendment.
 function auditReferenceBankNames(selection) {
-  const relation=selection.internal_audit_standard_catalogue;
-  const catalogue=Array.isArray(relation)?relation[0]:relation;
-  const code=clean(catalogue?.standard_code),name=clean(catalogue?.display_name),edition=clean(catalogue?.edition_label);
-  const names=[code,name];
-  if(code&&edition&&/^\d{4}(?:\/.*)?$/.test(edition)&&!/:\d{4}/.test(code))names.push(`${code}:${edition}`);
-  return [...new Set(names.filter(Boolean))];
+  return auditReferenceBankCandidates(selection).names;
 }
 
 async function loadAuditFieldworkState(supabase,user,audit,options={}) {
@@ -1238,22 +1233,28 @@ async function loadAuditFieldworkState(supabase,user,audit,options={}) {
     rows.forEach(row=>bank.set(row.id,row));
   }
   const referenceCriteria=[],guidanceByQuestion={},referenceBanks=[];
-  const refMatches=(a,b)=>{
-    const left=parseAuditClauseScope(a),right=parseAuditClauseScope(b);
-    return left.selectors.length===1&&right.selectors.length===1&&
-      (auditClauseMatches(a,right.selectors[0])||auditClauseMatches(b,left.selectors[0]));
+  // Scope overlap attaches relevant guidance; coverage completeness is still
+  // checked separately by the shared engine's stricter child-clause guard.
+  const refMatches=(a,b)=>auditClauseScopesOverlap(a,b);
+  const effectiveClause=link=>{
+    const question=bank.get(link.question_id),mapped=clean(link.clause);
+    const native=question?.standard_id===link.standard_id?clean(question.clause):null;
+    const m=parseAuditClauseScope(mapped),n=parseAuditClauseScope(native);
+    return mapped&&native&&m.selectors.length===1&&!m.selectors[0].end&&!m.invalid.length&&
+      n.selectors.length===1&&!n.selectors[0].end&&!n.invalid.length&&auditClauseMatches(native,m.selectors[0])
+      ?native:mapped||native;
   };
   for(const selection of selectedStandards){
-    const allowedNames=auditReferenceBankNames(selection);
-    const names=[...new Set(assessmentQuestions.filter(row=>allowedNames.includes(row.standard)).map(row=>row.standard))];
-    // A generic catalogue label must not silently combine standards/editions.
-    if(names.length!==1){referenceBanks.push({standardId:selection.standard_id,status:names.length?'ambiguous':'missing',names});continue;}
-    referenceBanks.push({standardId:selection.standard_id,status:'available',names});
+    const resolution=resolveAuditReferenceBank(selection,[...new Set(assessmentQuestions.map(row=>row.standard))]);
+    const {names}=resolution;
+    referenceBanks.push({standardId:selection.standard_id,...resolution,
+      amendmentReviewConfirmed:resolution.amendmentReviewRequired===true&&options.amendmentReviewConfirmed===true});
+    if(resolution.status!=='available')continue;
     for(const reference of assessmentQuestions.filter(row=>row.standard===names[0])){
       const clause=clean(reference.clause_reference)||clean(reference.question_number);
       if(!clause)continue;
       const matches=links.filter(link=>link.standard_id===selection.standard_id&&
-        (refMatches(link.clause,clause)||(bank.get(link.question_id)?.standard_id===selection.standard_id&&refMatches(bank.get(link.question_id)?.clause,clause))));
+        refMatches(effectiveClause(link),clause));
       referenceCriteria.push({...reference,standard_id:selection.standard_id,clause_reference:clause,scope_keys:[...new Set(matches.map(link=>link.scope_key).filter(Boolean))]});
       for(const link of matches){const current=guidanceByQuestion[link.question_id]||[];if(!current.some(item=>item.id===reference.id))current.push(reference);guidanceByQuestion[link.question_id]=current;}
     }
@@ -1266,6 +1267,11 @@ async function loadAuditFieldworkState(supabase,user,audit,options={}) {
     standardId:reference.standardId,blocking:true,
     message:reference.status==='ambiguous'?'More than one Assessment edition matches this audit standard. Review the catalogue edition.':'No exact Assessment reference bank matches this selected standard. Review the catalogue and clause inventory.',details:reference.names,
   });
+  for(const reference of referenceBanks.filter(row=>row.status==='available'&&row.amendmentReviewRequired)){
+    scope.issues.push({code:'assessment_amendment_review_required',standardId:reference.standardId,blocking:false,
+      message:'The stored reference bank covers the same base edition. The lead auditor must review the catalogue amendment, record the supporting evidence and explicitly confirm that review before completing Fieldwork.',
+      details:reference.names});
+  }
   scope.scopeReady=scope.questions.length>0&&!scope.issues.some(item=>item.blocking);
   scope.questions=scope.questions.map(question=>({...question,assessment_guidance:guidanceByQuestion[question.id]||[]}));
   const coverage=buildAuditFieldworkCoverage({scope,answers,evidence,findings,auditId:audit.id,ownerId:user.id,organizationId:audit.organization_id});
@@ -1312,6 +1318,15 @@ async function requireReportCoverage(supabase,user,audit) {
   if(review?.event_data?.human_scope_review!==true)
     throw new Error('A saved human Fieldwork coverage review is required. Open Plan, reapprove it to reopen Fieldwork, then complete the criterion-inventory review. Existing answers and findings are retained.');
   const state=await loadAuditFieldworkState(supabase,user,audit,{referenceInventoryReviewed:true});
+  const savedBanks=Array.isArray(review.event_data?.reference_banks)?review.event_data.reference_banks:[];
+  for(const current of state.referenceBanks.filter(row=>row.status==='available')){
+    const saved=savedBanks.find(row=>row.standardId===current.standardId);
+    if(!saved||JSON.stringify(saved.names)!==JSON.stringify(current.names))
+      throw new Error('The controlled reference bank changed or its saved review is missing. Reopen Fieldwork through Plan approval and complete the current criterion-inventory review.');
+    if(current.amendmentReviewRequired&&
+      (saved.amendmentReviewConfirmed!==true||String(review.event_data.amendment_review_note||'').trim().length<20))
+      throw new Error('The selected amendment needs an explicit lead-auditor review with supporting evidence. Reopen Fieldwork through Plan approval and record the amendment review before report progression.');
+  }
   if(!state.coverage.canCompleteFieldwork)
     throw new Error('Current audit coverage is incomplete or has unresolved criterion mappings. Reopen Fieldwork through Plan approval, resolve the highlighted items and complete the coverage review.');
   return state;
@@ -1778,7 +1793,12 @@ export async function completeAuditFieldwork(formData) {
   if(!auditId||formData.get('fieldwork_confirmation')!=='on')throw new Error('Human fieldwork completion and criterion-inventory review are required.');
   const {supabase,user,audit}=await context(auditId);
   if(!audit.plan_approved||audit.current_gate!=='fieldwork'||audit.status==='closed')throw new Error('Approved, open fieldwork is required.');
-  const state=await loadAuditFieldworkState(supabase,user,audit,{referenceInventoryReviewed:true});
+  const amendmentConfirmed=formData.get('amendment_confirmation')==='on';
+  const amendmentNote=clean(formData.get('amendment_review_note'));
+  const state=await loadAuditFieldworkState(supabase,user,audit,{referenceInventoryReviewed:true,amendmentReviewConfirmed:amendmentConfirmed});
+  const amendmentRequired=state.referenceBanks.some(row=>row.status==='available'&&row.amendmentReviewRequired);
+  if(amendmentRequired&&(!amendmentConfirmed||!amendmentNote||amendmentNote.length<20||amendmentNote.length>2000))
+    throw new Error('Review the applicable amendment and record its supporting evidence (20 to 2,000 characters), then explicitly confirm the amendment review before completing Fieldwork.');
   if(!state.coverage.canCompleteFieldwork){
     const reason=!state.scope.scopeReady?'scope_coverage':'outstanding_questions';
     redirect(`/portal/internal-audits/${auditId}?gate=fieldwork&fieldwork_error=${reason}#fieldwork-requirements`);
@@ -1788,7 +1808,8 @@ export async function completeAuditFieldwork(formData) {
     event_type:'fieldwork_coverage_reviewed',summary:'Human fieldwork scope and evidence review recorded',
     event_data:{required:state.coverage.required,accounted_for:state.coverage.accountedFor,
       justified_not_applicable:state.coverage.justifiedNotApplicable,controlled_findings:state.coverage.linkedFindingCount,
-      reference_banks:state.referenceBanks,human_scope_review:true},created_by:user.id});
+      reference_banks:state.referenceBanks,human_scope_review:true,
+      amendment_review_note:amendmentRequired?amendmentNote:null},created_by:user.id});
   if(eventError)throw new Error('The fieldwork review history could not be recorded. The report gate remains locked.');
   const {data:advanced,error}=await supabase.from('internal_audits').update({current_gate:'report',status:'report_draft',updated_at:now})
     .eq('id',auditId).eq('owner_id',user.id).eq('current_gate','fieldwork').eq('plan_approved',true).neq('status','closed').select('id');
