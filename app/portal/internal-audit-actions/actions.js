@@ -340,10 +340,10 @@ export async function getNonconformityRequirementOptions() {
       questions.push(...await ncReadAll(()=>referenceClient.from('internal_audit_questions').select('id,standard_id,clause,process_area,question_code').in('standard_id',ids.slice(i,i+100)).eq('active',true),'detailed audit clauses'));
       let offset=0,lastKey=null;
       for(;;){
-        const {data,error}=await referenceClient.from('internal_audit_question_scope_links').select('question_id,standard_id,scope_key,clause,requirement_summary').in('standard_id',ids.slice(i,i+100)).order('standard_id').order('question_id').order('scope_key').range(offset,offset+499);
+        const {data,error}=await referenceClient.from('internal_audit_question_scope_links').select('question_id,standard_id,scope_key,clause,requirement_summary').in('standard_id',ids.slice(i,i+100)).order('standard_id').order('question_id').order('scope_key').order('clause').range(offset,offset+499);
         if(error||!Array.isArray(data))throw ncFailure('records_unavailable','The Audit Planning clause catalogue could not be loaded completely. Choose Other to enter a manual requirement, or retry the search.',true);
         if(!data.length)break;
-        const tail=data[data.length-1],key=JSON.stringify([tail.standard_id,tail.question_id,tail.scope_key]);
+        const tail=data[data.length-1],key=JSON.stringify([tail.standard_id,tail.question_id,tail.scope_key,tail.clause]);
         if(key===lastKey)throw ncFailure('pagination_failed','The Audit Planning clause catalogue could not be read completely. Retry while connected.',true);
         links.push(...data);offset+=data.length;lastKey=key;
       }
