@@ -1,6 +1,6 @@
 "use server";
 
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "../../../lib/supabase/admin";
@@ -8,11 +8,11 @@ import { createClient } from "../../../lib/supabase/server";
 
 import { getOrganizationAccess } from "../../../lib/organization-access";
 import { getUserSubscription, hasPlanAccess } from "../../../lib/subscription";
-import { buildNonconformityAnalytics, buildNonconformityExecutiveBrief, nonconformityDate } from "../../../lib/nonconformity-reporting.mjs";
+import { buildNonconformityAnalytics, buildNonconformityExecutiveBrief, nonconformityDate, buildAuditFieldworkScope, readCompleteAuditRows, parseAuditClauseScope, auditClauseMatches } from "../../../lib/nonconformity-reporting.mjs";
 
 const clean = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
 
-const MANUAL_NC_TYPES = new Set(["major_nc", "minor_nc"]);
+const MANUAL_NC_TYPES = new Set(["major_nc", "minor_nc", "observation", "ofi"]);
 const MANUAL_NC_SOURCES = new Set(["operations", "internal_audit", "supplier", "customer_complaint", "product_service", "process_monitoring", "incident", "management_review", "external_audit", "other"]);
 const MANUAL_NC_RISKS = new Set(["low", "medium", "high", "critical"]);
 const MAX_MANUAL_EVIDENCE_BYTES = 10 * 1024 * 1024;
@@ -31,7 +31,7 @@ export async function createManualNonconformity(formData) {
   const riskLevel = clean(formData.get("risk_level")) || "medium";
   const supplierId = clean(formData.get("supplier_id"));
   const supplierContactId = clean(formData.get("supplier_contact_id"));
-  if (!MANUAL_NC_TYPES.has(findingType) || !MANUAL_NC_SOURCES.has(sourceCategory) || !title || !criteria || !objectiveEvidence || !failureStatement || !MANUAL_NC_RISKS.has(riskLevel)) {
+  if (!MANUAL_NC_TYPES.has(findingType) || !MANUAL_NC_SOURCES.has(sourceCategory) || !title || !criteria || !objectiveEvidence || (["major_nc", "minor_nc"].includes(findingType) && !failureStatement) || !MANUAL_NC_RISKS.has(riskLevel)) {
     redirect("/portal/internal-audit-actions?raise=1&error=manual_incomplete#raise-manual-nc");
   }
 
@@ -107,6 +107,11 @@ export async function submitPortalAuditAction(formData) {
   const { data: access, error } = await admin.from("internal_audit_action_access").select("*")
     .eq("id", accessId).eq("assignee_user_id", user.id).maybeSingle();
   if (error || !access) throw new Error(error?.message || "Assigned action not found.");
+  const {data:controlledFinding,error:findingReadError}=await admin.from("internal_audit_findings").select("id,status,closure_verified")
+    .eq("id",access.finding_id).eq("owner_id",access.owner_id).maybeSingle();
+  if(findingReadError||!controlledFinding)throw new Error("The controlled finding could not be checked. Refresh before submitting.");
+  if(controlledFinding.status==="closed"||controlledFinding.closure_verified===true)throw new Error("This finding is closed. Its response cannot be changed by resubmitting the owner form.");
+  if(!["assigned","acknowledged","in_progress","returned","submitted"].includes(access.status))throw new Error("This response is under controlled review. Ask the authorised reviewer to return it before making further changes.");
   const correction = clean(formData.get("correction_and_containment"));
   const rootCause = clean(formData.get("root_cause_response"));
   const plan = clean(formData.get("corrective_action_plan"));
@@ -123,15 +128,18 @@ export async function submitPortalAuditAction(formData) {
     if (evidenceError) throw new Error(evidenceError.message);
   }
   const now = new Date().toISOString();
-  const { error: updateError } = await admin.from("internal_audit_action_access").update({
+  let responseUpdate = admin.from("internal_audit_action_access").update({
     correction_and_containment: correction, root_cause_response: rootCause,
     extent_and_systemic_review: clean(formData.get("extent_and_systemic_review")),
     corrective_action_plan: plan, effectiveness_measure: effectiveness,
     owner_submission_notes: clean(formData.get("owner_submission_notes")),
     status: "submitted", acknowledged_at: access.acknowledged_at || now,
     submitted_at: now, updated_at: now,
-  }).eq("id", access.id).eq("assignee_user_id", user.id);
+  }).eq("id", access.id).eq("owner_id",access.owner_id).eq("assignee_user_id", user.id).eq("status",access.status);
+  responseUpdate=access.updated_at?responseUpdate.eq("updated_at",access.updated_at):responseUpdate.is("updated_at",null);
+  const {data:updatedResponse,error:updateError}=await responseUpdate.select("id");
   if (updateError) throw new Error(updateError.message);
+  if(!updatedResponse?.length)throw new Error("The response or its assigned owner changed. Refresh before submitting again.");
   revalidatePath("/portal/internal-audit-actions");
   redirect(`/portal/internal-audit-actions?saved=1#action-${access.id}`);
 }
@@ -174,7 +182,10 @@ async function ncContext(level = 'view') {
     throw ncFailure('organisation_mismatch', 'The subscription and authorised company do not match.');
   }
   return { client, user, organization: access.organization, ownerId: access.organization.owner_id, subscription,
-    isOwner: access.isOwner === true, canCreate: ['contribute','review','approve','admin','owner'].includes(access.level) };
+    isOwner: access.isOwner === true, accessLevel: access.level,
+    canCreate: ['contribute','review','approve','admin','owner'].includes(access.level),
+    canReview: ['review','approve','admin','owner'].includes(access.level),
+    canApprove: ['approve','admin','owner'].includes(access.level) };
 }
 async function ncReadAll(makeQuery, source) {
   const rows = []; let offset = 0, previousLast = null;
@@ -195,8 +206,8 @@ async function ncLoadSnapshot(ctx) {
   const admin = createAdminClient();
   const org = ctx.organization;
   const findings = await ncReadAll(() => {
-    let q = admin.from('internal_audit_findings').select('id,organization_id,audit_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,requirement_source,requirement_standard_id,clause,source_audit_id,source_audit_reference,source_audit_title,objective_evidence,evidence_source,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,created_at,closed_at,closure_verified_at,updated_at,source_type,source_category,source_reference,detected_at')
-      .eq('owner_id', ctx.ownerId).in('finding_type', ['major_nc','minor_nc']);
+    let q = admin.from('internal_audit_findings').select('id,organization_id,audit_id,answer_id,supplier_id,finding_reference,finding_type,risk_level,title,failure_statement,criteria,requirement_source,requirement_standard_id,clause,source_audit_id,source_audit_reference,source_audit_title,source_audit_question_id,source_audit_question_code,reported_by_user_id,objective_evidence,evidence_source,process_area,responsible_owner_name,agreed_date,status,linked_rca_case_id,closure_verified,created_at,closed_at,closure_verified_at,updated_at,source_type,source_category,source_reference,detected_at')
+      .eq('owner_id', ctx.ownerId).in('finding_type', ['major_nc','minor_nc','observation','ofi']);
     // Legacy unassigned records remain visible to their original owner. Company
     // users receive only findings explicitly assigned to their organisation.
     q = ctx.isOwner ? q.or(`organization_id.eq.${org.id},organization_id.is.null`) : q.eq('organization_id', org.id);
@@ -229,7 +240,7 @@ async function ncLoadSnapshot(ctx) {
     asOf: new Date().toISOString().slice(0,10), fetchedAt: new Date().toISOString(), currentUserId: ctx.user.id,
     organization: { id: org.id, name: org.name || 'Organisation' },
     findings, access, audits, capaCases, myResponses, suppliers, contacts: contacts.filter(c=>supplierIds.has(c.supplier_id)), people, requirementStandards,
-    canCreate: ctx.canCreate, canExecutiveReport: hasPlanAccess(ctx.subscription,'consultant'),
+    canCreate: ctx.canCreate, canManage: ctx.canReview, canApprove: ctx.canApprove, canExecutiveReport: hasPlanAccess(ctx.subscription,'consultant'),
     legacyUnassigned: findings.filter(f=>!f.organization_id).length,
   };
 }
@@ -243,6 +254,77 @@ export async function getNonconformityAuditOptions() {
     const ctx=await ncContext('view'),admin=createAdminClient();
     const audits=await ncReadAll(()=>admin.from('internal_audits').select('id,audit_reference,title,audit_type,status,current_gate,planned_start_at').eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id),'audit source register');
     return {ok:true,audits:audits.sort((a,b)=>(b.planned_start_at||'').localeCompare(a.planned_start_at||'')||(a.audit_reference||'').localeCompare(b.audit_reference||''))};
+  }catch(error){return ncErrorResponse(error);}
+}
+
+// Read the same approved scope through the existing shared coverage engine.
+// Browser query strings identify a source; they never authorise it or supply
+// trusted audit labels, question references, reporter identities or evidence.
+async function ncAuditQuestionSource(ctx,admin,auditId,questionId,{requireOpen=true}={}) {
+  if(!NC_UUID.test(auditId||'')||!NC_UUID.test(questionId||''))throw ncFailure('invalid_audit_source','Select a valid audit and originating question.');
+  const {data:audit,error:auditError}=await admin.from('internal_audits')
+    .select('id,audit_reference,title,organization_id,plan_approved,current_gate,status,exclusion_justification,administration_location_label,processes')
+    .eq('id',auditId).eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).maybeSingle();
+  if(auditError)throw ncFailure('audit_source_check_failed','The source audit could not be checked. Keep the draft and retry.',true);
+  if(!audit)throw ncFailure('invalid_audit_source','The source audit is unavailable in this company.');
+  if(requireOpen&&(!audit.plan_approved||audit.current_gate!=='fieldwork'||audit.status==='closed'))throw ncFailure('audit_fieldwork_locked','New findings require approved, open audit fieldwork. Retain your draft and ask the audit administrator to review the audit stage.');
+  const read=(factory,label,orderKeys)=>readCompleteAuditRows(factory,{label,orderKeys});
+  const [selectedStandards,selectedProcesses]=await Promise.all([
+    read(()=>admin.from('internal_audit_selected_standards').select('*,internal_audit_standard_catalogue(*)').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit criteria'),
+    read(()=>admin.from('internal_audit_selected_processes').select('*').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit processes'),
+  ]);
+  const ids=[...new Set(selectedStandards.map(row=>row.standard_id).filter(Boolean))];
+  if(!ids.length)throw ncFailure('invalid_audit_source','The source audit has no approved selected criteria.');
+  const [links,native]=await Promise.all([
+    read(()=>admin.from('internal_audit_question_scope_links').select('question_id,standard_id,scope_key,clause,requirement_summary').in('standard_id',ids),'Source audit mappings',['standard_id','question_id','scope_key','clause']),
+    read(()=>admin.from('internal_audit_questions').select('*').in('standard_id',ids),'Source audit questions'),
+  ]);
+  const questions=new Map(native.map(row=>[row.id,row]));
+  const missing=[...new Set(links.map(row=>row.question_id).filter(id=>id&&!questions.has(id)))];
+  for(let start=0;start<missing.length;start+=100){
+    const rows=await read(()=>admin.from('internal_audit_questions').select('*').in('id',missing.slice(start,start+100)),'Mapped source audit questions');
+    rows.forEach(row=>questions.set(row.id,row));
+  }
+  const scope=buildAuditFieldworkScope({selectedStandards,selectedProcesses,links,questions:[...questions.values()],exclusionJustification:audit.exclusion_justification});
+  const question=scope.questions.find(row=>row.id===questionId);
+  // The database guard also requires a real mapping to a selected standard.
+  // Retained unmapped questions remain visible for audit coverage diagnosis,
+  // but cannot be used to manufacture a trusted source link.
+  if(!question||!links.some(row=>row.question_id===questionId))throw ncFailure('audit_question_out_of_scope','This question is inactive, unmapped or outside the current approved audit scope. Review its planning mapping before submitting.');
+  const {data:answer,error:answerError}=await admin.from('internal_audit_answers')
+    .select('id,conclusion,auditor_notes,risk_level,question_id')
+    .eq('audit_id',auditId).eq('owner_id',ctx.ownerId).eq('question_id',questionId).maybeSingle();
+  if(answerError)throw ncFailure('audit_source_check_failed','The source evidence note could not be checked. Keep the draft and retry.',true);
+  const standards=new Map(selectedStandards.map(row=>[row.standard_id,Array.isArray(row.internal_audit_standard_catalogue)?row.internal_audit_standard_catalogue[0]:row.internal_audit_standard_catalogue]));
+  const requirements=(question.criteria_links||[]).map(link=>{
+    const standard=standards.get(link.standard_id);
+    return {standardId:link.standard_id,standardCode:standard?.standard_code||'',standardName:standard?.display_name||standard?.standard_code||'',clause:link.clause||'',summary:link.requirement_summary||question.requirement_summary||''};
+  });
+  return {audit,question,answer,requirements};
+}
+
+export async function getNonconformityAuditQuestionSource(input={}) {
+  try {
+    const ctx=await ncContext('contribute');
+    if(!ctx.canCreate)throw ncFailure('module_access_required','Contribute access is required to raise an audit finding.');
+    const admin=createAdminClient();
+    const source=await ncAuditQuestionSource(ctx,admin,clean(input.audit_id),clean(input.question_id));
+    const findingType=MANUAL_NC_TYPES.has(input.finding_type)?input.finding_type:'minor_nc';
+    const existingFindings=await ncReadAll(()=>admin.from('internal_audit_findings')
+      .select('id,finding_reference,finding_type,status,responsible_owner_name,agreed_date')
+      .eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id)
+      .eq('source_audit_id',source.audit.id).eq('source_audit_question_id',source.question.id),'source question findings');
+    return {ok:true,source:{
+      audit:{id:source.audit.id,reference:source.audit.audit_reference,title:source.audit.title},
+      question:{id:source.question.id,code:source.question.question_code||source.question.clause||source.question.id,text:source.question.question_text},
+      requirements:source.requirements,existingFindings,
+      defaults:{source_category:'internal_audit',source_audit_id:source.audit.id,source_audit_question_id:source.question.id,
+        source_reference:source.audit.audit_reference||'',finding_type:findingType,
+        objective_evidence:source.answer?.conclusion||'',risk_level:MANUAL_NC_RISKS.has(source.answer?.risk_level)?source.answer.risk_level:'medium',
+        process_area:source.question.process_area||source.audit.administration_location_label||'',
+        criteria:source.requirements.map(row=>[row.standardName,row.clause&&`clause ${row.clause}`,row.summary].filter(Boolean).join(' · ')).join('\n')||source.question.requirement_summary||'',
+      },
+    }};
   }catch(error){return ncErrorResponse(error);}
 }
 
@@ -292,7 +374,7 @@ function ncSubmission(input, ctx) {
   const payload = {
     finding_type:ncText(input,'finding_type',30,true), source_category:ncText(input,'source_category',40,true),
     title:ncText(input,'title',220,true), criteria:ncText(input,'criteria',12000,true),
-    objective_evidence:ncText(input,'objective_evidence',16000,true), failure_statement:ncText(input,'failure_statement',12000,true),
+    objective_evidence:ncText(input,'objective_evidence',16000,true), failure_statement:ncText(input,'failure_statement',12000,['major_nc','minor_nc'].includes(input.finding_type)),
     process_area:ncText(input,'process_area',300), risk_level:ncText(input,'risk_level',20,true),
     source_reference:ncText(input,'source_reference',300), detected_at:ncText(input,'detected_at',10,true),
     agreed_date:ncText(input,'agreed_date',10), supplier_id:ncText(input,'supplier_id',36),
@@ -326,6 +408,13 @@ function ncSubmission(input, ctx) {
     if(payload.source_audit_id&&!NC_UUID.test(payload.source_audit_id))throw ncFailure('invalid_audit_source','Select a valid audit register record.');
     if(payload.source_category==='internal_audit'&&!payload.source_audit_id)throw ncFailure('invalid_audit_source','Select the applicable audit from this company’s register.');
     if(payload.source_category==='external_audit'&&!payload.source_reference)throw ncFailure('invalid_audit_source','Enter the external auditor or organisation and report reference.');
+  }
+  // Leave old device-draft digests unchanged. Only an explicit, non-empty
+  // question handoff adds source-question identity to a new submission.
+  const sourceQuestion=ncText(input,'source_audit_question_id',36);
+  if(sourceQuestion){
+    if(!NC_UUID.test(sourceQuestion)||payload.source_category!=='internal_audit'||!payload.source_audit_id)throw ncFailure('invalid_audit_source','An originating question requires its internal audit register record.');
+    payload.source_audit_question_id=sourceQuestion;
   }
   let evidence = null;
   if (input.evidence !== undefined && input.evidence !== null) {
@@ -424,14 +513,24 @@ async function ncProcessSubmission(input,allowCreate) {
       if(!data)throw ncFailure('invalid_audit_source','The selected audit is no longer available in this company. Review the source before submitting.');
       sourceAudit=data;
     }
+    const auditQuestion=submission.payload.source_audit_question_id
+      ?await ncAuditQuestionSource(ctx,admin,submission.payload.source_audit_id,submission.payload.source_audit_question_id):null;
+    if(auditQuestion&&submission.payload.requirement_standard_id&&!auditQuestion.requirements.some(row=>{
+      const clause=parseAuditClauseScope(row.clause);
+      return row.standardId===submission.payload.requirement_standard_id&&clause.selectors.some(selector=>auditClauseMatches(submission.payload.clause,selector));
+    }))throw ncFailure('requirement_outside_source_question','Select an applicable requirement linked to this audit question. Use Other to describe a separate legal, contractual or procedural requirement.');
+    // An historical audit reference alone remains a manual finding. A current
+    // verified question handoff also receives the native audit/answer links,
+    // so existing reports, CAPA links and closure gates see the same record.
     const owner=await ncResolveOwner(admin,ctx,submission.payload);
     const { responsible_person_id,responsible_owner_name,responsible_owner_email,...fields }=submission.payload;
     const day=new Date().toISOString().slice(0,10).replaceAll('-','');
     const { data,error }=await admin.from('internal_audit_findings').insert({
-      ...fields,owner_id:ctx.ownerId,organization_id:ctx.organization.id,audit_id:null,
+      ...fields,owner_id:ctx.ownerId,organization_id:ctx.organization.id,audit_id:auditQuestion?.audit.id||null,
+      ...(auditQuestion?{answer_id:auditQuestion.answer?.id||null,reported_by_user_id:ctx.user.id}:{}),
       finding_reference:`MNC-${day}-${randomUUID().slice(0,8).toUpperCase()}`,
       responsible_owner_name:owner.name,responsible_owner_email:owner.email,
-      source_type:'manual',status:'response_due',closure_verified:false,
+      source_type:'manual',status:['major_nc','minor_nc'].includes(fields.finding_type)?'response_due':'issued',closure_verified:false,
       ...(sourceAudit?{source_audit_reference:sourceAudit.audit_reference,source_audit_title:sourceAudit.title}:{}),
       requirement_source:fields.requirement_source||'other_criteria',evidence_source:fields.evidence_source||'multiple_sources',
       client_submission_id:submission.requestId,client_submission_digest:submission.digest,
@@ -441,6 +540,7 @@ async function ncProcessSubmission(input,allowCreate) {
     else finding=data;
     if (!finding) throw ncFailure('registration_unconfirmed','Registration could not be confirmed. Keep the original device draft and retry.',true);
     revalidatePath(NC_ROOT);revalidatePath('/portal/suppliers');
+    if(auditQuestion)revalidatePath(`/portal/internal-audits/${auditQuestion.audit.id}`);
   }
   return ncEvidence(admin,ctx,submission,finding,allowCreate,replayed);
 }
@@ -466,4 +566,186 @@ export async function createNonconformityExecutiveReport(options={}) {
     const analytics=buildNonconformityAnalytics(snapshot,filters);
     return { ok:true,report:{ reference:`NC-REVIEW-${randomUUID()}`,generatedAt:new Date().toISOString(),organization:snapshot.organization,analytics,brief:buildNonconformityExecutiveBrief(analytics,snapshot.organization.name) } };
   } catch(error) { return ncErrorResponse(error); }
+}
+
+// Existing Findings & Actions management. The browser sends an intention and
+// expected record version; only this authenticated server builds SQL changes.
+const NC_MANAGEMENT_LEVELS={save_details:'review',assign_owner:'review',start_capa:'review',link_capa:'review',review_response:'review',verify_action:'approve',verify_finding:'approve',close_advisory:'approve',reopen:'approve'};
+const NC_MANAGEMENT_FIELDS=['finding_type','title','criteria','objective_evidence','failure_statement','process_area','risk_level','agreed_date'];
+const NC_ACCESS_PUBLIC=['id','finding_id','rca_case_id','assignee_user_id','assignee_name','assignee_email','status','updated_at','correction_and_containment','root_cause_response','extent_and_systemic_review','corrective_action_plan','effectiveness_measure','owner_submission_notes','submitted_at','auditor_response','auditor_response_at','auditor_response_by','effectiveness_result','verification_method','verification_evidence','verified_at','verified_by','d6_verification_requested_at','d6_verification_completed_at'];
+const ncPick=(row,keys)=>row?Object.fromEntries(keys.map(key=>[key,row[key]??null])):null;
+// Preserve PostgreSQL microseconds; Date.toISOString() would truncate the
+// record version and make a legitimate subsequent transaction look stale.
+const ncVersion=value=>value===null?null:typeof value==='string'&&!Number.isNaN(Date.parse(value))?value.trim():undefined;
+const ncIsClosed=finding=>finding.status==='closed'||finding.closure_verified===true;
+const ncIsNC=finding=>['major_nc','minor_nc'].includes(finding.finding_type);
+const ncEffective=action=>action.status==='verified'&&['effective','effective_verified'].includes(action.effectiveness_result)&&action.verified_by&&action.verified_at;
+const ncReason=event=>String(event?.event_data?.reason||event?.summary||'').replace(/\n\[request identity sha256: [0-9a-f]{64}\]$/,'');
+function ncManagementInput(input,ctx){
+  if(!input||typeof input!=='object'||Array.isArray(input)||input.user_id!==ctx.user.id||input.organization_id!==ctx.organization.id)throw ncFailure('management_scope_mismatch','This decision belongs to another signed-in account or company.');
+  const operation=ncText(input,'operation',40,true),findingId=ncText(input,'finding_id',36,true),requestId=ncText(input,'request_id',36,true),reason=ncText(input,'reason',1000,true);
+  if(!Object.hasOwn(NC_MANAGEMENT_LEVELS,operation)||!NC_UUID.test(findingId)||!NC_UUID.test(requestId)||reason.length<5)throw ncFailure('invalid_management_request','Choose a supported decision and record a clear reason.');
+  const expected=ncVersion(input.expected_updated_at),linksDigest=ncText(input,'expected_links_digest',64,true);if(expected===undefined||!NC_SHA256.test(linksDigest))throw ncFailure('record_version_required','Refresh this finding and its linked responses before recording a decision.');
+  if(!input.data||typeof input.data!=='object'||Array.isArray(input.data)||JSON.stringify(input.data).length>100000)throw ncFailure('invalid_management_request','Check the decision fields.');
+  const keys={save_details:NC_MANAGEMENT_FIELDS,assign_owner:['person_id','supplier_contact_id','agreed_date'],start_capa:[],link_capa:['case_id'],review_response:['decision','conclusion','human_confirmation'],verify_action:['action_id','result','method','conclusion','human_confirmation'],verify_finding:['result','method','conclusion','human_confirmation'],close_advisory:['conclusion','human_confirmation'],reopen:['conclusion','human_confirmation']}[operation];
+  if(Object.keys(input.data).some(key=>!keys.includes(key)))throw ncFailure('invalid_management_request','This decision contains fields that are not editable for its operation.');
+  // Bind interrupted/repeated high-level requests to their original content.
+  // The fingerprint is retained in the existing event reason; the UI displays
+  // the human reason only. No new request store or device database is used.
+  const data=Object.fromEntries(keys.filter(key=>Object.hasOwn(input.data,key)).map(key=>[key,input.data[key]]));
+  const digest=createHash('sha256').update(JSON.stringify({actor:ctx.user.id,organization:ctx.organization.id,findingId,requestId,operation,reason,expected,linksDigest,data})).digest('hex');
+  const conclusion=['close_advisory','reopen'].includes(operation)?ncText(data,'conclusion',9000,true):null;
+  return {operation,findingId,requestId,reason,expected,linksDigest,data,boundReason:`${reason}${conclusion?`\nReview conclusion: ${conclusion}`:''}\n[request identity sha256: ${digest}]`};
+}
+async function ncManagementReplay(admin,ctx,request){
+  const {data:event,error}=await admin.from('internal_audit_events').select('id,created_by,event_data')
+    .eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).eq('finding_id',request.findingId)
+    .eq('event_data->>management_request_id',request.requestId).maybeSingle();
+  if(error)throw ncFailure('management_history_unavailable','The decision history could not be checked. Retain this request and retry.',true);
+  if(!event)return null;
+  if(event.created_by!==ctx.user.id||event.event_data?.operation!==request.operation||event.event_data?.reason!==request.boundReason)throw ncFailure('management_request_conflict','This request identity already belongs to different decision content. Refresh the finding before starting a separate decision.');
+  return {ok:true,replayed:true,result:event.event_data.result};
+}
+async function ncManagementState(ctx,admin,findingId){
+  const {data:finding,error}=await admin.from('internal_audit_findings').select('*').eq('id',findingId).eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).maybeSingle();
+  if(error)throw ncFailure('finding_unavailable','This finding could not be loaded completely.',true);
+  if(!finding||!MANUAL_NC_TYPES.has(finding.finding_type))throw ncFailure('finding_unavailable','This controlled finding is unavailable in the authorised company. Legacy findings without a company assignment require administrator review.');
+  const one=async(table,id)=>{if(!id)return null;let q=admin.from(table).select('*').eq('id',id).eq('owner_id',ctx.ownerId);if(['internal_audits','rca_cases'].includes(table))q=q.eq('organization_id',ctx.organization.id);const {data,error}=await q.maybeSingle();if(error||!data)throw ncFailure('linked_record_unavailable','A linked controlled record could not be checked. Refresh before continuing.',true);return data;};
+  const [{data:access,error:accessError},audit,capa]=await Promise.all([
+    admin.from('internal_audit_action_access').select('*').eq('finding_id',findingId).eq('owner_id',ctx.ownerId).maybeSingle(),one('internal_audits',finding.audit_id),one('rca_cases',finding.linked_rca_case_id),
+  ]);
+  if(accessError)throw ncFailure('response_unavailable','The assigned response could not be loaded.',true);
+  if(access&&access.rca_case_id&&access.rca_case_id!==finding.linked_rca_case_id)throw ncFailure('linked_record_mismatch','The response and finding refer to different CAPA cases. Ask an administrator to review the controlled links.');
+  const [actions,disciplines,evidence,people]=await Promise.all([
+    capa?ncReadAll(()=>admin.from('rca_actions').select('*').eq('owner_id',ctx.ownerId).eq('case_id',capa.id),'linked corrective actions'):[],
+    capa?ncReadAll(()=>admin.from('rca_8d_disciplines').select('*').eq('owner_id',ctx.ownerId).eq('case_id',capa.id),'controlled CAPA disciplines'):[],
+    capa?ncReadAll(()=>admin.from('rca_evidence').select('id,action_id,discipline,reference,description,evidence_date,storage_path').eq('owner_id',ctx.ownerId).eq('case_id',capa.id).eq('discipline',6),'action verification evidence'):[],
+    ncReadAll(()=>admin.from('organization_people').select('id,first_name,last_name,email,user_id,account_status').eq('organization_id',ctx.organization.id),'controlled company owner references'),
+  ]);
+  const contacts=finding.supplier_id?await ncReadAll(()=>admin.from('supplier_contacts').select('id,first_name,last_name,email,business_title').eq('supplier_id',finding.supplier_id).eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).eq('is_active',true),'linked supplier owner references'):[];
+  return {finding,access,audit,capa,actions,disciplines,evidence,people,contacts,selected:actions.filter(action=>Number(action.discipline)===5&&action.selection_status==='selected')};
+}
+function ncIndependent(ctx,state,action=null){
+  const email=ctx.user.email?.toLowerCase();
+  if(state.access&&(state.access.assignee_user_id===ctx.user.id||(email&&state.access.assignee_email?.toLowerCase()===email)))return false;
+  const person=action?state.people.find(person=>person.id===action.action_owner_person_id):null;
+  if(person&&(person.user_id===ctx.user.id||(email&&person.email?.toLowerCase()===email)))return false;
+  return true;
+}
+function ncLinkedVersion(state){
+  return createHash('sha256').update(JSON.stringify({finding:ncPick(state.finding,['id','finding_type','title','criteria','objective_evidence','failure_statement','risk_level','process_area','agreed_date','status','updated_at','linked_rca_case_id','closure_verified','closure_verified_at']),access:ncPick(state.access,NC_ACCESS_PUBLIC),capa:state.capa,actions:state.actions,disciplines:state.disciplines,evidence:state.evidence})).digest('hex');
+}
+export async function getNonconformityManagementRecord(findingId){
+  try{
+    const ctx=await ncContext('view');if(!NC_UUID.test(findingId||''))throw ncFailure('invalid_reference','Choose a valid finding.');
+    const admin=createAdminClient(),state=await ncManagementState(ctx,admin,findingId),{finding,access,audit,capa}=state;
+    const history=await ncReadAll(()=>admin.from('internal_audit_events').select('id,event_type,summary,event_data,created_by,created_at').eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).eq('finding_id',findingId),'finding management history');
+    const paths=state.evidence.map(row=>row.storage_path).filter(Boolean);let urls=[];
+    if(paths.length){const result=await admin.storage.from('rca-evidence').createSignedUrls(paths,300);if(result.error)throw ncFailure('evidence_unavailable','Controlled evidence links could not be prepared.',true);urls=result.data||[];}
+    const usable=!ncIsClosed(finding)&&audit?.status!=='closed',independent=ncIndependent(ctx,state);
+    return {ok:true,record:{linksDigest:ncLinkedVersion(state),
+      finding:ncPick(finding,['id','finding_reference','finding_type','title','criteria','objective_evidence','failure_statement','risk_level','process_area','agreed_date','status','updated_at','audit_id','supplier_id','source_audit_id','source_audit_reference','source_audit_question_id','source_audit_question_code','responsible_owner_name','responsible_owner_email','responsible_owner_person_id','responsible_owner_supplier_contact_id','linked_rca_case_id','closure_verified','closure_verified_by','closure_verified_at','closed_at']),
+      access:ncPick(access,NC_ACCESS_PUBLIC),audit:ncPick(audit,['id','audit_reference','title','status','current_gate']),capa:ncPick(capa,['id','case_reference','title','status','method','current_discipline','target_close_date','updated_at']),
+      actions:state.selected.map(action=>({...ncPick(action,['id','title','action_owner','action_owner_person_id','status','due_date','effectiveness_criteria','implementation_result','effectiveness_result','effectiveness_verification_method','effectiveness_verification_conclusion','verified_by','verified_at','updated_at','d6_submitted_at']),canVerify:ctx.canApprove&&usable&&ncIndependent(ctx,state,action)})),
+      evidence:state.evidence.map(row=>({...ncPick(row,['id','action_id','reference','description','evidence_date']),url:urls.find(url=>url.path===row.storage_path)?.signedUrl||null})),
+      people:state.people.filter(person=>person.account_status==='active').map(person=>ncPick(person,['id','first_name','last_name','email','user_id'])),
+      contacts:state.contacts,
+      history:history.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))||a.id.localeCompare(b.id)).map(event=>({id:event.id,operation:event.event_data?.operation||event.event_type,reason:ncReason(event),actorId:event.created_by,createdAt:event.created_at,changes:event.event_data?.changes||[]})),
+      capabilities:{canEdit:ctx.canReview&&usable&&(!audit||audit.current_gate==='fieldwork'),canAssign:ctx.canReview&&usable,canStartCapa:ctx.canReview&&usable&&ncIsNC(finding)&&!capa,canReview:ctx.canReview&&usable&&independent&&ncIsNC(finding)&&Boolean(access),canVerify:ctx.canApprove&&usable&&independent&&ncIsNC(finding)&&Boolean(access)&&Boolean(capa),canCloseAdvisory:ctx.canApprove&&usable&&!ncIsNC(finding),canReopen:ctx.canApprove&&ncIsClosed(finding)&&audit?.status!=='closed'},
+    }};
+  }catch(error){return ncErrorResponse(error);}
+}
+export async function getNonconformityCapaOptions(){
+  try{const ctx=await ncContext('review');if(!ctx.canReview)throw ncFailure('module_access_required','Review access is required.');const admin=createAdminClient();return {ok:true,cases:await ncReadAll(()=>admin.from('rca_cases').select('id,case_reference,title,status,method').eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).eq('method','8d'),'controlled CAPA linking options')};}catch(error){return ncErrorResponse(error);}
+}
+async function ncPortalPersonId(admin,email){
+  if(!email)return null;
+  for(let page=1;page<=100;page++){const {data,error}=await admin.auth.admin.listUsers({page,perPage:200});if(error)throw ncFailure('owner_account_unavailable','The selected owner’s portal account could not be checked.',true);const users=data?.users;if(!Array.isArray(users))throw ncFailure('owner_account_unavailable','The portal account register returned an incomplete result.',true);const user=users.find(user=>user.email?.toLowerCase()===email.toLowerCase());if(user)return user.id;if(!users.length)return null;}
+  throw ncFailure('owner_account_unavailable','The account register could not be checked completely. Contact the platform administrator.',true);
+}
+export async function manageNonconformity(input){
+  let admin,ctx,request;
+  try{
+    const operation=input?.operation,level=Object.hasOwn(NC_MANAGEMENT_LEVELS,operation)?NC_MANAGEMENT_LEVELS[operation]:'approve';
+    ctx=await ncContext(level);request=ncManagementInput(input,ctx);
+    if((level==='contribute'&&!ctx.canCreate)||(level==='review'&&!ctx.canReview)||(level==='approve'&&!ctx.canApprove))throw ncFailure('module_access_required','Your current role cannot make this finding-management decision.');
+    admin=createAdminClient();const replay=await ncManagementReplay(admin,ctx,request);if(replay)return replay;
+    const state=await ncManagementState(ctx,admin,request.findingId),{finding:f,access,audit,capa}=state;
+    if(ncVersion(f.updated_at)!==request.expected)throw ncFailure('management_conflict','The finding changed. Refresh and review it before recording a decision.');
+    if(ncLinkedVersion(state)!==request.linksDigest)throw ncFailure('management_conflict','A linked owner response, corrective action or evidence record changed. Refresh and review it before recording a decision.');
+    if(audit?.status==='closed')throw ncFailure('audit_revision_required','The audit is closed. Use its controlled revision process before amending linked findings.');
+    if(ncIsClosed(f)&&request.operation!=='reopen')throw ncFailure('record_closed','Reopen the controlled finding before making further changes.');
+    const data=request.data,now=new Date().toISOString(),changes=[];let caseId=capa?.id||null,ownerAccess=null;
+    const update=(table,row,values)=>changes.push({table,id:row.id,kind:'update',expected_updated_at:row.updated_at??null,values});
+    const updateFinding=values=>update('internal_audit_findings',f,values);
+    const text=(key,max=12000,required=true)=>ncText(data,key,max,required);
+    const confirm=()=>{if(data.human_confirmation!==true)throw ncFailure('human_confirmation_required','Review the evidence and confirm this human decision before submitting.');};
+    const requireNC=()=>{if(!ncIsNC(f))throw ncFailure('invalid_management_operation','This control applies to Major and Minor NCs. Observation and OFI follow-up is proportionate.');};
+    const requireIndependent=action=>{if(!ncIndependent(ctx,state,action))throw ncFailure('independent_reviewer_required','The response or action owner cannot verify their own work. Appoint an independent authorised reviewer.');};
+    const finalReady=()=>{if(!capa||Number(capa.current_discipline)<8&&!['effectiveness_review','closed'].includes(capa.status)||!state.selected.length||!state.selected.every(action=>ncEffective(action)&&action.verified_by!==access?.assignee_user_id&&action.verified_by!==state.people.find(person=>person.id===action.action_owner_person_id)?.user_id))throw ncFailure('capa_verification_required','The controlled CAPA must reach D8/effectiveness review and every selected corrective action must be independently verified effective.');};
+    switch(request.operation){
+      case 'save_details':{
+        if(audit&&audit.current_gate!=='fieldwork')throw ncFailure('audit_revision_required','An approved audit finding statement requires the controlled revision process before amendment.');
+        const type=text('finding_type',30),risk=text('risk_level',20),date=text('agreed_date',10,false);
+        if(!MANUAL_NC_TYPES.has(type)||!MANUAL_NC_RISKS.has(risk)||(date&&!nonconformityDate(date)))throw ncFailure('invalid_classification','Check classification, risk and target date.');
+        updateFinding({finding_type:type,title:text('title',220),criteria:text('criteria',12000),objective_evidence:text('objective_evidence',16000),failure_statement:ncText(data,'failure_statement',12000,['major_nc','minor_nc'].includes(type)),process_area:text('process_area',300,false),risk_level:risk,agreed_date:date});break;
+      }
+      case 'assign_owner':{
+        const personId=text('person_id',36,false),contactId=text('supplier_contact_id',36,false),date=text('agreed_date',10,false);
+        if(Boolean(personId)===Boolean(contactId)||personId&&!NC_UUID.test(personId)||contactId&&!NC_UUID.test(contactId)||date&&!nonconformityDate(date))throw ncFailure('invalid_owner','Select one active company person or linked supplier contact and check the target date.');
+        let person,name,email,userId;
+        if(personId){person=state.people.find(person=>person.id===personId&&person.account_status==='active');if(!person)throw ncFailure('owner_unavailable','Select a current person in this company.');name=[person.first_name,person.last_name].filter(Boolean).join(' ');email=person.email;userId=person.user_id||null;}
+        else{if(!f.supplier_id)throw ncFailure('owner_unavailable','This finding has no controlled supplier link.');const {data:contact,error}=await admin.from('supplier_contacts').select('id,first_name,last_name,email').eq('id',contactId).eq('supplier_id',f.supplier_id).eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).eq('is_active',true).maybeSingle();if(error||!contact)throw ncFailure('owner_unavailable','Select an active contact belonging to this finding’s supplier.');name=[contact.first_name,contact.last_name].filter(Boolean).join(' ');email=contact.email;userId=await ncPortalPersonId(admin,email);}
+        if(!name||ncIsNC(f)&&!email)throw ncFailure('owner_unavailable','A controlled name and email are required for an NC response.');
+        updateFinding({responsible_owner_name:name,responsible_owner_email:email||null,responsible_owner_person_id:personId,responsible_owner_supplier_contact_id:contactId,agreed_date:Object.hasOwn(data,'agreed_date')?date:f.agreed_date||null});
+        if(ncIsNC(f)){
+          if(!userId&&!capa)throw ncFailure('capa_link_required','Initiate or link the controlled CAPA before issuing access to an external response owner.');
+          const token=randomBytes(32).toString('base64url');
+          const values={assignee_user_id:userId,assignee_name:name,assignee_email:email,rca_case_id:caseId,status:'assigned',secure_token_hash:createHash('sha256').update(token).digest('hex'),secure_token_expires_at:new Date(Date.now()+14*86400000).toISOString()};
+          if(capa)ownerAccess={path:`/audit-actions/${token}`,expiresAt:values.secure_token_expires_at};
+          if(access){update('internal_audit_action_access',access,values);}else{
+            changes.push({table:'internal_audit_action_access',id:request.requestId,kind:'insert',values});
+          }
+        }break;
+      }
+      case 'start_capa':{
+        requireNC();if(capa)throw ncFailure('capa_already_linked','This finding already has a controlled CAPA. Open its existing case.');caseId=request.requestId;
+        changes.push({table:'rca_cases',id:caseId,kind:'insert',values:{case_reference:`8D-${f.finding_reference||'NC'}-${caseId.slice(0,6).toUpperCase()}`,method:'8d',source_type:'audit',title:`${f.finding_reference||'NC'} · ${f.title}`,problem_statement:f.failure_statement||f.objective_evidence,severity:f.risk_level||'medium',status:'draft',current_discipline:0,sponsor_name:f.responsible_owner_name||null,product_service_process:f.process_area||null,detected_at:now,target_close_date:f.agreed_date||null}});
+        if(access)update('internal_audit_action_access',access,{rca_case_id:caseId});updateFinding({linked_rca_case_id:caseId});break;
+      }
+      case 'link_capa':{
+        requireNC();if(capa)throw ncFailure('capa_already_linked','An existing controlled CAPA link cannot be silently replaced.');caseId=text('case_id',36);if(!NC_UUID.test(caseId))throw ncFailure('invalid_reference','Select a controlled CAPA case.');const {data:chosen,error}=await admin.from('rca_cases').select('id,method').eq('id',caseId).eq('owner_id',ctx.ownerId).eq('organization_id',ctx.organization.id).maybeSingle();if(error||!chosen||chosen.method!=='8d')throw ncFailure('capa_unavailable','Select an 8D case belonging to this company.');if(access)update('internal_audit_action_access',access,{rca_case_id:caseId});updateFinding({linked_rca_case_id:caseId});break;
+      }
+      case 'review_response':{
+        requireNC();confirm();requireIndependent();if(!capa||Number(capa.current_discipline)<8&&!['effectiveness_review','closed'].includes(capa.status))throw ncFailure('capa_final_stage_required','Complete the controlled CAPA through D8 before reviewing the final owner response.');if(!access||access.status!=='submitted')throw ncFailure('response_not_submitted','A submitted final owner response is required.');const decision=text('decision',20),conclusion=text('conclusion');if(!['accepted','returned'].includes(decision))throw ncFailure('invalid_decision','Choose Accept or Return.');if(decision==='accepted')finalReady();
+        update('internal_audit_action_access',access,{status:decision==='accepted'?'verified_effective':'returned',auditor_response:conclusion,auditor_response_at:now,auditor_response_by:ctx.user.id});
+        if(capa){for(const discipline of state.disciplines)update('rca_8d_disciplines',discipline,{status:decision==='accepted'?'approved':'in_progress',human_approved:decision==='accepted',approved_by:decision==='accepted'?ctx.user.id:null,approved_at:decision==='accepted'?now:null});update('rca_cases',capa,{status:decision==='accepted'?'effectiveness_review':'active',current_discipline:8});}
+        updateFinding({status:'action_in_progress'});break;
+      }
+      case 'verify_action':{
+        requireNC();confirm();const actionId=text('action_id',36),result=text('result',40),method=text('method'),conclusion=text('conclusion');if(!['effective_verified','partially_effective','not_effective','unable_to_verify'].includes(result))throw ncFailure('invalid_decision','Choose a supported action-effectiveness result.');const action=state.selected.find(action=>action.id===actionId);if(!action||!action.d6_submitted_at||!access||!capa)throw ncFailure('action_not_submitted','Select a submitted D6 corrective action belonging to this finding.');requireIndependent(action);const effective=result==='effective_verified';if(effective&&!state.evidence.some(evidence=>evidence.action_id===actionId))throw ncFailure('action_evidence_required','Action-linked objective evidence is required to verify effectiveness.');
+        update('rca_actions',action,{effectiveness_result:effective?'effective':result,implementation_evidence:'Objective evidence retained in the controlled D6 repository.',effectiveness_verification_method:method,effectiveness_verification_conclusion:conclusion,verified_by:ctx.user.id,verified_at:now,status:effective?'verified':'open'});
+        const allEffective=effective&&state.selected.filter(row=>row.id!==actionId).every(ncEffective);for(const discipline of state.disciplines.filter(row=>Number(row.discipline)===6))update('rca_8d_disciplines',discipline,{status:allEffective?'approved':'in_progress',completion_score:allEffective?100:60,human_approved:allEffective,approved_by:allEffective?ctx.user.id:null,approved_at:allEffective?now:null});
+        update('rca_cases',capa,{status:'active',current_discipline:allEffective?7:6});update('internal_audit_action_access',access,{status:'verification_requested',effectiveness_result:null,verified_at:null,verified_by:null,d6_verification_completed_at:allEffective?now:null});updateFinding({status:'action_in_progress'});break;
+      }
+      case 'verify_finding':{
+        requireNC();confirm();requireIndependent();const result=text('result',40),method=text('method'),conclusion=text('conclusion');if(!['effective','partially_effective','ineffective'].includes(result)||!access||!capa)throw ncFailure('invalid_decision','A controlled owner response, CAPA and supported effectiveness decision are required.');const effective=result==='effective';if(Number(capa.current_discipline)<8&&!['effectiveness_review','closed'].includes(capa.status))throw ncFailure('capa_final_stage_required','Complete D8 before recording a final finding-effectiveness decision.');if(effective){finalReady();if(access.status!=='verified_effective')throw ncFailure('response_review_required','Accept the final submitted response before recording finding closure.');}
+        updateFinding({status:effective?'closed':'action_in_progress',closure_verified:effective,closure_verified_by:effective?ctx.user.id:null,closure_verified_at:effective?now:null,closed_at:effective?now:null});
+        update('internal_audit_action_access',access,{status:effective?'verified_effective':result==='partially_effective'?'verified_partially_effective':'verified_ineffective',verification_method:method,verification_evidence:conclusion,effectiveness_result:result,verified_by:ctx.user.id,verified_at:now});
+        const otherFindings=await ncReadAll(()=>admin.from('internal_audit_findings').select('id,status,closure_verified').eq('owner_id',ctx.ownerId).eq('linked_rca_case_id',capa.id),'findings sharing the controlled CAPA');const closeCase=effective&&otherFindings.filter(row=>row.id!==f.id).every(row=>row.status==='closed'&&row.closure_verified===true);update('rca_cases',capa,{status:closeCase?'closed':'effectiveness_review',closed_at:closeCase?now:null,closure_summary:conclusion});break;
+      }
+      case 'close_advisory':{
+        confirm();if(ncIsNC(f))throw ncFailure('invalid_management_operation','Major and Minor NCs require verified corrective action.');text('conclusion');updateFinding({status:'closed',closed_at:now,closure_verified:false,closure_verified_by:null,closure_verified_at:null});break;
+      }
+      case 'reopen':{
+        confirm();text('conclusion');if(!ncIsClosed(f))throw ncFailure('record_not_closed','This finding is already open.');updateFinding({status:ncIsNC(f)?'action_in_progress':'issued',closed_at:null,closure_verified:false,closure_verified_by:null,closure_verified_at:null});if(capa&&capa.status==='closed')update('rca_cases',capa,{status:'effectiveness_review',closed_at:null});break;
+      }
+    }
+    const args={p_owner_id:ctx.ownerId,p_organization_id:ctx.organization.id,p_actor_id:ctx.user.id,p_finding_id:f.id,p_request_id:request.requestId,p_operation:request.operation,p_reason:request.boundReason,p_expected_updated_at:request.expected,p_changes:changes,p_case_id:caseId};
+    const {data:result,error}=await admin.rpc('apply_nc_management_change',args);
+    if(error){const replay=await ncManagementReplay(admin,ctx,request);if(replay)return replay;console.error('NC_MANAGEMENT_SAVE_FAILED',{code:error.code||'transaction_failed'});throw ncFailure('management_save_failed','The decision was not confirmed. Refresh linked records or retry the same original request; no partial database update is retained.',true);}
+    if(!result?.finding_id)throw ncFailure('management_save_unconfirmed','The management result was not confirmed. Retry the original request to check its saved history.',true);
+    revalidatePath(NC_ROOT);if(f.audit_id)revalidatePath(`/portal/internal-audits/${f.audit_id}`);if(caseId)revalidatePath(`/portal/rca/${caseId}`);
+    return {ok:true,result,replayed:Boolean(result.replayed),...(ownerAccess?{ownerAccess}:{} )};
+  }catch(error){return ncErrorResponse(error);}
 }
