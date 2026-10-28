@@ -303,7 +303,7 @@ async function ncAuditQuestionSource(ctx,admin,auditId,questionId,{requireOpen=t
   const read=ncReadAuditSourceRows;
   const [selectedStandards,selectedProcesses]=await Promise.all([
     read(()=>admin.from('internal_audit_selected_standards').select('*,internal_audit_standard_catalogue(*)').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit criteria'),
-    read(()=>admin.from('internal_audit_selected_processes').select('*').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit processes'),
+    read(()=>admin.from('internal_audit_selected_processes').select('standard_id,scope_key,process_name').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit processes',['standard_id','scope_key']),
   ]);
   const ids=[...new Set(selectedStandards.map(row=>row.standard_id).filter(Boolean))];
   if(!ids.length)throw ncFailure('invalid_audit_source','The source audit has no approved selected criteria.');
