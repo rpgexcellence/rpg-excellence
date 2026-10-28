@@ -32,6 +32,7 @@ export default function sitemap() {
     "/privacy",
     "/cookies",
     "/insights",
+    "/insights/iso-9001-2026-technical-insights-publication",
     "/insights/scan-check-report-workplace-safety",
     "/insights/offline-audit-fieldwork",
     "/insights/enterprise-integration-controlled-access",
