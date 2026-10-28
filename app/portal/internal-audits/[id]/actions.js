@@ -4,10 +4,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { createClient } from "../../../../lib/supabase/server";
-import { createAdminClient } from "../../../../lib/supabase/admin";
 import { buildAuditFieldworkScope, buildAuditFieldworkCoverage, readCompleteAuditRows, auditClauseMatches, parseAuditClauseScope } from "../../../../lib/nonconformity-reporting.mjs";
 import { loadAdministrationLocations } from "../../../../lib/rcaCompanyLinks";
 
@@ -968,6 +967,7 @@ export async function approveAuditPlan(
     user,
     audit,
   } = await context(auditId);
+  if(audit.status==='closed')throw new Error('A closed audit requires a controlled revision before its plan can be reopened.');
 
   if (
     !audit.scope_approved ||
@@ -1272,6 +1272,57 @@ async function loadAuditFieldworkState(supabase,user,audit,options={}) {
   return {auditId:audit.id,ownerId:user.id,organizationId:audit.organization_id,scope,coverage,selectedStandards,selectedProcesses,referenceBanks,answers,evidence,findings};
 }
 
+
+// Legacy entry points retain their exports for existing links, but never mutate
+// findings, owner credentials or CAPA records outside the canonical workspace.
+async function openControlledAuditFinding(formData) {
+  const auditId=clean(formData.get('audit_id'));
+  if(!auditId)throw new Error('Audit reference is required.');
+  const {supabase,user,audit}=await context(auditId);
+  let findingId=clean(formData.get('finding_id'));
+  if(!findingId){
+    const accessId=clean(formData.get('action_access_id'));
+    if(!accessId)throw new Error('A controlled finding reference is required.');
+    const {data:access,error}=await supabase.from('internal_audit_action_access').select('finding_id')
+      .eq('id',accessId).eq('audit_id',audit.id).eq('owner_id',user.id).maybeSingle();
+    if(error||!access?.finding_id)throw new Error('The linked owner response is unavailable.');
+    findingId=access.finding_id;
+  }
+  const {data:finding,error}=await supabase.from('internal_audit_findings')
+    .select('id,organization_id').eq('id',findingId).eq('owner_id',user.id)
+    .or(`audit_id.eq.${audit.id},source_audit_id.eq.${audit.id}`).maybeSingle();
+  if(error||!finding||(finding.organization_id&&finding.organization_id!==audit.organization_id))
+    throw new Error('The controlled finding does not belong to this audit and company.');
+  redirect(`/portal/internal-audit-actions?record=${encodeURIComponent(finding.id)}`);
+}
+
+function requireOpenFieldwork(audit) {
+  if(audit.status==='closed'||audit.current_gate!=='fieldwork'||!audit.plan_approved)
+    throw new Error('Only approved, open Fieldwork can be amended. Reopen the audit through its controlled planning and approval process first.');
+}
+
+async function requireReportCoverage(supabase,user,audit) {
+  if(audit.status==='closed')throw new Error('The audit is closed. A controlled revision is required before changing or issuing its report.');
+  if(!audit.scope_approved||!audit.plan_approved||!['report','actions','closing'].includes(audit.current_gate))
+    throw new Error('Complete the approved Fieldwork coverage review before preparing, approving or issuing the audit report.');
+  const {data:review,error}=await supabase.from('internal_audit_events').select('id,event_data,created_at')
+    .eq('audit_id',audit.id).eq('owner_id',user.id).eq('event_type','fieldwork_coverage_reviewed')
+    .order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(error)throw new Error('The saved Fieldwork review could not be checked. Report progression remains locked.');
+  if(review?.event_data?.human_scope_review!==true)
+    throw new Error('A saved human Fieldwork coverage review is required. Open Plan, reapprove it to reopen Fieldwork, then complete the criterion-inventory review. Existing answers and findings are retained.');
+  const state=await loadAuditFieldworkState(supabase,user,audit,{referenceInventoryReviewed:true});
+  if(!state.coverage.canCompleteFieldwork)
+    throw new Error('Current audit coverage is incomplete or has unresolved criterion mappings. Reopen Fieldwork through Plan approval, resolve the highlighted items and complete the coverage review.');
+  return state;
+}
+
+async function requireAuditRowsUpdated(query,message) {
+  const {data,error}=await query.select('id');
+  if(error)throw new Error(error.message);
+  if(!data?.length)throw new Error(message);
+}
+
 export async function getAuditFieldworkSnapshot(auditId) {
   const {supabase,user,audit}=await context(auditId);
   return loadAuditFieldworkState(supabase,user,audit);
@@ -1395,6 +1446,8 @@ export async function saveAuditAnswer(
     user,
     audit,
   } = await context(auditId);
+
+  requireOpenFieldwork(audit);
 
   if (!audit.plan_approved) {
     throw new Error(
@@ -1554,6 +1607,8 @@ export async function addAuditEvidence(
     audit,
   } = await context(auditId);
 
+  requireOpenFieldwork(audit);
+
   if (!audit.plan_approved) {
     throw new Error(
       "The audit plan must be approved before evidence capture."
@@ -1711,49 +1766,7 @@ export async function addAuditEvidence(
 }
 
 export async function linkAuditFindingToAnswer(formData) {
-  const auditId = clean(formData.get("audit_id"));
-  const findingId = clean(formData.get("finding_id"));
-  const answerId = clean(formData.get("answer_id"));
-
-  if (!auditId || !findingId || !answerId) {
-    throw new Error("Select an assessed criterion to link to the finding.");
-  }
-
-  const { supabase, user, audit } = await context(auditId);
-  if (!audit.plan_approved) {
-    throw new Error("The approved audit plan is required.");
-  }
-
-  const [findingResult, answerResult] = await Promise.all([
-    supabase.from("internal_audit_findings").select("id, answer_id")
-      .eq("id", findingId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
-    supabase.from("internal_audit_answers").select("id")
-      .eq("id", answerId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
-  ]);
-
-  if (findingResult.error || !findingResult.data) {
-    throw new Error("Controlled finding not found.");
-  }
-  if (answerResult.error || !answerResult.data) {
-    throw new Error("The selected assessed criterion is unavailable.");
-  }
-
-  const { error } = await supabase.from("internal_audit_findings")
-    .update({ answer_id: answerId, updated_at: new Date().toISOString() })
-    .eq("id", findingId).eq("audit_id", auditId).eq("owner_id", user.id);
-
-  if (error) throw new Error(error.message);
-
-  await supabase.from("internal_audit_events").insert({
-    owner_id: user.id,
-    audit_id: auditId,
-    event_type: "finding_linked_to_assessment",
-    summary: "Controlled finding linked to assessed audit criterion",
-    event_data: { finding_id: findingId, answer_id: answerId },
-    created_by: user.id,
-  });
-
-  returnTo(auditId, "fieldwork", "finding_linked");
+  return openControlledAuditFinding(formData);
 }
 
 export async function addAuditFinding(formData) {
@@ -1784,242 +1797,19 @@ export async function completeAuditFieldwork(formData) {
   returnTo(auditId,'report');
 }
 
-export async function verifyAuditFindingEffectiveness(
-  formData
-) {
-  const auditId = clean(formData.get("audit_id"));
-  const findingId = clean(formData.get("finding_id"));
-  const result = clean(formData.get("effectiveness_result"));
-  const conclusion = clean(formData.get("effectiveness_conclusion"));
-  const verificationMethod = clean(formData.get("verification_method"));
-
-  if (
-    !auditId ||
-    !findingId ||
-    !["effective", "partially_effective", "ineffective"].includes(result) ||
-    !conclusion ||
-    !verificationMethod ||
-    formData.get("human_verification") !== "on"
-  ) {
-    throw new Error(
-      "A documented effectiveness result and human verification are required."
-    );
-  }
-
-  const { supabase, user } = await context(auditId);
-
-  const { data: finding, error: findingError } = await supabase
-    .from("internal_audit_findings")
-    .select("id, finding_reference, finding_type, linked_rca_case_id")
-    .eq("id", findingId)
-    .eq("audit_id", auditId)
-    .eq("owner_id", user.id)
-    .maybeSingle();
-
-  if (
-    findingError ||
-    !finding ||
-    !["major_nc", "minor_nc"].includes(finding.finding_type) ||
-    !finding.linked_rca_case_id
-  ) {
-    throw new Error("A linked audit nonconformity and 8D case are required.");
-  }
-
-  const [rcaResult, actionsResult] = await Promise.all([
-    supabase
-      .from("rca_cases")
-      .select("id, status, current_discipline")
-      .eq("id", finding.linked_rca_case_id)
-      .eq("owner_id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("rca_actions")
-      .select("id, status, effectiveness_result")
-      .eq("case_id", finding.linked_rca_case_id)
-      .eq("owner_id", user.id)
-      .eq("discipline", 5)
-      .eq("selection_status", "selected"),
-  ]);
-
-  if (rcaResult.error || !rcaResult.data || actionsResult.error) {
-    throw new Error(
-      rcaResult.error?.message ||
-      actionsResult.error?.message ||
-      "The linked 8D case could not be verified."
-    );
-  }
-
-  const actions = actionsResult.data ?? [];
-  const allActionsComplete =
-    actions.length > 0 &&
-    actions.every((action) => ["effective", "effective_verified"].includes(action.effectiveness_result) && action.status === "verified");
-  const rcaAtEffectivenessGate =
-    Number(rcaResult.data.current_discipline) >= 8 ||
-    ["effectiveness_review", "closed"].includes(rcaResult.data.status);
-
-  if (
-    result === "effective" &&
-    (!allActionsComplete || !rcaAtEffectivenessGate)
-  ) {
-    redirect(`/portal/internal-audits/${auditId}?gate=closing&closure_error=capa#verify-${findingId}`);
-  }
-
-  const effective = result === "effective";
-  const now = new Date().toISOString();
-
-  const { error: updateError } = await supabase
-    .from("internal_audit_findings")
-    .update({
-      status: effective ? "closed" : "action_in_progress",
-      closure_verified: effective,
-      closure_verified_by: effective ? user.id : null,
-      closure_verified_at: effective ? now : null,
-      closed_at: effective ? now : null,
-      updated_at: now,
-    })
-    .eq("id", findingId)
-    .eq("audit_id", auditId)
-    .eq("owner_id", user.id);
-
-  if (updateError) throw new Error(updateError.message);
-
-  const { error: rcaUpdateError } = await supabase
-    .from("rca_cases")
-    .update({
-      status: effective ? "closed" : "effectiveness_review",
-      closed_at: effective ? now : null,
-      closure_summary: conclusion,
-      updated_at: now,
-    })
-    .eq("id", finding.linked_rca_case_id)
-    .eq("owner_id", user.id);
-
-  if (rcaUpdateError) throw new Error(rcaUpdateError.message);
-
-  const actionStatus = effective
-    ? "verified_effective"
-    : result === "partially_effective"
-      ? "verified_partially_effective"
-      : "verified_ineffective";
-  const { error: accessUpdateError } = await supabase.from("internal_audit_action_access").update({
-    status: actionStatus,
-    verification_method: verificationMethod,
-    verification_evidence: conclusion,
-    effectiveness_result: result,
-    verified_at: now,
-    verified_by: user.id,
-    updated_at: now,
-  }).eq("finding_id", findingId).eq("audit_id", auditId).eq("owner_id", user.id);
-  if (accessUpdateError) throw new Error(accessUpdateError.message);
-
-  await supabase.from("internal_audit_events").insert({
-    owner_id: user.id,
-    audit_id: auditId,
-    event_type: "capa_effectiveness_verified",
-    summary: `${finding.finding_reference}: ${result}`,
-    event_data: {
-      finding_id: findingId,
-      rca_case_id: finding.linked_rca_case_id,
-      effectiveness_result: result,
-      conclusion,
-    },
-    created_by: user.id,
-  });
-
-  returnTo(auditId, "closing", "effectiveness");
+export async function verifyAuditFindingEffectiveness(formData) {
+  return openControlledAuditFinding(formData);
 }
 
 export async function verifyD6CorrectiveAction(formData) {
-  const auditId = clean(formData.get("audit_id"));
-  const findingId = clean(formData.get("finding_id"));
-  const accessId = clean(formData.get("action_access_id"));
-  const actionId = clean(formData.get("action_id"));
-  const result = clean(formData.get("effectiveness_result"));
-  const verificationMethod = clean(formData.get("effectiveness_verification_method"));
-  const conclusion = clean(formData.get("effectiveness_verification_conclusion"));
-  const allowedResults = ["effective_verified", "partially_effective", "not_effective", "unable_to_verify"];
-  if (!auditId || !findingId || !accessId || !actionId || !allowedResults.includes(result) || !verificationMethod || !conclusion || formData.get("independent_verification") !== "on") {
-    throw new Error("A complete independent D6 effectiveness decision is required.");
-  }
-  const { supabase, user } = await context(auditId);
-  const { data: finding, error: findingError } = await supabase.from("internal_audit_findings")
-    .select("id, finding_reference, linked_rca_case_id").eq("id", findingId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
-  if (findingError || !finding?.linked_rca_case_id) throw new Error(findingError?.message || "Linked CAPA–8D case not found.");
-  const { data: access, error: accessError } = await supabase.from("internal_audit_action_access")
-    .select("id, rca_case_id").eq("id", accessId).eq("audit_id", auditId).eq("finding_id", findingId).eq("owner_id", user.id).maybeSingle();
-  if (accessError || !access || access.rca_case_id !== finding.linked_rca_case_id) throw new Error(accessError?.message || "D6 verification request not found.");
-  const { count: linkedEvidenceCount, error: linkedEvidenceError } = await supabase.from("rca_evidence")
-    .select("id", { count: "exact", head: true }).eq("case_id", finding.linked_rca_case_id)
-    .eq("owner_id", user.id).eq("discipline", 6).eq("action_id", actionId);
-  if (linkedEvidenceError) throw new Error(linkedEvidenceError.message);
-  if (result === "effective_verified" && !linkedEvidenceCount) {
-    throw new Error("This action cannot be confirmed effective because no objective evidence is linked to it.");
-  }
-  const now = new Date().toISOString();
-  const effective = result === "effective_verified";
-  // The existing accountable-human trigger uses the canonical value
-  // "effective". The form/event retain the clearer "effective_verified" label.
-  const storedEffectivenessResult = effective ? "effective" : result;
-  const { data: action, error: actionError } = await supabase.from("rca_actions").update({
-    effectiveness_result: storedEffectivenessResult,
-    implementation_evidence: "Objective evidence linked to this corrective action in the controlled D6 evidence repository.",
-    effectiveness_verification_method: verificationMethod,
-    effectiveness_verification_conclusion: conclusion,
-    verified_by: user.id,
-    verified_at: now,
-    status: effective ? "verified" : "open",
-    updated_at: now,
-  }).eq("id", actionId).eq("case_id", finding.linked_rca_case_id).eq("owner_id", user.id)
-    .eq("discipline", 5).eq("selection_status", "selected").select("id, title").maybeSingle();
-  if (actionError || !action) throw new Error(actionError?.message || "Selected D6 corrective action not found.");
-  const { data: selectedActions, error: selectedError } = await supabase.from("rca_actions").select("id, effectiveness_result")
-    .eq("case_id", finding.linked_rca_case_id).eq("owner_id", user.id).eq("discipline", 5).eq("selection_status", "selected");
-  if (selectedError) throw new Error(selectedError.message);
-  const allEffective = (selectedActions ?? []).length > 0 && (selectedActions ?? []).every((item) => ["effective", "effective_verified"].includes(item.effectiveness_result));
-  const { error: disciplineError } = await supabase.from("rca_8d_disciplines").update(allEffective ? {
-    status: "approved", completion_score: 100, human_approved: true, approved_by: user.id, approved_at: now,
-  } : { status: "in_progress", completion_score: 60, human_approved: false, approved_by: null, approved_at: null })
-    .eq("case_id", finding.linked_rca_case_id).eq("owner_id", user.id).eq("discipline", 6);
-  if (disciplineError) throw new Error(disciplineError.message);
-  const { error: caseError } = await supabase.from("rca_cases").update({ current_discipline: allEffective ? 7 : 6, status: "active", updated_at: now })
-    .eq("id", finding.linked_rca_case_id).eq("owner_id", user.id);
-  if (caseError) throw new Error(caseError.message);
-  // D6 verifies the individual corrective actions only. The parent audit
-  // action must remain at verification_requested until the auditor records the
-  // separate final 8D acceptance, which supplies the accountable closure data.
-  const accessVerificationUpdate = allEffective ? {
-    status: "verification_requested",
-    effectiveness_result: null,
-    verified_at: null,
-    verified_by: null,
-    d6_verification_completed_at: now,
-    updated_at: now,
-  } : {
-    status: "verification_requested",
-    effectiveness_result: null,
-    verified_at: null,
-    verified_by: null,
-    d6_verification_completed_at: null,
-    updated_at: now,
-  };
-  const { error: accessUpdateError } = await supabase.from("internal_audit_action_access").update(accessVerificationUpdate)
-    .eq("id", accessId).eq("owner_id", user.id);
-  if (accessUpdateError) throw new Error(accessUpdateError.message);
-  await supabase.from("rca_case_events").insert({ case_id: finding.linked_rca_case_id, owner_id: user.id,
-    event_type: "d6_effectiveness_decision", discipline: 6,
-    summary: `${action.title}: ${result.replaceAll("_", " ")}`,
-    event_data: { action_id: action.id, finding_id: findingId, result, all_actions_effective: allEffective } });
-  await supabase.from("internal_audit_events").insert({ owner_id: user.id, audit_id: auditId,
-    event_type: "d6_action_effectiveness_decided", summary: `${finding.finding_reference}: ${action.title} — ${result.replaceAll("_", " ")}`,
-    event_data: { finding_id: findingId, action_id: action.id, result, all_actions_effective: allEffective }, created_by: user.id });
-  returnTo(auditId, "actions", "d6_verification");
+  return openControlledAuditFinding(formData);
 }
 
 export async function saveAuditReport(formData) {
   const auditId = clean(formData.get("audit_id"));
   if (!auditId) throw new Error("Audit reference is required.");
   const { supabase, user, audit } = await context(auditId);
-  if(['scope','team','plan','fieldwork'].includes(audit.current_gate))throw new Error('Complete the approved fieldwork coverage review before preparing the audit report.');
+  await requireReportCoverage(supabase,user,audit);
 
   const reportReference = clean(formData.get("report_reference")) || `${audit.audit_reference}-RPT`;
   const { data: existingReport, error: existingReportError } = await supabase
@@ -2051,10 +1841,10 @@ export async function saveAuditReport(formData) {
   const { error } = await supabase.from("internal_audit_report_controls")
     .upsert(payload, { onConflict: "audit_id" });
   if (error) throw new Error(error.message);
-  const { error: auditError } = await supabase.from("internal_audits").update({
-    current_gate: "report", status: "report_draft", updated_at: new Date().toISOString(),
-  }).eq("id", auditId).eq("owner_id", user.id);
-  if (auditError) throw new Error(auditError.message);
+  await requireAuditRowsUpdated(supabase.from('internal_audits').update({
+    current_gate:'report',status:'report_draft',updated_at:new Date().toISOString(),
+  }).eq('id',auditId).eq('owner_id',user.id).eq('current_gate',audit.current_gate).eq('status',audit.status),
+    'The audit changed while saving the report. Refresh and review the current audit stage.');
   returnTo(auditId, "report", "report");
 }
 
@@ -2063,31 +1853,28 @@ export async function generateAuditReportGuidedDraft(formData) {
   const replaceExisting = formData.get("replace_existing") === "on";
   if (!auditId) throw new Error("Audit reference is required.");
   const { supabase, user, audit } = await context(auditId);
-  if(['scope','team','plan','fieldwork'].includes(audit.current_gate))throw new Error('Complete the approved fieldwork coverage review before preparing the audit report.');
+  const fieldwork=await requireReportCoverage(supabase,user,audit);
 
-  const [reportResult, answersResult, findingsResult, evidenceResult, teamResult] = await Promise.all([
-    supabase.from("internal_audit_report_controls").select("*").eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle(),
-    supabase.from("internal_audit_answers").select("result, conclusion, auditor_notes, risk_level, confidence_level, not_applicable_justification, internal_audit_questions(question_code, clause, process_area, question_text)").eq("audit_id", auditId).eq("owner_id", user.id).neq("result", "not_assessed"),
-    supabase.from("internal_audit_findings").select("finding_reference, finding_type, risk_level, title, failure_statement, criteria, objective_evidence, process_area, status").eq("audit_id", auditId).eq("owner_id", user.id),
-    supabase.from("internal_audit_evidence").select("evidence_reference, evidence_type, title, description, source_name, source_date, evidence_owner, process_area, confidentiality, reliability").eq("audit_id", auditId).eq("owner_id", user.id),
-    supabase.from("internal_audit_team_members").select("member_name, audit_role").eq("audit_id", auditId).eq("owner_id", user.id),
+  const [reportResult,team]=await Promise.all([
+    supabase.from('internal_audit_report_controls').select('*').eq('audit_id',auditId).eq('owner_id',user.id).maybeSingle(),
+    readCompleteAuditRows(()=>supabase.from('internal_audit_team_members').select('id,member_name,audit_role')
+      .eq('audit_id',auditId).eq('owner_id',user.id),{label:'Audit report team'}),
   ]);
-  for (const result of [reportResult, answersResult, findingsResult, evidenceResult, teamResult]) {
-    if (result.error) throw new Error(result.error.message);
-  }
-  const answers = answersResult.data ?? [];
-  if (!answers.length) redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=guided_insufficient_evidence`);
-  const findings = findingsResult.data ?? [];
-  const evidence = evidenceResult.data ?? [];
-  const team = teamResult.data ?? [];
+  if(reportResult.error)throw new Error(reportResult.error.message);
+  const answers=fieldwork.coverage.rows.map(row=>({...row.answer,result:row.displayResult,
+    internal_audit_questions:row.question}));
+  const findings=[...new Map(fieldwork.findings.filter(finding=>(!finding.organization_id||finding.organization_id===audit.organization_id)&&
+    ['major_nc','minor_nc','observation','ofi'].includes(finding.finding_type)&&
+    !['draft','device_draft','pending_submission','withdrawn','cancelled','canceled','deleted','void'].includes(finding.status)).map(finding=>[finding.id,finding])).values()];
+  const evidence=fieldwork.evidence;
   const tally = (records, field, value) => records.filter((record) => record[field] === value).length;
-  const assessed = answers.length;
+  const assessed = fieldwork.coverage.accountedFor;
   const conformity = tally(answers, "result", "conformity");
-  const major = Math.max(tally(answers, "result", "major_nc"), tally(findings, "finding_type", "major_nc"));
-  const minor = Math.max(tally(answers, "result", "minor_nc"), tally(findings, "finding_type", "minor_nc"));
-  const observations = Math.max(tally(answers, "result", "observation"), tally(findings, "finding_type", "observation"));
-  const opportunities = Math.max(tally(answers, "result", "ofi"), tally(findings, "finding_type", "ofi"));
-  const positives = Math.max(tally(answers, "result", "positive_practice"), tally(findings, "finding_type", "positive_practice"));
+  const major = tally(findings, "finding_type", "major_nc");
+  const minor = tally(findings, "finding_type", "minor_nc");
+  const observations = tally(findings, "finding_type", "observation");
+  const opportunities = tally(findings, "finding_type", "ofi");
+  const positives = tally(answers, "result", "positive_practice");
   const unable = tally(answers, "result", "unable_to_verify");
   const notApplicable = tally(answers, "result", "not_applicable");
   const lowConfidence = answers.filter((answer) => answer.confidence_level === "low");
@@ -2108,7 +1895,7 @@ export async function generateAuditReportGuidedDraft(formData) {
   const payload = {
     owner_id: user.id, audit_id: auditId,
     report_reference: existing?.report_reference || `${audit.audit_reference}-RPT`,
-    report_version: existing?.report_version || 1,
+    report_version: existing?.status==='issued'?(existing.report_version||1)+1:existing?.report_version||1,
     executive_summary: choose("executive_summary"),
     methodology_and_sampling: choose("methodology_and_sampling"),
     limitations_and_exclusions: choose("limitations_and_exclusions"),
@@ -2116,12 +1903,16 @@ export async function generateAuditReportGuidedDraft(formData) {
     overall_conclusion: choose("overall_conclusion"),
     confidentiality_classification: existing?.confidentiality_classification || "controlled",
     distribution_list: existing?.distribution_list || null,
-    lead_auditor_name: existing?.lead_auditor_name || (teamResult.data ?? []).find((member) => member.audit_role === "lead_auditor")?.member_name || null,
+    lead_auditor_name: existing?.lead_auditor_name || team.find((member) => member.audit_role === "lead_auditor")?.member_name || null,
     status: "draft", approved_at: null, approved_by: null, issued_at: null, issued_by: null,
     updated_at: new Date().toISOString(),
   };
   const { error: saveError } = await supabase.from("internal_audit_report_controls").upsert(payload, { onConflict: "audit_id" });
   if (saveError) throw new Error(saveError.message);
+  await requireAuditRowsUpdated(supabase.from('internal_audits').update({
+    current_gate:'report',status:'report_draft',updated_at:new Date().toISOString(),
+  }).eq('id',auditId).eq('owner_id',user.id).eq('current_gate',audit.current_gate).eq('status',audit.status),
+    'The audit changed while generating the report. Refresh and review the current audit stage.');
   await supabase.from("internal_audit_events").insert({ owner_id: user.id, audit_id: auditId, event_type: "report_guided_draft_generated", summary: "Guided report narrative generated from the controlled audit record", event_data: { replaced_existing: replaceExisting, assessed_criteria: assessed, evidence_records: evidence.length, findings: findings.length }, created_by: user.id });
   revalidatePath(`/portal/internal-audits/${auditId}`);
   redirect(`/portal/internal-audits/${auditId}?gate=report&saved=guided_draft`);
@@ -2132,152 +1923,58 @@ export async function approveAuditReport(formData) {
   if (!auditId || formData.get("report_approval_confirmation") !== "on") {
     throw new Error("Lead-auditor report approval is required.");
   }
-  const { supabase, user } = await context(auditId);
+  const { supabase, user, audit } = await context(auditId);
+  await requireReportCoverage(supabase,user,audit);
   const { data: report, error: reportError } = await supabase.from("internal_audit_report_controls")
-    .select("id, executive_summary, overall_conclusion, lead_auditor_name")
+    .select("id, status, report_version, updated_at, executive_summary, overall_conclusion, lead_auditor_name")
     .eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
   if (reportError) throw new Error(reportError.message);
   if (!report?.executive_summary || !report?.overall_conclusion || !report?.lead_auditor_name) {
     redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=incomplete`);
   }
   const now = new Date().toISOString();
-  const { error } = await supabase.from("internal_audit_report_controls").update({
-    status: "approved", approved_at: now, approved_by: user.id, updated_at: now,
-  }).eq("id", report.id).eq("owner_id", user.id);
-  if (error) throw new Error(error.message);
-  await supabase.from("internal_audits").update({ current_gate: "actions", status: "report_approved", updated_at: now })
-    .eq("id", auditId).eq("owner_id", user.id);
+  if(report.status!=='draft')throw new Error('Save a current report draft before approving it. An issued report requires a new controlled version.');
+  await requireAuditRowsUpdated(supabase.from('internal_audit_report_controls').update({
+    status:'approved',approved_at:now,approved_by:user.id,updated_at:now,
+  }).eq('id',report.id).eq('owner_id',user.id).eq('status','draft').eq('report_version',report.report_version)
+    .eq('updated_at',report.updated_at),'The report changed during approval. Refresh and review it again.');
+  await requireAuditRowsUpdated(supabase.from('internal_audits').update({current_gate:'actions',status:'report_approved',updated_at:now})
+    .eq('id',auditId).eq('owner_id',user.id).eq('current_gate',audit.current_gate).eq('status',audit.status)
+    .eq('plan_approved',true),'The audit changed during report approval. Refresh before proceeding.');
   returnTo(auditId, "actions", "report_approved");
 }
 
 export async function issueAuditReport(formData) {
   const auditId = clean(formData.get("audit_id"));
   if (!auditId) throw new Error("Audit reference is required.");
-  const { supabase, user } = await context(auditId);
+  const { supabase, user, audit } = await context(auditId);
+  await requireReportCoverage(supabase,user,audit);
   const { data: report, error: reportReadError } = await supabase.from("internal_audit_report_controls")
-    .select("id, status").eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
+    .select("id, status, report_version, updated_at").eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
   if (reportReadError) throw new Error(reportReadError.message);
   if (!report || !["approved", "issued"].includes(report.status)) {
     redirect(`/portal/internal-audits/${auditId}?gate=report&report_error=approval_required`);
   }
-  const now = new Date().toISOString();
-  const { error } = await supabase.from("internal_audit_report_controls").update({
-    status: "issued", issued_at: now, issued_by: user.id, updated_at: now,
-  }).eq("id", report.id).eq("owner_id", user.id);
-  if (error) throw new Error(error.message);
-  await supabase.from("internal_audits").update({ current_gate: "actions", status: "capa_monitoring", updated_at: now })
-    .eq("id", auditId).eq("owner_id", user.id);
+  if(!['report_approved','capa_monitoring','effectiveness_review'].includes(audit.status))
+    throw new Error('The current audit report must be approved before issue.');
+  if(report.status==='issued')returnTo(auditId,'actions','report_already_issued');
+  const now=new Date().toISOString();
+  await requireAuditRowsUpdated(supabase.from('internal_audit_report_controls').update({
+    status:'issued',issued_at:now,issued_by:user.id,updated_at:now,
+  }).eq('id',report.id).eq('owner_id',user.id).eq('status','approved').eq('report_version',report.report_version)
+    .eq('updated_at',report.updated_at),'The approved report changed before issue. Refresh and review the current version.');
+  await requireAuditRowsUpdated(supabase.from('internal_audits').update({current_gate:'actions',status:'capa_monitoring',updated_at:now})
+    .eq('id',auditId).eq('owner_id',user.id).eq('current_gate',audit.current_gate).eq('status',audit.status)
+    .eq('plan_approved',true),'The audit changed during report issue. Refresh before proceeding.');
   returnTo(auditId, "actions", "report_issued");
 }
 
 export async function assignAuditActionOwner(formData) {
-  const auditId = clean(formData.get("audit_id"));
-  const findingId = clean(formData.get("finding_id"));
-  const assigneeName = clean(formData.get("assignee_name"));
-  const assigneeEmail = clean(formData.get("assignee_email"))?.toLowerCase();
-  let assigneeUserId = clean(formData.get("assignee_user_id"));
-  if (!auditId || !findingId || !assigneeName || !assigneeEmail) {
-    throw new Error("Action-owner name and email are required.");
-  }
-  const { supabase, user } = await context(auditId);
-  if (!assigneeUserId) {
-    const admin = createAdminClient();
-    const { data: usersResult } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    assigneeUserId = usersResult?.users?.find((candidate) => candidate.email?.toLowerCase() === assigneeEmail)?.id || null;
-  }
-  const { data: finding, error: findingError } = await supabase.from("internal_audit_findings")
-    .select("id, linked_rca_case_id, finding_type").eq("id", findingId).eq("audit_id", auditId)
-    .eq("owner_id", user.id).maybeSingle();
-  if (findingError || !finding || !["major_nc", "minor_nc"].includes(finding.finding_type)) {
-    throw new Error(findingError?.message || "Only a controlled nonconformity can be assigned.");
-  }
-  const token = randomBytes(32).toString("base64url");
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: access, error } = await supabase.from("internal_audit_action_access").upsert({
-    owner_id: user.id, audit_id: auditId, finding_id: findingId,
-    rca_case_id: finding.linked_rca_case_id, assignee_user_id: assigneeUserId,
-    assignee_name: assigneeName, assignee_email: assigneeEmail,
-    secure_token_hash: tokenHash, secure_token_expires_at: expiresAt,
-    status: "assigned", updated_at: new Date().toISOString(),
-  }, { onConflict: "finding_id" }).select("id").single();
-  if (error || !access) throw new Error(error?.message || "Unable to assign the action owner.");
-  revalidatePath(`/portal/internal-audits/${auditId}`);
-  redirect(`/portal/internal-audits/${auditId}?gate=actions&saved=owner&access=${access.id}&action_token=${token}#action-${findingId}`);
+  return openControlledAuditFinding(formData);
 }
 
 export async function reviewAuditActionResponse(formData) {
-  const auditId = clean(formData.get("audit_id"));
-  const accessId = clean(formData.get("action_access_id"));
-  const decision = clean(formData.get("decision"));
-  const response = clean(formData.get("auditor_response"));
-  if (!auditId || !accessId || !response || !["accepted", "returned"].includes(decision)) {
-    throw new Error("Record an auditor decision and response.");
-  }
-  const { supabase, user } = await context(auditId);
-  const now = new Date().toISOString();
-  const { data: access, error: accessLookupError } = await supabase.from("internal_audit_action_access")
-    .select("id, finding_id, rca_case_id, status").eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id).maybeSingle();
-  if (accessLookupError || !access) throw new Error(accessLookupError?.message || "Assigned 8D response not found.");
-  if (decision === "accepted" && access.rca_case_id) {
-    const { data: selectedActions, error: selectedActionsError } = await supabase.from("rca_actions")
-      .select("id, effectiveness_result, status, verified_by, verified_at")
-      .eq("case_id", access.rca_case_id).eq("owner_id", user.id)
-      .eq("discipline", 5).eq("selection_status", "selected");
-    if (selectedActionsError) throw new Error(selectedActionsError.message);
-    const allIndependentlyVerified = (selectedActions ?? []).length > 0 && (selectedActions ?? []).every((action) =>
-      ["effective", "effective_verified"].includes(action.effectiveness_result) &&
-      action.status === "verified" &&
-      action.verified_by &&
-      action.verified_at
-    );
-    if (!allIndependentlyVerified) {
-      redirect(`/portal/internal-audits/${auditId}?gate=actions&action_error=d6_verification_required#action-${access.finding_id}`);
-    }
-  }
-  const reviewUpdate = decision === "accepted" ? {
-    status: "verified_effective",
-    effectiveness_result: "effective",
-    verification_method: "Independent action-by-action D6 effectiveness verification",
-    verification_evidence: response,
-    verified_at: now,
-    verified_by: user.id,
-    auditor_response: response,
-    auditor_response_at: now,
-    auditor_response_by: user.id,
-    updated_at: now,
-  } : {
-    status: "returned",
-    auditor_response: response,
-    auditor_response_at: now,
-    auditor_response_by: user.id,
-    updated_at: now,
-  };
-  const { error } = await supabase.from("internal_audit_action_access").update(reviewUpdate)
-    .eq("id", accessId).eq("audit_id", auditId).eq("owner_id", user.id);
-  if (error) throw new Error(error.message);
-  if (access.rca_case_id) {
-    const stageUpdate = decision === "accepted"
-      ? { status: "approved", human_approved: true, approved_by: user.id, approved_at: now }
-      : { status: "in_progress", human_approved: false, approved_by: null, approved_at: null };
-    const { error: stageError } = await supabase.from("rca_8d_disciplines").update(stageUpdate)
-      .eq("case_id", access.rca_case_id).eq("owner_id", user.id);
-    if (stageError) throw new Error(stageError.message);
-    const { error: caseError } = await supabase.from("rca_cases").update({
-      status: decision === "accepted" ? "effectiveness_review" : "active",
-      current_discipline: 8,
-      updated_at: now,
-    }).eq("id", access.rca_case_id).eq("owner_id", user.id);
-    if (caseError) throw new Error(caseError.message);
-    await supabase.from("rca_case_events").insert({
-      case_id: access.rca_case_id, owner_id: user.id,
-      event_type: decision === "accepted" ? "final_8d_accepted" : "final_8d_returned",
-      discipline: 8,
-      summary: decision === "accepted" ? "Final D0-D8 response accepted by auditor" : "Final D0-D8 response returned for revision",
-      event_data: { action_access_id: accessId, auditor_response: response },
-    });
-  }
-  returnTo(auditId, "actions", "action_review");
+  return openControlledAuditFinding(formData);
 }
 
 export async function completeAuditClosure(formData) {
@@ -2290,7 +1987,8 @@ export async function completeAuditClosure(formData) {
     throw new Error("Human audit closure confirmation is required.");
   }
 
-  const { supabase, user } = await context(auditId);
+  const { supabase, user, audit } = await context(auditId);
+  await requireReportCoverage(supabase,user,audit);
 
   const { data: report, error: reportError } = await supabase
     .from("internal_audit_report_controls")
@@ -2303,14 +2001,10 @@ export async function completeAuditClosure(formData) {
     redirect(`/portal/internal-audits/${auditId}?gate=closing&closure_error=report`);
   }
 
-  const { data: findings, error: findingsError } = await supabase
-    .from("internal_audit_findings")
-    .select("id, finding_reference, linked_rca_case_id, closure_verified, status")
-    .eq("audit_id", auditId)
-    .eq("owner_id", user.id)
-    .in("finding_type", ["major_nc", "minor_nc"]);
-
-  if (findingsError) throw new Error(findingsError.message);
+  const findings=await readCompleteAuditRows(()=>supabase.from('internal_audit_findings')
+    .select('id,finding_reference,linked_rca_case_id,closure_verified,status')
+    .or(`audit_id.eq.${auditId},source_audit_id.eq.${auditId}`).eq('owner_id',user.id)
+    .in('finding_type',['major_nc','minor_nc']),{label:'Audit nonconformity closure checks'});
 
   const unresolved = (findings ?? []).filter(
     (finding) =>
