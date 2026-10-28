@@ -301,16 +301,22 @@ async function ncAuditQuestionSource(ctx,admin,auditId,questionId,{requireOpen=t
   if(!audit)throw ncFailure('invalid_audit_source','The source audit is unavailable in this company.');
   if(requireOpen&&(!audit.plan_approved||audit.current_gate!=='fieldwork'||audit.status==='closed'))throw ncFailure('audit_fieldwork_locked','New findings require approved, open audit fieldwork. Retain your draft and ask the audit administrator to review the audit stage.');
   const read=ncReadAuditSourceRows;
-  const [selectedStandards,selectedProcesses]=await Promise.all([
-    read(()=>admin.from('internal_audit_selected_standards').select('*,internal_audit_standard_catalogue(*)').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit criteria'),
+  const [criterionRows,selectedProcesses]=await Promise.all([
+    read(()=>admin.from('internal_audit_selected_standards').select('*').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit criteria',['standard_id']),
     read(()=>admin.from('internal_audit_selected_processes').select('standard_id,scope_key,process_name').eq('audit_id',auditId).eq('owner_id',ctx.ownerId),'Source audit processes',['standard_id','scope_key']),
   ]);
-  const ids=[...new Set(selectedStandards.map(row=>row.standard_id).filter(Boolean))];
+  const ids=[...new Set(criterionRows.map(row=>row.standard_id).filter(Boolean))];
   if(!ids.length)throw ncFailure('invalid_audit_source','The source audit has no approved selected criteria.');
-  const [links,native]=await Promise.all([
+  const [links,native,catalogue]=await Promise.all([
     read(()=>admin.from('internal_audit_question_scope_links').select('question_id,standard_id,scope_key,clause,requirement_summary').in('standard_id',ids),'Source audit mappings',['standard_id','question_id','scope_key','clause']),
     read(()=>admin.from('internal_audit_questions').select('*').in('standard_id',ids),'Source audit questions'),
+    read(()=>admin.from('internal_audit_standard_catalogue').select('id,standard_code,display_name,edition_label,active').in('id',ids),'Source criteria catalogue'),
   ]);
+  // Resolve the existing catalogue by its explicit ID instead of depending on
+  // a PostgREST embedded relationship. Selection rows need no synthetic id.
+  const byStandardId=new Map(catalogue.map(row=>[row.id,row]));
+  if(ids.some(id=>!byStandardId.has(id)))throw ncFailure('invalid_audit_source','An approved criterion has no available catalogue record. Ask the audit administrator to review its planning reference.');
+  const selectedStandards=criterionRows.map(row=>({...row,internal_audit_standard_catalogue:byStandardId.get(row.standard_id)}));
   const questions=new Map(native.map(row=>[row.id,row]));
   const missing=[...new Set(links.map(row=>row.question_id).filter(id=>id&&!questions.has(id)))];
   for(let start=0;start<missing.length;start+=100){
