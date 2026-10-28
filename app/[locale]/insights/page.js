@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "032",
+      title: "ISO 9001:2026: From Quality Evidence to Management Decisions",
+      description: "The seven-part Technical Insight series is now a reviewed 53-page PDF with seven chapter covers and 21 supporting posters. £9.99 one-off purchase.",
+      href: "iso-9001-2026-technical-insights-publication",
+    },
+    {
       number: "031",
       title: "Scan. Check. Report. Safety at the Point of Work",
       description: "Zone-linked mobile access to workplace safety information and accident, incident and near-miss reporting, with optional photo evidence and contact details.",
