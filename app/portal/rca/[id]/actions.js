@@ -113,6 +113,19 @@ async function getOwnedCase(supabase, userId, caseId) {
     throw new Error("8D case not found.");
   }
 
+  // Ordinary investigation edits must not reopen a controlled closed record.
+  // Reopening remains an explicit, authorised workflow through Findings.
+  // Keep the timestamp check for legacy records whose status was previously
+  // reset by an overview save while the closure timestamp was retained.
+  if (data.status === "closed" || data.closed_at != null) {
+    throw new Error(
+      "This 8D case is closed and cannot be changed through the investigation form. " +
+      "An authorised reviewer must reopen its linked finding through Findings & Actions " +
+      "before investigation work resumes. For a standalone case, ask the administrator " +
+      "for a controlled reopening; do not change its status through an ordinary save."
+    );
+  }
+
   if (data.access_scope === "single_assessment") {
     if (!data.assessment_id) {
       throw new Error("This case is missing its purchased-assessment access link.");
@@ -167,7 +180,7 @@ export async function saveCaseOverview(formData) {
   const title = clean(formData.get("title"));
   if (!title) throw new Error("Case title is required.");
 
-  const { error } = await supabase
+  const { data: savedOverview, error } = await supabase
     .from("rca_cases")
     .update({
       title,
@@ -182,12 +195,21 @@ export async function saveCaseOverview(formData) {
       target_close_date: clean(
         formData.get("target_close_date")
       ),
-      status: "active",
+      // Starting a draft may activate it; routine metadata edits do not
+      // withdraw a pending effectiveness review or overwrite another state.
+      status: rcaCase.status === "draft" ? "active" : rcaCase.status,
     })
     .eq("id", caseId)
-    .eq("owner_id", user.id);
+    .eq("owner_id", user.id)
+    .eq("status", rcaCase.status)
+    .is("closed_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) throw new Error(error.message);
+  if (!savedOverview) {
+    throw new Error("The 8D case changed or was closed while you were editing. Refresh the case before making further changes.");
+  }
   revalidatePath(`/portal/rca/${caseId}`);
   revalidatePath("/portal/rca");
   redirect(`/portal/rca/${caseId}`);
