@@ -19,6 +19,17 @@ export async function saveCapaStage(formData) {
 
   const {data:rcaCase,error:caseError}=await supabase.from("rca_cases").select("*").eq("id",caseId).eq("owner_id",user.id).maybeSingle();
   if(caseError || !rcaCase || rcaCase.case_type!=="capa") throw new Error("CAPA case not found.");
+  // Closed records are amended through a controlled reopening, never by
+  // replaying an earlier stage or changing an effectiveness decision.
+  // Include legacy closure timestamps and the terminal CAPA stage.
+  if(rcaCase.status==="closed" || rcaCase.closed_at!=null || rcaCase.capa_current_stage==="closed") {
+    throw new Error(
+      "This CAPA case is closed and cannot be changed through the stage form. " +
+      "An authorised reviewer must reopen its linked finding through Findings & Actions " +
+      "before corrective-action work resumes. For a standalone case, ask the administrator " +
+      "for a controlled reopening; do not change its status through an ordinary save."
+    );
+  }
   if(rcaCase.access_scope==="single_assessment") await requireAssessmentRemediationAccess(user.id,rcaCase.assessment_id);
 
   const {data:stages,error:stagesError}=await supabase.from("rca_capa_stages").select("*").eq("case_id",caseId).eq("owner_id",user.id).order("stage_order");
