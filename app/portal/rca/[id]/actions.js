@@ -1,5 +1,10 @@
 "use server";
 
+import { rcaReviewAccess } from "../../../../lib/rca-review-access";
+import { readGateData, gateDataProblems, independentlyEffective } from "../../../../lib/rca-workflow.mjs";
+import { createAdminClient } from "../../../../lib/supabase/admin";
+import { getOrganizationAccess } from "../../../../lib/organization-access";
+import { getUserSubscription, hasPlanAccess } from "../../../../lib/subscription";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
@@ -153,6 +158,7 @@ async function assertDisciplineUnlocked(
     .order("discipline");
 
   if (error) throw new Error(error.message);
+  if((preceding || []).length !== discipline) throw new Error("A preceding discipline record is missing. Ask the administrator to review the case.");
   const blocker = (preceding ?? []).find((item) => item.status !== "approved");
   if (blocker) redirect(`/portal/rca/${caseId}?d=${blocker.discipline}&locked=1`);
 }
@@ -184,6 +190,17 @@ export async function saveCaseOverview(formData) {
     .from("rca_cases")
     .update({
       title,
+      workflow_profile: (() => {
+        const profile = clean(formData.get("workflow_profile")) || rcaCase.workflow_profile || "general_8d";
+        if (!["general_8d", "rm13000"].includes(profile)) throw new Error("Select a supported workflow profile.");
+        return profile;
+      })(),
+      detected_at: (() => {
+        const value = clean(formData.get("detected_at"));
+        if (!value) return rcaCase.detected_at || rcaCase.created_at;
+        if (!Number.isFinite(Date.parse(value))) throw new Error("Enter a valid detection date.");
+        return new Date(value).toISOString();
+      })(),
       problem_statement: clean(
         formData.get("problem_statement")
       ),
@@ -224,45 +241,30 @@ export async function saveDiscipline(previousState, formData) {
   }
 }
 
-// Withdraw dependent sign-offs before changing a discipline record. Recorded
-// narratives, evidence, actions and previous sign-offs remain traceable.
-async function invalidateDependentDisciplineApprovals(supabase, userId, rcaCase, discipline, narrative, intent, revision = null) {
-  const { data: rows, error: readError } = await supabase.from("rca_8d_disciplines")
-    .select("*").eq("case_id", rcaCase.id).eq("owner_id", userId).order("discipline");
-  if (readError) throw new Error(readError.message);
-  const current = (rows || []).find(row => Number(row.discipline) === discipline);
-  if (!current) throw new Error("This discipline record could not be found. Refresh the case before saving.");
-  const changed = (clean(current.narrative) || "") !== (narrative || "");
-  const withdrawCurrent = current.status === "approved" && intent !== "approve";
-  if (!changed && !withdrawCurrent && !revision) return;
-  const dependent = (rows || []).filter(row => Number(row.discipline) > discipline &&
-    (row.status === "approved" || row.status === "ready_for_review" || row.human_approved || row.approved_at || row.approved_by));
-  if (!dependent.length && !["approved", "ready_for_review"].includes(current.status) && !current.human_approved && !current.approved_at && !current.approved_by) return;
-
-  // Save the previous approvals before withdrawing them. If any operation fails,
-  // stop the edit; do not silently retain downstream approval after an edit.
-  const { error: historyError } = await supabase.from("rca_case_events").insert({
-    case_id: rcaCase.id, owner_id: userId, discipline,
-    event_type: "discipline_approval_invalidation_requested",
-    summary: `D${discipline} revision requires renewed review of dependent disciplines`,
-    event_data: { confirmed_by: userId, intent, previous_case_status: rcaCase.status,
-      previous_current_discipline: rcaCase.current_discipline,
-      previous_discipline: current, dependent_approvals: dependent, revision }
-  });
-  if (historyError) throw new Error(historyError.message);
-  const { data: savedCase, error: caseError } = await supabase.from("rca_cases")
-    .update({current_discipline: discipline, status: "active"})
-    .eq("id", rcaCase.id).eq("owner_id", userId).eq("status", rcaCase.status)
-    .is("closed_at", null).select("id").maybeSingle();
-  if (caseError) throw new Error(caseError.message);
-  if (!savedCase) throw new Error("The 8D case changed or was closed while you were editing. Refresh the case before making further changes.");
-  const { error: resetError } = await supabase.from("rca_8d_disciplines")
-    .update({status: "in_progress", human_approved: false, approved_by: null,
-      approved_at: null, completion_score: 0})
-    .eq("case_id", rcaCase.id).eq("owner_id", userId).gte("discipline", discipline);
-  if (resetError) throw new Error(resetError.message);
-  rcaCase.current_discipline = discipline;
-  rcaCase.status = "active";
+async function validateWorkflowGate(supabase,user,rcaCase,discipline,data) {
+  const rows=async(table)=>{const {data,error}=await supabase.from(table).select("*").eq("case_id",rcaCase.id).eq("owner_id",user.id);if(error)throw new Error(error.message);return data||[];};
+  if(discipline===1){
+    const team=(await rows("rca_team_members")).filter(p=>p.active!==false);
+    if(!rcaCase.sponsor_name || !rcaCase.leader_name || !team.length)throw new Error("Assign a sponsor, investigation leader and cross-functional team before D1 approval.");
+    if(rcaCase.workflow_profile==='rm13000' && !team.some(p=>p.organization_person_id===data.trained_practitioner_person_id) && data.trained_practitioner_person_id!==rcaCase.leader_person_id)throw new Error("The trained practitioner must be in the case team or be the investigation leader.");
+  }
+  if(discipline===2 && !rcaCase.problem_statement?.trim())throw new Error("Record the initial problem in Case control before D2 approval.");
+  if(discipline===4){
+    const causes=(await rows("rca_causes")).filter(c=>c.status==='validated');
+    for(const type of ['occurrence','escape','systemic']){
+      if(!causes.some(c=>c.cause_type===type) && (type==='occurrence'||!data[type+'_not_applicable']?.trim()))throw new Error("Validate the "+type+" causal stream, or record an evidence-based not-applicable rationale for escape/systemic streams.");
+    }
+    if(causes.some(c=>!c.validation_method?.trim()||!c.validation_result?.trim()||!c.validated_by||!c.validated_at))throw new Error("Every validated cause requires a recorded test, result, validator and date.");
+  }
+  if(discipline===6 || discipline===8){
+    const actions=(await rows("rca_actions")).filter(a=>Number(a.discipline)===5&&a.selection_status==='selected');
+    const {data:people,error:peopleError}=await supabase.from("organization_people").select("id,user_id,email").eq("organization_id",rcaCase.organization_id);
+    const {data:access,error:accessError}=await supabase.from("internal_audit_action_access").select("assignee_user_id").eq("rca_case_id",rcaCase.id).eq("owner_id",user.id).maybeSingle();
+    if(peopleError||accessError)throw new Error("Independent verification references could not be checked.");
+    if(!actions.length||actions.some(a=>!independentlyEffective(a,people||[],access?.assignee_user_id)))throw new Error("All selected actions need independent effectiveness verification with a method, conclusion, reviewer and date.");
+    const evidence=await rows("rca_evidence");
+    if(actions.some(a=>!evidence.some(e=>e.action_id===a.id&&Number(e.discipline)===6&&e.storage_path)))throw new Error("Each selected action needs its own retained D6 evidence file.");
+  }
 }
 
 async function persistDiscipline(formData) {
@@ -283,13 +285,28 @@ async function persistDiscipline(formData) {
     caseId
   );
 
+  const {data: previousDiscipline, error: previousError} = await supabase.from("rca_8d_disciplines").select("*")
+    .eq("case_id",caseId).eq("owner_id",user.id).eq("discipline",discipline).maybeSingle();
+  if(previousError || !previousDiscipline) throw new Error(previousError?.message || "Discipline record not found.");
+  const gateData = readGateData(formData,discipline,previousDiscipline.gate_data);
+  if(intent === "approve") {
+    const issues=gateDataProblems(discipline,rcaCase.workflow_profile,gateData,rcaCase);
+    if(issues.length) throw new Error(issues.join(" "));
+    await validateWorkflowGate(supabase,user,rcaCase,discipline,gateData);
+  }
+
   if (!["save", "review", "approve"].includes(intent)) throw new Error("Choose Save Progress, Ready for Review or Approve.");
   let reviewer = {};
   const reviewerId = clean(formData.get("reviewer_person_id"));
   if (intent === "approve" || reviewerId) {
     const {data:organization,error:orgError}=await supabase.from("organizations").select("*").eq("id",rcaCase.organization_id).eq("owner_id",user.id).maybeSingle();
     if(orgError || !organization)throw new Error(orgError?.message || "Company not found.");
-    reviewer=resolveRcaReviewer(await loadRcaCompanyLinks(organization),formData);
+    const companyOptions=await loadRcaCompanyLinks(organization);
+    reviewer=resolveRcaReviewer(companyOptions,formData);
+    if(intent === "approve") {
+      const person=companyOptions.people.find(row=>row.id===reviewer.reviewer_person_id);
+      if(!person || !(person.user_id===user.id || person.email?.toLowerCase()===user.email?.toLowerCase())) throw new Error("The signed-in reviewer must approve using their own active company-person record.");
+    }
   } else if (formData.has("reviewer_person_id")) {
     reviewer = { reviewer_person_id: null, reviewer_name: null, reviewer_email: null };
   }
@@ -461,10 +478,6 @@ async function persistDiscipline(formData) {
     }
   }
 
-  await invalidateDependentDisciplineApprovals(
-    supabase, user.id, rcaCase, discipline, narrative, intent
-  );
-
   const approved = intent === "approve";
   const status = approved
     ? "approved"
@@ -476,6 +489,7 @@ async function persistDiscipline(formData) {
     .from("rca_8d_disciplines")
     .update({
       narrative: narrative || "",
+      gate_data: gateData,
       status,
       completion_score: approved ? 100 : 60,
       human_approved: approved,
@@ -643,10 +657,6 @@ async function persistAddCauseHypothesis(formData) {
     throw new Error("Complete the Why sequence in order without leaving gaps.");
   }
 
-  await invalidateDependentDisciplineApprovals(supabase, user.id, rcaCase, 4, null, "save", {
-    reason: "cause_hypothesis_added", cause_type: causeType, statement
-  });
-
   const { error } = await supabase
     .from("rca_causes")
     .insert({
@@ -691,20 +701,22 @@ export async function reviewCauseHypothesis(formData) {
     );
   }
 
-  const rcaCase = await getOwnedCase(supabase, user.id, caseId);
+  await getOwnedCase(supabase, user.id, caseId);
   await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
 
-  const { data: previousCause, error: causeReadError } = await supabase.from("rca_causes")
-    .select("*").eq("id", causeId).eq("case_id", caseId).eq("owner_id", user.id).maybeSingle();
-  if (causeReadError) throw new Error(causeReadError.message);
-  if (!previousCause) throw new Error("Cause hypothesis not found.");
-  if (decision === "validate" && (!previousCause.profile_code || !previousCause.profile_rationale)) {
-    redirect(`/portal/rca/${caseId}?d=4&error=cause_profile_required&cause=${encodeURIComponent(causeId)}`);
+  if (decision === "validate") {
+    const { data: profiledCause, error: profileError } = await supabase
+      .from("rca_causes")
+      .select("profile_code, profile_rationale")
+      .eq("id", causeId)
+      .eq("case_id", caseId)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (profileError) throw new Error(profileError.message);
+    if (!profiledCause?.profile_code || !profiledCause?.profile_rationale) {
+      redirect(`/portal/rca/${caseId}?d=4&error=cause_profile_required&cause=${encodeURIComponent(causeId)}`);
+    }
   }
-  await invalidateDependentDisciplineApprovals(supabase, user.id, rcaCase, 4, null, "save", {
-    reason: "cause_validation_revised", cause_id: causeId, previous_cause: previousCause,
-    decision, validation_method: validationMethod, validation_result: validationResult
-  });
 
   const validated = decision === "validate";
   const now = new Date().toISOString();
@@ -765,7 +777,7 @@ async function persistSaveCauseProfile(formData) {
 
   const { data: cause, error: causeError } = await supabase
     .from("rca_causes")
-    .select("*")
+    .select("id, cause_type, status, accountable_system_owner, accountable_system_owner_person_id")
     .eq("id", causeId)
     .eq("case_id", caseId)
     .eq("owner_id", user.id)
@@ -786,11 +798,6 @@ async function persistSaveCauseProfile(formData) {
       validated_at: null,
     });
   }
-  await invalidateDependentDisciplineApprovals(supabase, user.id, rcaCase, 4, null, "save", {
-    reason: "cause_profile_revised", cause_id: causeId, previous_cause: cause,
-    revised_profile: profile, validation_reopened: wasValidated
-  });
-
   const { error } = await supabase
     .from("rca_causes")
     .update(update)
@@ -1106,7 +1113,7 @@ export async function addObjectiveEvidence(formData) {
   if (
     !caseId ||
     !Number.isInteger(discipline) ||
-    discipline < 2 ||
+    discipline < 0 ||
     discipline > 8
   ) {
     throw new Error("Objective evidence can be added from D2 onwards.");
@@ -1564,4 +1571,21 @@ export async function deleteCostEntry(formData) {
   revalidatePath(`/portal/rca/${caseId}`);
   revalidatePath(`/portal/rca/${caseId}/summary`);
   redirect(`/portal/rca/${caseId}?d=${discipline}#copq`);
+}
+
+export async function manageStandaloneRca(previousState,formData) {
+  try {
+    const caseId=clean(formData.get("case_id")),operation=clean(formData.get("operation")),reason=clean(formData.get("reason"));
+    if(!caseId||!["reopen","verify_action","close_8d"].includes(operation)||!reason||reason.length<20||formData.get("human_confirmation")!=="on")throw new Error("Choose a valid operation, enter a reason of at least 20 characters and confirm your review.");
+    const {admin,user,access,rcaCase}=await rcaReviewAccess(caseId,operation==='reopen'?'admin':'approve');
+    if(operation==='reopen'&&!['owner','admin'].includes(access.level))throw new Error("Controlled reopening requires a company administrator.");
+    const {error}=await admin.rpc('manage_standalone_rca_workflow',{
+      p_case_id:caseId,p_organization_id:rcaCase.organization_id,p_actor_id:user.id,
+      p_operation:operation,p_reason:reason,p_expected_updated_at:clean(formData.get("expected_updated_at")),
+      p_values:{action_id:clean(formData.get("action_id")),method:clean(formData.get("verification_method")),conclusion:clean(formData.get("verification_conclusion")),result:clean(formData.get("verification_result"))}
+    });
+    if(error){console.error('RCA_CONTROLLED_REVIEW_FAILED',{code:error.code||'database_error'});throw new Error(error.message||"The controlled review was not saved. Refresh before retrying.");}
+    revalidatePath(`/portal/rca/${caseId}`);revalidatePath('/portal/rca');
+    redirect(`/portal/rca/${caseId}?d=${operation==='reopen'?6:operation==='verify_action'?6:8}`);
+  } catch(error) {if(error?.digest?.startsWith('NEXT_REDIRECT'))throw error;return {error:error?.message||'The controlled review could not be saved.'};}
 }
