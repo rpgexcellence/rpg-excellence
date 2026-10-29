@@ -224,6 +224,47 @@ export async function saveDiscipline(previousState, formData) {
   }
 }
 
+// Withdraw dependent sign-offs before changing a discipline record. Recorded
+// narratives, evidence, actions and previous sign-offs remain traceable.
+async function invalidateDependentDisciplineApprovals(supabase, userId, rcaCase, discipline, narrative, intent) {
+  const { data: rows, error: readError } = await supabase.from("rca_8d_disciplines")
+    .select("*").eq("case_id", rcaCase.id).eq("owner_id", userId).order("discipline");
+  if (readError) throw new Error(readError.message);
+  const current = (rows || []).find(row => Number(row.discipline) === discipline);
+  if (!current) throw new Error("This discipline record could not be found. Refresh the case before saving.");
+  const changed = (clean(current.narrative) || "") !== (narrative || "");
+  const withdrawCurrent = current.status === "approved" && intent !== "approve";
+  if (!changed && !withdrawCurrent) return;
+  const dependent = (rows || []).filter(row => Number(row.discipline) > discipline &&
+    (row.status === "approved" || row.status === "ready_for_review" || row.human_approved || row.approved_at || row.approved_by));
+  if (!dependent.length && current.status !== "approved") return;
+
+  // Save the previous approvals before withdrawing them. If any operation fails,
+  // stop the edit; do not silently retain downstream approval after an edit.
+  const { error: historyError } = await supabase.from("rca_case_events").insert({
+    case_id: rcaCase.id, owner_id: userId, discipline,
+    event_type: "discipline_approval_invalidation_requested",
+    summary: `D${discipline} revision requires renewed review of dependent disciplines`,
+    event_data: { confirmed_by: userId, intent, previous_case_status: rcaCase.status,
+      previous_current_discipline: rcaCase.current_discipline,
+      previous_discipline: current, dependent_approvals: dependent }
+  });
+  if (historyError) throw new Error(historyError.message);
+  const { data: savedCase, error: caseError } = await supabase.from("rca_cases")
+    .update({current_discipline: discipline, status: "active"})
+    .eq("id", rcaCase.id).eq("owner_id", userId).eq("status", rcaCase.status)
+    .is("closed_at", null).select("id").maybeSingle();
+  if (caseError) throw new Error(caseError.message);
+  if (!savedCase) throw new Error("The 8D case changed or was closed while you were editing. Refresh the case before making further changes.");
+  const { error: resetError } = await supabase.from("rca_8d_disciplines")
+    .update({status: "in_progress", human_approved: false, approved_by: null,
+      approved_at: null, completion_score: 0})
+    .eq("case_id", rcaCase.id).eq("owner_id", userId).gte("discipline", discipline);
+  if (resetError) throw new Error(resetError.message);
+  rcaCase.current_discipline = discipline;
+  rcaCase.status = "active";
+}
+
 async function persistDiscipline(formData) {
   const { supabase, user } = await context();
   const caseId = clean(formData.get("case_id"));
@@ -419,6 +460,10 @@ async function persistDiscipline(formData) {
       redirect(`/portal/rca/${caseId}?d=6&error=d6_effectiveness_incomplete`);
     }
   }
+
+  await invalidateDependentDisciplineApprovals(
+    supabase, user.id, rcaCase, discipline, narrative, intent
+  );
 
   const approved = intent === "approve";
   const status = approved
