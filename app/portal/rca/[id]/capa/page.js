@@ -26,6 +26,20 @@ const META = {
     "prompt": "Record the sample, monitoring period, result and independent conclusion. An ineffective result reopens corrective action."
   }
 };
+async function submitOpenCapaStage(formData) {
+  "use server";
+  try {
+    return await saveCapaStage(formData);
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    const caseId = String(formData.get("case_id") || "");
+    if (error?.message?.startsWith("This CAPA case is closed and cannot be changed through the stage form.") && /^[0-9a-f-]{36}$/i.test(caseId)) {
+      redirect(`/portal/rca/${caseId}/capa?error=case_closed`);
+    }
+    throw error;
+  }
+}
+
 const pretty = v => String(v || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
 export default async function CapaCasePage({
   params
@@ -53,10 +67,9 @@ export default async function CapaCasePage({
   if (stageError) throw new Error(stageError.message);
   const completed = (stages || []).filter(row => row.completed_at).length;
   const progress = Math.round(completed / 4 * 100);
-  return <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'capa:' + id} label="CAPA" baseline={{
-    "rcaCase": rcaCase,
-    "stages": stages
-  }}><main className="capaDetail">
+  const caseClosed = rcaCase.status === "closed" || rcaCase.closed_at != null || rcaCase.capa_current_stage === "closed";
+  const content = <main className="capaDetail">
+      <fieldset disabled={caseClosed} data-closed-case={caseClosed ? "true" : "false"} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>
       <style>
         {"\n    .capaDetail,.capaDetail *{box-sizing:border-box}.capaDetail{min-height:100vh;background:#edf3fa;color:#061a35;padding:28px clamp(16px,2.2vw,32px) 70px}.capaDetailWrap{width:100%;max-width:none;min-width:0;margin:0}.capaDetailTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.capaDetailEyebrow{color:#155eef;font-weight:900;letter-spacing:.1em;font-size:12px}.capaDetailTop h1{font-size:clamp(26px,2.4vw,34px);line-height:1.2;margin:7px 0}.capaDetailTop p{color:#61758d}.capaDetailBack{padding:12px 15px;background:#fff;border:1px solid #cbd8e7;border-radius:10px;color:#061a35;text-decoration:none;font-weight:850}.capaDetailHero{margin:18px 0;min-height:0;height:auto;display:grid;grid-template-columns:1fr 260px;gap:22px;padding:24px 28px;border-radius:18px;background:linear-gradient(115deg,#0b2343,#173e72);color:#fff}.capaDetailHero p{color:#c6d8ec;line-height:1.55}.capaDetailMeter{align-self:center}.capaDetailBar{height:10px;background:#ffffff24;border-radius:99px;overflow:hidden}.capaDetailBar i{display:block;height:100%;background:#51ded1}.capaDetailMeter strong{display:block;font-size:30px;margin-bottom:9px}.capaDetailGrid{display:grid;gap:16px}.capaDetailCard{padding:24px;border:1px solid #d5e1ed;border-left:5px solid #a8b8ca;border-radius:16px;background:#fff}.capaDetailCard.capaDetailActive{border-left-color:#155eef}.capaDetailCard.capaDetailDone{border-left-color:#0a9b69}.capaDetailHead{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.capaDetailHead h2{margin:0 0 6px;font-size:21px}.capaDetailGuide{margin:0;color:#60758e;line-height:1.55}.capaDetailState{white-space:nowrap;padding:7px 10px;border-radius:99px;background:#eef3f8;font-size:12px;font-weight:900}.capaDetailForm{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:18px}.capaDetailWide{grid-column:1/-1}.capaDetailField{display:grid;gap:7px;font-size:13px;font-weight:850}.capaDetailField :is(input,textarea,select){width:100%;min-height:46px;padding:12px;border:1px solid #cbd8e7;border-radius:9px;background:#fff;font:inherit}.capaDetailActions{display:flex;gap:10px}.capaDetailBtn{padding:12px 16px;border:0;border-radius:9px;background:#155eef;color:#fff;font-weight:900;cursor:pointer}.capaDetailBtn.capaDetailSecondary{background:#eaf0f8;color:#123}.capaDetailLocked{margin-top:15px;padding:13px;border-radius:9px;background:#f4f6f9;color:#6c7b8b}@media(max-width:720px){.capaDetailHero,.capaDetailForm{grid-template-columns:1fr}.capaDetailWide{grid-column:auto}}\n  \n.capaDetail{font-family:Arial,sans-serif}.capaDetailTop p{margin:6px 0 0;line-height:1.5}.capaDetailHero h2{font-size:24px;line-height:1.3;margin-bottom:10px}.capaDetailHero p{margin:0;max-width:780px}.capaDetailHero>div,.capaDetailCard,.capaDetailField{min-width:0}.capaDetailHead h2{line-height:1.3}.capaDetailActions{flex-wrap:wrap}.capaDetailBack{display:inline-flex;align-items:center;justify-content:center;font-size:13px}.capaDetailHeaderLinks{display:flex;flex-wrap:wrap;gap:10px}.capaDetailState{align-self:flex-start}.capaDetailField textarea{resize:vertical;line-height:1.55;min-height:108px}.capaDetailBtn{font:inherit;font-size:13px}.capaDetailCard:focus-within{border-color:#8da8ed}@media(max-width:720px){.capaDetailHero{padding:22px;gap:18px}.capaDetailCard{padding:18px}.capaDetailHead{flex-wrap:wrap}.capaDetailMeter strong{font-size:25px}.capaDetailHeaderLinks{width:100%}.capaDetailTop{gap:14px}}\n"}
       </style>
@@ -81,6 +94,11 @@ export default async function CapaCasePage({
             </Link>
           </div>
         </header>
+        {caseClosed && <section role="note" style={{marginTop: 18, padding: 20, border: "1px solid #b8d6d1", borderRadius: 12, background: "#eef8f5"}}>
+          <h2 style={{margin: "0 0 8px", fontSize: 20}}>Closed case — read only</h2>
+          <p style={{margin: "0 0 12px", lineHeight: 1.6}}>Review the recorded stages and evidence references below. An authorised reviewer must reopen the linked finding through Findings &amp; Actions before work resumes. Standalone cases require a controlled reopening by an administrator.</p>
+          <Link className="capaDetailBack" href="/portal/internal-audit-actions">Open Findings &amp; Actions →</Link>
+        </section>}
         <section className="capaDetailHero">
           <div>
             <h2 style={{
@@ -131,6 +149,7 @@ export default async function CapaCasePage({
                       return "Completed";
                     }
                     return (() => {
+                      if (caseClosed) return "Read only";
                       if (locked) {
                         return "Locked";
                       }
@@ -140,12 +159,12 @@ export default async function CapaCasePage({
                   </span>
                 </div>
                 {(() => {
-                if (locked) {
+                if (locked && !caseClosed) {
                   return <div className="capaDetailLocked">
                     Complete the preceding stage to unlock this controlled record.
                   </div>;
                 }
-                return <form action={saveCapaStage} className="capaDetailForm">
+                return <form action={submitOpenCapaStage} className="capaDetailForm">
                     <input type="hidden" name="case_id" value={id} />
                     <input type="hidden" name="stage" value={row.stage} />
                     <label className="capaDetailField capaDetailWide">
@@ -172,19 +191,21 @@ export default async function CapaCasePage({
                           </option>
                         </select>
                       </label>}
-                    <div className="capaDetailActions capaDetailWide">
+                    {!caseClosed && <div className="capaDetailActions capaDetailWide">
                       <button className="capaDetailBtn capaDetailSecondary" name="intent" value="save">
                         Save draft
                       </button>
                       {!done && <button className="capaDetailBtn" name="intent" value="complete">
                           Complete stage →
                         </button>}
-                    </div>
+                    </div>}
                   </form>;
               })()}
               </article>;
           })}
         </section>
       </div>
-    </main></ControlledDeviceDrafts>;
+      </fieldset>
+    </main>;
+  return caseClosed ? content : <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'capa:' + id} label="CAPA" baseline={{rcaCase, stages}}>{content}</ControlledDeviceDrafts>;
 }
