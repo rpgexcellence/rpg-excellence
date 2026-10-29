@@ -226,7 +226,7 @@ export async function saveDiscipline(previousState, formData) {
 
 // Withdraw dependent sign-offs before changing a discipline record. Recorded
 // narratives, evidence, actions and previous sign-offs remain traceable.
-async function invalidateDependentDisciplineApprovals(supabase, userId, rcaCase, discipline, narrative, intent) {
+async function invalidateDependentDisciplineApprovals(supabase, userId, rcaCase, discipline, narrative, intent, revision = null) {
   const { data: rows, error: readError } = await supabase.from("rca_8d_disciplines")
     .select("*").eq("case_id", rcaCase.id).eq("owner_id", userId).order("discipline");
   if (readError) throw new Error(readError.message);
@@ -234,10 +234,10 @@ async function invalidateDependentDisciplineApprovals(supabase, userId, rcaCase,
   if (!current) throw new Error("This discipline record could not be found. Refresh the case before saving.");
   const changed = (clean(current.narrative) || "") !== (narrative || "");
   const withdrawCurrent = current.status === "approved" && intent !== "approve";
-  if (!changed && !withdrawCurrent) return;
+  if (!changed && !withdrawCurrent && !revision) return;
   const dependent = (rows || []).filter(row => Number(row.discipline) > discipline &&
     (row.status === "approved" || row.status === "ready_for_review" || row.human_approved || row.approved_at || row.approved_by));
-  if (!dependent.length && current.status !== "approved") return;
+  if (!dependent.length && !["approved", "ready_for_review"].includes(current.status) && !current.human_approved && !current.approved_at && !current.approved_by) return;
 
   // Save the previous approvals before withdrawing them. If any operation fails,
   // stop the edit; do not silently retain downstream approval after an edit.
@@ -247,7 +247,7 @@ async function invalidateDependentDisciplineApprovals(supabase, userId, rcaCase,
     summary: `D${discipline} revision requires renewed review of dependent disciplines`,
     event_data: { confirmed_by: userId, intent, previous_case_status: rcaCase.status,
       previous_current_discipline: rcaCase.current_discipline,
-      previous_discipline: current, dependent_approvals: dependent }
+      previous_discipline: current, dependent_approvals: dependent, revision }
   });
   if (historyError) throw new Error(historyError.message);
   const { data: savedCase, error: caseError } = await supabase.from("rca_cases")
@@ -643,6 +643,10 @@ async function persistAddCauseHypothesis(formData) {
     throw new Error("Complete the Why sequence in order without leaving gaps.");
   }
 
+  await invalidateDependentDisciplineApprovals(supabase, user.id, rcaCase, 4, null, "save", {
+    reason: "cause_hypothesis_added", cause_type: causeType, statement
+  });
+
   const { error } = await supabase
     .from("rca_causes")
     .insert({
@@ -687,22 +691,20 @@ export async function reviewCauseHypothesis(formData) {
     );
   }
 
-  await getOwnedCase(supabase, user.id, caseId);
+  const rcaCase = await getOwnedCase(supabase, user.id, caseId);
   await assertDisciplineUnlocked(supabase, user.id, caseId, 4);
 
-  if (decision === "validate") {
-    const { data: profiledCause, error: profileError } = await supabase
-      .from("rca_causes")
-      .select("profile_code, profile_rationale")
-      .eq("id", causeId)
-      .eq("case_id", caseId)
-      .eq("owner_id", user.id)
-      .maybeSingle();
-    if (profileError) throw new Error(profileError.message);
-    if (!profiledCause?.profile_code || !profiledCause?.profile_rationale) {
-      redirect(`/portal/rca/${caseId}?d=4&error=cause_profile_required&cause=${encodeURIComponent(causeId)}`);
-    }
+  const { data: previousCause, error: causeReadError } = await supabase.from("rca_causes")
+    .select("*").eq("id", causeId).eq("case_id", caseId).eq("owner_id", user.id).maybeSingle();
+  if (causeReadError) throw new Error(causeReadError.message);
+  if (!previousCause) throw new Error("Cause hypothesis not found.");
+  if (decision === "validate" && (!previousCause.profile_code || !previousCause.profile_rationale)) {
+    redirect(`/portal/rca/${caseId}?d=4&error=cause_profile_required&cause=${encodeURIComponent(causeId)}`);
   }
+  await invalidateDependentDisciplineApprovals(supabase, user.id, rcaCase, 4, null, "save", {
+    reason: "cause_validation_revised", cause_id: causeId, previous_cause: previousCause,
+    decision, validation_method: validationMethod, validation_result: validationResult
+  });
 
   const validated = decision === "validate";
   const now = new Date().toISOString();
@@ -763,7 +765,7 @@ async function persistSaveCauseProfile(formData) {
 
   const { data: cause, error: causeError } = await supabase
     .from("rca_causes")
-    .select("id, cause_type, status, accountable_system_owner, accountable_system_owner_person_id")
+    .select("*")
     .eq("id", causeId)
     .eq("case_id", caseId)
     .eq("owner_id", user.id)
@@ -784,6 +786,11 @@ async function persistSaveCauseProfile(formData) {
       validated_at: null,
     });
   }
+  await invalidateDependentDisciplineApprovals(supabase, user.id, rcaCase, 4, null, "save", {
+    reason: "cause_profile_revised", cause_id: causeId, previous_cause: cause,
+    revised_profile: profile, validation_reopened: wasValidated
+  });
+
   const { error } = await supabase
     .from("rca_causes")
     .update(update)
