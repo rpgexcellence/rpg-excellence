@@ -56,6 +56,7 @@ export default async function RcaCasePage({
     if (result.error) throw new Error(result.error.message);
   }
   const rcaCase = caseResult.data;
+  const caseClosed = rcaCase.status === "closed" || rcaCase.closed_at != null;
   if (rcaCase.case_type === "capa") redirect("/portal/rca/" + id + "/capa");
   const {
     data: linkedAuditAction,
@@ -133,26 +134,25 @@ export default async function RcaCasePage({
     "analysisModels": analysisModels,
     "analysisNodes": analysisNodes
   });
-  return <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'rca:' + id} label="RCA–8D" baseline={{
-    "rcaCase": rcaCase,
-    "disciplines": disciplines,
-    "team": team,
-    "causes": causes,
-    "actions": actions,
-    "analysisModels": analysisModels,
-    "analysisNodes": analysisNodesResult.data,
-    "evidence": evidenceResult.data,
-    "costs": costsResult.data
-  }}><main style={{
+  const content = <main style={{
       "minHeight": "100vh",
       "background": "#f3f6fa",
       "color": "#061a35",
       "padding": "42px 22px 80px"
     }}>
+      <fieldset disabled={caseClosed} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} data-closed-case={caseClosed ? "true" : "false"}>
       <div style={{
         "maxWidth": "1500px",
         "margin": "0 auto"
       }}>
+        {caseClosed && <div role="status" style={{ marginBottom: 20, padding: "16px 18px", border: "1px solid #9dd8c7", borderRadius: 12, background: "#edf9f4", color: "#145c48", lineHeight: 1.6 }}>
+          <strong>Closed case — read only</strong>
+          <p style={{ margin: "5px 0 0" }}>This investigation is closed. You can review its records, evidence and reports. Editing requires an authorised, recorded reopening.</p>
+          <Link href="/portal/internal-audit-actions" style={{ color: "#145c48", fontWeight: 800 }}>Open Findings &amp; Actions →</Link>
+        </div>}
+        {pageError === "case_closed" && !caseClosed && <div role="alert" style={{ marginBottom: 20, padding: "14px 18px", border: "1px solid #f2c078", borderRadius: 12, background: "#fff8eb", color: "#805414" }}>
+          The previous save was blocked because the case was closed. Its current state has changed; review the refreshed record before editing.
+        </div>}
         <div style={{
           "display": "flex",
           "justifyContent": "space-between",
@@ -550,7 +550,7 @@ export default async function RcaCasePage({
                       "marginTop": "4px"
                     }}>Source: {entry.source_reference}</div>}
                       </div>
-                      <form action={deleteCostEntry}>
+                      <form action={submitOpenCaseAction.bind(null, "deleteCostEntry")}>
                         <input type="hidden" name="case_id" value={id} />
                         <input type="hidden" name="cost_id" value={entry.id} />
                         <input type="hidden" name="discipline" value={selected} />
@@ -559,7 +559,7 @@ export default async function RcaCasePage({
                     </div>)}
                 </div>}
 
-              <form action={addCostEntry} style={{
+              <form action={submitOpenCaseAction.bind(null, "addCostEntry")} style={{
                 "marginTop": "18px"
               }}>
                 <input type="hidden" name="case_id" value={id} />
@@ -673,7 +673,7 @@ export default async function RcaCasePage({
                       </div>)}
                   </div>}
 
-                <form action={addObjectiveEvidence} encType="multipart/form-data" style={{
+                <form action={submitOpenCaseAction.bind(null, "addObjectiveEvidence")} encType="multipart/form-data" style={{
                 "marginTop": "18px"
               }}>
                   <input type="hidden" name="case_id" value={id} />
@@ -718,7 +718,7 @@ export default async function RcaCasePage({
             {selected === 0 && <section style={cardStyle}>
                 <h2>Case control</h2>
                 {linkedFinding && <p>Linked NC: <strong>{linkedFinding.finding_reference}</strong>{linkedSupplierId && " \xB7 " + (companyLinks.suppliers.find(row => row.id === linkedSupplierId)?.legal_name || "Supplier") + ""}</p>}
-                <form action={saveCaseOverview}>
+                <form action={submitOpenCaseAction.bind(null, "saveCaseOverview")}>
                   <input type="hidden" name="case_id" value={id} />
                   <input name="title" defaultValue={rcaCase.title} required style={fieldStyle} />
                   <textarea name="problem_statement" rows={5} defaultValue={rcaCase.problem_statement ?? ""} placeholder="Initial known facts" style={{
@@ -783,7 +783,7 @@ export default async function RcaCasePage({
                         {discipline.no_action_justification}
                       </div>
                     </div>
-                    <form action={recordNoContainmentRequired}>
+                    <form action={submitOpenCaseAction.bind(null, "recordNoContainmentRequired")}>
                       <input type="hidden" name="case_id" value={id} />
                       <button name="intent" value="clear" style={secondaryButton}>
                         Clear Decision
@@ -807,7 +807,7 @@ export default async function RcaCasePage({
                       <span>{label(action.status)}</span>
                     </div>)}
                 </div>
-                {selected === 3 && !discipline?.no_action_required && <form action={recordNoContainmentRequired} style={noActionFormStyle}>
+                {selected === 3 && !discipline?.no_action_required && <form action={submitOpenCaseAction.bind(null, "recordNoContainmentRequired")} style={noActionFormStyle}>
                     <input type="hidden" name="case_id" value={id} />
                     <strong>No containment action required?</strong>
                     <p style={{
@@ -880,8 +880,40 @@ export default async function RcaCasePage({
           </div>
         </div>
       </div>
-    </main></ControlledDeviceDrafts>;
+      </fieldset>
+    </main>;
+  // A closed record has no editable device draft to save or restore.
+  return caseClosed ? content : <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'rca:' + id} label="RCA–8D" baseline={{
+    "rcaCase": rcaCase,
+    "disciplines": disciplines,
+    "team": team,
+    "causes": causes,
+    "actions": actions,
+    "analysisModels": analysisModels,
+    "analysisNodes": analysisNodesResult.data,
+    "evidence": evidenceResult.data,
+    "costs": costsResult.data
+  }}>{content}</ControlledDeviceDrafts>;
 }
+
+// Retain the existing mutation actions and their ownership/closure checks.
+// Expected closed-record rejections return to the readable case page.
+async function submitOpenCaseAction(actionName, formData) {
+  "use server";
+  const actions = { addCostEntry, addAnalysisNode, addObjectiveEvidence, createAnalysisModel, decideCorrectiveActionCandidate, deleteCostEntry, recordNoContainmentRequired, reviewAnalysisNode, reviewCauseHypothesis, saveCaseOverview, submitD6ActionForVerification };
+  if (!Object.prototype.hasOwnProperty.call(actions, actionName)) throw new Error("Unsupported 8D form action.");
+  try {
+    return await actions[actionName](formData);
+  } catch (error) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
+    const caseId = String(formData.get("case_id") || "");
+    if (typeof error?.message === "string" && error.message.startsWith("This 8D case is closed and cannot be changed through the investigation form.") && /^[0-9a-f-]{36}$/i.test(caseId)) {
+      redirect(`/portal/rca/${caseId}?error=case_closed`);
+    }
+    throw error;
+  }
+}
+
 function D6EffectivenessWorkbench({
   caseId,
   actions,
@@ -1100,7 +1132,7 @@ function D6EffectivenessWorkbench({
                   }
                   return null;
                 })()}</div>)}</div>}
-              <form action={addObjectiveEvidence} encType="multipart/form-data" style={{
+              <form action={submitOpenCaseAction.bind(null, "addObjectiveEvidence")} encType="multipart/form-data" style={{
               "marginTop": "14px"
             }}><input type="hidden" name="case_id" value={caseId} /><input type="hidden" name="discipline" value="6" /><input type="hidden" name="action_id" value={action.id} /><label style={dropZoneStyle}><strong>Attach evidence to this action</strong><span style={{
                   "color": "#607089",
@@ -1116,7 +1148,7 @@ function D6EffectivenessWorkbench({
                 "marginTop": "12px"
               }}>Add Evidence to This Action</button></form>
             </div>
-            <form action={submitD6ActionForVerification} style={{
+            <form action={submitOpenCaseAction.bind(null, "submitD6ActionForVerification")} style={{
             "marginTop": "14px"
           }}>
               <input type="hidden" name="case_id" value={caseId} /><input type="hidden" name="action_id" value={action.id} />
@@ -1283,7 +1315,7 @@ function CorrectiveActionSelectionWorkbench({
               {action.selection_rationale && <div style={{
             "marginTop": "10px"
           }}><strong>Decision rationale:</strong> {action.selection_rationale}</div>}
-              {action.selection_status === "candidate" && <form action={decideCorrectiveActionCandidate} style={{
+              {action.selection_status === "candidate" && <form action={submitOpenCaseAction.bind(null, "decideCorrectiveActionCandidate")} style={{
             "marginTop": "14px"
           }}>
                   <input type="hidden" name="case_id" value={caseId} />
@@ -1438,7 +1470,7 @@ function AnalysisWorkbench({
                 })()}</span>
             </Link>;
           }
-          return <form action={createAnalysisModel} key={method.key} style={methodCardStyle(false)}>
+          return <form action={submitOpenCaseAction.bind(null, "createAnalysisModel")} key={method.key} style={methodCardStyle(false)}>
               <input type="hidden" name="case_id" value={caseId} />
               <input type="hidden" name="method" value={method.key} />
               <strong style={{
@@ -1593,7 +1625,7 @@ function CauseCards({
           }}>Save RCA Profile</button>
             </RcaDisciplineForm>
           </details>}
-          {cause.status === "validated" && !cause.profile_code && ["escape", "systemic"].includes(cause.cause_type) && <form action={reviewCauseHypothesis} style={{
+          {cause.status === "validated" && !cause.profile_code && ["escape", "systemic"].includes(cause.cause_type) && <form action={submitOpenCaseAction.bind(null, "reviewCauseHypothesis")} style={{
         ...validationNoticeStyle,
         "marginTop": "12px"
       }}>
@@ -1627,7 +1659,7 @@ function CauseCards({
             <div><strong>Evidence supporting:</strong><br />{cause.evidence_for || "Not recorded"}</div>
             <div><strong>Evidence against / missing:</strong><br />{cause.evidence_against || "Not recorded"}</div>
           </div>
-          {["hypothesis", "under_test"].includes(cause.status) && <form action={reviewCauseHypothesis} style={{
+          {["hypothesis", "under_test"].includes(cause.status) && <form action={submitOpenCaseAction.bind(null, "reviewCauseHypothesis")} style={{
         "marginTop": "14px"
       }}>
               <input type="hidden" name="case_id" value={caseId} />
@@ -1914,7 +1946,7 @@ function AnalysisNodeCard({
         <div><strong>Evidence supporting:</strong><br />{node.evidence_for || "Not recorded"}</div>
         <div><strong>Evidence against:</strong><br />{node.evidence_against || "Not recorded"}</div>
       </div>
-      {["hypothesis", "under_test"].includes(node.status) && <form action={reviewAnalysisNode} style={{
+      {["hypothesis", "under_test"].includes(node.status) && <form action={submitOpenCaseAction.bind(null, "reviewAnalysisNode")} style={{
       "marginTop": "12px"
     }}>
           <input type="hidden" name="case_id" value={caseId} />
@@ -1953,7 +1985,7 @@ function AnalysisNodeForm({
       "cursor": "pointer",
       "fontSize": "18px"
     }}>Add analysis element</summary>
-      <form action={addAnalysisNode} style={{
+      <form action={submitOpenCaseAction.bind(null, "addAnalysisNode")} style={{
       "marginTop": "16px"
     }}>
         <input type="hidden" name="case_id" value={caseId} />
