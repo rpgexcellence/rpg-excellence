@@ -1,3 +1,5 @@
+import { rcaReviewAccess } from "../../../../../lib/rca-review-access";
+import { workflowSummary } from "../../../../../lib/rca-workflow.mjs";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -31,20 +33,24 @@ const money = (value, currency = "GBP") =>
 
 export async function GET(_request, { params }) {
   const { id } = await params;
-  const supabase = await createClient();
+  let supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return new Response("Unauthorised", { status: 401 });
 
+  let ownerId=user.id;
+  const {data:ownedCase,error:ownedError}=await supabase.from("rca_cases").select("id").eq("id",id).eq("owner_id",user.id).maybeSingle();
+  if(ownedError)return new Response("Case access could not be checked",{status:503});
+  if(!ownedCase){try{const scope=await rcaReviewAccess(id,'view');supabase=scope.admin;ownerId=scope.ownerId;}catch{return new Response("This company case is not available to the signed-in account",{status:403});}}
   const [caseResult, disciplinesResult, causesResult, actionsResult, costsResult] =
     await Promise.all([
-      supabase.from("rca_cases").select("*").eq("id", id).eq("owner_id", user.id).maybeSingle(),
-      supabase.from("rca_8d_disciplines").select("*").eq("case_id", id).eq("owner_id", user.id).order("discipline"),
-      supabase.from("rca_causes").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at"),
-      supabase.from("rca_actions").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at"),
-      supabase.from("rca_cost_entries").select("*").eq("case_id", id).eq("owner_id", user.id).order("discipline"),
+      supabase.from("rca_cases").select("*").eq("id", id).eq("owner_id", ownerId).maybeSingle(),
+      supabase.from("rca_8d_disciplines").select("*").eq("case_id", id).eq("owner_id", ownerId).order("discipline"),
+      supabase.from("rca_causes").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at"),
+      supabase.from("rca_actions").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at"),
+      supabase.from("rca_cost_entries").select("*").eq("case_id", id).eq("owner_id", ownerId).order("discipline"),
     ]);
 
   if (caseResult.error) return new Response(caseResult.error.message, { status: 500 });
@@ -224,6 +230,17 @@ export async function GET(_request, { params }) {
       paragraph(`Effectiveness: ${action.effectiveness_criteria || "Not defined"}`, { after: 8 });
     });
   } else paragraph("No permanent corrective actions have been selected.", { color: grey });
+
+  const workflow = workflowSummary(rcaCase,disciplines);
+  heading("Workflow assurance and approval evidence");
+  paragraph(workflow.profile);
+  paragraph("Recorded statements support human review; they are not independent assurance of compliance.",{color:grey});
+  for(const gate of workflow.gates){
+    heading(`D${gate.discipline} - ${cleanLabel(gate.status)}`,13);
+    paragraph(`Reviewer: ${gate.reviewer} | Approved: ${gate.approvedAt || 'Not approved'}`,{color:grey});
+    if(gate.deadline) paragraph(`Milestone: ${gate.deadline}${gate.overdue?' - OVERDUE':''}`,{bold:gate.overdue});
+    for(const field of gate.fields){ensureSpace(65);paragraph(field.label,{bold:true,after:1});paragraph(field.value);}
+  }
 
   heading("Cost of Poor Quality");
   paragraph(
