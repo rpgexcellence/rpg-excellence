@@ -29,6 +29,6 @@ export default function RcaGateReviewerField({ people, discipline, locked = fals
     {!people.length && <small>Add or activate company users under <a href="/portal/company/people">Administration → People, Roles &amp; Access</a>.</small>}
     {!approved && !locked && !canApprove && <small style={{ color: "#8a4600" }}>Select an active company reviewer to enable the green approval button.</small>}
     <small>Save Progress keeps your reviewer selection and draft text. Ready for Review and approval require evidence, analysis and conclusion.</small>
-    <small>The selected reviewer is recorded with this gate. Your signed-in account records the approval confirmation.</small>
+    <small>Approval must use your own active company-person record. The signed-in reviewer and approval time are retained in the audit history.</small>
   </div>;
 }
