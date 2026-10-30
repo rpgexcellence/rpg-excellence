@@ -1,3 +1,4 @@
+import { rcaReviewAccess } from "../../../../lib/rca-review-access";
 // VERIFIED_RCA_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../../components/ControlledDeviceDrafts";
 import Link from "next/link";
@@ -38,16 +39,20 @@ export default async function RcaCasePage({
   const pageError = query?.error;
   const missingCauseTypes = String(query?.missing ?? "").split(",").filter(Boolean).map(label);
   const requestedDiscipline = Math.min(8, Math.max(0, Number(query?.d ?? 0) || 0));
-  const supabase = await createClient();
+  let supabase = await createClient();
   const {
     data: {
       user
     }
   } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login");
-  const [caseResult, disciplinesResult, teamResult, causesResult, actionsResult, evidenceResult, analysisModelsResult, analysisNodesResult, costsResult] = await Promise.all([supabase.from("rca_cases").select("*").eq("id", id).eq("owner_id", user.id).maybeSingle(), supabase.from("rca_8d_disciplines").select("*").eq("case_id", id).eq("owner_id", user.id).order("discipline"), supabase.from("rca_team_members").select("*").eq("case_id", id).eq("owner_id", user.id).eq("active", true).order("created_at"), supabase.from("rca_causes").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at"), supabase.from("rca_actions").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at"), supabase.from("rca_evidence").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at", {
+  let ownerId=user.id, reviewerContext=null;
+  const {data:ownedCase,error:ownedError}=await supabase.from("rca_cases").select("id").eq("id",id).eq("owner_id",user.id).maybeSingle();
+  if(ownedError)throw new Error(ownedError.message);
+  if(!ownedCase){try{reviewerContext=await rcaReviewAccess(id,'view');supabase=reviewerContext.admin;ownerId=reviewerContext.ownerId;}catch{redirect('/portal/my-access?error=access');}}
+  const [caseResult, disciplinesResult, teamResult, causesResult, actionsResult, evidenceResult, analysisModelsResult, analysisNodesResult, costsResult] = await Promise.all([supabase.from("rca_cases").select("*").eq("id", id).eq("owner_id", ownerId).maybeSingle(), supabase.from("rca_8d_disciplines").select("*").eq("case_id", id).eq("owner_id", ownerId).order("discipline"), supabase.from("rca_team_members").select("*").eq("case_id", id).eq("owner_id", ownerId).eq("active", true).order("created_at"), supabase.from("rca_causes").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at"), supabase.from("rca_actions").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at"), supabase.from("rca_evidence").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at", {
     "ascending": false
-  }), supabase.from("rca_analysis_models").select("*").eq("case_id", id).eq("owner_id", user.id).eq("status", "active").order("created_at"), supabase.from("rca_analysis_nodes").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at"), supabase.from("rca_cost_entries").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at", {
+  }), supabase.from("rca_analysis_models").select("*").eq("case_id", id).eq("owner_id", ownerId).eq("status", "active").order("created_at"), supabase.from("rca_analysis_nodes").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at"), supabase.from("rca_cost_entries").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at", {
     "ascending": false
   })]);
   if (caseResult.error) throw new Error(caseResult.error.message);
@@ -57,22 +62,26 @@ export default async function RcaCasePage({
   }
   const rcaCase = caseResult.data;
   const caseClosed = rcaCase.status === "closed" || rcaCase.closed_at != null;
+  const reviewerView = ownerId !== user.id;
+  const readOnly = caseClosed || reviewerView;
+  const canReview = !reviewerView || ['approve','admin','owner'].includes(reviewerContext?.access?.level);
+  const canReopen = !reviewerView || ['admin','owner'].includes(reviewerContext?.access?.level);
   if (rcaCase.case_type === "capa") redirect("/portal/rca/" + id + "/capa");
   const {
     data: linkedAuditAction,
     error: linkedAuditActionError
-  } = await supabase.from("internal_audit_action_access").select("id, status, audit_id").eq("rca_case_id", id).eq("owner_id", user.id).limit(1).maybeSingle();
+  } = await supabase.from("internal_audit_action_access").select("id, status, audit_id").eq("rca_case_id", id).eq("owner_id", ownerId).limit(1).maybeSingle();
   if (linkedAuditActionError) throw new Error(linkedAuditActionError.message);
   const finalOwnerResponseSubmitted = ["submitted", "accepted"].includes(linkedAuditAction?.status);
   const {
     data: organization,
     error: organizationError
-  } = await supabase.from("organizations").select("*").eq("id", rcaCase.organization_id).eq("owner_id", user.id).maybeSingle();
+  } = await supabase.from("organizations").select("*").eq("id", rcaCase.organization_id).eq("owner_id", ownerId).maybeSingle();
   if (organizationError) {
     throw new Error(organizationError.message);
   }
   if (!organization) throw new Error("Company not found.");
-  const [companyLinks, linkedFinding] = await Promise.all([loadRcaCompanyLinks(organization), rcaLinkedFinding(supabase, rcaCase, user.id)]);
+  const [companyLinks, linkedFinding] = await Promise.all([loadRcaCompanyLinks(organization), rcaLinkedFinding(supabase, rcaCase, ownerId)]);
   const linkedSupplierId = linkedFinding?.supplier_id || rcaCase.supplier_id || companyLinks.audits.find(row => row.id === linkedFinding?.audit_id)?.supplier_id;
   const disciplines = disciplinesResult.data ?? [];
   const team = teamResult.data ?? [];
@@ -140,7 +149,7 @@ export default async function RcaCasePage({
       "color": "#061a35",
       "padding": "42px 22px 80px"
     }}>
-      <fieldset disabled={caseClosed} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} data-closed-case={caseClosed ? "true" : "false"}>
+      <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} data-closed-case={caseClosed ? "true" : "false"}>
       <div style={{
         "maxWidth": "1500px",
         "margin": "0 auto"
@@ -469,7 +478,7 @@ export default async function RcaCasePage({
                   </div>
                 </div>
 
-                <RcaDisciplineForm actionName="saveDiscipline">
+                <RcaDisciplineForm actionName="saveDiscipline" discipline={selected} gateData={discipline.gate_data || {}} profile={rcaCase.workflow_profile || "general_8d"} people={companyLinks.people} detectedAt={rcaCase.detected_at || rcaCase.created_at}>
                   <input type="hidden" name="case_id" value={id} />
                   <input type="hidden" name="discipline" value={selected} />
                   {selected === 4 && activeAnalysisModel && <input type="hidden" name="model_id" value={activeAnalysisModel.id} />}
@@ -485,7 +494,7 @@ export default async function RcaCasePage({
                   "marginTop": "8px",
                   "resize": "vertical"
                 }} />
-                  <RcaGateReviewerField key={"" + (discipline.id || selected) + ":" + (discipline.reviewer_person_id || "") + ":" + discipline.status + ""} people={companyLinks.people} discipline={discipline} locked={finalOwnerResponseSubmitted} approvalLabel={"Approve D" + selected + ""} approvalStyle={approveButton} saveStyle={primaryButton} reviewStyle={secondaryButton} />
+                  <RcaGateReviewerField key={"" + (discipline.id || selected) + ":" + (discipline.reviewer_person_id || "") + ":" + discipline.status + ""} people={companyLinks.people.filter(p=>p.user_id===user.id || p.email?.toLowerCase()===user.email?.toLowerCase())} discipline={discipline} locked={finalOwnerResponseSubmitted} approvalLabel={"Approve D" + selected + ""} approvalStyle={approveButton} saveStyle={primaryButton} reviewStyle={secondaryButton} />
                 </RcaDisciplineForm>
               </section>}
 
@@ -599,7 +608,7 @@ export default async function RcaCasePage({
               </form>
             </section>
 
-            {selected >= 2 && selected !== 6 && <section style={cardStyle}>
+            {selected >= 0 && selected !== 6 && <section style={cardStyle}>
                 <div style={{
                 "display": "flex",
                 "justifyContent": "space-between",
@@ -725,6 +734,15 @@ export default async function RcaCasePage({
                   ...fieldStyle,
                   "marginTop": "12px"
                 }} />
+                  <label style={{display:"grid",gap:8,marginTop:14,fontWeight:800}}>Workflow profile
+                    <select name="workflow_profile" defaultValue={rcaCase.workflow_profile || "general_8d"} style={fieldStyle}>
+                      <option value="general_8d">General CAPA / 8D</option><option value="rm13000">Customer quality investigation</option>
+                    </select>
+                  </label>
+                  <label style={{display:"grid",gap:8,marginTop:14,fontWeight:800}}>Detected at (UTC)
+                    <input name="detected_at" type="datetime-local" defaultValue={(rcaCase.detected_at || rcaCase.created_at || "").slice(0,16)} style={fieldStyle}/>
+                  </label>
+                  <p style={{color:"#607089",lineHeight:1.5}}>Record customer-specific evidence, agreed milestones and any authorised changes to response dates.</p>
                   <RcaCaseControlFields options={companyLinks} rcaCase={rcaCase} supplierId={linkedSupplierId} />
                   <button style={{
                   ...primaryButton,
@@ -881,9 +899,35 @@ export default async function RcaCasePage({
         </div>
       </div>
       </fieldset>
+      {reviewerView && <p role="note" style={{padding:16,background:"#edf4ff",borderRadius:10}}>Company reviewer view. Investigation forms are read-only; authorised decisions are recorded below.</p>}
+      <section style={{...cardStyle,marginTop:20}}>
+        <h2>Controlled review and reopening</h2>
+        {linkedFinding || rcaCase.assessment_finding_id ? <p>This case has a controlled source finding. Use its existing Findings &amp; Actions / assessment review process for action verification, final closure and reopening. Investigation gates must be approved individually.</p> : <>
+          <p>Independent reviewers use their own account. Administrators may reopen a closed standalone case with a recorded reason. All operations are checked against company roles and current records.</p>
+          {canReview && !caseClosed && selected===6 && actions.filter(a=>Number(a.discipline)===5&&a.selection_status==='selected').map(action=><details key={action.id} style={{padding:12,borderBottom:"1px solid #dce6ef"}}>
+            <summary>{action.title} · {action.effectiveness_result || 'Awaiting verification'}</summary>
+            <RcaDisciplineForm actionName="manageStandaloneRca">
+              <input type="hidden" name="case_id" value={id}/><input type="hidden" name="operation" value="verify_action"/><input type="hidden" name="action_id" value={action.id}/><input type="hidden" name="expected_updated_at" value={rcaCase.updated_at || ''}/>
+              <label style={{display:'grid',gap:8}}>Effectiveness result<select name="verification_result" style={fieldStyle} required><option value="">Select decision</option><option value="effective_verified">Verified effective</option><option value="not_effective">Not effective - further action required</option></select></label>
+              <label style={{display:'grid',gap:8,marginTop:12}}>Verification method<textarea name="verification_method" rows={3} style={fieldStyle} required/></label>
+              <label style={{display:'grid',gap:8,marginTop:12}}>Evidence-based conclusion<textarea name="verification_conclusion" rows={3} style={fieldStyle} required/></label>
+              <label style={{display:'grid',gap:8,marginTop:12}}>Reason / evidence reference<textarea name="reason" rows={2} minLength={20} style={fieldStyle} required/></label>
+              <label style={{display:'block',marginTop:12}}><input type="checkbox" name="human_confirmation" required/> I reviewed the evidence and am independent of the action implementation.</label>
+              <button style={{...primaryButton,marginTop:12}}>Record independent verification</button>
+            </RcaDisciplineForm>
+          </details>)}
+          {((caseClosed && canReopen) || (!caseClosed && selected===8 && canReview)) && <RcaDisciplineForm actionName="manageStandaloneRca">
+            <input type="hidden" name="case_id" value={id}/><input type="hidden" name="operation" value={caseClosed?'reopen':'close_8d'}/><input type="hidden" name="expected_updated_at" value={rcaCase.updated_at || ''}/>
+            <label style={{display:'grid',gap:8}}>Reason and review conclusion<textarea name="reason" rows={3} minLength={20} style={fieldStyle} required/></label>
+            <label style={{display:'block',marginTop:12}}><input type="checkbox" name="human_confirmation" required/> I confirm this controlled {caseClosed?'reopening':'closure'} decision.</label>
+            <button style={{...primaryButton,marginTop:12}}>{caseClosed?'Reopen case - administrator':'Close case - independent approver'}</button>
+          </RcaDisciplineForm>}
+        </>}
+      </section>
+
     </main>;
   // A closed record has no editable device draft to save or restore.
-  return caseClosed ? content : <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'rca:' + id} label="RCA–8D" baseline={{
+  return readOnly ? content : <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'rca:' + id} label="RCA–8D" baseline={{
     "rcaCase": rcaCase,
     "disciplines": disciplines,
     "team": team,
@@ -910,6 +954,8 @@ async function submitOpenCaseAction(actionName, formData) {
     if (typeof error?.message === "string" && error.message.startsWith("This 8D case is closed and cannot be changed through the investigation form.") && /^[0-9a-f-]{36}$/i.test(caseId)) {
       redirect(`/portal/rca/${caseId}?error=case_closed`);
     }
+    const racedCaseId=String(formData.get("case_id")||"");
+    if(error?.message?.startsWith("This case is closed")&&/^[0-9a-f-]{36}$/i.test(racedCaseId))redirect(`/portal/rca/${racedCaseId}?error=case_closed`);
     throw error;
   }
 }
