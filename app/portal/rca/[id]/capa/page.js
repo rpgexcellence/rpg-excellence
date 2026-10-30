@@ -1,9 +1,9 @@
+import { rcaReviewAccess } from "../../../../../lib/rca-review-access";
+import RcaDisciplineForm from "../../../../../components/RcaDisciplineForm";
 // VERIFIED_CAPA_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../../../components/ControlledDeviceDrafts";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "../../../../../lib/supabase/server";
-import { saveCapaStage } from "./actions";
 const META = {
   "correction": {
     "title": "1. Correction and containment",
@@ -26,20 +26,6 @@ const META = {
     "prompt": "Record the sample, monitoring period, result and independent conclusion. An ineffective result reopens corrective action."
   }
 };
-async function submitOpenCapaStage(formData) {
-  "use server";
-  try {
-    return await saveCapaStage(formData);
-  } catch (error) {
-    if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
-    const caseId = String(formData.get("case_id") || "");
-    if (error?.message?.startsWith("This CAPA case is closed and cannot be changed through the stage form.") && /^[0-9a-f-]{36}$/i.test(caseId)) {
-      redirect(`/portal/rca/${caseId}/capa?error=case_closed`);
-    }
-    throw error;
-  }
-}
-
 const pretty = v => String(v || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
 export default async function CapaCasePage({
   params
@@ -47,24 +33,14 @@ export default async function CapaCasePage({
   const {
     id
   } = await params;
-  const supabase = await createClient();
-  const {
-    data: {
-      user
-    }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login");
-  const [{
-    data: rcaCase,
-    error
-  }, {
-    data: stages,
-    error: stageError
-  }] = await Promise.all([supabase.from("rca_cases").select("*").eq("id", id).eq("owner_id", user.id).maybeSingle(), supabase.from("rca_capa_stages").select("*").eq("case_id", id).eq("owner_id", user.id).order("stage_order")]);
-  if (error) throw new Error(error.message);
-  if (!rcaCase) notFound();
-  if (rcaCase.case_type !== "capa") redirect("/portal/rca/" + id);
-  if (stageError) throw new Error(stageError.message);
+  let scope;try{scope=await rcaReviewAccess(id,'view');}catch{redirect('/portal/my-access?error=access');}
+  const {admin:supabase,user,ownerId,rcaCase,access}=scope;
+  if(rcaCase.case_type!=='capa')redirect('/portal/rca/'+id);
+  const {data:stages,error:stageError}=await supabase.from('rca_capa_stages').select('*').eq('case_id',id).eq('owner_id',ownerId).order('stage_order');
+  if(stageError)throw new Error(stageError.message);
+  const reviewerView=ownerId!==user.id;
+  const canReview=['owner','admin','approve'].includes(access.level);
+  const canReopen=['owner','admin'].includes(access.level);
   const completed = (stages || []).filter(row => row.completed_at).length;
   const progress = Math.round(completed / 4 * 100);
   const caseClosed = rcaCase.status === "closed" || rcaCase.closed_at != null || rcaCase.capa_current_stage === "closed";
@@ -164,7 +140,7 @@ export default async function CapaCasePage({
                     Complete the preceding stage to unlock this controlled record.
                   </div>;
                 }
-                return <form action={submitOpenCapaStage} className="capaDetailForm">
+                return <RcaDisciplineForm actionName="saveCapaStage" className="capaDetailForm"><fieldset disabled={reviewerView && (row.stage!=="effectiveness_review" || !canReview)} style={{border:0,padding:0,margin:0,minWidth:0,display:"contents"}}>
                     <input type="hidden" name="case_id" value={id} />
                     <input type="hidden" name="stage" value={row.stage} />
                     <label className="capaDetailField capaDetailWide">
@@ -191,21 +167,36 @@ export default async function CapaCasePage({
                           </option>
                         </select>
                       </label>}
+                    {row.stage==='effectiveness_review'&&<>
+                      <label className="capaDetailField capaDetailWide">Verification method<textarea name="review_method" rows={3} defaultValue={row.review_data?.method||''}/></label>
+                      <label className="capaDetailField capaDetailWide">Completed monitoring period and sample<textarea name="monitoring_period" rows={3} defaultValue={row.review_data?.monitoring_period||''}/></label>
+                      <p className="capaDetailWide" style={{color:'#60758e',lineHeight:1.6}}>An independent company approver must sign in using their own account and open this case URL. They cannot have completed any preceding CAPA stage.</p>
+                    </>}
                     {!caseClosed && <div className="capaDetailActions capaDetailWide">
-                      <button className="capaDetailBtn capaDetailSecondary" name="intent" value="save">
+                      <button className="capaDetailBtn capaDetailSecondary" name="intent" value="save" formNoValidate>
                         Save draft
                       </button>
                       {!done && <button className="capaDetailBtn" name="intent" value="complete">
                           Complete stage →
                         </button>}
                     </div>}
-                  </form>;
+                  </fieldset></RcaDisciplineForm>;
               })()}
               </article>;
           })}
         </section>
       </div>
       </fieldset>
+      {caseClosed && canReopen && <section className="capaDetailCard" style={{marginTop:20}}>
+        <h2>Controlled reopening</h2><p>Linked findings must be reopened through their existing Findings &amp; Actions / assessment process. A company administrator may reopen a standalone CAPA below.</p>
+        <RcaDisciplineForm actionName="manageStandaloneRca">
+          <input type="hidden" name="case_id" value={id}/><input type="hidden" name="operation" value="reopen"/><input type="hidden" name="expected_updated_at" value={rcaCase.updated_at||''}/>
+          <label className="capaDetailField">Reason<textarea name="reason" rows={3} minLength={20} required/></label>
+          <label style={{display:'block',marginTop:12}}><input type="checkbox" name="human_confirmation" required/> I confirm this controlled reopening.</label>
+          <button className="capaDetailBtn" style={{marginTop:12}}>Reopen standalone CAPA - administrator</button>
+        </RcaDisciplineForm>
+      </section>}
+
     </main>;
-  return caseClosed ? content : <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'capa:' + id} label="CAPA" baseline={{rcaCase, stages}}>{content}</ControlledDeviceDrafts>;
+  return caseClosed || reviewerView ? content : <ControlledDeviceDrafts userId={user.id} organizationId={rcaCase.organization_id} recordKey={'capa:' + id} label="CAPA" baseline={{rcaCase, stages}}>{content}</ControlledDeviceDrafts>;
 }
