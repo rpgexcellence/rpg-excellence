@@ -1,3 +1,5 @@
+import { rcaReviewAccess } from "../../../../../lib/rca-review-access";
+import { workflowSummary } from "../../../../../lib/rca-workflow.mjs";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
@@ -27,20 +29,24 @@ const money = (value, currency = "GBP") =>
 
 export default async function RcaExecutiveSummary({ params }) {
   const { id } = await params;
-  const supabase = await createClient();
+  let supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/portal/login");
 
+  let ownerId=user.id;
+  const {data:ownedCase,error:ownedError}=await supabase.from("rca_cases").select("id").eq("id",id).eq("owner_id",user.id).maybeSingle();
+  if(ownedError)throw new Error("Case access could not be checked.");
+  if(!ownedCase){try{const scope=await rcaReviewAccess(id,'view');supabase=scope.admin;ownerId=scope.ownerId;}catch{redirect('/portal/my-access?error=access');}}
   const [caseResult, disciplinesResult, causesResult, actionsResult, costsResult] =
     await Promise.all([
-      supabase.from("rca_cases").select("*").eq("id", id).eq("owner_id", user.id).maybeSingle(),
-      supabase.from("rca_8d_disciplines").select("*").eq("case_id", id).eq("owner_id", user.id).order("discipline"),
-      supabase.from("rca_causes").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at"),
-      supabase.from("rca_actions").select("*").eq("case_id", id).eq("owner_id", user.id).order("created_at"),
-      supabase.from("rca_cost_entries").select("*").eq("case_id", id).eq("owner_id", user.id).order("discipline"),
+      supabase.from("rca_cases").select("*").eq("id", id).eq("owner_id", ownerId).maybeSingle(),
+      supabase.from("rca_8d_disciplines").select("*").eq("case_id", id).eq("owner_id", ownerId).order("discipline"),
+      supabase.from("rca_causes").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at"),
+      supabase.from("rca_actions").select("*").eq("case_id", id).eq("owner_id", ownerId).order("created_at"),
+      supabase.from("rca_cost_entries").select("*").eq("case_id", id).eq("owner_id", ownerId).order("discipline"),
     ]);
 
   if (caseResult.error) throw new Error(caseResult.error.message);
@@ -143,6 +149,18 @@ export default async function RcaExecutiveSummary({ params }) {
             </ul>
           </section>
         </div>
+
+        <section style={cardStyle}>
+          <div style={kickerStyle}>Workflow assurance</div>
+          <h2>{workflowSummary(rcaCase,disciplines).profile}</h2>
+          <p>Recorded approval evidence supports leadership review. Existing customer agreements govern changed deadlines.</p>
+          {workflowSummary(rcaCase,disciplines).gates.map(gate=><details open key={gate.discipline} style={{padding:"12px 0",borderBottom:"1px solid #dce6ef"}}>
+            <summary style={{fontWeight:800}}>D{gate.discipline} · {gate.status}{gate.overdue?' · OVERDUE':''}</summary>
+            <p>Reviewer: {gate.reviewer} · Approved: {gate.approvedAt || 'Not approved'}</p>
+            {gate.deadline&&<p>Milestone: {gate.deadline}</p>}
+            <dl>{gate.fields.map(field=><div key={field.label}><dt style={{fontWeight:800,marginTop:12}}>{field.label}</dt><dd style={{margin:"6px 0",whiteSpace:"pre-wrap"}}>{field.value}</dd></div>)}</dl>
+          </details>)}
+        </section>
 
         <section style={cardStyle}>
           <div style={kickerStyle}>Root-cause conclusion</div>
