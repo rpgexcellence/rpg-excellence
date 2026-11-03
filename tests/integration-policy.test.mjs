@@ -22,9 +22,13 @@ test('database permission constraint agrees with released and retained legacy re
 test('all authenticated exports are wrapped and every route has an OpenAPI path',()=>{
  const root=new URL('../app/api/v1/integration/',import.meta.url),spec=fs.readFileSync(new URL('../docs/api/rpg-integration-v1.openapi.yaml',import.meta.url),'utf8');
  const files=fs.readdirSync(root,{recursive:true}).filter(path=>path.endsWith('route.js'));
- assert.equal(files.length,12);
+ const requiredRoutes=['health/route.js','findings/route.js','audits/route.js','capa-8d/route.js','assets/route.js','suppliers/route.js','people/route.js','security-incidents/route.js','workplace-inspections/route.js','workplace-inspections/programmes/route.js','workplace-inspections/[id]/route.js','openapi/route.js','exports/[resource]/route.js'];
+ for(const required of requiredRoutes) assert.ok(files.includes(required),required+' present');
+ const documented=[...spec.matchAll(/^  (\/[^\n]+):\s*$/gm)].map(match=>match[1]);
+ const implemented=files.map(file=>'/'+file.replace(/\/route.js$/,'').replace(/\[([^\]]+)\]/g,'{$1}'));
+ assert.deepEqual(implemented.slice().sort(),documented.slice().sort(),'implemented routes and documented paths agree');
  for(const file of files){
-  const code=fs.readFileSync(new URL(file,root),'utf8');const url='/'+file.replace(/\/route.js$/,'').replace('[id]','{id}');
+  const code=fs.readFileSync(new URL(file,root),'utf8');const url='/'+file.replace(/\/route.js$/,'').replace(/\[([^\]]+)\]/g,'{$1}');
   assert.ok(spec.includes('  '+url+':'),url+' documented');
   if(url!=='/openapi') assert.ok(code.includes('withIntegrationRequest(async function GET('),url+' wrapped');
   assert.ok(!code.includes('.eq("owner_id", client.owner_id)'),url+' does not use owner-only data export');
