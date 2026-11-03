@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: RPG Excellence Enterprise Integration API
-  version: 1.1.0
+  version: 1.2.0
   description: 'Organisation-bound read API. Live exports require an active scoped credential and current organisation-owner
     Consultant entitlement (including protected RPG platform administrators). Test keys can call /health only;
     they cannot read customer data. No inbound write API, sandbox dataset or outbound webhook service is released.
@@ -10,7 +10,8 @@ info:
     identified-key request is logged when the audit database is available; rejected unidentified credentials
     and log-write failures are reported in hosting logs. Existing unassigned legacy findings are excluded until
     their tenant is explicitly confirmed. Offset pagination uses a unique ID tie-breaker; it is not an incremental
-    change feed and does not guarantee a snapshot during concurrent updates.'
+    change feed and does not guarantee a snapshot during concurrent updates. Use /exports/{resource} for
+    frozen snapshot pages and checkpoint-based changes, including deletions.'
   contact:
     name: RPG Excellence
     url: https://www.rpgexcellence.com
@@ -890,6 +891,118 @@ paths:
                 type: string
         '503':
           $ref: '#/components/responses/DependencyUnavailable'
+  /exports/{resource}:
+    get:
+      tags:
+      - Service
+      summary: Read a frozen snapshot or resume a checkpoint-based change export
+      operationId: getIntegrationExportPage
+      description: |
+        Live keys only. The existing entitlement, organisation binding, source-IP restriction,
+        request budgets and mandatory audit controls apply to every page.
+
+        Resource permissions: audits requires audits:read; findings requires findings:read;
+        capa-8d requires capa:read; assets requires assets:read; suppliers requires suppliers:read;
+        people requires people:read; security-incidents requires security_incidents:read;
+        workplace-inspections and inspection-programmes require workplace_inspections:read.
+        Findings contain Major and Minor NCs only. Security incidents contain summary fields
+        only, even when the credential also has security_incidents:detail. Historical changes
+        from before export capture was installed are not available.
+
+        Start without cursor to create a full snapshot. Apply every returned entry durably,
+        following next_cursor until complete is true. Only then save checkpoint. Pass that
+        checkpoint as cursor on the next poll to start a frozen change batch. An empty completed
+        batch still returns a new checkpoint, which must replace the previous checkpoint.
+        Reusing a cursor replays that page or batch; never reuse an old checkpoint for a new poll.
+        If the first response is lost before a cursor is received, start a new snapshot.
+
+        Use record_id as the receiver identity and compare change_id as a per-record version.
+        change_id is a decimal string: compare using an arbitrary-precision integer, not a
+        floating-point number. Apply upsert or delete only when its version is newer than the
+        receiver's retained version; retain deletion versions too. Replay is expected.
+        Sequence allocation is not commit order: never use a global maximum change_id or a
+        timestamp to decide which changes have been received. Long-running source transactions
+        can delay visibility; an empty batch is not proof that all in-flight writes have finished.
+
+        A complete initial or replacement snapshot must be reconciled with the destination,
+        including records absent from that snapshot. Do not clear the receiver on the first
+        page or treat a partial snapshot as complete. Page sessions last 48 hours and final
+        checkpoints last 30 days from issuance. On 410 full_resync_required, create and finish
+        a new snapshot before resuming delta polling. A replacement key in the same organisation
+        with the required scope can resume the cursor. Revoked keys cannot resume it.
+
+        Only cursor and page_size are accepted, each once. Page numbers, date filters and other
+        filters are rejected. Initial page_size defaults to 100; omit it when resuming, or use
+        the same value. cursor is opaque and must not be edited. request_id identifies this
+        HTTP attempt and may differ on retries; it is not a receiver deduplication identifier.
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [audits, findings, capa-8d, assets, suppliers, people, security-incidents, workplace-inspections, inspection-programmes]
+      - name: cursor
+        in: query
+        description: Opaque next_cursor or final checkpoint returned by this resource.
+        schema:
+          type: string
+          format: uuid
+      - name: page_size
+        in: query
+        description: Initial page size; omit when resuming to retain the original value.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      responses:
+        '200':
+          description: Frozen snapshot or change page. An empty data array is valid.
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Unknown export resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '410':
+          description: Cursor or checkpoint expired. Start and reconcile a new full snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Export capture is initialising, or a required dependency is unavailable.
+          headers:
+            Retry-After:
+              description: Returned for export_initialising; retry after this many seconds.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -1071,3 +1184,84 @@ components:
           format: date-time
         request_id:
           type: string
+
+    ExportEntry:
+      type: object
+      required: [change_id, record_id, operation, record]
+      additionalProperties: false
+      properties:
+        change_id:
+          type: string
+          pattern: '^[1-9][0-9]*$'
+          description: Per-record version. Not a transaction commit watermark.
+        record_id:
+          type: string
+          format: uuid
+        operation:
+          type: string
+          enum: [upsert, delete]
+        record:
+          type: [object, 'null']
+          description: Allow-listed resource fields for upsert; null for delete.
+      oneOf:
+      - properties:
+          operation:
+            const: upsert
+          record:
+            type: object
+      - properties:
+          operation:
+            const: delete
+          record:
+            type: 'null'
+    ExportPage:
+      type: object
+      required: [resource, mode, data, complete, next_cursor, checkpoint, cursor_expires_at, payload_version, request_id]
+      additionalProperties: false
+      properties:
+        resource:
+          type: string
+          enum: [audits, findings, capa-8d, assets, suppliers, people, security-incidents, workplace-inspections, inspection-programmes]
+        mode:
+          type: string
+          enum: [snapshot, changes]
+        data:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ExportEntry'
+        complete:
+          type: boolean
+        next_cursor:
+          type: [string, 'null']
+          format: uuid
+        checkpoint:
+          type: [string, 'null']
+          format: uuid
+        cursor_expires_at:
+          type: string
+          format: date-time
+          description: Expiry of the current page session, not the final checkpoint expiry.
+        payload_version:
+          type: integer
+          const: 1
+        request_id:
+          type: string
+          format: uuid
+      oneOf:
+      - properties:
+          complete:
+            const: true
+          next_cursor:
+            type: 'null'
+          checkpoint:
+            type: string
+            format: uuid
+      - properties:
+          complete:
+            const: false
+          next_cursor:
+            type: string
+            format: uuid
+          checkpoint:
+            type: 'null'
