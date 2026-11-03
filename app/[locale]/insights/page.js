@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "033",
+      title: "Quality culture: what happens when someone raises a concern?",
+      description: "Practical quality-culture controls, deliverables and leadership responses, informed by ISO 10010:2022 and ISO 9001:2026. Includes a downloadable poster.",
+      href: "quality-culture-speaking-up",
+    },
+    {
       number: "032",
       title: "ISO 9001:2026: From Quality Evidence to Management Decisions",
       description: "The seven-part Technical Insight series is now a reviewed 53-page PDF with seven chapter covers and 21 supporting posters. £9.99 one-off purchase.",
