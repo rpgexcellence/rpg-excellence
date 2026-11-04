@@ -57,7 +57,7 @@ async function context(caseId) {
   } = await supabase
     .from("internal_audits")
     .select(
-      "id, audit_reference, organization_id, supplier_id, audit_type, administration_location_id, administration_location_label, title, current_gate, status, scope_approved, plan_approved, planned_start_at, planned_end_at, auditee_contact_name, auditee_contact_email, scope_statement, sites, processes, exclusion_justification"
+      "id, audit_reference, organization_id, supplier_id, audit_type, administration_location_id, administration_location_label, title, updated_at, current_gate, status, scope_approved, plan_approved, planned_start_at, planned_end_at, auditee_contact_name, auditee_contact_email, scope_statement, sites, processes, exclusion_justification"
     )
     .eq("id", caseId)
     .eq("owner_id", user.id)
@@ -99,6 +99,19 @@ function returnTeamWarning(auditId, warning) {
   redirect(`/portal/internal-audits/${auditId}?gate=team&team_warning=${warning}`);
 }
 
+function scopeWarning(auditId, code) {
+  redirect(`/portal/internal-audits/${auditId}?gate=scope&scope_error=${code}`);
+}
+
+function plannedUtcDate(value) {
+  const raw = clean(value);
+  const match = raw?.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
+  if (!match) return null;
+  const canonical = `${match[1]}T${match[2]}:${match[3] || "00"}.${(match[4] || "").padEnd(3, "0")}Z`;
+  const parsed = new Date(canonical);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === canonical ? canonical : null;
+}
+
 export async function saveAuditScope(
   formData
 ) {
@@ -121,6 +134,20 @@ export async function saveAuditScope(
     user,
     audit,
   } = await context(auditId);
+
+  if (audit.current_gate !== "scope" || !["draft", "scope_review"].includes(audit.status) || audit.scope_approved || audit.plan_approved) {
+    scopeWarning(auditId, "locked");
+  }
+  if (formData.has("expected_updated_at") && clean(formData.get("expected_updated_at")) !== (audit.updated_at || null)) {
+    scopeWarning(auditId, "stale");
+  }
+  const hasDates = formData.has("planned_start_at") || formData.has("planned_end_at");
+  const plannedStart = hasDates ? plannedUtcDate(formData.get("planned_start_at")) : audit.planned_start_at;
+  const plannedEnd = hasDates ? plannedUtcDate(formData.get("planned_end_at")) : audit.planned_end_at;
+  if (hasDates && (!plannedStart || !plannedEnd || Date.parse(plannedEnd) <= Date.parse(plannedStart))) {
+    scopeWarning(auditId, "dates");
+  }
+  const datesChanged = hasDates && (Date.parse(plannedStart) !== Date.parse(audit.planned_start_at) || Date.parse(plannedEnd) !== Date.parse(audit.planned_end_at));
 
   const administrationLocationId = clean(formData.get("administration_location_id"));
   const { data: organization, error: organizationError } = await supabase.from("organizations")
@@ -167,9 +194,10 @@ export async function saveAuditScope(
   const approved =
     intent === "approve";
 
-  const { error } = await supabase
+  let scopeUpdate = supabase
     .from("internal_audits")
     .update({
+      ...(hasDates ? { planned_start_at: plannedStart, planned_end_at: plannedEnd } : {}),
       purpose,
       objectives,
 
@@ -275,15 +303,26 @@ export async function saveAuditScope(
         new Date().toISOString(),
     })
     .eq("id", auditId)
-    .eq("owner_id", user.id);
+    .eq("owner_id", user.id)
+    .eq("current_gate", "scope")
+    .eq("status", audit.status);
+  scopeUpdate = audit.updated_at ? scopeUpdate.eq("updated_at", audit.updated_at) : scopeUpdate.is("updated_at", null);
+  const { data: updated, error } = await scopeUpdate.select("id");
 
   if (error) {
-    throw new Error(
-      error.message
-    );
+    const message = String(error.message || "");
+    const dateError = message.includes("AUDIT_MANDATE_DATES_AGENDA") ? "agenda"
+      : message.includes("AUDIT_MANDATE_DATES_ORDER") ? "dates"
+      : message.includes("AUDIT_MANDATE_DATES_LOCKED") ? "locked"
+      : message.includes("AUDIT_MANDATE_DATES_ACCESS") ? "access" : null;
+    if (dateError) scopeWarning(auditId, dateError);
+    throw new Error(error.message);
   }
+  if (!updated?.length) scopeWarning(auditId, "stale");
 
-  await supabase
+  // Date changes are recorded atomically by the database trigger, including
+  // scope approval when both decisions are saved together. Avoid duplicate logs.
+  if (!datesChanged) await supabase
     .from("internal_audit_events")
     .insert({
       owner_id:
