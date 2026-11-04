@@ -186,7 +186,7 @@ export default async function About({ params }) {
             </span>
 
             <h2>
-              One assessment, one operational hub—or one connected assurance
+              One assessment, one operational hub or one connected assurance
               system.
             </h2>
           </div>
