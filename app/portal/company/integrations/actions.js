@@ -248,16 +248,16 @@ export async function completeIntegrationApiKeyRotation(_previousState, formData
     return { error: "The replacement must be a current, active live key in this organisation." };
   }
   if (original.revoked_at || !original.active) return { success: "The original key is already disabled. It has not been reactivated." };
-  const link = await admin.from("integration_events").select("id,created_at")
+  const link = await admin.from("integration_events").select("id,occurred_at")
     .eq("organization_id", organization.id).eq("api_client_id", replacementId)
     .eq("event_type", "key_rotation_started").eq("resource_type", "integration_api_client")
-    .eq("resource_id", sourceId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    .eq("resource_id", sourceId).order("occurred_at", { ascending: false }).limit(1).maybeSingle();
   if (link.error || !link.data) return { error: "These keys do not have a recorded rotation link. No key has been changed." };
   const proof = await admin.from("integration_events").select("id")
     .eq("organization_id", organization.id).eq("api_client_id", replacementId)
     .eq("event_type", "request_completed").eq("response_status", 200)
     .like("endpoint", "/api/v1/integration/%").neq("endpoint", "/api/v1/integration/health")
-    .gte("created_at", link.data.created_at).limit(1).maybeSingle();
+    .gte("occurred_at", link.data.occurred_at).limit(1).maybeSingle();
   if (proof.error || !proof.data) {
     return { error: "First make a successful data request with the replacement key. A health check alone does not complete this check. The original key remains active." };
   }
