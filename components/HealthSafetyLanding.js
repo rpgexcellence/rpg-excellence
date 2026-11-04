@@ -170,7 +170,7 @@ export default function HealthSafetyLanding({ locale = "en" }) {
         <p className={styles.lead}>Connect workplace risk assessment, control actions, approval, review and assessor competence in one H&S workspace.</p>
         <aside className={styles.executiveInsight} aria-labelledby="hs-executive-title">
           <p className={styles.insightLabel}>EXECUTIVE INSIGHT</p>
-          <h2 id="hs-executive-title">Know where people are exposed—and where action is needed.</h2>
+          <h2 id="hs-executive-title">Know where people are exposed and where action is needed.</h2>
           <p>Bring workplace hazards, control delivery and assessment currency into a connected view so leadership can challenge priorities, allocate resources and act on evidence.</p>
           <ul><li><strong>Protect people</strong><span>Keep attention on hazards, affected people and practical controls.</span></li><li><strong>Direct action</strong><span>Connect additional controls with accountable owners and deadlines.</span></li><li><strong>Build capability</strong><span>Use review evidence and training to strengthen assessment practice.</span></li></ul>
         </aside>
@@ -207,7 +207,7 @@ export default function HealthSafetyLanding({ locale = "en" }) {
       <div className={styles.reportingCopy}>
         <p className={styles.eyebrow}>ACCIDENT, INCIDENT &amp; NEAR MISS REPORTING</p>
         <h2 id="hs-reporting-title">The next safety concern shouldn’t wait for a laptop.</h2>
-        <p className={styles.reportingLead}>Put the right information—and a clear reporting route—in your people’s hands.</p>
+        <p className={styles.reportingLead}>Put the right information and a clear reporting route in your people’s hands.</p>
         <p>Turn your work-area poster into a practical connection between employees and your safety system. Scan the zone QR code, check available local controls and report an accident, incident, near miss or concern from a phone browser.</p>
         <ul className={styles.reportingValue}>
           <li><strong>Make it easier to speak up.</strong><span>No sign-in needed to submit a zone report. Contact details are optional.</span></li>
