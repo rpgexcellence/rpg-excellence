@@ -2,10 +2,15 @@
 const nextConfig = {
   experimental: { serverActions: { bodySizeLimit: "6mb" } },
   outputFileTracingIncludes: {
+    "/api/publications/quality-performance/download": [
+      "./private-assets/Decoding_Quality_Performance_RPG.pdf",
+    ],
     "/api/publications/iso-9001-2026-insights/download": [
       "./private-assets/RPG_ISO9001_2026_Collected_Technical_Insights.pdf",
     ],
-    "/api/v1/integration/openapi": ["./docs/api/rpg-integration-v1.openapi.yaml"],
+    "/api/v1/integration/openapi": [
+      "./docs/api/rpg-integration-v1.openapi.yaml",
+    ],
     "/api/publications/iso-17025-2017/download": [
       "./private-assets/Decoding_ISO_IEC_17025_2017_RPG_Excellence_Expanded_Manuscript.pdf",
     ],
