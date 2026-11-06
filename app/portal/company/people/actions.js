@@ -179,7 +179,9 @@ export async function createPersonInvitation(
         20
       );
 
-      const accessLevel = isSuperAdministrator
+      const accessLevel = moduleKey === "asset_management" && accountType !== "system"
+        ? "none"
+        : isSuperAdministrator
         ? "admin"
         : allowedLevels.has(submittedLevel)
           ? submittedLevel
@@ -677,7 +679,7 @@ export async function updatePersonAccess(formData) {
       organization_id: organization.id,
       person_id: person.id,
       module_key: moduleKey,
-      access_level: editingSelf && moduleKey === "people_access" ? "admin" : allowedLevels.has(submittedLevel) ? submittedLevel : "none",
+      access_level: moduleKey === "asset_management" && person.account_type !== "system" ? "none" : editingSelf && moduleKey === "people_access" ? "admin" : allowedLevels.has(submittedLevel) ? submittedLevel : "none",
       scope_type: "organisation",
       scope_values: [],
       granted_by: user.id,
