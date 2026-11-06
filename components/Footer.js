@@ -104,10 +104,8 @@ export default function Footer({ locale }) {
         <small>
           © {new Date().getFullYear()} RPG Excellence Ltd. All rights reserved.
         </small>
-        <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #d8e2eb", paddingTop: 20, color: "#526a80", fontSize: 12, lineHeight: 1.8, overflowWrap: "anywhere" }}>
-          <strong style={{ color: "#123451" }}>RPG EXCELLENCE LTD</strong>{" · "}Registered in England and Wales · Company number 17564662.
-          <br />
-          Registered office: 71-75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ.
+        <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #d8e2eb", paddingTop: 20, textAlign: "center", color: "#526a80", fontSize: 12, lineHeight: 1.8, overflowWrap: "anywhere" }}>
+          <strong style={{ color: "#123451" }}>RPG EXCELLENCE LTD</strong>{" · "}Registered in England and Wales · Company number 17564662 · Registered office: 71-75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ.
         </div>
       </div>
     </footer>
