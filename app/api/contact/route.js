@@ -5,7 +5,38 @@ const clean = (value, max = 500) => String(value || "").trim().slice(0, max);
 const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
 
-async function sendNotification({ reference, fullName, email, organisation, phone, jobTitle, country, topic, standards, otherStandard, preferredContact, timescale, message }) {
+
+function emailTable(rows) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:12px 0 22px">${rows.map(([label, value]) => `<tr><th scope="row" style="width:34%;padding:12px;text-align:left;vertical-align:top;background:#f0f5fb;border:1px solid #dce6ef;font-size:13px;line-height:1.6">${escapeHtml(label)}</th><td style="padding:12px;vertical-align:top;border:1px solid #dce6ef;font-size:14px;line-height:1.6;word-break:break-word">${escapeHtml(value)}</td></tr>`).join("")}</table>`;
+}
+
+function emailText(value) {
+  // Explicit line breaks remain readable in Outlook and other email clients.
+  return escapeHtml(value).replace(/\r\n?/g, "\n").replace(/\n/g, "<br />");
+}
+
+function partnerApplicationHtml(message) {
+  const text = message.replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
+  const prefixes = ["Partner route: ", "Business website: ", "Countries served: ", "Industry focus: "];
+  // Keep the complete original message as a readable fallback for older formats.
+  if (!prefixes.every((prefix, index) => lines[index]?.startsWith(prefix))) return null;
+  const experienceMarker = "\n\nRelevant experience and current services:\n";
+  const proposalMarker = "\n\nProposed collaboration:\n";
+  const notice = "Applicant requests a partnership discussion. No partner appointment or commercial terms are accepted by submitting this form.";
+  const start = text.indexOf(experienceMarker);
+  const end = text.indexOf(proposalMarker, start + experienceMarker.length);
+  if (start < 0 || end < 0) return null;
+  const experience = text.slice(start + experienceMarker.length, end);
+  const proposalWithNotice = text.slice(end + proposalMarker.length);
+  const proposal = proposalWithNotice.endsWith("\n\n" + notice)
+    ? proposalWithNotice.slice(0, -(notice.length + 2)) : proposalWithNotice;
+  const details = prefixes.map((prefix, index) => [prefix.slice(0, -2), lines[index].slice(prefix.length)]);
+  const section = (heading, value) => `<h2 style="margin:26px 0 10px;color:#102d4e;font-size:19px;line-height:1.4">${heading}</h2><div style="padding:18px;background:#f7faff;border:1px solid #dce6ef;border-left:4px solid #1459d9;border-radius:4px;font-size:14px;line-height:1.8;word-break:break-word">${emailText(value)}</div>`;
+  return `<h2 style="margin:26px 0 10px;color:#102d4e;font-size:19px">Partnership details</h2>${emailTable(details)}${section("Experience and current services", experience)}${section("Proposed collaboration", proposal)}<p style="margin:22px 0;color:#607089;font-size:12px;line-height:1.7">Application for discussion only. Partner appointment and commercial terms require separate agreement.</p>`;
+}
+
+async function sendNotification({ reference, fullName, email, organisation, phone, jobTitle, country, topic, standards, otherStandard, preferredContact, timescale, message, source }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
 
@@ -24,7 +55,12 @@ async function sendNotification({ reference, fullName, email, organisation, phon
     ["Required timescale", timescale],
   ].filter(([, value]) => value);
 
-  const htmlRows = rows.map(([label, value]) => `<tr><th style="padding:9px 12px;text-align:left;vertical-align:top;background:#f3f7fb;border:1px solid #dce6ef">${escapeHtml(label)}</th><td style="padding:9px 12px;border:1px solid #dce6ef">${escapeHtml(value)}</td></tr>`).join("");
+  const isPartner = source === "partner-application";
+  const heading = isPartner ? "New partner application" : "New RPG Excellence enquiry";
+  const htmlRows = emailTable(rows);
+  const partnerBody = isPartner ? partnerApplicationHtml(message) : null;
+  const messageBody = partnerBody || `<h2 style="margin-top:24px">${isPartner ? "Partner application details" : "Customer message"}</h2><div style="padding:16px;background:#f7faff;border-left:4px solid #1459d9;font-size:14px;line-height:1.8">${emailText(message)}</div>`;
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -33,8 +69,8 @@ async function sendNotification({ reference, fullName, email, organisation, phon
       to: ["info@rpgexcellence.com"],
       reply_to: email,
       subject: `[${reference}] ${topic} — ${organisation}`,
-      html: `<div style="font-family:Arial,sans-serif;color:#0b1830;max-width:720px"><h1 style="color:#1459d9">New RPG Excellence enquiry</h1><table style="width:100%;border-collapse:collapse">${htmlRows}</table><h2 style="margin-top:24px">Customer message</h2><div style="white-space:pre-wrap;padding:16px;background:#f7faff;border-left:4px solid #1459d9">${escapeHtml(message)}</div><p style="color:#607089">Reply to this email to respond directly to ${escapeHtml(fullName)}.</p></div>`,
-      text: `${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\nCustomer message:\n${message}`,
+      html: `<div style="font-family:Arial,sans-serif;color:#0b1830;max-width:720px;margin:0 auto"><h1 style="color:#1459d9;font-size:26px;line-height:1.25">${heading}</h1><h2 style="font-size:19px;color:#102d4e">${isPartner ? "Applicant and contact details" : "Enquiry details"}</h2>${htmlRows}${messageBody}<p style="margin-top:24px;color:#607089;font-size:13px;line-height:1.7">Reply to this email to respond directly to ${escapeHtml(fullName)}.</p></div>`,
+      text: `${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${isPartner ? "Partner application details" : "Customer message"}:\n${message}`,
     }),
   });
 
@@ -92,7 +128,7 @@ export async function POST(request) {
       return Response.json({ error: "Your enquiry could not be saved. Please email info@rpgexcellence.com." }, { status: 500 });
     }
     try {
-      await sendNotification({ reference, fullName, email, organisation, phone, jobTitle, country, topic, standards, otherStandard, preferredContact, timescale, message });
+      await sendNotification({ reference, fullName, email, organisation, phone, jobTitle, country, topic, standards, otherStandard, preferredContact, timescale, message, source: clean(body?.source, 80) });
     } catch (notificationError) {
       console.error("Contact notification email error:", notificationError);
       return Response.json({ success: true, reference, notificationSent: false });
