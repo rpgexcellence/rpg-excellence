@@ -323,6 +323,7 @@ export default function PeopleAccessForm({ people }) {
           {PLATFORM_MODULES.map(([key, label], index) => (
             <label key={key}>
               <span>{label}</span>
+              {key === "asset_management" && <small>Professional plan or above. Assigned only by the company Super Administrator; available to System Users.</small>}
 
               {superAdministrator && (
                 <input
