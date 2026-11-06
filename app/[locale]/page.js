@@ -1,3 +1,4 @@
+import HomePartnerProgramme from "../../components/HomePartnerProgramme";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../components/Header";
@@ -95,6 +96,7 @@ export default async function Home({ params }) {
     </section>
     <section className="startingPoints" id="solutions"><header><span>CHOOSE WHERE TO START</span><h2>What does your organisation need to achieve?</h2><p>Select an outcome and open the connected RPG Excellence workspace.</p></header><div>{startingPoints.map(([need,product,href])=><Link href={href} key={need}><span>{need}</span><strong>{product}</strong><b>→</b></Link>)}</div></section>
     <PlatformHubsFeature locale={locale} />
+    <HomePartnerProgramme locale={locale} />
     <HomeConversionSection locale={locale} />
     <section id="newsletter" style={{padding:"54px clamp(28px,6vw,90px)",background:"#0a2b52",color:"#fff",display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(320px,640px)",gap:"36px",alignItems:"center"}}>
       <div><span style={{color:"#5ee3d0",fontSize:"11px",fontWeight:950,letterSpacing:".14em"}}>RPG INSIGHTS</span><h2 style={{margin:"10px 0",fontSize:"32px"}}>Practical assurance guidance, directly to your inbox.</h2><p style={{margin:0,color:"#c9d9e8",lineHeight:1.6}}>Receive useful ISO updates, implementation guidance and new RPG Intelligence releases.</p></div>
