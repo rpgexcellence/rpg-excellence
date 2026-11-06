@@ -209,7 +209,7 @@ export default async function AssetWorkspace({
     peopleResult.data || [];
 
   const maintenance =
-    maintenanceResult.data || [];
+    (maintenanceResult.data || []).sort((a,b) => String(b.scheduled_date || "").localeCompare(String(a.scheduled_date || "")));
 
   const mocs =
     mocResult.data || [];
@@ -509,6 +509,10 @@ export default async function AssetWorkspace({
                       asset.id,
                     ) || [];
 
+                  const openPlanned = records.filter(record => record.status === "planned").sort((a,b) => String(a.scheduled_date || "9999").localeCompare(String(b.scheduled_date || "9999")));
+                  const maintenanceDates = [...openPlanned.map(record => record.scheduled_date), ...(asset.ppm_required ? [asset.next_maintenance_date] : [])].filter(Boolean).sort();
+                  const nextMaintenance = maintenanceDates[0] || null;
+
                   const linkedMocs =
                     mocByAsset.get(
                       asset.id,
@@ -619,21 +623,17 @@ export default async function AssetWorkspace({
 
                         <div>
                           <span>
-                            NEXT DUE
+                            NEXT MAINTENANCE
                           </span>
 
                           <strong
                             className={
-                              isOverdue
+                              nextMaintenance && nextMaintenance < today
                                 ? "danger"
                                 : ""
                             }
                           >
-                            {asset.ppm_required
-                              ? date(
-                                  asset.next_maintenance_date,
-                                )
-                              : "—"}
+                            {date(nextMaintenance)}
                           </strong>
                         </div>
                       </div>
@@ -646,8 +646,14 @@ export default async function AssetWorkspace({
                         </p>
                       )}
 
+                      {openPlanned.length > 0 && <section aria-label={`Planned maintenance for ${asset.asset_reference}`} style={{margin:"14px 0",padding:14,border:"1px solid #bcd8ec",borderLeft:"4px solid #1762ef",borderRadius:8,background:"#f0f7ff"}}>
+                        <strong style={{display:"block",fontSize:13,marginBottom:10}}>Planned maintenance · {openPlanned.length} open {openPlanned.length === 1 ? "record" : "records"}</strong>
+                        {openPlanned.slice(0,3).map(record => <div key={record.id} style={{padding:"9px 0",borderTop:"1px solid #d8e6f2"}}><div style={{display:"flex",gap:12,flexWrap:"wrap",justifyContent:"space-between",fontSize:12}}><strong>{record.maintenance_reference}</strong><strong style={{color:record.scheduled_date < today ? "#ba2937" : "#1658b1"}}>{date(record.scheduled_date)} · {record.scheduled_date < today ? "Overdue" : "Planned"}</strong></div><p style={{margin:"5px 0",fontSize:12}}>{title(record.maintenance_type)} · {personName(peopleById.get(record.responsible_person_id))}</p>{record.work_completed && <p style={{fontSize:12,margin:"5px 0"}}>{record.work_completed}</p>}<Link href={`/portal/asset-management/maintenance?q=${encodeURIComponent(asset.asset_reference)}&record=${encodeURIComponent(record.id)}#maintenance-${encodeURIComponent(record.id)}`} style={{fontSize:11,fontWeight:700}}>Open maintenance record →</Link></div>)}
+                        {openPlanned.length > 3 && <p style={{fontSize:11,margin:"7px 0 0"}}>Showing the next 3 planned records. All {openPlanned.length} are included in maintenance history below.</p>}
+                      </section>}
+
                       <div className="arHistory">
-                        <details className="arPpmDetails">
+                        <details className="arPpmDetails" open={mode === "maintenance" || records.some(record => record.id === query?.record)}>
                           <summary>
                             {
                               records.length
@@ -717,6 +723,8 @@ export default async function AssetWorkspace({
                                 {records.map(
                                   record => (
                                     <article
+                                      id={`maintenance-${record.id}`}
+                                      style={{scrollMarginTop:110}}
                                       key={
                                         record.id
                                       }
