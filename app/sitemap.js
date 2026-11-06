@@ -5,6 +5,8 @@ export default function sitemap() {
     "",
     "/about",
     "/contact",
+    "/partners",
+    "/partners/apply",
     "/pricing",
     "/publications",
     "/publications/iso-9001-2026-technical-insights",
