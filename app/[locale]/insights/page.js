@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "034",
+      title: "Can you prove quality is powering performance?",
+      description: "World Quality Week 2026: connect quality activity to customer outcomes, reliable measures and credible business value. Includes a downloadable poster and the £4.99 Decoding Quality Performance companion guide.",
+      href: "quality-powering-performance",
+    },
+    {
       number: "033",
       title: "Quality culture: what happens when someone raises a concern?",
       description: "Practical quality-culture controls, deliverables and leadership responses, informed by ISO 10010:2022 and ISO 9001:2026. Includes a downloadable poster.",
