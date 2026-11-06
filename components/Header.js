@@ -81,11 +81,15 @@ export default function Header({ locale, nav, variant = "default" }) {
           <Link href={"/" + locale + "/insights#newsletter"}>Newsletter</Link>
           <Link href={"/" + locale + "/pricing"}>{nav.pricing}</Link>
           <Link href={"/" + locale + "/about"}>{nav.about}</Link>
+          <Link href={"/" + locale + "/partners"}>Partners</Link>
           <Link href={"/" + locale + "/contact"}>{nav.contact}</Link>
         </nav>
 
+        <Link href={`/${locale}/partners`} className="headerPartnerShortcut">Partners</Link>
         <div className="headerAccount"><AccountMenu tone={variant === "home" ? "dark" : "light"}/></div>
         <style>{`
+          .headerPartnerShortcut{display:none;text-decoration:none;font-size:13px;font-weight:850;border:1px solid currentColor;border-radius:8px;padding:9px 13px;flex-shrink:0;color:inherit}
+          @media(min-width:1100px) and (max-width:1800px){.headerPartnerShortcut{display:inline-flex;margin-left:auto}.header .headerAccount{margin-left:0}}
           .headerAccount{flex:0 0 auto;margin-left:auto;margin-right:10px}
           .header .mobileNav{margin-left:0}
           @media(min-width:1801px){.headerAccount{margin-left:12px}.header .homeNav{gap:15px}}
@@ -119,7 +123,8 @@ export default function Header({ locale, nav, variant = "default" }) {
             <Link href={"/" + locale + "/insights#newsletter"}>Newsletter</Link>
             <Link href={"/" + locale + "/pricing"}>{nav.pricing}</Link>
             <Link href={"/" + locale + "/about"}>{nav.about}</Link>
-            <Link href={"/" + locale + "/contact"}>{nav.contact}</Link>
+            <Link href={"/" + locale + "/partners"}>Partners</Link>
+          <Link href={"/" + locale + "/contact"}>{nav.contact}</Link>
 
             <div className="mobileNavActions">
               <a className="mobileSignIn" href="/portal">
