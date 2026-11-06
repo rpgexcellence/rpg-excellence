@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAssetAccess } from "../../../../lib/asset-management";
+
 import {
   randomUUID,
 } from "node:crypto";
@@ -97,28 +99,7 @@ const EVIDENCE_TYPES =
   ]);
 
 async function assetContext() {
-  const access =
-    await requireOrganizationAccess(
-      "people_access",
-      "admin",
-      "/portal/company/assets",
-    );
-
-  const subscription =
-    await getUserSubscription(
-      access.user.id,
-    );
-
-  if (
-    !hasPlanAccess(
-      subscription,
-      "professional",
-    )
-  ) {
-    throw new Error(
-      "Asset Management requires the Professional plan.",
-    );
-  }
+  const access = await requireAssetAccess("contribute");
 
   return {
     ...access,
@@ -775,9 +756,8 @@ export async function saveCompanyAsset(
       }
     }
 
-    revalidatePath(
-      "/portal/company/assets",
-    );
+    revalidatePath("/portal/asset-management", "layout");
+    revalidatePath("/portal/company/assets");
 
     revalidatePath(
       "/portal/health-safety/permits/new",
@@ -1158,9 +1138,8 @@ export async function recordAssetMaintenance(
       }
     }
 
-    revalidatePath(
-      "/portal/company/assets",
-    );
+    revalidatePath("/portal/asset-management", "layout");
+    revalidatePath("/portal/company/assets");
 
     return {
       success: completed
@@ -1229,9 +1208,8 @@ export async function changeCompanyAssetStatus(
     );
   }
 
-  revalidatePath(
-    "/portal/company/assets",
-  );
+  revalidatePath("/portal/asset-management", "layout");
+  revalidatePath("/portal/company/assets");
 
   revalidatePath(
     "/portal/health-safety/permits/new",
