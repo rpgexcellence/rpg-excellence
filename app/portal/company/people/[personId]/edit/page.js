@@ -100,10 +100,11 @@ export default async function EditPersonAccessPage({ params, searchParams }) {
           </section>
 
           <section className="editSection">
-            <header><span>03</span><div><h2>Platform permissions</h2><p>Access is controlled independently for every module. Select “No access” to remove a module.</p></div></header>
+            <header><span>03</span><div><h2>Platform permissions</h2><p>Access is controlled independently for every module. Select “No access” to remove a module. Asset Management is available to System Users on Professional or above; only a company Super Administrator can allocate access.</p></div></header>
             <div className="permissionGrid">
               {PLATFORM_MODULES.map(([key, label]) => {
                 const protectedPermission = editingSelf && key === "people_access";
+                if (key === "asset_management" && person.account_type !== "system") return <label key={key}><span>{label}</span><input type="hidden" name="module_asset_management" value="none" /><select disabled defaultValue="none"><option value="none">System User account required</option></select></label>;
                 return <label key={key}><span>{label}{protectedPermission ? " · protected" : ""}</span>{protectedPermission && <input type="hidden" name={`module_${key}`} value="admin" />}<select name={protectedPermission ? undefined : `module_${key}`} defaultValue={protectedPermission ? "admin" : permissionByKey.get(key)?.access_level || "none"} disabled={protectedPermission}>{ACCESS_LEVELS.map(([value, text]) => <option value={value} key={value}>{text}</option>)}</select></label>;
               })}
             </div>
