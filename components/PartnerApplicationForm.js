@@ -1151,7 +1151,7 @@ export function buildPartnerEnquiry(form, locale) {
     fullName: form.fullName, email: form.email, organisation: form.organisation,
     jobTitle: form.jobTitle, phone: form.phone, country: form.country,
     topic: `Partner application — ${form.interest}`,
-    standards: [form.standard], preferredContact: "Email", timescale: "Exploratory / no date yet",
+    standards: form.standards, preferredContact: "Email", timescale: "Exploratory / no date yet",
     message: [
       `Partner route: ${form.interest}`,
       `Business website: ${form.businessWebsite || "Not provided"}`,
@@ -1166,7 +1166,7 @@ export function buildPartnerEnquiry(form, locale) {
 }
 
 export default function PartnerApplicationForm({ locale = "en", initialInterest = "" }) {
-  const [form, setForm] = useState({ fullName: "", email: "", organisation: "", jobTitle: "", phone: "", country: "", businessWebsite: "", countries: [], industries: [], otherIndustry: "", experience: "", proposal: "", interest: interests.includes(initialInterest) ? initialInterest : "", standard: "Other / not sure", consent: false, website: "" });
+  const [form, setForm] = useState({ fullName: "", email: "", organisation: "", jobTitle: "", phone: "", country: "", businessWebsite: "", countries: [], industries: [], otherIndustry: "", experience: "", proposal: "", interest: interests.includes(initialInterest) ? initialInterest : "", standards: [], consent: false, website: "" });
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   const [reference, setReference] = useState("");
@@ -1175,7 +1175,7 @@ export default function PartnerApplicationForm({ locale = "en", initialInterest 
   async function submit(event) {
     event.preventDefault();
     if (busy.current) return;
-    if (!interests.includes(form.interest) || !standards.includes(form.standard) || !form.consent || form.experience.trim().length < 20 || form.proposal.trim().length < 20) { setError("Complete the required fields and consent before sending your application."); return; }
+    if (!interests.includes(form.interest) || (form.standards.length === 0 || !form.standards.every(value => standards.includes(value))) || !form.consent || form.experience.trim().length < 20 || form.proposal.trim().length < 20) { setError("Complete the required fields and consent before sending your application."); return; }
     if (form.countries.length === 0) { setError("Select at least one country you serve, or choose Worldwide."); return; }
     if (form.industries.includes("Other") && !form.otherIndustry.trim()) { setError("Enter your industry when selecting Other."); return; }
     const payload = buildPartnerEnquiry(form, locale);
@@ -1201,7 +1201,13 @@ export default function PartnerApplicationForm({ locale = "en", initialInterest 
       <label>Telephone<input name="phone" type="tel" value={form.phone} onChange={update} maxLength={80} autoComplete="tel" /></label>
       <label className={styles.wide}>Business website<input name="businessWebsite" type="url" placeholder="https://" value={form.businessWebsite} onChange={update} maxLength={300} /></label>
       <label>Partnership interest *<select name="interest" value={form.interest} onChange={update} required><option value="">Select a route</option>{interests.map(value => <option key={value}>{value}</option>)}</select></label>
-      <label>Main standard or management system<select name="standard" value={form.standard} onChange={update}>{standards.map(value => <option key={value}>{value}</option>)}</select></label>
+      <fieldset className={styles.wide} style={{ margin: 0, padding: "16px", border: "1px solid #b9cde0", borderRadius: 8 }}>
+        <legend style={{ padding: "0 6px", color: "#123451", fontSize: 13, fontWeight: 800 }}>Main standards or management systems *</legend>
+        <p className={styles.note} style={{ margin: "0 0 10px" }}>Select all that apply. Choose Other / not sure if you would like help defining the scope.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 210px), 1fr))", gap: "4px 16px" }}>
+          {standards.map(value => <label key={value} className={styles.multiOption}><input type="checkbox" name="standards" value={value} checked={form.standards.includes(value)} onChange={() => setForm(current => ({ ...current, standards: current.standards.includes(value) ? current.standards.filter(item => item !== value) : [...current.standards, value] }))} /><span>{value}</span></label>)}
+        </div>
+      </fieldset>
       <MultiSelect label="Countries you serve" placeholder="Select countries" options={countryOptions} selected={form.countries} onChange={countries => setForm(current => ({ ...current, countries }))} required />
       <MultiSelect label="Industry focus" placeholder="Select industries" options={industryOptions} selected={form.industries} onChange={industries => setForm(current => ({ ...current, industries }))} />
       {form.industries.includes("Other") && <label className={styles.wide}>Other industry *<input name="otherIndustry" value={form.otherIndustry} onChange={update} maxLength={200} required /></label>}
