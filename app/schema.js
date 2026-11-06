@@ -3,12 +3,17 @@ export const organizationSchema = {
   "@type": "ProfessionalService",
   "@id": "https://www.rpgexcellence.com/#organization",
   name: "RPG Excellence",
+  legalName: "RPG EXCELLENCE LTD",
+  identifier: { "@type": "PropertyValue", propertyID: "Companies House company number", value: "17564662" },
   url: "https://www.rpgexcellence.com",
   description:
     "AI-powered ISO consultancy and business assurance services for organisations worldwide.",
   email: "info@rpgexcellence.com",
   address: {
     "@type": "PostalAddress",
+    streetAddress: "71-75 Shelton Street, Covent Garden",
+    addressLocality: "London",
+    postalCode: "WC2H 9JQ",
     addressCountry: "GB"
   },
   areaServed: "Worldwide",
