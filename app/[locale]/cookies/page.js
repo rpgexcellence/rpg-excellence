@@ -23,7 +23,7 @@ export default async function Cookies({ params }) {
           <h1>Cookie Policy</h1>
 
           <p>
-            <strong>Last updated:</strong> 20 August 2026
+            <strong>Last updated:</strong> 6 November 2026
           </p>
 
           <p>
@@ -61,6 +61,13 @@ export default async function Cookies({ params }) {
           <h2>2. Who uses these technologies?</h2>
 
           <p>
+            RPG Excellence and RPG Intelligence are operated by <strong>RPG EXCELLENCE LTD</strong>,
+            registered in England and Wales under company number <strong>17564662</strong>.
+            Registered office: 71-75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ.
+          </p>
+
+
+          <p>
             RPG Excellence operates the RPG Excellence website and the RPG
             Intelligence platform.
           </p>
@@ -76,7 +83,7 @@ export default async function Cookies({ params }) {
           </p>
 
           <p>
-            <strong>RPG Excellence</strong>
+            <strong>RPG EXCELLENCE LTD</strong>
             <br />
             Privacy contact:{" "}
             <a href="mailto:info@rpgexcellence.com">
@@ -419,7 +426,7 @@ export default async function Cookies({ params }) {
           </p>
 
           <p>
-            <strong>RPG Excellence</strong>
+            <strong>RPG EXCELLENCE LTD</strong>
             <br />
             Privacy contact:{" "}
             <a href="mailto:info@rpgexcellence.com">
