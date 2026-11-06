@@ -104,6 +104,11 @@ export default function Footer({ locale }) {
         <small>
           © {new Date().getFullYear()} RPG Excellence Ltd. All rights reserved.
         </small>
+        <nav aria-label="Partner Programme" style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "center", alignItems: "center", flexWrap: "wrap", gap: "12px 24px", fontSize: 13 }}>
+          <strong style={{ color: "#123451" }}>Partners</strong>
+          <Link href={`/${locale}/partners`}>Why partner with RPG Excellence?</Link>
+          <Link href={`/${locale}/partners/apply`}>Become a partner</Link>
+        </nav>
         <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #d8e2eb", paddingTop: 20, textAlign: "center", color: "#526a80", fontSize: 12, lineHeight: 1.8, overflowWrap: "anywhere" }}>
           <strong style={{ color: "#123451" }}>RPG EXCELLENCE LTD</strong>{" · "}Registered in England and Wales · Company number 17564662 · Registered office: 71-75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ.
         </div>
