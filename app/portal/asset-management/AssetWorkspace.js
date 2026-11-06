@@ -1,3 +1,4 @@
+import { filterCompanyAssets, assetFilters } from "../../../lib/asset-dashboard";
 import { requireAssetAccess, loadAssetRows } from "../../../lib/asset-management";
 import Link from "next/link";
 
@@ -200,9 +201,9 @@ export default async function AssetWorkspace({
   }
 
   const allAssets = assetResult.data || [];
-  const search = String(query?.q || "").trim().toLowerCase();
-  const status = String(query?.status || "");
-  const assets = allAssets.filter(asset => (!search || [asset.asset_reference, asset.asset_name, asset.site_location_label, asset.serial_number].some(value => String(value || "").toLowerCase().includes(search))) && (!status || asset.operational_status === status));
+  const filters = assetFilters(query);
+  const assets = filterCompanyAssets(allAssets, query);
+
 
   const people =
     peopleResult.data || [];
@@ -482,7 +483,8 @@ export default async function AssetWorkspace({
           }</div>}
 
           {mode !== "new" && <section className="arPanel">
-            <form method="get" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}><label>Search assets<input name="q" defaultValue={query?.q || ""} placeholder="Reference, name, serial or site" /></label><label>Status<select name="status" defaultValue={query?.status || ""}><option value="">All statuses</option><option value="active">Active</option><option value="out_of_service">Out of service</option><option value="retired">Retired</option></select></label><button type="submit">Apply filters</button><Link href={mode === "maintenance" ? "/portal/asset-management/maintenance" : "/portal/asset-management/register"}>Clear</Link></form>
+            <form method="get" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}><input type="hidden" name="site" value={filters.site} /><input type="hidden" name="type" value={filters.type} /><input type="hidden" name="owner" value={filters.owner} /><input type="hidden" name="days" value={filters.days} /><input type="hidden" name="focus" value={String(query?.focus || "")} /><label>Search assets<input name="q" defaultValue={query?.q || ""} placeholder="Reference, name, serial or site" /></label><label>Status<select name="status" defaultValue={query?.status || ""}><option value="">All statuses</option><option value="active">Active</option><option value="out_of_service">Out of service</option><option value="retired">Retired</option></select></label><button type="submit">Apply filters</button><Link href={mode === "maintenance" ? "/portal/asset-management/maintenance" : "/portal/asset-management/register"}>Clear</Link></form>
+            {(filters.site || filters.type || filters.owner || query?.focus) && <p style={{padding:12,background:"#edf6ff",borderRadius:8}}>Dashboard selection applied{query?.focus ? ` · ${String(query.focus).replaceAll("_", " ")}` : ""}. Use Clear to show all company assets.</p>}
             <h2>{mode === "maintenance" ? "Asset maintenance history & evidence" : "Current assets"}</h2>
 
             <p>
