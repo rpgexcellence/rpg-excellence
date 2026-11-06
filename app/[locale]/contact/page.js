@@ -33,7 +33,6 @@ export default async function Contact({ params, searchParams }) {
               <div><dt>Registered office</dt><dd><address>71-75 Shelton Street<br />Covent Garden<br />London<br />United Kingdom<br />WC2H 9JQ</address></dd></div>
               <div><dt>Email</dt><dd><a href="mailto:info@rpgexcellence.com">info@rpgexcellence.com</a></dd></div>
             </dl>
-            <a className="companyRegisterLink" href="https://find-and-update.company-information.service.gov.uk/company/17564662" target="_blank" rel="noopener noreferrer">View Companies House record <span aria-hidden="true">↗</span><span className="companyContactSrOnly"> (opens in a new tab)</span></a>
           </aside>
         </div>
         <style>{`
@@ -50,9 +49,7 @@ export default async function Contact({ params, searchParams }) {
           .companyContactCard dd { margin: 0; color: #123451; font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
           .companyContactCard address { font-style: normal; }
           .companyContactCard a { color: #1459d9; text-underline-offset: 4px; }
-          .companyRegisterLink { display: inline-block; font-size: 13px; line-height: 1.6; font-weight: 700; }
           .companyContactCard a:focus-visible { outline: 3px solid #1459d9; outline-offset: 4px; }
-          .companyContactSrOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
           @media (max-width: 1000px) { .companyContactPage .companyContactLayout { grid-template-columns: minmax(0, 1fr); } .companyContactCard { width: 100%; box-sizing: border-box; } }
           @media (max-width: 480px) { .companyContactPage { padding: 48px 5vw; } .companyContactCard { padding: 22px; } }
         `}</style>
