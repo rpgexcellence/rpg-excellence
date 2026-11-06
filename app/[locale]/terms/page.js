@@ -24,7 +24,7 @@ export default async function Terms({ params }) {
           <h1>Terms &amp; Conditions</h1>
 
           <p>
-            <strong>Last updated:</strong> 17 October 2026
+            <strong>Last updated:</strong> 6 November 2026
           </p>
 
           <p>
@@ -49,6 +49,13 @@ export default async function Terms({ params }) {
           <h2>1. About RPG Excellence</h2>
 
           <p>
+            RPG Excellence and RPG Intelligence are operated by <strong>RPG EXCELLENCE LTD</strong>,
+            registered in England and Wales under company number <strong>17564662</strong>.
+            Registered office: 71-75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ.
+          </p>
+
+
+          <p>
             RPG Excellence provides business-assurance, management-system,
             risk, compliance, assessment and decision-support services and
             technology.
@@ -66,7 +73,7 @@ export default async function Terms({ params }) {
           </p>
 
           <p>
-            <strong>RPG Excellence</strong>
+            <strong>RPG EXCELLENCE LTD</strong>
             <br />
             Email:{" "}
             <a href="mailto:info@rpgexcellence.com">
@@ -736,7 +743,7 @@ export default async function Terms({ params }) {
           </p>
 
           <p>
-            <strong>RPG Excellence</strong>
+            <strong>RPG EXCELLENCE LTD</strong>
             <br />
             Email:{" "}
             <a href="mailto:info@rpgexcellence.com">
