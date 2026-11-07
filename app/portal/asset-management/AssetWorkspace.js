@@ -1,3 +1,4 @@
+import {assetCategories,categoryLabel} from "../../../lib/asset-catalog";
 import { filterCompanyAssets, assetFilters } from "../../../lib/asset-dashboard";
 import { requireAssetAccess, loadAssetRows } from "../../../lib/asset-management";
 import Link from "next/link";
@@ -441,7 +442,7 @@ export default async function AssetWorkspace({
 
         <div className="arLayout" style={{ gridTemplateColumns: "minmax(0,1fr)" }}>
           {canWrite && (mode === "new" || mode === "maintenance" || editAsset) && <div className="arForms">
-            {(mode === "new" || editAsset) && <CompanyAssetRegister
+            {(mode === "new" || editAsset) && <CompanyAssetRegister key={editAsset?.id||"new"}
               locations={
                 locations
               }
@@ -560,9 +561,7 @@ export default async function AssetWorkspace({
                           </h3>
 
                           <p>
-                            {title(
-                              asset.asset_type,
-                            )}{" "}
+                            {assetCategories(asset).map(categoryLabel).join(" · ")}{" "}
                             ·{" "}
                             {asset.site_location_label ||
                               "No site"}
@@ -582,6 +581,7 @@ export default async function AssetWorkspace({
                         </span>
                       </div>
 
+                      {asset.calibration_required&&<div style={{padding:"12px 14px",margin:"12px 0",border:"1px solid #b9dcd7",background:"#effaf7",borderRadius:8,fontSize:12,lineHeight:1.7}}><strong>Calibration required</strong> · Last: {date(asset.last_calibration_date)} · Next: {date(asset.next_calibration_date)} · Result: {title(asset.calibration_result||"not_assessed")}<br/>Provider: {asset.calibration_provider||"Not recorded"} · Certificate: {asset.calibration_certificate_reference||"Not recorded"}<br/>Interval basis: {asset.calibration_interval_basis||"Review required"}</div>}
                       <div className="arFacts">
                         <div>
                           <span>
@@ -755,6 +755,7 @@ export default async function AssetWorkspace({
                                       </p>
 
                                       <div className="arRecordLinks">
+                                        {record.maintenance_type === "calibration" && <p>Calibration result: {title(record.calibration_result||"not_assessed")} · Next calibration due: {date(record.next_due_date)}</p>}
                                         {record.evidence_reference && (
                                           <span>
                                             Reference:{" "}
