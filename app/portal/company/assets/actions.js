@@ -1,5 +1,7 @@
 "use server";
 
+import { saveControlledAsset } from "../../../../lib/asset-save";
+import { addAssetInterval, validDay } from "../../../../lib/asset-catalog";
 import { requireAssetAccess } from "../../../../lib/asset-management";
 
 import {
@@ -248,538 +250,8 @@ const safeFileName = value =>
     "-",
   );
 
-export async function saveCompanyAsset(
-  _previousState,
-  formData,
-) {
-  try {
-    const {
-      organization,
-      admin,
-    } = await assetContext();
-
-    const text = (
-      name,
-      max,
-    ) =>
-      clean(
-        formData.get(name),
-        max,
-      );
-
-    const id =
-      text("id", 80);
-
-    const assetReference =
-      text(
-        "asset_reference",
-        100,
-      );
-
-    const assetName =
-      text("asset_name", 180);
-
-    const assetType =
-      text("asset_type", 40);
-
-    const locationId =
-      text(
-        "site_location_id",
-        180,
-      );
-
-    const ownerPersonId =
-      text(
-        "asset_owner_person_id",
-        80,
-      );
-
-    const operationalStatus =
-      text(
-        "operational_status",
-        30,
-      ) || "active";
-
-    const criticality =
-      text(
-        "criticality",
-        20,
-      ) || "medium";
-
-    const ppmRequired =
-      text(
-        "ppm_required",
-        10,
-      ) === "true";
-
-    const maintenanceOwnerType =
-      text(
-        "maintenance_owner_type",
-        20,
-      ) || "internal";
-
-    const maintenanceOwnerPersonId =
-      text(
-        "maintenance_owner_person_id",
-        80,
-      );
-
-    const maintenanceSupplierId =
-      text(
-        "maintenance_supplier_id",
-        80,
-      ) || null;
-
-    const frequencyValue =
-      Number(
-        text(
-          "ppm_frequency_value",
-          10,
-        ),
-      );
-
-    const frequencyUnit =
-      text(
-        "ppm_frequency_unit",
-        20,
-      );
-
-    const lastMaintenanceDate =
-      text(
-        "last_maintenance_date",
-        10,
-      ) || null;
-
-    const submittedNextDate =
-      text(
-        "next_maintenance_date",
-        10,
-      ) || null;
-
-    if (!assetName) {
-      return {
-        error:
-          "Enter the asset name.",
-      };
-    }
-
-    if (
-      id &&
-      !assetReference
-    ) {
-      return {
-        error:
-          "The controlled asset reference cannot be removed.",
-      };
-    }
-
-    if (
-      !ASSET_TYPES.has(
-        assetType,
-      )
-    ) {
-      return {
-        error:
-          "Select a valid asset type.",
-      };
-    }
-
-    if (
-      !STATUSES.has(
-        operationalStatus,
-      )
-    ) {
-      return {
-        error:
-          "Select a valid operational status.",
-      };
-    }
-
-    if (
-      !CRITICALITIES.has(
-        criticality,
-      )
-    ) {
-      return {
-        error:
-          "Select a valid asset criticality.",
-      };
-    }
-
-    const locations =
-      await loadAdministrationLocations(
-        organization,
-      );
-
-    const location =
-      locations.find(
-        item =>
-          item.id ===
-          locationId,
-      );
-
-    if (!location) {
-      return {
-        error:
-          "Select a current location from Administration → Site Profile.",
-      };
-    }
-
-    await resolveOwner(
-      admin,
-      organization.id,
-      ownerPersonId,
-    );
-
-    if (
-      !OWNER_TYPES.has(
-        maintenanceOwnerType,
-      )
-    ) {
-      return {
-        error:
-          "Select internal or supplier maintenance delivery.",
-      };
-    }
-
-    await resolveOwner(
-      admin,
-      organization.id,
-      maintenanceOwnerPersonId,
-    );
-
-    if (
-      maintenanceOwnerType ===
-      "supplier"
-    ) {
-      await resolveSupplier(
-        admin,
-        organization.id,
-        maintenanceSupplierId,
-      );
-    }
-
-    let nextMaintenanceDate =
-      null;
-
-    if (ppmRequired) {
-      if (
-        !Number.isInteger(
-          frequencyValue,
-        ) ||
-        frequencyValue < 1 ||
-        !FREQUENCY_UNITS.has(
-          frequencyUnit,
-        )
-      ) {
-        return {
-          error:
-            "Set the PPM frequency using a positive number and days, weeks, months or years.",
-        };
-      }
-
-      const base =
-        lastMaintenanceDate ||
-        new Date()
-          .toISOString()
-          .slice(0, 10);
-
-      nextMaintenanceDate =
-        submittedNextDate ||
-        addFrequency(
-          base,
-          frequencyValue,
-          frequencyUnit,
-        );
-    }
-
-    const values = {
-      organization_id:
-        organization.id,
-
-      owner_id:
-        organization.owner_id,
-
-      asset_reference:
-        assetReference || null,
-
-      asset_name:
-        assetName,
-
-      asset_type:
-        assetType,
-
-      site_location_id:
-        location.id,
-
-      site_location_label:
-        location.label,
-
-      area_department:
-        text(
-          "area_department",
-          180,
-        ) || null,
-
-      description:
-        text(
-          "description",
-          2000,
-        ) || null,
-
-      manufacturer:
-        text(
-          "manufacturer",
-          180,
-        ) || null,
-
-      model:
-        text(
-          "model",
-          180,
-        ) || null,
-
-      serial_number:
-        text(
-          "serial_number",
-          180,
-        ) || null,
-
-      asset_owner_person_id:
-        ownerPersonId,
-
-      criticality,
-      operational_status:
-        operationalStatus,
-
-      ppm_required:
-        ppmRequired,
-
-      ppm_frequency_value:
-        ppmRequired
-          ? frequencyValue
-          : null,
-
-      ppm_frequency_unit:
-        ppmRequired
-          ? frequencyUnit
-          : null,
-
-      last_maintenance_date:
-        lastMaintenanceDate,
-
-      next_maintenance_date:
-        nextMaintenanceDate,
-
-      maintenance_owner_type:
-        maintenanceOwnerType,
-
-      maintenance_owner_person_id:
-        maintenanceOwnerPersonId,
-
-      maintenance_supplier_id:
-        maintenanceOwnerType ===
-        "supplier"
-          ? maintenanceSupplierId
-          : null,
-
-      maintenance_provider:
-        null,
-
-      maintenance_notes:
-        text(
-          "maintenance_notes",
-          2000,
-        ) || null,
-
-      change_control_required:
-        text(
-          "change_control_required",
-          10,
-        ) !== "false",
-
-      updated_at:
-        new Date().toISOString(),
-    };
-
-    const query = id
-      ? admin
-          .from(
-            "organization_assets",
-          )
-          .update(values)
-          .eq("id", id)
-          .eq(
-            "organization_id",
-            organization.id,
-          )
-          .select("id")
-          .single()
-      : admin
-          .from(
-            "organization_assets",
-          )
-          .insert({
-            ...values,
-            created_at:
-              new Date()
-                .toISOString(),
-          })
-          .select("id")
-          .single();
-
-    const {
-      data: saved,
-      error,
-    } = await query;
-
-    if (
-      error?.code === "23505"
-    ) {
-      return {
-        error:
-          "That asset reference already exists in this company.",
-      };
-    }
-
-    if (error) {
-      return {
-        error: error.message,
-      };
-    }
-
-    const assetId = saved.id;
-
-    const requestedDocumentIds = [
-      ...new Set(
-        formData
-          .getAll(
-            "controlled_document_ids",
-          )
-          .map(value =>
-            clean(value, 80),
-          )
-          .filter(Boolean),
-      ),
-    ];
-
-    const {
-      error: deleteLinksError,
-    } = await admin
-      .from(
-        "organization_asset_document_links",
-      )
-      .delete()
-      .eq(
-        "organization_id",
-        organization.id,
-      )
-      .eq(
-        "asset_id",
-        assetId,
-      );
-
-    if (deleteLinksError) {
-      throw new Error(
-        deleteLinksError.message,
-      );
-    }
-
-    if (
-      requestedDocumentIds.length
-    ) {
-      const {
-        data: validDocuments,
-        error: documentError,
-      } = await admin
-        .from(
-          "controlled_documents",
-        )
-        .select("id")
-        .in(
-          "id",
-          requestedDocumentIds,
-        )
-        .eq(
-          "status",
-          "Current",
-        );
-
-      if (documentError) {
-        throw new Error(
-          documentError.message,
-        );
-      }
-
-      if (
-        (
-          validDocuments || []
-        ).length !==
-        requestedDocumentIds.length
-      ) {
-        throw new Error(
-          "One or more linked documents are no longer current. Review the Documented Information selection.",
-        );
-      }
-
-      const {
-        error: linkError,
-      } = await admin
-        .from(
-          "organization_asset_document_links",
-        )
-        .insert(
-          validDocuments.map(
-            document => ({
-              organization_id:
-                organization.id,
-
-              owner_id:
-                organization.owner_id,
-
-              asset_id:
-                assetId,
-
-              controlled_document_id:
-                document.id,
-
-              created_by:
-                organization.owner_id,
-            }),
-          ),
-        );
-
-      if (linkError) {
-        throw new Error(
-          linkError.message,
-        );
-      }
-    }
-
-    revalidatePath("/portal/asset-management", "layout");
-    revalidatePath("/portal/company/assets");
-
-    revalidatePath(
-      "/portal/health-safety/permits/new",
-    );
-
-    revalidatePath(
-      "/portal/health-safety/moc/new",
-    );
-
-    return {
-      success: id
-        ? "Asset details, ownership and PPM controls updated."
-        : "Asset added with a unique controlled reference.",
-      error: "",
-    };
-  } catch (error) {
-    return {
-      error:
-        error?.message ||
-        "The asset could not be saved.",
-    };
-  }
+export async function saveCompanyAsset(_previousState, formData) {
+  return saveControlledAsset(formData);
 }
 
 export async function recordAssetMaintenance(
@@ -912,6 +384,16 @@ export async function recordAssetMaintenance(
 
     const completed =
       Boolean(completedDate);
+    const calibrationResult = text("calibration_result", 30) || "not_assessed";
+    const explicitCalDue = text("calibration_next_due_date", 10);
+    const calibrationCriteria = text("calibration_acceptance_criteria",2000) || asset.calibration_acceptance_criteria || null;
+    if (maintenanceType === "calibration" && completedDate && calibrationResult !== "not_assessed" && !calibrationCriteria) throw new Error("Record the acceptance criteria / decision rule reference before assigning a calibration result.");
+    if (maintenanceType === "calibration" && !["not_assessed","within_limits","out_of_tolerance","conditional"].includes(calibrationResult)) throw new Error("Select a valid calibration result.");
+    if (completedDate && (!validDay(completedDate) || completedDate > new Date().toISOString().slice(0,10))) throw new Error("Use an actual completed date on or before today.");
+    if (explicitCalDue && (!validDay(explicitCalDue) || (completedDate && explicitCalDue <= completedDate))) throw new Error("The next calibration due date must be after the completed calibration.");
+    const nextCalDue = maintenanceType === "calibration" && completedDate ? explicitCalDue || (asset.calibration_required && asset.calibration_frequency_value && asset.calibration_frequency_unit ? addAssetInterval(completedDate,asset.calibration_frequency_value,asset.calibration_frequency_unit) : null) : null;
+    if (maintenanceType === "calibration" && completedDate && asset.calibration_required && !nextCalDue) throw new Error("Enter the next calibration due date for this calibration-required asset.");
+
 
     const reference =
       `PPM-${new Date().getUTCFullYear()}-` +
@@ -1016,6 +498,9 @@ export async function recordAssetMaintenance(
 
           maintenance_type:
             maintenanceType,
+          calibration_result: maintenanceType === "calibration" ? calibrationResult : null,
+          calibration_acceptance_criteria: maintenanceType === "calibration" ? calibrationCriteria : null,
+          next_due_date: maintenanceType === "calibration" ? nextCalDue : null,
 
           scheduled_date:
             scheduledDate,
@@ -1097,6 +582,7 @@ export async function recordAssetMaintenance(
 
     if (
       completed &&
+      maintenanceType !== "calibration" &&
       asset.ppm_required &&
       asset.ppm_frequency_value &&
       asset.ppm_frequency_unit
@@ -1136,6 +622,19 @@ export async function recordAssetMaintenance(
           updateError.message,
         );
       }
+    }
+
+    if (completedDate && maintenanceType === "calibration" && (!asset.last_calibration_date || completedDate >= asset.last_calibration_date)) {
+      const { error: calibrationUpdateError } = await admin.from("organization_assets").update({
+        last_calibration_date: completedDate,
+        next_calibration_date: asset.calibration_required ? nextCalDue : asset.next_calibration_date,
+        calibration_result: calibrationResult,
+        calibration_acceptance_criteria: calibrationCriteria,
+        calibration_provider: supplier?.legal_name || performedCalibrationName(responsible),
+        calibration_certificate_reference: text("evidence_reference",500)||null,
+        updated_at: new Date().toISOString(),
+      }).eq("id",assetId).eq("organization_id",organization.id);
+      if (calibrationUpdateError) throw new Error("The calibration history was saved, but its asset summary could not be updated. Review the history before retrying.");
     }
 
     revalidatePath("/portal/asset-management", "layout");
@@ -1215,3 +714,5 @@ export async function changeCompanyAssetStatus(
     "/portal/health-safety/permits/new",
   );
 }
+
+function performedCalibrationName(person){return [person.first_name,person.last_name].filter(Boolean).join(" ")||person.email;}
