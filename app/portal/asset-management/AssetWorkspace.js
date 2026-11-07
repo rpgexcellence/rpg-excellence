@@ -65,7 +65,7 @@ const personName = person =>
     : "Unassigned";
 
 export default async function AssetWorkspace({
-  searchParams, mode = "register",
+  searchParams, mode = "register", draftEnabled = false,
 }) {
   const query =
     await searchParams;
@@ -455,6 +455,7 @@ export default async function AssetWorkspace({
               documents={
                 documents
               }
+              draftEnabled={draftEnabled && mode === "new" && !editAsset}
               asset={editAsset}
               linkedDocumentIds={
                 editAsset
