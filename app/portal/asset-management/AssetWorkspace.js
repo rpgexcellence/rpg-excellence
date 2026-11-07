@@ -64,6 +64,23 @@ const personName = person =>
       person.email
     : "Unassigned";
 
+// Match the current customer-facing document register, without its default row limit.
+async function loadRegisterDocuments(admin) {
+  const documents = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await admin.from("controlled_documents")
+      .select("id,document_number,title,document_type,standard,revision,status,description")
+      .eq("status", "Current")
+      .in("audience", ["Customer", "Both"])
+      .order("document_number")
+      .order("id")
+      .range(offset, offset + 499);
+    if (error) throw new Error(error.message);
+    documents.push(...(data || []));
+    if (!data || data.length < 500) return documents;
+  }
+}
+
 export default async function AssetWorkspace({
   searchParams, mode = "register", draftEnabled = false,
 }) {
@@ -147,27 +164,7 @@ export default async function AssetWorkspace({
       )
       .order("legal_name"),
 
-    admin
-      .from(
-        "controlled_documents",
-      )
-      .select(
-        "id,document_number,title,document_type,revision,status",
-      )
-      .eq(
-        "status",
-        "Current",
-      )
-      .in(
-        "audience",
-        [
-          "Customer",
-          "Both",
-        ],
-      )
-      .order(
-        "document_number",
-      ),
+    loadRegisterDocuments(admin).then(data => ({ data })),
 
     admin
       .from(
