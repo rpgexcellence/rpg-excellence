@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {useActionState,useState} from "react";
+import {useDeviceDraftState} from "./DeviceDraftWorkspace";
 import {recordAssetMaintenance,saveCompanyAsset} from "../app/portal/company/assets/actions";
 
 const initialState={error:"",success:""};
@@ -10,10 +11,10 @@ const personLabel=person=>[person.first_name,person.last_name].filter(Boolean).j
 
 function Message({state}){return <>{state?.error&&<p className="carMessage error" role="alert">{state.error}</p>}{state?.success&&<p className="carMessage success" role="status">{state.success}</p>}</>;}
 
-function DocumentPicker({documents=[],initialIds=[]}){
+function DocumentPicker({documents=[],initialIds=[],draftEnabled=false}){
   const [query,setQuery]=useState("");
   const [candidate,setCandidate]=useState("");
-  const [selectedIds,setSelectedIds]=useState(initialIds);
+  const [selectedIds,setSelectedIds]=useDeviceDraftState("asset.new.documentIds",initialIds,draftEnabled);
   const selected=new Set(selectedIds);
   const results=documents.filter(document=>{
     if(selected.has(document.id))return false;
@@ -35,10 +36,10 @@ function DocumentPicker({documents=[],initialIds=[]}){
   </div>;
 }
 
-export default function CompanyAssetRegister({locations=[],people=[],suppliers=[],documents=[],asset=null,linkedDocumentIds=[]}){
+export default function CompanyAssetRegister({locations=[],people=[],suppliers=[],documents=[],asset=null,linkedDocumentIds=[],draftEnabled=false}){
   const [state,action,pending]=useActionState(saveCompanyAsset,initialState);
-  const [ppmRequired,setPpmRequired]=useState(Boolean(asset?.ppm_required));
-  const [ownerType,setOwnerType]=useState(asset?.maintenance_owner_type||"internal");
+  const [ppmRequired,setPpmRequired]=useDeviceDraftState("asset.new.ppmRequired",Boolean(asset?.ppm_required),draftEnabled&&!asset?.id);
+  const [ownerType,setOwnerType]=useDeviceDraftState("asset.new.maintenanceOwnerType",asset?.maintenance_owner_type||"internal",draftEnabled&&!asset?.id);
   const editing=Boolean(asset?.id);
   return <section className="carCard">
     <style>{styles}</style>
@@ -63,7 +64,7 @@ export default function CompanyAssetRegister({locations=[],people=[],suppliers=[
         {ownerType==="supplier"&&<div className="carField"><label>Approved maintenance supplier *</label><select name="maintenance_supplier_id" defaultValue={asset?.maintenance_supplier_id||""} required><option value="" disabled>{suppliers.length?"Select approved supplier":"No approved suppliers available"}</option>{suppliers.map(supplier=><option value={supplier.id} key={supplier.id}>{supplier.legal_name||supplier.name}</option>)}</select><small>Linked to the Supplier Management register.</small></div>}
         <div className="carField full"><label>Description and identification guidance</label><textarea name="description" maxLength={2000} defaultValue={asset?.description||""} placeholder="Record the asset boundary, function and information needed to identify the correct equipment."/></div>
       </div>
-      <fieldset className="carPpm"><legend>Linked documented information</legend><p>Link the current work instructions, operating manuals, safe systems of work, inspection standards or other controlled documents needed to operate and maintain this asset.</p><DocumentPicker documents={documents} initialIds={linkedDocumentIds}/><Link className="carModuleLink" href="/portal/documents">Open Documented Information module</Link></fieldset>
+      <fieldset className="carPpm"><legend>Linked documented information</legend><p>Link the current work instructions, operating manuals, safe systems of work, inspection standards or other controlled documents needed to operate and maintain this asset.</p><DocumentPicker documents={documents} initialIds={linkedDocumentIds} draftEnabled={draftEnabled&&!editing}/><Link className="carModuleLink" href="/portal/documents">Open Documented Information module</Link></fieldset>
       <fieldset className="carPpm"><legend>Planned preventive maintenance (PPM)</legend><label className="carSwitch"><input type="checkbox" checked={ppmRequired} onChange={event=>setPpmRequired(event.target.checked)}/><span>PPM or periodic inspection is required</span></label><input type="hidden" name="ppm_required" value={ppmRequired?"true":"false"}/>{ppmRequired&&<div className="carGrid ppm"><div className="carField"><label>Frequency number *</label><input type="number" min="1" name="ppm_frequency_value" required defaultValue={asset?.ppm_frequency_value||1}/></div><div className="carField"><label>Frequency unit *</label><select name="ppm_frequency_unit" required defaultValue={asset?.ppm_frequency_unit||"months"}><option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option><option value="years">Years</option></select></div><div className="carField"><label>Last maintenance date</label><input type="date" name="last_maintenance_date" defaultValue={asset?.last_maintenance_date||""}/></div><div className="carField"><label>Next maintenance due</label><input type="date" name="next_maintenance_date" defaultValue={asset?.next_maintenance_date||""}/><small>Leave blank to calculate from the frequency.</small></div><div className="carField full"><label>Maintenance requirements / notes</label><textarea name="maintenance_notes" defaultValue={asset?.maintenance_notes||""} placeholder="Define servicing, inspection, calibration or statutory examination requirements."/></div></div>}</fieldset>
       <fieldset className="carPpm"><legend>Management of Change</legend><label className="carSwitch"><input type="checkbox" name="change_control_required" value="true" defaultChecked={asset?.change_control_required!==false}/><span>Material changes to this asset require Management of Change screening</span></label><p>Changes to duty, location, safeguarding, capacity, process, controls or ownership should be screened before implementation.</p></fieldset>
       <div className="carActions"><button className="carButton" disabled={pending}>{pending?"Saving asset…":editing?"Save asset changes":"Add to Asset Register"}</button></div>
