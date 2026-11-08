@@ -4,9 +4,10 @@ import fs from 'node:fs';
 import {INTEGRATION_PERMISSIONS,LEGACY_INTEGRATION_PERMISSIONS,validateIntegrationPermissions,normaliseInspectionBand,integrationDateOnly} from '../lib/integration-policy.mjs';
 test('released scopes are unique and inert legacy scopes cannot be issued',()=>{
  assert.equal(new Set(INTEGRATION_PERMISSIONS).size,INTEGRATION_PERMISSIONS.length);
- for(const scope of INTEGRATION_PERMISSIONS) if(scope!=='security_incidents:detail') assert.deepEqual(validateIntegrationPermissions([scope]),[scope]);
+ for(const scope of INTEGRATION_PERMISSIONS) if(!['security_incidents:detail','assets:maintenance:read','assets:links:read'].includes(scope)) assert.deepEqual(validateIntegrationPermissions([scope]),[scope]);
  for(const scope of LEGACY_INTEGRATION_PERMISSIONS) assert.throws(()=>validateIntegrationPermissions([scope]),/released/);
  assert.throws(()=>validateIntegrationPermissions(['security_incidents:detail']),/summary/);
+ for(const scope of ['assets:maintenance:read','assets:links:read']) {assert.throws(()=>validateIntegrationPermissions([scope]),/assets:read/);assert.deepEqual(validateIntegrationPermissions(['assets:read',scope]),['assets:read',scope]);}
  assert.deepEqual(validateIntegrationPermissions(['security_incidents:read','security_incidents:detail']),['security_incidents:read','security_incidents:detail']);
 });
 test('inspection aliases preserve compatibility and impossible dates are rejected',()=>{
@@ -14,7 +15,7 @@ test('inspection aliases preserve compatibility and impossible dates are rejecte
  assert.equal(integrationDateOnly('2028-02-29'),true);assert.equal(integrationDateOnly('2026-02-29'),false);assert.equal(integrationDateOnly('2026-02-31'),false);
 });
 test('database permission constraint agrees with released and retained legacy registry',()=>{
- const sql=fs.readFileSync(new URL('../supabase/migrations/20261022_integration_api_stabilisation.sql',import.meta.url),'utf8');
+ const sql=fs.readFileSync(new URL('../supabase/migrations/20261108_asset_management_integration_extension.sql',import.meta.url),'utf8');
  const values=sql.match(/permissions <@ array\[([\s\S]*?)\]::text\[\]/)[1];
  const actual=[...values.matchAll(/'([^']+)'/g)].map(m=>m[1]);
  assert.deepEqual(actual.slice().sort(),[...INTEGRATION_PERMISSIONS,...LEGACY_INTEGRATION_PERMISSIONS].sort());
