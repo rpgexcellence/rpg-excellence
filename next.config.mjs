@@ -2,6 +2,10 @@
 const nextConfig = {
   experimental: { serverActions: { bodySizeLimit: "6mb" } },
   outputFileTracingIncludes: {
+    "/api/publications/environmental-aspects/download": [
+      "./private-assets/RPG_Decoding_Environmental_Aspects.pdf",
+      "./private-assets/RPG_Environmental_Guidance_Posters.pdf",
+    ],
     "/api/publications/quality-performance/download": [
       "./private-assets/Decoding_Quality_Performance_RPG.pdf",
     ],
