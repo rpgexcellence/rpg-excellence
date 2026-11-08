@@ -20,6 +20,12 @@ export default async function InsightsPage({ params }) {
 
   const issues = [
     {
+      number: "035",
+      title: "Your Asset Information Where the Work Happens",
+      description: "The RPG Excellence Asset Management upgrade brings authorised asset ownership, maintenance, calibration, evidence and linked records to your phone through individual QR labels. Includes two briefing posters.",
+      href: "asset-management-at-the-point-of-work",
+    },
+    {
       number: "034",
       title: "Can you prove quality is powering performance?",
       description: "World Quality Week 2026: connect quality activity to customer outcomes, reliable measures and credible business value. Includes a downloadable poster and the £4.99 Decoding Quality Performance companion guide.",
@@ -310,9 +316,9 @@ export default async function InsightsPage({ params }) {
 
                 <Link
                   className="button"
-                  href={issue.number === "026" ? `/${locale}/publications/decoding-iso-14001-2026` : `/${locale}/insights/${issue.href}`}
+                  href={issue.number === "026" ? "/" + locale + "/publications/decoding-iso-14001-2026" : "/" + locale + "/insights/" + issue.href}
                 >
-                  {issue.number === "026" ? "View publication" : `Read Issue ${issue.number}`}
+                  {issue.number === "026" ? "View publication" : "Read Issue " + issue.number}
                 </Link>
               </article>
             ))}
