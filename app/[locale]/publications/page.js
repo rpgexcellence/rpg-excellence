@@ -5,6 +5,7 @@ import PageShell from "../../../components/PageShell";
 import { locales } from "../../../lib/i18n";
 export const metadata = { title: "Digital Publications | RPG Excellence", description: "Practical independent ISO publications, technical insights and supporting posters. Digital publications from £4.99." };
 const books = [
+  { title: "Decoding Environmental Aspects", subtitle: "Climate, biodiversity and life cycle decisions", desc: "A practical environmental workbook with five reusable worksheets, a worked water-and-waste case and four guidance posters. Includes a separate printable poster PDF.", pages: 30, price: "£7.99", format: "PDF bundle", image: "/images/publications/environmental-aspects.png", slug: "decoding-environmental-aspects" },
   { title: "ISO 9001:2026 Technical Insights & Poster Collection", subtitle: "Collected published series · Clauses 4–10", desc: "Seven complete technical articles, seven chapter covers and 21 supporting posters. Reviewed collected edition with all articles and posters inside one PDF.", pages: 53, price: "£9.99", format: "PDF", slug: "iso-9001-2026-technical-insights" },
   { title: "Decoding ISO/IEC 17025:2017", subtitle: "Testing & Calibration Laboratories", desc: "Translate technical laboratory requirements into practical implementation: impartiality, competence, traceability, uncertainty, decision rules, result validity and audit evidence. Includes technical examples, templates and posters.", pages: 52, slug: "decoding-iso-17025-2017" },
   { title: "Decoding ISO 9001:2026", subtitle: "Quality Management", desc: "Understand requirements, test evidence and make stronger quality decisions. Clause-by-clause guidance, practical examples and Annex A interpretation.", pages: 33, slug: "decoding-iso-9001-2026" },
@@ -20,6 +21,7 @@ export default async function Page({ params }) {
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24,margin:"32px 0"}}>
       <QualityPerformancePublicationCard locale={locale} />
       {books.map(book => <article key={book.slug} style={{border:"1px solid #d8e2eb",borderRadius:14,overflow:"hidden",background:"#fff"}}>
+        {book.image && <img src={book.image} alt="Decoding Environmental Aspects publication" style={{width:"100%",height:"auto",display:"block"}} />}
         <div style={{padding:26,background:"#102b4a",color:"white",minHeight:170}}><small style={{letterSpacing:2}}>RPG EXCELLENCE</small><h2 style={{color:"white",margin:"18px 0 8px"}}>{book.title}</h2><p>{book.subtitle}</p></div>
         <div style={{padding:26}}><p>{book.desc}</p><p><strong>{book.price || "£29.99"}</strong> · {book.pages} pages · {book.format || "PDF"}</p><Link className="button" href={`/${locale}/publications/${book.slug}`}>View &amp; purchase</Link></div>
       </article>)}
