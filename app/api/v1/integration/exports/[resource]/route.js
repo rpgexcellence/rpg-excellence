@@ -15,6 +15,12 @@ const RESOURCES = new Map([
   ["findings", "findings:read"],
   ["capa-8d", "capa:read"],
   ["assets", "assets:read"],
+  ["asset-controls", "assets:read"],
+  ["asset-maintenance", "assets:maintenance:read"],
+  ["asset-documents", "assets:links:read"],
+  ["asset-assurance-links", "assets:links:read"],
+  ["asset-moc-links", "assets:links:read"],
+
   ["suppliers", "suppliers:read"],
   ["people", "people:read"],
   ["security-incidents", "security_incidents:read"],
