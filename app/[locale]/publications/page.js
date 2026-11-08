@@ -1,3 +1,4 @@
+import { CLAUSE_PUBLICATIONS } from "../../../lib/iso9001-clause-publications.mjs";
 import QualityPerformancePublicationCard from "../../../components/QualityPerformancePublicationCard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,6 +19,23 @@ export default async function Page({ params }) {
     <span className="kicker">RPG EXCELLENCE · DIGITAL PUBLICATIONS</span>
     <h1>Practical ISO publications</h1>
     <p style={{fontSize:19}}>Independent practitioner guides designed to help you interpret requirements, make sound decisions and demonstrate objective evidence.</p>
+    <section aria-labelledby="clause-guides" style={{marginTop:36}}>
+      <h2 id="clause-guides">ISO 9001:2026 clause guides</h2>
+      <p>Seven expanded standalone publications at <strong>£4.99 each</strong>. Choose the clause relevant to your work. Every guide includes practical interpretation, scenarios, worksheets and two poster annexes.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24,margin:"24px 0 40px"}}>
+        {CLAUSE_PUBLICATIONS.map(publication => <article key={publication.code} style={{border:"1px solid #d8e2eb",borderRadius:14,overflow:"hidden",background:"#fff",display:"flex",flexDirection:"column"}}>
+          <img src={publication.image} alt={publication.name + " front poster"} width="1536" height="1024" style={{width:"100%",height:"auto",display:"block"}} />
+          <div style={{padding:24,display:"flex",flexDirection:"column",flex:1}}>
+            <p className="kicker">ISO 9001:2026 · CLAUSE {publication.clause}</p>
+            <h3 style={{fontSize:24,margin:"4px 0 12px"}}>{publication.topic}</h3>
+            <p>{publication.promise}</p>
+            <p style={{marginTop:"auto",paddingTop:12}}><strong>£{(publication.unitAmount / 100).toFixed(2)}</strong> · {publication.pages} pages · PDF and printable posters</p>
+            <Link className="button" href={"/" + locale + "/publications/" + publication.slug}>View &amp; purchase</Link>
+          </div>
+        </article>)}
+      </div>
+    </section>
+    <h2>More practitioner publications</h2>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24,margin:"32px 0"}}>
       <QualityPerformancePublicationCard locale={locale} />
       {books.map(book => <article key={book.slug} style={{border:"1px solid #d8e2eb",borderRadius:14,overflow:"hidden",background:"#fff"}}>
