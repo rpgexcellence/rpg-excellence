@@ -135,6 +135,55 @@ try {
  await assert.rejects(()=>exportDb.exec('delete from integration_export_pages'),/permission denied/);await exportDb.exec('reset role');
  console.log('PASS SQL cursor expiry, current scope/revocation/test-key/expiry checks, denied public execution and service-only read RPC');
 
+
+ // Asset Management extension: execute real migration SQL, not source-text assertions.
+ const assetExtension=fs.readFileSync(new URL('../supabase/migrations/20261108_asset_management_integration_extension.sql',import.meta.url),'utf8');
+ await exportDb.exec('alter table organization_assets add column asset_categories text[]');
+ await exportDb.exec('alter table organization_assets add column calibration_required boolean');
+ await exportDb.exec('alter table organization_assets add column last_calibration_date text');
+ await exportDb.exec('alter table organization_assets add column next_calibration_date text');
+ await exportDb.exec('alter table organization_assets add column calibration_frequency_value text');
+ await exportDb.exec('alter table organization_assets add column calibration_frequency_unit text');
+ await exportDb.exec('alter table organization_assets add column calibration_interval_basis text');
+ await exportDb.exec('alter table organization_assets add column calibration_provider text');
+ await exportDb.exec('alter table organization_assets add column calibration_certificate_reference text');
+ await exportDb.exec('alter table organization_assets add column calibration_result text');
+ await exportDb.exec('alter table organization_assets add column calibration_scope text');
+ await exportDb.exec('alter table organization_assets add column calibration_acceptance_criteria text');
+ await exportDb.exec('create table organization_asset_maintenance(id uuid primary key,asset_id uuid,maintenance_reference text,maintenance_type text,scheduled_date text,completed_date text,status text,maintenance_owner_type text,responsible_person_id uuid,supplier_id uuid,performed_by text,work_completed text,evidence_reference text,calibration_result text,calibration_acceptance_criteria text,next_due_date text,created_at text,organization_id uuid,owner_id uuid)');
+ await exportDb.exec('create table organization_asset_document_links(id uuid primary key,asset_id uuid,controlled_document_id uuid,created_at text,organization_id uuid,owner_id uuid)');
+ await exportDb.exec('create table organization_asset_assurance_links(id uuid primary key,asset_id uuid,finding_id uuid,rca_case_id uuid,created_at text,organization_id uuid)');
+ await exportDb.exec('create table hs_moc_changes(id uuid primary key,organization_asset_id uuid,organization_id uuid,owner_id uuid)');
+
+ await exportDb.exec(assetExtension);
+ const extensionAsset=X(100),job=X(101),link=X(102),moc=X(103);
+ await exportDb.query("insert into organization_assets(id,organization_id,owner_id,asset_reference,asset_name,asset_categories,calibration_required,next_calibration_date)values($1,$2,$3,'A100','Gauge',array['equipment','measuring_instruments'],true,'2026-12-01')",[extensionAsset,xOrg,xOwner]);
+ await exportDb.query("insert into organization_asset_maintenance(id,asset_id,organization_id,owner_id,status,maintenance_type,scheduled_date)values($1,$2,$3,$4,'planned','calibration','2026-12-01')",[job,extensionAsset,xOrg,xOwner]);
+ await exportDb.query("insert into organization_asset_assurance_links(id,asset_id,organization_id,finding_id)values($1,$2,$3,$4)",[link,extensionAsset,xOrg,X(104)]);
+ await exportDb.query("insert into hs_moc_changes(id,organization_asset_id,organization_id,owner_id)values($1,$2,$3,$4)",[moc,extensionAsset,xOrg,xOwner]);
+ await exportDb.query("update integration_api_clients set permissions=array['assets:read','assets:maintenance:read','assets:links:read','audits:read'] where id=$1",[xClient]);
+ let controls=await readPage('asset-controls');assert.equal(controls.data.find(x=>x.record_id===extensionAsset).record.calibration_required,true);
+ assert.deepEqual(controls.data.find(x=>x.record_id===extensionAsset).record.asset_categories,['equipment','measuring_instruments']);
+ let jobs=await readPage('asset-maintenance');assert.equal(jobs.data.find(x=>x.record_id===job).record.status,'planned');
+ let refs=await readPage('asset-assurance-links');assert.equal(refs.data.find(x=>x.record_id===link).record.finding_id,X(104));
+ assert(!JSON.stringify(jobs).includes('evidence_storage_path'));
+ const legacy=await readPage('assets');assert(!Object.hasOwn(legacy.data.find(x=>x.record_id===extensionAsset).record,'calibration_required'));
+ await exportDb.query("update integration_api_clients set permissions=array['assets:maintenance:read'] where id=$1",[xClient]);await assert.rejects(()=>readPage('asset-maintenance'),/scope_required/);
+ await exportDb.query("update integration_api_clients set permissions=array['assets:read','assets:maintenance:read','assets:links:read','audits:read'] where id=$1",[xClient]);
+ const oldCheckpoint=controls.checkpoint;
+ await exportDb.query("update organization_assets set next_calibration_date='2027-01-01' where id=$1",[extensionAsset]);
+ controls=await readPage('asset-controls',oldCheckpoint);assert(controls.data.some(x=>x.record_id===extensionAsset&&x.record.next_calibration_date==='2027-01-01'));
+ await exportDb.query('delete from organization_asset_maintenance where id=$1',[job]);jobs=await readPage('asset-maintenance',jobs.checkpoint);assert(jobs.data.some(x=>x.record_id===job&&x.operation==='delete'));
+ await exportDb.query('update organization_assets set organization_id=$1 where id=$2',[xForeign,extensionAsset]);
+ refs=await readPage('asset-assurance-links',refs.checkpoint);assert(refs.data.some(x=>x.record_id===link&&x.operation==='delete'));
+ assert(!(await readPage('asset-assurance-links')).data.some(x=>x.record_id===link));
+ await exportDb.query('update organization_assets set organization_id=$1 where id=$2',[xOrg,extensionAsset]);
+ assert((await readPage('asset-assurance-links')).data.some(x=>x.record_id===link),'Restored parent restores eligible child visibility');
+ for(const role of ['anon','authenticated']){await exportDb.exec('set role '+role);await assert.rejects(()=>exportDb.query('select * from integration_asset_controls'),/permission denied/);await exportDb.exec('reset role');}
+ await exportDb.exec(assetExtension);
+ assert.equal((await exportDb.query("select count(*)::int n from integration_export_sources where resource like 'asset-%'")).rows[0].n,5);
+ console.log('PASS asset extension SQL: independent feeds, unchanged legacy payload, category/calibration updates, maintenance deletions, parent move tombstones, scope dependencies, service isolation and idempotent migration');
+
  // Controlled visibility-boundary simulation, not a multi-connection concurrency
  // test: a lower sequence can belong to a transaction deferred to a later batch.
  // Use different records so a receiver must receive BOTH entries regardless of
