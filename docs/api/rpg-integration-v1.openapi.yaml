@@ -300,12 +300,16 @@ paths:
     get:
       tags:
       - Assets
-      summary: List controlled organisation assets and PPM status
+      summary: List controlled organisation assets, categories, PPM and calibration status
       operationId: listAssets
       x-required-permission: assets:read
       parameters:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
+      - name: category
+        in: query
+        description: Match one configured multi-select asset category ID. asset_type remains the legacy primary reporting group.
+        schema: {type: string}
       - name: asset_type
         in: query
         schema:
@@ -901,6 +905,7 @@ paths:
         Live keys only. The existing entitlement, organisation binding, source-IP restriction,
         request budgets and mandatory audit controls apply to every page.
 
+        New asset-controls feed requires assets:read. Asset-maintenance requires assets:read and assets:maintenance:read. Asset-documents, asset-assurance-links and asset-moc-links require assets:read and assets:links:read. Start a new snapshot for each new feed; existing asset cursors remain valid.
         Resource permissions: audits requires audits:read; findings requires findings:read;
         capa-8d requires capa:read; assets requires assets:read; suppliers requires suppliers:read;
         people requires people:read; security-incidents requires security_incidents:read;
@@ -941,7 +946,7 @@ paths:
         required: true
         schema:
           type: string
-          enum: [audits, findings, capa-8d, assets, suppliers, people, security-incidents, workplace-inspections, inspection-programmes]
+          enum: [audits, findings, capa-8d, assets, suppliers, people, security-incidents, workplace-inspections, inspection-programmes, asset-controls, asset-maintenance, asset-documents, asset-assurance-links, asset-moc-links]
       - name: cursor
         in: query
         description: Opaque next_cursor or final checkpoint returned by this resource.
@@ -1003,6 +1008,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /assets/{id}/maintenance:
+    get:
+      tags: [Assets]
+      summary: Read paginated asset maintenance
+      description: Requires assets:read and assets:maintenance:read. References do not grant source-record access. No evidence bytes or storage paths are returned.
+      operationId: listAssetMaintenance
+      x-required-permission: assets:maintenance:read
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - name: page
+        in: query
+        schema: {type: integer, minimum: 1, maximum: 100000, default: 1}
+      - name: page_size
+        in: query
+        schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+      responses:
+        '200':
+          description: Company-bound records with data, pagination and request_id
+        '400':
+          description: Invalid parameters
+        '401':
+          description: Invalid or expired API key
+        '403':
+          description: Missing explicit permissions
+        '404':
+          description: Asset unavailable in the authenticated company
+        '503':
+          description: Data or mandatory audit dependency unavailable
+  /assets/{id}/links:
+    get:
+      tags: [Assets]
+      summary: Read paginated asset links
+      description: Requires assets:read and assets:links:read. References do not grant source-record access. No evidence bytes or storage paths are returned.
+      operationId: listAssetLinks
+      x-required-permission: assets:links:read
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - name: page
+        in: query
+        schema: {type: integer, minimum: 1, maximum: 100000, default: 1}
+      - name: page_size
+        in: query
+        schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+      - name: kind
+        in: query
+        schema: {type: string, enum: [documents, assurance, moc], default: documents}
+      responses:
+        '200':
+          description: Company-bound records with data, pagination and request_id
+        '400':
+          description: Invalid parameters
+        '401':
+          description: Invalid or expired API key
+        '403':
+          description: Missing explicit permissions
+        '404':
+          description: Asset unavailable in the authenticated company
+        '503':
+          description: Data or mandatory audit dependency unavailable
 components:
   securitySchemes:
     bearerAuth:
@@ -1221,7 +1291,7 @@ components:
       properties:
         resource:
           type: string
-          enum: [audits, findings, capa-8d, assets, suppliers, people, security-incidents, workplace-inspections, inspection-programmes]
+          enum: [audits, findings, capa-8d, assets, suppliers, people, security-incidents, workplace-inspections, inspection-programmes, asset-controls, asset-maintenance, asset-documents, asset-assurance-links, asset-moc-links]
         mode:
           type: string
           enum: [snapshot, changes]
