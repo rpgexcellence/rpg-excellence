@@ -11,7 +11,7 @@ const evidencePoster = "/insights/asset-management-connected-record.png";
 const title = "Your Asset Information Where the Work Happens";
 
 export const metadata = {
-  title: title + " | RPG Insights Issue 034",
+  title: title + " | RPG Insights Issue 035",
   description: "Explore the RPG Excellence Asset Management upgrade: scan an individual asset QR on your phone to reach authorised ownership, maintenance, calibration, evidence and linked records at the point of work.",
   alternates: { canonical: "/en/insights/" + slug },
   openGraph: {
@@ -52,7 +52,7 @@ export default async function AssetManagementInsight({ params }) {
           <Link className={styles.back} href={insightsHref}>Back to RPG Insights</Link>
           <header className={styles.intro}>
             <div>
-              <p className={styles.kicker}>RPG INSIGHTS · ISSUE 034 · 8 NOVEMBER 2026</p>
+              <p className={styles.kicker}>RPG INSIGHTS · ISSUE 035 · 8 NOVEMBER 2026</p>
               <h1>Your asset information.<br />Where the work happens.</h1>
               <p className={styles.lead}>Scan the label. Open the record on your phone. Find the information you need beside the asset.</p>
               <p>You are standing beside a piece of equipment. You need to know who owns it, what maintenance is due and where the latest certificate is held. The answer should be easier to reach than a spreadsheet on another computer or an attachment in somebody else&apos;s inbox.</p>
