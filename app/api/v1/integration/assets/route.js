@@ -1,3 +1,4 @@
+import { CATEGORY_BY_ID } from "../../../../../lib/asset-catalog";
 import {
   integrationJson,
   withIntegrationRequest,
@@ -53,6 +54,8 @@ export const GET = withIntegrationRequest(async function GET(request) {
   const pageSize = boundedInteger(parameters.get("page_size"), 25, 1, 100);
   const assetType = parameters.get("asset_type");
   const status = parameters.get("status");
+  const category = parameters.get("category");
+  if (category && !CATEGORY_BY_ID.has(category)) return integrationJson({error:"invalid_category",message:"Choose a configured asset category."},400,requestId);
   const criticality = parameters.get("criticality");
   const ppm = parameters.get("ppm_status");
 
@@ -99,12 +102,13 @@ export const GET = withIntegrationRequest(async function GET(request) {
        criticality,operational_status,ppm_required,ppm_frequency_value,
        ppm_frequency_unit,last_maintenance_date,next_maintenance_date,
        maintenance_owner_type,maintenance_owner_person_id,maintenance_supplier_id,
-       change_control_required,created_at,updated_at`,
+       change_control_required,created_at,updated_at,asset_categories,calibration_required,last_calibration_date,next_calibration_date,calibration_frequency_value,calibration_frequency_unit,calibration_interval_basis,calibration_provider,calibration_certificate_reference,calibration_result,calibration_scope,calibration_acceptance_criteria`,
       { count: "exact" }
     )
     .eq("organization_id", client.organization_id)
     .order("asset_reference", { ascending: true });
 
+  if (category) query = query.contains("asset_categories", [category]);
   if (assetType) query = query.eq("asset_type", assetType);
   if (status) query = query.eq("operational_status", status);
   if (criticality) query = query.eq("criticality", criticality);
@@ -163,6 +167,8 @@ export const GET = withIntegrationRequest(async function GET(request) {
       data: (data || []).map((asset) => ({
         ...asset,
         ppm_status: ppmStatus(asset, today, dueLimit),
+        calibration_status: !asset.calibration_required ? "not_required" : asset.operational_status === "retired" ? "retired" : !asset.next_calibration_date ? "date_missing" : asset.next_calibration_date < today ? "overdue" : asset.next_calibration_date <= dueLimit ? "due_30_days" : "scheduled",
+        record_path: "/portal/asset-management/records/" + asset.id,
       })),
       pagination: {
         page,
@@ -173,6 +179,7 @@ export const GET = withIntegrationRequest(async function GET(request) {
       filters: {
         asset_type: assetType || null,
         status: status || null,
+        category: category || null,
         criticality: criticality || null,
         ppm_status: ppm || null,
       },
