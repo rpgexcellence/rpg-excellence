@@ -2,6 +2,9 @@
 const nextConfig = {
   experimental: { serverActions: { bodySizeLimit: "6mb" } },
   outputFileTracingIncludes: {
+    "/api/publications/iso-9001-2026-clauses/*/download": [
+      "./private-assets/RPG_ISO9001_2026_Clause_*.pdf",
+    ],
     "/api/publications/environmental-aspects/download": [
       "./private-assets/RPG_Decoding_Environmental_Aspects.pdf",
       "./private-assets/RPG_Environmental_Guidance_Posters.pdf",
