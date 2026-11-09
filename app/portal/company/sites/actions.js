@@ -1,5 +1,7 @@
 "use server";
 
+import { sameAddress } from "../../../../lib/company-setup.mjs";
+
 import { revalidatePath } from "next/cache";
 
 import { businessProfileContext } from "../../../../lib/businessProfileAccess";
@@ -241,6 +243,15 @@ export async function saveOrganizationSite(
       ],
     );
 
+    if (!id && formData.get("address_source")) {
+      const {data: savedLocations, error: lookupError} = await admin.from("organization_sites")
+        .select("id,site_name,address_line_1,address_line_2,city,region,postal_code,country")
+        .eq("organization_id", organization.id).neq("status", "archived");
+      if (lookupError) return {error: "Existing locations could not be checked. Please retry."};
+      const address = Object.fromEntries(["address_line_1","address_line_2","city","region","postal_code","country"].map(key => [key, clean(formData.get(key), 180)]));
+      if ((savedLocations || []).some(row => sameAddress(address, row))) return {error: "This address already has a saved location. Open it from the location register instead."};
+    }
+
     const primaryControlPresent =
       formData.get(
         "is_primary_control",
@@ -455,8 +466,8 @@ export async function saveOrganizationSite(
 
     return {
       success: id
-        ? "Site Profile updated."
-        : "Site Profile created.",
+        ? "Location updated."
+        : "Location created.",
 
       error: "",
     };
