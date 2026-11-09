@@ -20,5 +20,5 @@ export async function saveBusinessProfile(previousState, formData) {
     .select("id").maybeSingle();
   if (error || !data) return { error: error?.message || "The business profile could not be saved. Refresh the page and try again." };
   revalidatePath("/portal", "layout");
-  return { success: "Business profile saved.", error: "" };
+  return { success: "Company details saved.", error: "" };
 }
