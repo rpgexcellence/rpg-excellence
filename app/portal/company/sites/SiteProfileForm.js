@@ -5,6 +5,7 @@ import { useActionState } from "react";
 export default function SiteProfileForm({
   action,
   site,
+  draft = null,
   people = [],
 }) {
   const [
@@ -15,6 +16,8 @@ export default function SiteProfileForm({
     action,
     null,
   );
+
+  const values = site || draft;
 
   const textField = (
     name,
@@ -36,7 +39,7 @@ export default function SiteProfileForm({
         name={name}
         type={type}
         defaultValue={
-          site?.[name] || ""
+          values?.[name] || ""
         }
         required={required}
         placeholder={placeholder}
@@ -56,7 +59,7 @@ export default function SiteProfileForm({
       <select
         name={name}
         defaultValue={
-          site?.[name] || ""
+          values?.[name] || ""
         }
       >
         <option value="">
@@ -105,6 +108,8 @@ export default function SiteProfileForm({
         value={site?.id || ""}
       />
 
+      {draft?._source && <input type="hidden" name="address_source" value={draft._source}/> }
+
       <header className="osFormHeader">
         <div>
           <small>
@@ -113,8 +118,8 @@ export default function SiteProfileForm({
 
           <h2>
             {site
-              ? "Edit Site Profile"
-              : "Add Site Profile"}
+              ? "Edit location"
+              : "Add location"}
           </h2>
 
           <p>
@@ -138,7 +143,7 @@ export default function SiteProfileForm({
           role="alert"
         >
           <strong>
-            Site Profile was not saved
+            location was not saved
           </strong>
 
           <span>{state.error}</span>
@@ -151,7 +156,7 @@ export default function SiteProfileForm({
           role="status"
         >
           <strong>
-            Site Profile saved
+            location saved
           </strong>
 
           <span>{state.success}</span>
@@ -185,7 +190,7 @@ export default function SiteProfileForm({
           <select
             name="site_type"
             defaultValue={
-              site?.site_type ||
+              values?.site_type ||
               "operational_site"
             }
             required
@@ -230,7 +235,7 @@ export default function SiteProfileForm({
           <select
             name="status"
             defaultValue={
-              site?.status ||
+              values?.status ||
               "active"
             }
             required
@@ -264,7 +269,7 @@ export default function SiteProfileForm({
             name="is_primary"
             value="true"
             defaultChecked={Boolean(
-              site?.is_primary,
+              values?.is_primary,
             )}
           />
 
@@ -412,7 +417,7 @@ export default function SiteProfileForm({
           <textarea
             name="notes"
             defaultValue={
-              site?.notes || ""
+              values?.notes || ""
             }
             rows="5"
             maxLength="2000"
@@ -437,8 +442,8 @@ export default function SiteProfileForm({
           {pending
             ? "Saving…"
             : site
-              ? "Update Site Profile"
-              : "Add Site Profile"}
+              ? "Update location"
+              : "Add location"}
         </button>
       </footer>
     </form>
