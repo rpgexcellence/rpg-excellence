@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import CompanySetupNav from "../../../../components/CompanySetupNav";
 // RPG PEOPLE PAGE FIX V3 — NULL-SAFE DATA HANDLING — 2026-09-23
 import Image from "next/image";
 import Link from "next/link";
@@ -77,7 +78,7 @@ export default async function PeopleAccessPage({ searchParams }) {
       invitePreview = { ...invitation, qr: await QRCode.toDataURL(`${site}/join/${params.invite}`, { width: 700, margin: 2, errorCorrectionLevel: "M", color: { dark: "#082a54", light: "#ffffff" } }) };
     }
   }
-  return <main className="paPage"><style>{styles}</style><div className="paShell">
+  return <main className="paPage"><style>{styles}</style><div className="paShell"><CompanySetupNav section="people"/>
     <header className="paTop"><div><span>RPG EXCELLENCE · COMPANY GOVERNANCE</span><h1>People, Roles &amp; Access</h1><p>Control people, reporting relationships, illustrated professional functions, module permissions and QR onboarding from one auditable company register.</p></div><Link href="/portal">← Customer portal</Link></header>
     <section className="paMetrics"><article><span>People</span><b>{people.length}</b></article><article><span>Active users</span><b>{active}</b></article><article><span>Awaiting activation</span><b>{invited}</b></article><article><span>Directory only</span><b>{directory}</b></article></section>
     {params?.created === "directory" && <div className="paNotice success"><b>Directory person created.</b><span>The person can now be selected as an owner, manager, deputy or escalation contact.</span></div>}
