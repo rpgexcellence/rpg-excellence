@@ -5,7 +5,6 @@ import { businessWorkforceCount } from "../../../../lib/businessWorkforce";
 import CompanySetupNav from "../../../../components/CompanySetupNav";
 import CompanyDetailsPanel from "../business-profile/CompanyDetailsPanel";
 import LocationsPanel from "../sites/LocationsPanel";
-import OwnerPersonForm from "./OwnerPersonForm";
 import { createAdminClient } from "../../../../lib/supabase/admin";
 import styles from "./setup.module.css";
 export const dynamic = "force-dynamic";
@@ -18,7 +17,7 @@ export default async function CompanySetupPage({ searchParams }) {
   const [sites, workforce] = await Promise.all([loadOrganizationSites(organization.id, {includeInactive: true}), businessWorkforceCount(organization.id)]);
   let ownerPerson = null;
   if (section === "people" && isOwner) {
-    const {data, error} = await createAdminClient().from("organization_people").select("id,account_status,user_id").eq("organization_id", organization.id).eq("email", user.email.toLowerCase()).maybeSingle();
+    const {data, error} = await createAdminClient().from("organization_people").select("id,account_status,user_id,first_name,last_name").eq("organization_id", organization.id).eq("user_id", user.id).maybeSingle();
     if (error) throw new Error("The company-user register is temporarily unavailable.");
     ownerPerson = data;
   }
@@ -32,9 +31,9 @@ export default async function CompanySetupPage({ searchParams }) {
     </header>
     {section === "details" && <CompanyDetailsPanel/>}
     {section === "locations" && <LocationsPanel searchParams={Promise.resolve(query)}/>}
-    {section === "people" && <main className={styles.people}><h2>People &amp; access</h2><p>Your login and company-user record serve different purposes. Company-user records let you assign asset ownership, site responsibilities and operational work.</p>
-      {isOwner && !ownerPerson && <OwnerPersonForm firstName={user.user_metadata?.first_name || ""} lastName={user.user_metadata?.last_name || ""} email={user.email}/>}
-      {ownerPerson && <p>Your email already has a company-user record. Review that record in People, Roles &amp; Access.</p>}
+    {section === "people" && <main className={styles.people}><h2>People &amp; access</h2><p>Your company owner uses their existing login. Complete profile details and choose a company location, then add colleagues and assign their access.</p>
+      {isOwner && !ownerPerson && <p role="alert">Your existing account needs a directory-link review. Apply the owner-and-location migration, or review an existing suspended or conflicting directory record. Do not create another invitation for yourself.</p>}
+      {ownerPerson && <p>Your existing login is linked to the company directory. <Link href={`/portal/company/people/${ownerPerson.id}/edit`}>{!ownerPerson.first_name || !ownerPerson.last_name ? "Complete my profile" : "Edit my profile"}</Link></p>}
       <Link href="/portal/company/people">Manage people, roles &amp; access</Link>
     </main>}
   </div>;
