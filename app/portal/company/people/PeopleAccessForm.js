@@ -1,5 +1,7 @@
 "use client";
 
+import CompanyPersonSiteField from "../../../../components/CompanyPersonSiteField";
+
 import { useActionState, useState } from "react";
 import ProfessionalFunctionIcon from "../../../../components/ProfessionalFunctionIcon";
 import {
@@ -12,7 +14,7 @@ import { createPersonInvitation } from "./actions";
 
 const initialState = { error: "" };
 
-export default function PeopleAccessForm({ people }) {
+export default function PeopleAccessForm({ people, sites = [], companyName }) {
   const [state, action, pending] = useActionState(
     createPersonInvitation,
     initialState
@@ -51,6 +53,7 @@ export default function PeopleAccessForm({ people }) {
 
   return (
     <form action={action} className="paForm">
+      <p>Company: <strong>{companyName}</strong>. This profile will belong to the company you are administering.</p>
       <input
         type="hidden"
         name="account_type"
@@ -108,10 +111,7 @@ export default function PeopleAccessForm({ people }) {
             <input name="department" />
           </label>
 
-          <label>
-            <span>Site</span>
-            <input name="site" />
-          </label>
+          <CompanyPersonSiteField sites={sites}/>
 
           <label>
             <span>Employee reference</span>
