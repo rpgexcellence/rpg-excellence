@@ -1,5 +1,7 @@
 "use server";
 
+import { resolveCompanyPersonSite } from "../../../../lib/company-person-site.mjs";
+
 import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "../../../../lib/supabase/admin";
@@ -158,6 +160,11 @@ export async function createPersonInvitation(
     };
   }
 
+  let siteValues;
+  try { siteValues = await resolveCompanyPersonSite(admin, organization.id, formData); }
+  catch (error) { return {error: error.message}; }
+  if (email === user.email?.toLowerCase()) return {error: "Your existing login already belongs to you. Open your profile in the company register instead of creating another invitation."};
+
   const requestedFunctions = formData
     .getAll("selected_functions")
     .map(String)
@@ -301,7 +308,7 @@ export async function createPersonInvitation(
           clean(formData.get("position"), 180) || null,
         department:
           clean(formData.get("department"), 180) || null,
-        site: clean(formData.get("site"), 180) || null,
+        ...siteValues,
         employee_reference:
           clean(
             formData.get("employee_reference"),
@@ -614,6 +621,10 @@ export async function updatePersonAccess(formData) {
   const submittedEmail = clean(formData.get("email"), 254).toLowerCase();
   if (!firstName || !lastName || !validEmail(submittedEmail)) redirect(`/portal/company/people/${person.id}/edit?error=identity`);
 
+  let siteValues;
+  try { siteValues = await resolveCompanyPersonSite(admin, organization.id, formData, person); }
+  catch { redirect(`/portal/company/people/${person.id}/edit?error=site`); }
+
   const relationshipKeys = ["manager_person_id", "functional_manager_person_id", "deputy_person_id"];
   const relationships = Object.fromEntries(relationshipKeys.map((key) => [key, clean(formData.get(key), 60) || null]));
   const relationshipIds = Object.values(relationships).filter((id) => id && id !== person.id);
@@ -632,13 +643,13 @@ export async function updatePersonAccess(formData) {
     email: person.user_id ? person.email : submittedEmail,
     position: clean(formData.get("position"), 180) || null,
     department: clean(formData.get("department"), 180) || null,
-    site: clean(formData.get("site"), 180) || null,
+    ...siteValues,
     employee_reference: clean(formData.get("employee_reference"), 100) || null,
     comments: clean(formData.get("comments"), 2000) || null,
     account_status: accountStatus,
     ...relationships,
     updated_at: new Date().toISOString(),
-  }).eq("id", person.id);
+  }).eq("id", person.id).eq("organization_id", organization.id);
   if (personError) redirect(`/portal/company/people/${person.id}/edit?error=profile`);
   if (accountStatus === "suspended") {
     await admin.from("organization_invitations").update({ status: "revoked", revoked_at: new Date().toISOString() }).eq("person_id", person.id).eq("status", "active");
