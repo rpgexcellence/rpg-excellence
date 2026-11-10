@@ -36,7 +36,7 @@ const tools = [
     title: "Controlled documents",
     description:
       "Create, revise, supersede and withdraw controlled platform documents.",
-    href: "/portal/documents/admin",
+    href: "/portal/rpg-documents/admin",
     code: "DOC",
   },
   {
