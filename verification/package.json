@@ -5,7 +5,8 @@
     "test": "node incident-sql.test.mjs && node incident-dynamic.test.mjs",
     "test:integration": "node integration-sql.test.mjs",
     "test:inspections": "node inspection-scheduling.test.mjs && node inspection-checklist.test.mjs",
-    "test:company-setup": "node company-setup-sql.test.mjs"
+    "test:company-setup": "node company-setup-sql.test.mjs",
+    "test:owner-sites": "node owner-sites-sql.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11"
