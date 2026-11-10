@@ -1,3 +1,4 @@
+import { createClient } from "../../../lib/supabase/server";
 import { assetCategories, categoryLabel } from "../../../lib/asset-catalog";
 import { filterCompanyAssets, assetFilters } from "../../../lib/asset-dashboard";
 import { requireAssetAccess, loadAssetRows } from "../../../lib/asset-management";
@@ -54,7 +55,7 @@ export default async function AssetWorkspace({
     data
   })), canMoc ? admin.from("hs_moc_changes").select("id,moc_reference,title,status,organization_asset_id").eq("organization_id", organization.id).not("organization_asset_id", "is", null) : Promise.resolve({
     data: []
-  }), admin.from("suppliers").select("id,legal_name,approval_status").eq("organization_id", organization.id).in("approval_status", ["approved", "conditionally_approved"]).order("legal_name"), canDocuments ? loadRegisterDocuments(admin).then(data => ({
+  }), admin.from("suppliers").select("id,legal_name,approval_status").eq("organization_id", organization.id).in("approval_status", ["approved", "conditionally_approved"]).order("legal_name"), canDocuments ? loadRegisterDocuments(await createClient()).then(data => ({
     data
   })) : Promise.resolve({
     data: []
