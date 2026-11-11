@@ -4,11 +4,15 @@ import { createAdminClient } from "../../../lib/supabase/admin";
 import { requireOrganizationAccess } from "../../../lib/organization-access";
 import { loadAssuranceTaskSources } from "../../../lib/assurance-task-sources";
 
+import { getPortalAccess } from "../../../lib/portal-access";
+import { allowedTaskSources } from "../../../lib/task-module-access.mjs";
+import { companyDocumentTasks } from "../../../lib/company-documents";
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My Tasks & Approvals | RPG Excellence" };
 
 const CLOSED = new Set(["closed", "complete", "completed", "effective", "verified", "cancelled", "approved", "verified_effective", "effective_verified", "archived"]);
-const VERIFY = new Set(["awaiting_review", "awaiting_verification", "evidence_submitted", "verification", "ready_for_review", "submitted", "verification_requested", "effectiveness_review"]);
+const VERIFY = new Set(["awaiting_review", "awaiting_verification", "evidence_submitted", "verification", "ready_for_review", "submitted", "verification_requested", "effectiveness_review", "approved_for_release", "acknowledgement_due"]);
 const value = (...items) => items.find((item) => item !== null && item !== undefined && String(item).trim()) || "";
 const words = (input) => String(input || "open").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const date = (input) => input ? new Intl.DateTimeFormat("en-GB", { day:"2-digit", month:"short", year:"numeric" }).format(new Date(input)) : "No due date";
@@ -214,11 +218,12 @@ function securityIncidentTasks(sources) {
 export default async function TasksPage({ searchParams }) {
   const params = await searchParams;
   const access = await requireOrganizationAccess(null, "view", "/portal/tasks");
+  const enabledSources = allowedTaskSources(await getPortalAccess(access.user));
   const admin = createAdminClient();
   const organizationId = access.organization.id;
   const [peopleResult, sources] = await Promise.all([
     admin.from("organization_people").select("*").eq("organization_id", organizationId).neq("account_status", "closed"),
-    loadAssuranceTaskSources(admin, organizationId),
+    loadAssuranceTaskSources(admin, organizationId, enabledSources),
   ]);
   if (peopleResult.error) throw new Error(peopleResult.error.message);
   const people = peopleResult.data || [];
@@ -230,9 +235,11 @@ export default async function TasksPage({ searchParams }) {
   const organisationOversight = Boolean(access.isOwner || access.isCompanyAdministrator || activeFunctions.has("ims_manager"));
   const siteOversight = activeFunctions.has("site_director");
   const reports = new Set(people.filter((person) => person.manager_person_id === me?.id || person.functional_manager_person_id === me?.id).map((person) => person.id));
-  const incidentTasks = await loadIncidentTasks(admin,access);
-  const all = [...incidentTasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
-    .filter((item) => item.title)
+  const incidentTasks = enabledSources.has("incident") ? await loadIncidentTasks(admin,access) : [];
+  const documentSource = enabledSources.has("documents") ? await companyDocumentTasks({...access,person:me}) : {tasks:[],error:false};
+  if (documentSource.error) sources.sourceErrors.push({module:"documents",label:"Document Management"});
+  const all = [...incidentTasks,...documentSource.tasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
+    .filter((item) => item.title && enabledSources.has(item.source))
     .map((item) => ({ ...item, due: item.due ? String(item.due).slice(0,10) : "" }))
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
   const isMine = (item) => item.assignee === myPersonId || item.verifier === myPersonId || item.assigneeUserId === access.user.id;
@@ -277,7 +284,8 @@ export default async function TasksPage({ searchParams }) {
     ["isms","Information Security","ISMS","/portal/information-security"],
     ["security_incident","Security Incidents","INC","/portal/information-security/incidents"],
     ["maintenance","Assets & PPM","PPM","/portal/company/assets"],
-  ].map(([source,label,code,href]) => {
+    ["documents","Document Management","DOC","/portal/documents"],
+  ].filter(([source]) => enabledSources.has(source)).map(([source,label,code,href]) => {
     const records = baseScope.filter((item)=>item.source===source && !CLOSED.has(item.status));
     return { source,label,code,href,unavailable:(sources.sourceErrors || []).some((error)=>error.module===source),open:records.length,overdue:records.filter((item)=>item.overdue).length,decisions:records.filter((item)=>needsDecision(item)).length };
   });
