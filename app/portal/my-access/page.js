@@ -1,3 +1,4 @@
+import {loadCompanyStructure} from "../../../lib/company-structure";
 import CompanyDocumentTasks from "../../../components/CompanyDocumentTasks";
 import Link from "next/link";
 import { getPortalAccess } from "../../../lib/portal-access";
@@ -32,6 +33,8 @@ export default async function MyAccessPage({ searchParams }) {
   if (!context.user) redirect("/portal/login?next=/portal/my-access");
   if (context.isOwner) redirect("/portal");
   if (!context.organization || !context.person) return <main className="maPage"><style>{styles}</style><section className="maEmpty"><h1>No active company access</h1><p>Your RPG login is valid, but it is not connected to an active company profile. Ask your company administrator to issue a personal QR invitation.</p><Link href="/portal">Return to customer portal</Link></section></main>;
+  const structure=await loadCompanyStructure(context.organization.id);
+  const departmentName=structure.departments.find(d=>d.id===context.person.department_id)?.name||context.person.department;
   const activeFunctions = context.functions.filter((item) => item.status === "authorised" && (!item.expires_at || item.expires_at >= new Date().toISOString().slice(0, 10)));
   const portal=await getPortalAccess(context.user);
   const groupFor={internal_audit:"audits",capa_8d:"capa",supplier_assurance:"suppliers",asset_management:"assets",risk_management:"health",business_continuity:"bcp",information_security:"isms",documents:"evidence",assessments:"assessments",reports:"reports",people_access:"people",incidents:"incidents"};
@@ -41,7 +44,7 @@ export default async function MyAccessPage({ searchParams }) {
     <header className="maTop"><div><span>RPG EXCELLENCE · AUTHORISED USER</span><h1>Welcome, {context.person.first_name}</h1><p>{context.organization.name} · {context.person.position || "Company user"}</p></div><form action="/auth/signout" method="post"><button>Sign out</button></form></header>
     {query?.welcome && <div className="maWelcome"><b>Your company access is active.</b><span>A personalised welcome email has been sent and the activation is recorded in the access audit trail.</span></div>}
     {query?.error === "access" && <div className="maError"><b>Access not authorised.</b><span>Your profile does not provide the permission required for that area.</span></div>}
-    <section className="maProfile"><div><small>COMPANY PROFILE</small><h2>{context.person.first_name} {context.person.last_name}</h2><p>{context.person.email}</p></div><dl><div><dt>Position</dt><dd>{context.person.position || "Not assigned"}</dd></div><div><dt>Department</dt><dd>{context.person.department || "Not assigned"}</dd></div><div><dt>Site</dt><dd>{context.person.site || "Organisation-wide"}</dd></div><div><dt>Status</dt><dd>Active system user</dd></div></dl></section>
+    <section className="maProfile"><div><small>COMPANY PROFILE</small><h2>{context.person.first_name} {context.person.last_name}</h2><p>{context.person.email}</p></div><dl><div><dt>Position</dt><dd>{context.person.position || "Not assigned"}</dd></div><div><dt>Department</dt><dd>{departmentName || "Not assigned"}</dd></div><div><dt>Site</dt><dd>{context.person.site || "Organisation-wide"}</dd></div><div><dt>Status</dt><dd>Active system user</dd></div></dl></section>
     <CompanyDocumentTasks context={context}/>
     <section className="maPanel"><header><div><small>AUTHORISED FUNCTIONS</small><h2>Your professional functions</h2></div><span>{activeFunctions.length} active</span></header><div className="maFunctions">{activeFunctions.length ? activeFunctions.map((item) => <article key={item.id}><ProfessionalFunctionIcon type={item.function_key} label={functionLabel(item.function_key)} size={70}/><b>{functionLabel(item.function_key)}</b><small>{item.expires_at ? `Authorised to ${item.expires_at}` : "Authorised"}</small></article>) : <p>No professional function is currently authorised.</p>}</div></section>
     <section className="maPanel"><header><div><small>CONTROLLED PLATFORM ACCESS</small><h2>Your RPG workspaces</h2></div><span>{accessible.length} available</span></header><div className="maModules"><Link href="/portal/tasks"><div><b>My Tasks &amp; Approvals</b><p>Your assigned reviews, decisions and acknowledgements</p></div><span>Open →</span></Link>{accessible.map((item) => <Link href={routes[item.module_key] || "/portal/my-access"} key={item.id}><div><b>{moduleLabel(item.module_key)}</b><p>{accessLabel(item.access_level)}</p></div><span>Open →</span></Link>)}</div></section>

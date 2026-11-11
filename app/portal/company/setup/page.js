@@ -1,3 +1,4 @@
+import DepartmentsPanel from "../departments/DepartmentsPanel";
 import Link from "next/link";
 import { businessProfileContext } from "../../../../lib/businessProfileAccess";
 import { loadOrganizationSites } from "../../../../lib/organization-sites";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Company Setup | RPG Excellence" };
 export default async function CompanySetupPage({ searchParams }) {
   const query = await searchParams || {};
-  const section = ["locations", "people"].includes(query.section) ? query.section : "details";
+  const section = ["locations", "departments", "people"].includes(query.section) ? query.section : "details";
   const { organization, user, isOwner } = await businessProfileContext();
   if (!organization) return <main className={styles.people}><h1>Create your company</h1><p>Start your company workspace on the Dashboard, then return here to add its details, locations and people.</p><Link href="/portal">Open Dashboard</Link></main>;
   const [sites, workforce] = await Promise.all([loadOrganizationSites(organization.id, {includeInactive: true}), businessWorkforceCount(organization.id)]);
@@ -31,6 +32,7 @@ export default async function CompanySetupPage({ searchParams }) {
     </header>
     {section === "details" && <CompanyDetailsPanel/>}
     {section === "locations" && <LocationsPanel searchParams={Promise.resolve(query)}/>}
+    {section === "departments" && <DepartmentsPanel query={query}/>}
     {section === "people" && <main className={styles.people}><h2>People &amp; access</h2><p>Your company owner uses their existing login. Complete profile details and choose a company location, then add colleagues and assign their access.</p>
       {isOwner && !ownerPerson && <p role="alert">Your existing account needs a directory-link review. Apply the owner-and-location migration, or review an existing suspended or conflicting directory record. Do not create another invitation for yourself.</p>}
       {ownerPerson && <p>Your existing login is linked to the company directory. <Link href={`/portal/company/people/${ownerPerson.id}/edit`}>{!ownerPerson.first_name || !ownerPerson.last_name ? "Complete my profile" : "Edit my profile"}</Link></p>}

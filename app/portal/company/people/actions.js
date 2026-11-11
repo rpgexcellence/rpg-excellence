@@ -1,6 +1,7 @@
 "use server";
 
 import { resolveCompanyPersonSite } from "../../../../lib/company-person-site.mjs";
+import { resolveCompanyPersonDepartment } from "../../../../lib/company-person-department.mjs";
 
 import crypto from "node:crypto";
 import { redirect } from "next/navigation";
@@ -160,8 +161,8 @@ export async function createPersonInvitation(
     };
   }
 
-  let siteValues;
-  try { siteValues = await resolveCompanyPersonSite(admin, organization.id, formData); }
+  let siteValues,departmentValues;
+  try { siteValues = await resolveCompanyPersonSite(admin, organization.id, formData); departmentValues = await resolveCompanyPersonDepartment(admin,organization.id,formData,null,siteValues); }
   catch (error) { return {error: error.message}; }
   if (email === user.email?.toLowerCase()) return {error: "Your existing login already belongs to you. Open your profile in the company register instead of creating another invitation."};
 
@@ -306,8 +307,7 @@ export async function createPersonInvitation(
         email,
         position:
           clean(formData.get("position"), 180) || null,
-        department:
-          clean(formData.get("department"), 180) || null,
+        ...departmentValues,
         ...siteValues,
         employee_reference:
           clean(
@@ -621,8 +621,8 @@ export async function updatePersonAccess(formData) {
   const submittedEmail = clean(formData.get("email"), 254).toLowerCase();
   if (!firstName || !lastName || !validEmail(submittedEmail)) redirect(`/portal/company/people/${person.id}/edit?error=identity`);
 
-  let siteValues;
-  try { siteValues = await resolveCompanyPersonSite(admin, organization.id, formData, person); }
+  let siteValues,departmentValues;
+  try { siteValues = await resolveCompanyPersonSite(admin, organization.id, formData, person); departmentValues = await resolveCompanyPersonDepartment(admin,organization.id,formData,person,siteValues); }
   catch { redirect(`/portal/company/people/${person.id}/edit?error=site`); }
 
   const relationshipKeys = ["manager_person_id", "functional_manager_person_id", "deputy_person_id"];
@@ -642,7 +642,7 @@ export async function updatePersonAccess(formData) {
     last_name: lastName,
     email: person.user_id ? person.email : submittedEmail,
     position: clean(formData.get("position"), 180) || null,
-    department: clean(formData.get("department"), 180) || null,
+    ...departmentValues,
     ...siteValues,
     employee_reference: clean(formData.get("employee_reference"), 100) || null,
     comments: clean(formData.get("comments"), 2000) || null,

@@ -1,3 +1,4 @@
+import {loadCompanyStructure} from "../../../../lib/company-structure";
 import Link from "next/link";
 import { addressText, sameAddress, legacyLocationCandidates, locationDraft, locationSetupPath } from "../../../../lib/company-setup.mjs";
 
@@ -74,6 +75,7 @@ export default async function LocationsPanel({
     );
   }
 
+  const departmentStructure=await loadCompanyStructure(organization.id);
   const admin =
     createAdminClient();
 
@@ -304,6 +306,7 @@ export default async function LocationsPanel({
           </article>
         </section>
 
+        {selectedSite?<section style={{padding:20,background:'#fff',border:'1px solid #d5e1ec',borderRadius:12,marginBottom:18}}><h2>Departments at {selectedSite.site_name}</h2><p>{departmentStructure.departments.filter(d=>d.status==='active'&&(d.all_sites||d.site_ids.includes(selectedSite.id))).map(d=>d.name).join(' · ')||'No active departments assigned.'}</p><Link href={`/portal/company/setup?section=departments&site=${selectedSite.id}`}>Select, create or update applicable departments</Link></section>:null}
         <div className="osLayout">
         <SiteProfileForm
   key={
@@ -443,7 +446,7 @@ export default async function LocationsPanel({
                           )}
                         </span>
 
-                        <Link href={`/portal/company/sites/${site.id}/zones`}>Buildings &amp; zones</Link>
+                        <Link href={`/portal/company/sites/${site.id}/zones`}>Buildings &amp; zones</Link><Link href={`/portal/company/setup?section=departments&site=${site.id}`}>Departments ({departmentStructure.departments.filter(d=>d.status==="active"&&(d.all_sites||d.site_ids.includes(site.id))).length})</Link>
                         <Link
                           href={locationSetupPath({ edit: site.id })}
                         >

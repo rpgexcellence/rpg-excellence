@@ -8,7 +8,7 @@ export default function BusinessProfileForm({ action, organization, workforceCou
   const [industries, setIndustries] = useState(initialIndustry.selected);
   const [otherSelected, setOtherSelected] = useState(Boolean(initialIndustry.custom));
   const [customIndustry, setCustomIndustry] = useState(initialIndustry.custom);
-  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country), ...Object.fromEntries(BUSINESS_DETAIL_FIELDS.map(item => [item.key, organization[item.key] || ""])), powra_reference_prefix: organization.powra_reference_prefix || "POWRA", powra_reference_padding: organization.powra_reference_padding || 0, vat_registration_status: organization.vat_registration_status || (organization.vat_number ? "registered" : "not_recorded") });
+  const [values, setValues] = useState({ name: organization.name || "", industry: organization.industry || "", country: businessCountryValue(organization.country), ...Object.fromEntries(BUSINESS_DETAIL_FIELDS.map(item => [item.key, organization[item.key] || ""])), vat_registration_status: organization.vat_registration_status || (organization.vat_number ? "registered" : "not_recorded") });
   const [edited, setEdited] = useState(false);
   const countryOptions = value => <><option value="">Select country</option>{value && !BUSINESS_COUNTRIES.some(country => country.name === value) && <option value={value}>{value} — previously saved</option>}{BUSINESS_COUNTRIES.map(country => <option key={country.code} value={country.name}>{country.name}</option>)}</>;
   const field = key => ({ name:key, value:values[key], onChange:event => {setValues(old => ({...old, [key]:event.target.value}));setEdited(true);} });
@@ -44,9 +44,6 @@ export default function BusinessProfileForm({ action, organization, workforceCou
       <div className="bpSectionTitle wide"><h3>Business contact details</h3><p>Company contact information for your organisation profile.</p></div>
       {detailInput("business_email")}{detailInput("business_phone")}{detailInput("website")}
       <label><span>Workforce — automatic count</span><input value={workforceCount === null ? "Unavailable" : workforceCount} readOnly aria-describedby="bpWorkforceHelp" /><small id="bpWorkforceHelp">Counts all people in your company register, including invited, suspended and directory records. Updates when this page opens. Manage people under <a href="/portal/company/people">People, Roles &amp; Access</a>.</small></label>
-      <div className="bpSectionTitle wide" id="powra-numbering"><h3>POWRA numbering</h3><p>References are assigned automatically on save. Set your company prefix and optional digit padding. Existing references remain unchanged.</p></div>
-      <label><span>Reference prefix</span><input {...field("powra_reference_prefix")} required maxLength={40} pattern={"[A-Za-z0-9_\\-]+"} /><small>Default: POWRA. Example custom prefix: SITE-POWRA-</small></label>
-      <label><span>Minimum digits</span><select {...field("powra_reference_padding")}>{[0,1,2,3,4,5,6,7,8].map(value => <option key={value} value={value}>{value === 0 ? "No leading zeros" : `${value} digits`}</option>)}</select><small>Next format example: {`${values.powra_reference_prefix}${String(organization.powra_next_number || 1).padStart(Number(values.powra_reference_padding) || 0,"0")}`}. The number is confirmed on save.</small></label>
     </div>
     <footer><span>Updates apply to your company workspace.</span><button type="submit" disabled={pending}>{pending ? "Saving…" : "Save company details"}</button></footer>
   </form>;

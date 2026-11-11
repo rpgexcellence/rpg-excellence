@@ -29,7 +29,7 @@ const toggleHazard = item => setHazards(current => current.includes(item) ? curr
 const decisionText = decision === "safe_to_start" ? "Safe to start" : decision === "supervisor_review" ? "Supervisor approval required" : "Stop work";
 return <form action={formAction} className="pwForm">
 {state?.error && <div className="pwNotice error" role="alert">{state.error}</div>}
-<div className="pwNotice"><strong>POWRA reference: allocated automatically on save</strong><span>Current format example: {example}. The final number is assigned when the record is saved.</span><a href="/portal/company/setup#powra-numbering">Administration · Numbering settings →</a></div>
+<div className="pwNotice"><strong>POWRA reference: allocated automatically on save</strong><span>Current format example: {example}. The final number is assigned when the record is saved.</span><a href="/portal/documents/settings#powra-numbering">Document Management · Numbering settings →</a></div>
 <input type="hidden" name="prestart_checks" value={JSON.stringify(checks.map(question => ({
 question,
 answer: answers[question]

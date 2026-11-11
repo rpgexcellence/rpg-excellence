@@ -1,6 +1,6 @@
 "use client";
 
-import CompanyPersonSiteField from "../../../../components/CompanyPersonSiteField";
+import CompanyPersonLocationFields from "../../../../components/CompanyPersonLocationFields";
 
 import { useActionState, useState } from "react";
 import ProfessionalFunctionIcon from "../../../../components/ProfessionalFunctionIcon";
@@ -14,7 +14,7 @@ import { createPersonInvitation } from "./actions";
 
 const initialState = { error: "" };
 
-export default function PeopleAccessForm({ people, sites = [], companyName }) {
+export default function PeopleAccessForm({ people, sites = [], departments = [], companyName }) {
   const [state, action, pending] = useActionState(
     createPersonInvitation,
     initialState
@@ -106,12 +106,7 @@ export default function PeopleAccessForm({ people, sites = [], companyName }) {
             <input name="position" />
           </label>
 
-          <label>
-            <span>Department</span>
-            <input name="department" />
-          </label>
-
-          <CompanyPersonSiteField sites={sites}/>
+          <CompanyPersonLocationFields sites={sites} departments={departments}/>
 
           <label>
             <span>Employee reference</span>

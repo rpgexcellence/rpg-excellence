@@ -1,5 +1,6 @@
+import {loadCompanyStructure} from "../../../../../../lib/company-structure";
 import Link from "next/link";
-import CompanyPersonSiteField from "../../../../../../components/CompanyPersonSiteField";
+import CompanyPersonLocationFields from "../../../../../../components/CompanyPersonLocationFields";
 import {loadOrganizationSites} from "../../../../../../lib/organization-sites";
 import { redirect } from "next/navigation";
 import ProfessionalFunctionIcon from "../../../../../../components/ProfessionalFunctionIcon";
@@ -26,7 +27,7 @@ export default async function EditPersonAccessPage({ params, searchParams }) {
     admin.from("organization_person_permissions").select("*").eq("person_id", personId),
   ]);
 
-  const sites = await loadOrganizationSites(organization.id, {includeInactive: true});
+  const {sites,departments} = await loadCompanyStructure(organization.id);
   const person = personResult.data;
   if (!person) redirect("/portal/company/people?error=person");
   const people = peopleResult.data || [];
@@ -37,7 +38,7 @@ export default async function EditPersonAccessPage({ params, searchParams }) {
   const editingSelf = person.user_id === user.id;
   const errorMessages = {
     identity: "Enter a valid name and email address.",
-    site: "Select an active location belonging to this company, or retain the previously recorded location.",
+    site: "Select a company location and an applicable department, or retain their historical assignments.",
     profile: "The person’s profile could not be updated.",
     authorisations: "Professional authorisations could not be updated.",
     permissions: "Module permissions could not be updated.",
@@ -69,8 +70,7 @@ export default async function EditPersonAccessPage({ params, searchParams }) {
               <label><span>Surname *</span><input name="last_name" required defaultValue={person.last_name} /></label>
               <label><span>Work email *</span><input type="email" name="email" required defaultValue={person.email} readOnly={Boolean(person.user_id)} /><small>{person.user_id ? "Email is locked after account activation. Use authenticated email-change control." : "The active invitation will use this email."}</small></label>
               <label><span>Company position</span><input name="position" defaultValue={person.position || ""} /></label>
-              <label><span>Department</span><input name="department" defaultValue={person.department || ""} /></label>
-              <CompanyPersonSiteField sites={sites} person={person}/>
+              <CompanyPersonLocationFields sites={sites} departments={departments} person={person}/>
               <label><span>Employee reference</span><input name="employee_reference" defaultValue={person.employee_reference || ""} /></label>
               <label><span>Direct line manager</span><select name="manager_person_id" defaultValue={person.manager_person_id || ""}><option value="">Not assigned</option>{people.map((item) => <option value={item.id} key={item.id}>{item.first_name} {item.last_name} · {item.position || "No position"}</option>)}</select></label>
               <label><span>Functional / dotted-line manager</span><select name="functional_manager_person_id" defaultValue={person.functional_manager_person_id || ""}><option value="">Not assigned</option>{people.map((item) => <option value={item.id} key={item.id}>{item.first_name} {item.last_name}</option>)}</select></label>
