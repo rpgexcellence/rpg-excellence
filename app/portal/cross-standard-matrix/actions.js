@@ -1,4 +1,6 @@
 "use server";
+import { createClient } from "../../../lib/supabase/server";
+
 
 import { revalidatePath } from "next/cache";
 import { requireOrganizationAccess } from "../../../lib/organization-access";
@@ -367,7 +369,7 @@ export async function linkCrossStandardEvidence(
     const {
       data: document,
       error: documentError,
-    } = await admin
+    } = await (await createClient())
       .from(
         "controlled_documents",
       )
