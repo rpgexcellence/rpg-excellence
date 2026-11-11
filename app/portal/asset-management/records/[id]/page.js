@@ -1,3 +1,4 @@
+import { createClient } from "../../../../../lib/supabase/server";
 import QRCode from "qrcode";
 import { assetRecordUrl } from "../../../../../lib/asset-label";
 import Link from "next/link";
@@ -63,7 +64,7 @@ export default async function AssetRecord({
       const {
         data,
         error: documentError
-      } = await admin.from("controlled_documents").select("id,document_number,title,revision,document_type").in("id", ids.slice(offset, offset + 100)).eq("status", "Current").in("audience", ["Customer", "Both"]);
+      } = await (await createClient()).from("controlled_documents").select("id,document_number,title,revision,document_type").in("id", ids.slice(offset, offset + 100)).eq("status", "Current").in("audience", ["Customer", "Both"]);
       if (documentError) throw new Error("Linked document information is unavailable. Please try again later.");
       documents.push(...(data || []));
     }
