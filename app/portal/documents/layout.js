@@ -1,4 +1,7 @@
-import { redirect } from "next/navigation";
-import { createClient } from "../../../lib/supabase/server";
-import { requirePlanAccess } from "../../../lib/plan-access";
-export default async function DocumentsLayout({children}){const s=await createClient();const{data:{user}}=await s.auth.getUser();if(!user)redirect("/portal/login");await requirePlanAccess(user,"starter","Documents and Evidence");return children;}
+import { requireOrganizationAccess } from '../../../lib/organization-access';
+export const dynamic = 'force-dynamic';
+export default async function DocumentsLayout({children}) {
+  // Standard company access, independent of commercial plan or paid module grants.
+  await requireOrganizationAccess(null,'view','/portal/documents');
+  return children;
+}
