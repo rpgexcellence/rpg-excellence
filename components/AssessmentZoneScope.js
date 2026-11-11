@@ -1,9 +1,12 @@
 // VERIFIED_ZONE_DRAFT_20261021: explicit conditions and unique draft keys.
 'use client';
 
+import SiteDepartmentField from "./SiteDepartmentField";
 import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 export default function AssessmentZoneScope({
   locations,
+  departments = [],
+  initialDepartmentName = "",
   buildings,
   zones,
   initialSiteId = '',
@@ -47,6 +50,7 @@ export default function AssessmentZoneScope({
               }
               return 'No active Site Profiles available';
             })()}</option>{locations.map(location => <option key={location.id} value={location.id}>{location.label}</option>)}</select></label><label className="azs-label">Building filter<select value={building} onChange={event => setBuilding(event.target.value)} disabled={!siteId}><option value="all">All buildings and external areas</option>{siteBuildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}<option value="external">External / no building</option></select></label></div>
+  <SiteDepartmentField departments={departments} siteId={siteId} initialName={initialDepartmentName} />
   <p>Managed in <a href="/portal/company/sites">Administration → Site Profile</a>{siteId && <> · <a href={"/portal/company/sites/" + siteId + "/zones"}>Buildings &amp; Zones ↗</a></>}. Changing the site clears selections outside that site.</p>
   <fieldset className="azs-zones"><legend>Applicable zones · select all that apply</legend><div className="azs-list">{visible.map(zone => <label key={zone.id} className="azs-option"><input type="checkbox" checked={selected.includes(zone.id)} disabled={zone.status === 'archived' && !selected.includes(zone.id)} onChange={event => toggle(zone.id, event.target.checked)} /><span><strong>{zone.reference} · {zone.name}</strong><small>{buildings.find(item => item.id === zone.building_id)?.name || 'External / no building'} · {zone.status}</small></span></label>)}</div>{(() => {
         if (!siteId) {

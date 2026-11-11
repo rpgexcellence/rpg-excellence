@@ -6,7 +6,7 @@ import {requireOrganizationAccess} from "../../../../../lib/organization-access"
 import {createAdminClient} from "../../../../../lib/supabase/admin";
 import {loadPermitParticipants,resolvePermitParticipants} from "../../../../../lib/permitParticipants";
 import {loadPermitCompanyOptions,resolvePermitCompanyLinks} from "../../../../../lib/permitCompanyOptions";
-import {COMMON_CONTROLS,COMMON_HAZARDS,PERMIT_CONTROL_RULES,validatePermitSpecificControls} from "../../../../../lib/permitControlRules";
+import {COMMON_CONTROLS,COMMON_HAZARDS,PERMIT_CONTROL_RULES} from "../../../../../lib/permitControlRules";
 
 const readJson=(value,fallback)=>{
   try{return JSON.parse(String(value||""))}catch{return fallback}
@@ -26,37 +26,50 @@ export async function createPermit(previousState,formData){
   await requirePlanAccess(user.id,"professional","Permit to Work");
   const admin=createAdminClient();
   const [options,companyOptions]=await Promise.all([loadPermitParticipants(organisation),loadPermitCompanyOptions(organisation)]);
-  const participants = resolvePermitParticipants(options, organisation, formData);
-  const companyLinks=resolvePermitCompanyLinks(companyOptions,formData);
+  const participants = resolvePermitParticipants(options, organisation, formData, {draft:true});
+  const companyLinks=resolvePermitCompanyLinks(companyOptions,formData,{draft:true});
   const text=name=>String(formData.get(name)||"").trim();
   const permitType=text("permit_type"),rule=PERMIT_CONTROL_RULES[permitType];
   if(!rule)throw new Error("Select a valid permit type.");
   const hazards=readJson(text("hazards"),null),commonControls=readJson(text("common_controls"),null),specific=readJson(text("permit_specific_controls"),null);
   if(!Array.isArray(hazards)||!Array.isArray(commonControls)||!specific||!Array.isArray(specific.selected)||typeof specific.values!=="object")throw new Error("The permit controls could not be read.");
-  if(!hazards.length||hazards.some(value=>!COMMON_HAZARDS.includes(value)))throw new Error("Select at least one valid hazard.");
+  if(hazards.some(value=>!COMMON_HAZARDS.includes(value)))throw new Error("Select at least one valid hazard.");
   const validCommonKeys=COMMON_CONTROLS.map(item=>item.key);
   if(commonControls.some(value=>!validCommonKeys.includes(value)))throw new Error("The common-control selection is invalid.");
-  const missingCommon=COMMON_CONTROLS.filter(item=>item.critical&&!commonControls.includes(item.key));
-  if(missingCommon.length)throw new Error(`Confirm critical control: ${missingCommon[0].label}.`);
-  const validation=validatePermitSpecificControls(permitType,specific.values,specific.selected,hazards);
-  if(!validation.valid)throw new Error(`Complete the permit-specific requirements: ${[...validation.missingControls,...validation.missingFields].join(", ")}.`);
+
+  if(specific.selected.some(key=>!rule.controls.some(control=>control.key===key)))throw new Error("The permit-specific control selection is invalid.");
+
   const controlValues=cleanControlValues(rule,specific.values,options.people);
   const precautions=[...commonControls,...specific.selected];
   const validFrom=text("valid_from"),validUntil=text("valid_until");
-  if(!text("task_description")||!text("scope_limits")||!text("work_area")||!text("linked_assessment_id")||!text("stop_work_conditions")||!text("emergency_arrangements"))throw new Error("Complete all mandatory permit fields.");
-  if(!validFrom||!validUntil||!Number.isFinite(Date.parse(validFrom))||!Number.isFinite(Date.parse(validUntil))||new Date(validUntil)<=new Date(validFrom))throw new Error("The permit expiry must be after its start time.");
-  if(text("issuer_declaration")!=="true"||text("receiver_declaration")!=="true")throw new Error("Both permit declarations must be accepted.");
-  const {data:assessment,error:assessmentError}=await admin.from("hs_risk_assessments").select("id").eq("id",text("linked_assessment_id")).eq("organization_id",organisation.id).in("status",["approved","communicated"]).maybeSingle();
-  if(assessmentError)throw new Error(assessmentError.message);if(!assessment)throw new Error("Select one of your approved or communicated risk assessments.");
+  if (validFrom && !Number.isFinite(Date.parse(validFrom)) || validUntil && !Number.isFinite(Date.parse(validUntil))) throw new Error("Enter valid permit dates, or leave them blank in the draft.");
+  if(text("linked_assessment_id")) {
+    const {data:assessment,error:assessmentError}=await admin.from("hs_risk_assessments").select("id").eq("id",text("linked_assessment_id")).eq("organization_id",organisation.id).in("status",["approved","communicated"]).maybeSingle();
+    if(assessmentError)throw new Error(assessmentError.message);if(!assessment)throw new Error("Select one of your approved or communicated risk assessments.");
+  }
+  const permitId=text("permit_id");
+  let existing=null;
+  if(permitId){
+    const {data,error}=await admin.from("hs_permits").select("id,status,updated_at").eq("id",permitId).eq("organization_id",organisation.id).maybeSingle();
+    if(error || !data || data.status!=="draft")throw new Error("Only an accessible draft permit can be edited.");
+    if(data.updated_at!==text("expected_updated_at"))throw new Error("This draft changed. Reload before saving again.");
+    existing=data;
+  }
   const reference=`PTW-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0,6).toUpperCase()}`;
-  const {data,error}=await admin.from("hs_permits").insert({
-    owner_id:organisation.owner_id,organization_id:organisation.id,permit_reference:reference,permit_type:permitType,
+  const values={
+    owner_id:organisation.owner_id,organization_id:organisation.id,permit_type:permitType,
     task_description:text("task_description"),scope_limits:text("scope_limits"),work_area:text("work_area"),...companyLinks,
-    linked_assessment_id:text("linked_assessment_id"),valid_from:new Date(validFrom).toISOString(),valid_until:new Date(validUntil).toISOString(),
+    linked_assessment_id:text("linked_assessment_id")||null,valid_from:validFrom?new Date(validFrom).toISOString():null,valid_until:validUntil?new Date(validUntil).toISOString():null,
     hazards,precautions,permit_specific_controls:{selected:specific.selected,values:controlValues},prohibited_work:text("prohibited_work")||null,
     stop_work_conditions:text("stop_work_conditions"),emergency_arrangements:text("emergency_arrangements"),...participants,
-    issuer_declaration:true,receiver_declaration:true,status:"draft",version:1
-  }).select("id").single();
+    issuer_declaration:text("issuer_declaration")==="true",receiver_declaration:text("receiver_declaration")==="true",status:"draft",
+    draft_form_data:Object.fromEntries([...formData.entries()].filter(([key,value])=>typeof value==="string"&&!['permit_id','expected_updated_at'].includes(key))),updated_at:new Date().toISOString()
+  };
+  const result=existing
+    ? await admin.from("hs_permits").update(values).eq("id",existing.id).eq("organization_id",organisation.id).eq("status","draft").eq("updated_at",existing.updated_at).select("id").maybeSingle()
+    : await admin.from("hs_permits").insert({...values,permit_reference:reference,version:1}).select("id").single();
+  const {data,error}=result;
+  if(!error && !data)throw new Error("This draft changed. Reload before saving again.");
   if(error)throw new Error(error.message);revalidatePath("/portal/health-safety/permits");redirect(`/portal/health-safety/permits/${data.id}`);
   } catch(error) { if(error?.digest?.startsWith("NEXT_REDIRECT")) throw error; return {error:error.message || "The permit could not be saved."}; }
 }

@@ -219,6 +219,7 @@ export default async function PermitRecordPage({params,searchParams}){
       <p>Only actions available to your role and the present status are shown.</p>
 
       <div className="pcActions">
+        {status==="draft"&&mayEditPermit(access)&& <Link className="pcButton" href={`/portal/health-safety/permits/${id}/edit`}>Edit draft permit</Link>}
         {status==="draft"&&mayEditPermit(access)&&
           <Action id={id} intent="submit_verification" label="Submit for verification"/>
         }

@@ -5,7 +5,7 @@ import {redirect} from "next/navigation";
 import {createClient} from "../../../../../lib/supabase/server";
 import {requirePlanAccess} from "../../../../../lib/plan-access";
 import {getPermitAccess,mayAcceptHandback,mayEditPermit,mayIssuePermit,mayReceivePermit,mayVerifyPermit} from "../../../../../lib/permitAccess";
-import {effectivePermitStatus,getCloseReadiness,getIssueReadiness,requireTransition} from "../../../../../lib/permitLifecycle";
+import {effectivePermitStatus,getPermitDefinitionBlockers,getCloseReadiness,getIssueReadiness,requireTransition} from "../../../../../lib/permitLifecycle";
 import {getPermitRule} from "../../../../../lib/permitControlRules";
 
 const clean=value=>String(value||"").trim();
@@ -173,6 +173,13 @@ export async function changePermitLifecycle(formData){
     admin,
     permit
   );
+
+  if(["submit_verification","verify","issue"].includes(intent)){
+    const blockers=getPermitDefinitionBlockers(permit);
+    const {data:assessment,error}=await admin.from("hs_risk_assessments").select("id").eq("id",permit.linked_assessment_id||"00000000-0000-0000-0000-000000000000").eq("organization_id",permit.organization_id).in("status",["approved","communicated"]).maybeSingle();
+    if(error||!assessment)blockers.push("The linked risk assessment must still be approved or communicated in this company.");
+    if(blockers.length)workflowPrompt(id,`Complete the draft before progressing: ${blockers.join(" ")} Use Edit draft permit to complete the definition.`);
+  }
 
   let toStatus=fromStatus;
   let values={updated_at:now};

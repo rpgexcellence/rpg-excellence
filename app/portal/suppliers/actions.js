@@ -98,7 +98,8 @@ export async function saveSupplier(_state, fd) {
   const id = clean(fd.get("supplier_id"));
   const intent = clean(fd.get("intent")) || "save";
   const legalName = clean(fd.get("legal_name"));
-  const address = clean(fd.get("registered_address"));
+  const addressFields=Object.fromEntries(["address_line_1","address_line_2","city","region","postal_code"].map(key=>[key,clean(fd.get(key))]));
+  const address=addressFields.address_line_1 ? [...Object.values(addressFields),clean(fd.get("country"))].filter(Boolean).join(", ") : clean(fd.get("registered_address"));
   const supplyDescription = clean(fd.get("supply_description"));
   const types = json(fd, "supplier_types", []);
   const standards = json(fd, "applicable_standards", []);
@@ -218,6 +219,7 @@ export async function saveSupplier(_state, fd) {
     legal_name: legalName,
     trading_name: clean(fd.get("trading_name")) || null,
     registered_address: address,
+    ...addressFields,
     country: clean(fd.get("country")) || null,
     company_number: clean(fd.get("company_number")) || null,
     website: clean(fd.get("website")) || null,

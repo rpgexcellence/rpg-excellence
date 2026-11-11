@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
+import { buildNonconformityRows } from "../../../lib/nonconformity-reporting.mjs";
 import ControlledDeviceDrafts from "../../../components/ControlledDeviceDrafts";
 import ManualNonconformityForm from "../../../components/ManualNonconformityForm";
 import NonconformityWorkspace from "../../../components/NonconformityWorkspace";
@@ -9,8 +10,13 @@ export const dynamic = "force-dynamic";
 const text = value => typeof value === "string" ? value : "";
 const uuid = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value)) ? value : null;
 
-export default async function NonconformityRegister({ searchParams }) {
+export default async function NonconformityRegister({ searchParams, pageMode = null }) {
   const query = await searchParams;
+  if (!pageMode && (query?.record || query?.raise === "1" || query?.audit_id !== undefined || query?.question_id !== undefined)) {
+    const target = query?.record ? `/portal/internal-audit-actions/${encodeURIComponent(query.record)}` : "/portal/internal-audit-actions/new";
+    const params = new URLSearchParams(Object.entries(query || {}).filter(([key,value]) => !["record","raise"].includes(key) && typeof value === "string"));
+    redirect(target + (params.size ? "?" + params.toString() : ""));
+  }
   const client = await createClient();
   const { data: { user } } = await client.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/internal-audit-actions");
@@ -76,9 +82,12 @@ export default async function NonconformityRegister({ searchParams }) {
   ) : null;
   const initialRaise = query?.raise === "1" || sourceRequested;
   const initialRecordId = uuid(query?.record);
+  if (pageMode === "record" && (!initialRecordId || !buildNonconformityRows(snapshot).some(row=>row.id===initialRecordId))) notFound();
   return <NonconformityWorkspace
     key={`${scope.userId}:${scope.organizationId}:${draftKey}:${initialRecordId || ""}:${initialRaise ? "raise" : "browse"}`}
     snapshot={snapshot}
+    pageMode={pageMode}
+    initialRecordTab={query?.tab === "follow_up" ? "follow_up" : "report"}
     initialView={query?.view === "management" ? "management" : "register"}
     initialRaise={initialRaise}
     initialRecordId={initialRecordId}
