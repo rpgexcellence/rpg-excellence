@@ -143,16 +143,22 @@ export default async function RcaCasePage({
     "analysisModels": analysisModels,
     "analysisNodes": analysisNodes
   });
-  const content = <main style={{
+  const content = <main className="rcaInvestigationPage" style={{
       "minHeight": "100vh",
       "background": "#f3f6fa",
       "color": "#061a35",
-      "padding": "42px 22px 80px"
+      "padding": "24px clamp(12px,2vw,30px) 80px",
+      "width": "100%",
+      "minWidth": 0,
+      "boxSizing": "border-box"
     }}>
+      <style>{`.rcaInvestigationPage *{box-sizing:border-box}.rcaInvestigationPage h1{overflow-wrap:anywhere}.rcaInvestigationPage .rcaCaseHeader>div:first-child{flex:1 1 640px;min-width:0}.rcaInvestigationPage .rcaCaseHeaderLinks{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}.rcaInvestigationPage .rcaCaseHeaderLinks a{display:inline-flex;align-items:center;justify-content:center;line-height:1.4}@media(max-width:700px){.rcaInvestigationPage .rcaCaseHeaderLinks{width:100%}.rcaInvestigationPage .rcaCaseHeaderLinks a{flex:1 1 160px}.rcaInvestigationPage nav[aria-label="8D discipline status"]{grid-template-columns:repeat(3,minmax(0,1fr))!important}}`}</style>
       <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} data-closed-case={caseClosed ? "true" : "false"}>
       <div style={{
-        "maxWidth": "1500px",
-        "margin": "0 auto"
+        "width": "100%",
+        "maxWidth": "none",
+        "minWidth": 0,
+        "margin": 0
       }}>
         {caseClosed && <div role="status" style={{ marginBottom: 20, padding: "16px 18px", border: "1px solid #9dd8c7", borderRadius: 12, background: "#edf9f4", color: "#145c48", lineHeight: 1.6 }}>
           <strong>Closed case — read only</strong>
@@ -162,7 +168,7 @@ export default async function RcaCasePage({
         {pageError === "case_closed" && !caseClosed && <div role="alert" style={{ marginBottom: 20, padding: "14px 18px", border: "1px solid #f2c078", borderRadius: 12, background: "#fff8eb", color: "#805414" }}>
           The previous save was blocked because the case was closed. Its current state has changed; review the refreshed record before editing.
         </div>}
-        <div style={{
+        <div className="rcaCaseHeader" style={{
           "display": "flex",
           "justifyContent": "space-between",
           "gap": "20px",
@@ -210,10 +216,7 @@ export default async function RcaCasePage({
               {organization?.name ?? "Organisation"} · {label(rcaCase.source_type)} · {label(rcaCase.severity)}
             </div>
           </div>
-          <div style={{
-            "display": "flex",
-            "gap": "10px"
-          }}>
+          <div className="rcaCaseHeaderLinks">
             {rcaCase.assessment_id && <Link href={"/portal/assessments/" + rcaCase.assessment_id + "/findings"} style={linkButton}>
                 ← Source assessment
               </Link>}
