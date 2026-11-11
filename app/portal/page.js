@@ -1,3 +1,4 @@
+import CompanyDocumentTasks from "../../components/CompanyDocumentTasks";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
@@ -302,11 +303,11 @@ export default async function PortalPage({ searchParams }) {
       "starter",
     ],
     [
-      "Documents & Evidence",
+      "Document Management",
       "/portal/documents",
-      "Controlled documents and objective evidence",
+      "Controlled company documents, approvals and distribution",
       "DOC",
-      "starter",
+      null,
     ],
     [
       "Training & Competence",
@@ -530,7 +531,7 @@ export default async function PortalPage({ searchParams }) {
               </div>
             </div>
             <div className="pdEvidenceGroup">
-              <SideLink href="/portal/documents">Evidence</SideLink>
+              <SideLink href="/portal/documents">Document Management</SideLink>
               <div className="pdEvidenceMenu" aria-label="Document families">
                 <Link href="/portal/documents?family=ISO%209001%3A2015%2FAmd%201%3A2024">
                   ISO 9001
@@ -662,6 +663,7 @@ export default async function PortalPage({ searchParams }) {
               href="/portal/history"
             />
           </section>
+          <CompanyDocumentTasks/>
           <section className="pdWorkspaceSection">
             <header>
               <div>
