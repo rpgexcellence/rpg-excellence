@@ -320,6 +320,13 @@ async function saveProfile(_previousState, fd) {
 
     people = withIds(parseArray(fd, "training_participants"));
 
+  const siteId = clean(information.administrationSiteId) || existing?.organization_site_id;
+  if (!siteId) return {error: "Select a controlled company site before saving the profile."};
+  const {data: controlledSite, error: siteError} = await createAdminClient().from("organization_sites")
+    .select("id").eq("id",siteId).eq("organization_id",org.id).eq("status","active").maybeSingle();
+  if (siteError || !controlledSite) return {error: "The selected company site is unavailable. Refresh and select an active site."};
+  information.administrationSiteId = controlledSite.id;
+
   information.assets = withIds(
 
     Array.isArray(information.assets) ? information.assets : [],
@@ -663,6 +670,8 @@ async function saveProfile(_previousState, fd) {
     owner_id: user.id,
 
     organization_id: org.id,
+
+    organization_site_id: controlledSite.id,
 
     status,
 

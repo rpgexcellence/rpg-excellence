@@ -1,6 +1,7 @@
+import SupplierRegister from "../../../components/SupplierRegister";
 // VERIFIED_SUPPLIER_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../components/ControlledDeviceDrafts";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
 import SupplierAssuranceWorkspace from "../../../components/SupplierAssuranceWorkspace";
 import SupplierManagementBoard from "../../../components/SupplierManagementBoard";
@@ -80,6 +81,7 @@ export default async function SuppliersPage({
       throw new Error(error.message);
     }
     suppliers = data || [];
+    if (!params?.id && params?.new !== "1") return <SupplierRegister suppliers={suppliers} companyName={organization.name} />;
     if (suppliers.length) {
       const {
         data: supplierFindings = [],
@@ -117,8 +119,9 @@ export default async function SuppliersPage({
       selected = null;
     } else if (params?.id) {
       selected = suppliers.find(item => item.id === params.id) || null;
+      if (!selected) notFound();
     } else if (params?.new !== "1") {
-      selected = suppliers[0] || null;
+      selected = null;
     }
     if (selected) {
       const {
@@ -196,6 +199,7 @@ export default async function SuppliersPage({
       dueDiligenceEvents = ddEvents || [];
     }
   }
+  if(params?.id && !selected)notFound();
   return <ControlledDeviceDrafts userId={user.id} organizationId={organization?.id} recordKey={'supplier:' + (selected?.id || 'new')} label="Supplier assessment" baseline={{
     "key": (() => {
       if (params?.new === "1") {

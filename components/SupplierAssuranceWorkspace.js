@@ -27,6 +27,11 @@ const initialData = (source = {}) => ({
   "legal_name": source.legal_name || "",
   "trading_name": source.trading_name || "",
   "registered_address": source.registered_address || "",
+  "address_line_1": source.address_line_1 || source.registered_address || "",
+  "address_line_2": source.address_line_2 || "",
+  "city": source.city || "",
+  "region": source.region || "",
+  "postal_code": source.postal_code || "",
   "country": source.country || "United Kingdom",
   "company_number": source.company_number || "",
   "website": source.website || "",
@@ -185,10 +190,11 @@ export default function SupplierAssuranceWorkspace({
       };
     })());
   }, [reviewBaseDate, selectedReviewMonths]);
-  const update = (key, value) => setData(current => ({
-    ...current,
-    [key]: value
-  }));
+  const update = (key, value) => setData(current => {
+    const next={...current,[key]:value};
+    if(["address_line_1","address_line_2","city","region","postal_code","country"].includes(key))next.registered_address=[next.address_line_1,next.address_line_2,next.city,next.region,next.postal_code,next.country].filter(Boolean).join(", ");
+    return next;
+  });
   const toggle = (list, setter, value) => setter((() => {
     if (list.includes(value)) {
       return list.filter(item => item !== value);
@@ -338,7 +344,7 @@ export default function SupplierAssuranceWorkspace({
 
             {active && <Link href={"/portal/suppliers/" + active.id + "/qbr"}>Quarterly business reviews</Link>}
 
-            <span>SUPPLIER REGISTER</span>
+            <Link href="/portal/suppliers">← Search supplier register</Link><span>SUPPLIER REGISTER</span>
 
             {suppliers.map(supplier => <Link key={supplier.id} href={"/portal/suppliers?id=" + supplier.id + ""} className={(() => {
             if (active?.id === supplier.id) {
@@ -641,7 +647,7 @@ export default function SupplierAssuranceWorkspace({
             <input type="hidden" name="subtier_suppliers" value={JSON.stringify(subTiers)} />
             <input type="hidden" name="supplier_contacts" value={JSON.stringify(contacts)} />
 
-            {step !== 0 && ["legal_name", "trading_name", "registered_address", "country", "company_number", "website", "supply_description"].map(key => <input key={key} type="hidden" name={key} value={data[key]} />)}
+            {step !== 0 && ["legal_name", "trading_name", "registered_address", "address_line_1", "address_line_2", "city", "region", "postal_code", "country", "company_number", "website", "supply_description"].map(key => <input key={key} type="hidden" name={key} value={data[key]} />)}
 
             {step !== 2 && data.uses_subtier_suppliers && <input type="hidden" name="uses_subtier_suppliers" value="on" />}
 
@@ -668,7 +674,7 @@ export default function SupplierAssuranceWorkspace({
                 <div className="saGrid">
                   <Field label="Legal supplier name *" name="legal_name" value={data.legal_name} onChange={value => update("legal_name", value)} required />
                   <Field label="Trading name" name="trading_name" value={data.trading_name} onChange={value => update("trading_name", value)} />
-                  <Field label="Registered address *" name="registered_address" value={data.registered_address} onChange={value => update("registered_address", value)} area rows="4" className="wide" required />
+                  {[["address_line_1","Address line 1 *"],["address_line_2","Address line 2"],["city","Town / city"],["region","County / region"],["postal_code","Postcode / ZIP"]].map(([key,label])=><Field key={key} label={label} name={key} value={data[key]} onChange={value=>update(key,value)} required={key==="address_line_1"}/>)}
                   <Field label="Country" name="country" value={data.country} onChange={value => update("country", value)} />
                   <Field label="Company / registration number" name="company_number" value={data.company_number} onChange={value => update("company_number", value)} />
                   <Field label="Website" name="website" value={data.website} onChange={value => update("website", value)} type="url" />

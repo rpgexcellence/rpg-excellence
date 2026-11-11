@@ -648,7 +648,7 @@ export default async function SoaPage({
         </div>
       </div>
       <div style={{
-        "maxWidth": "1280px",
+        "maxWidth": "none",
         "margin": "0 auto",
         "position": "relative",
         "zIndex": 1

@@ -1,3 +1,5 @@
+import {loadCompanyStructure} from "../../../../../lib/company-structure";
+import {requireSiteDepartment} from "../../../../../lib/site-departments.mjs";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -46,10 +48,12 @@ async function createMoc(formData) {
   const requestor = requireMocPerson(companyOptions.people, t("requestor_person_id"), "Requestor");
   const changeOwner = requireMocPerson(companyOptions.people, t("change_owner_person_id"), "Accountable change owner");
   const location = resolveMocLocation(companyOptions.locations, t("administration_location_id"));
+  const {departments}=await loadCompanyStructure(organization.id);
+  const department=requireSiteDepartment(departments,location.id,t("department_id"),true);
 
   if (
     !t("title") ||
-    !t("department") ||
+    !department ||
     !t("change_description") ||
     !t("affected_area") ||
     !t("target_date") ||
@@ -114,7 +118,7 @@ async function createMoc(formData) {
       change_owner_person_id: changeOwner.id,
       administration_location_id: location.id,
       administration_location_snapshot: location.label,
-      department: t("department"),
+      department: department.name,
       date_requested: t("date_requested"),
       change_description: t("change_description"),
       change_type: t("change_type"),
@@ -210,6 +214,7 @@ export default async function NewMoc({ searchParams }) {
 
   const selectedAsset = assets.find((asset) => asset.id === requestedAssetId) || null;
 
+  const {departments}=await loadCompanyStructure(organization.id);
   return (
     <main className="mn">
       <style>{`*{box-sizing:border-box}.mn{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.ms{max-width:1120px;margin:auto}.mh{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap;margin-bottom:22px}.mh small{color:#087f6c;font-weight:900;letter-spacing:.1em}.mh h1{margin:6px 0;font-size:34px}.mh p{margin:0;color:#657b91}.mb{padding:11px 15px;border:1px solid #cbd8e3;border-radius:9px;background:#fff;color:#173b59;text-decoration:none;font-weight:850}`}</style>
@@ -230,6 +235,7 @@ export default async function NewMoc({ searchParams }) {
           today={new Date().toISOString().slice(0, 10)}
           people={companyOptions.people}
           locations={companyOptions.locations}
+          departments={departments}
           permits={companyOptions.permits}
         />
       </div>

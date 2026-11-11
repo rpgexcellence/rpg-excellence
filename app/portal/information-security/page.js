@@ -68,7 +68,7 @@ export default async function ISMSHub() {
     ).length;
   return (
     <main className="ish">
-      <style>{styles}</style>
+      <style>{styles+".ish{grid-template-columns:220px minmax(0,1fr)}.ishMain,.ishHero,.ishCards,.ishCard{min-width:0}.ishCards{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}.ishCard p{overflow-wrap:anywhere}@media(max-width:1000px){.ish{grid-template-columns:minmax(0,1fr)}.ish>aside{position:static;height:auto}.ish nav{display:flex;flex-wrap:wrap}.ishMain{padding:20px}}"}</style>
       <aside>
         <Link href="/portal" className="ishBrand">
           <b>RPG</b> Excellence

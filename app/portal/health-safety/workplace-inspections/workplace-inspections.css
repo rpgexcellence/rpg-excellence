@@ -154,3 +154,5 @@
   .wpiPage .wpiFormFooter button{width:100%}
   .wpiPage .wpiProgrammeForm>.wpiButton{align-self:stretch;width:100%}
 }
+
+.wpiPage .wpiBlocker{padding:24px;margin:20px 0;border:1px solid #e7cf9e;border-left:5px solid #b8750c;border-radius:12px;background:#fffaf0;line-height:1.7;color:#624814}.wpiBlocker strong{display:block;font-size:18px;margin-bottom:12px}.wpiBlocker ol{display:grid;gap:12px;padding-left:24px;margin:16px 0 22px}.wpiBlocker .wpiButtons{flex-wrap:wrap}.wpiPage .wpiHero.compact{padding:24px;min-height:0}.wpiPage .wpiHero.compact>strong{font-size:26px;white-space:nowrap}

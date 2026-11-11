@@ -1,3 +1,5 @@
+import {loadCompanyStructure} from "../../../../../lib/company-structure";
+import {requireSiteDepartment} from "../../../../../lib/site-departments.mjs";
 // VERIFIED_RA_NEW_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../../../components/ControlledDeviceDrafts";
 import AssessmentZoneScope from '../../../../../components/AssessmentZoneScope';
@@ -41,6 +43,8 @@ async function createRiskAssessment(formData) {
   const assessorPersonId = text("assessor_person_id");
   const linkedPermitId = text("linked_permit_id");
   const locations = await loadAdministrationLocations(organisation);
+  const {departments}=await loadCompanyStructure(organisation.id);
+  const department=requireSiteDepartment(departments,administrationLocationId,text("department_id"));
   const location = locations.find(item => item.id === administrationLocationId);
   const [{
     data: assessor
@@ -69,7 +73,7 @@ async function createRiskAssessment(formData) {
       "assessment_type": text("assessment_type") || "general",
       "site_location": location.label,
       "administration_location_id": location.id,
-      "area_department": text("area_department") || null,
+      "area_department": department?.name || null,
       "section_lab": text("section_lab") || null,
       "project_number": text("project_number") || null,
       "task_description": taskDescription,
@@ -152,6 +156,7 @@ export default async function NewRiskAssessmentPage() {
   const access = await requireOrganizationAccess("risk_management", "contribute", "/portal/health-safety/risk-assessment/new");
   const admin = createAdminClient();
   const locations = await loadAdministrationLocations(access.organization);
+  const {departments}=await loadCompanyStructure(access.organization.id);
   const [{
     data: companyPeople,
     error: peopleError
@@ -174,8 +179,7 @@ export default async function NewRiskAssessmentPage() {
         <div className="nrField full"><label htmlFor="title">Risk assessment title *</label><input id="title" name="title" required minLength={3} placeholder="For example: Operation of pedestal drill in Engineering Workshop" /></div>
         <div className="nrField"><label htmlFor="assessment_type">Assessment type *</label><select id="assessment_type" name="assessment_type" required>{types.map(([value, title]) => <option value={value} key={value}>{title}</option>)}</select></div>
         <div className="nrField"><label htmlFor="project_number">Project / job number</label><input id="project_number" name="project_number" /></div>
-        <AssessmentZoneScope locations={locations} {...zoneScope} />
-        <div className="nrField"><label htmlFor="area_department">Area / department</label><input id="area_department" name="area_department" /></div>
+        <AssessmentZoneScope departments={departments} locations={locations} {...zoneScope} />
         <div className="nrField"><label htmlFor="section_lab">Section / laboratory</label><input id="section_lab" name="section_lab" /></div>
         <div className="nrField full"><label htmlFor="task_description">Activity, task or workplace description *</label><textarea id="task_description" name="task_description" required placeholder="Describe normal work, foreseeable abnormal conditions, equipment, materials and boundaries." /></div>
       </div></section>
