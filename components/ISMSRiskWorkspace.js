@@ -1,5 +1,6 @@
 // VERIFIED_ISMS_RISK_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
+import {soaControlHref} from "../lib/soa-workflow.mjs";
 
 import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -253,6 +254,7 @@ export default function ISMSRiskWorkspace({
   };
   const startEdit = r => {
     const treatment = treatments.find(x => x.risk_id === r.id) || {};
+    const linkedSoaId=r.soa_assessment_id||links.find(x=>x.risk_id===r.id&&x.assessment_id)?.assessment_id||"";
     setEditingId(r.id);
     setRiskTitle(r.title || "");
     setRiskOwner(r.risk_owner || "");
@@ -275,7 +277,7 @@ export default function ISMSRiskWorkspace({
       }
       return ["Confidentiality"];
     })());
-    setSelectedControls(links.filter(x => x.risk_id === r.id).map(x => ({
+    setSelectedControls(links.filter(x => x.risk_id === r.id && (x.assessment_id||"")===linkedSoaId).map(x => ({
       "control_id": x.control_id,
       "treatment_purpose": x.treatment_purpose || "Risk treatment",
       "design_status": x.design_status || "not_assessed",
@@ -304,7 +306,7 @@ export default function ISMSRiskWorkspace({
     setFieldCache({
       "assumptions": r.assumptions || "",
       "evidence_reference": r.evidence_reference || "",
-      "soa_assessment_id": r.soa_assessment_id || "",
+      "soa_assessment_id": linkedSoaId,
       "review_due_date": r.review_due_date || "",
       "treatment_action": treatment.action || "",
       "treatment_owner": treatment.action_owner || "",
@@ -509,7 +511,7 @@ export default function ISMSRiskWorkspace({
                       })())}>{a.asset_reference} · {a.asset_name}</button>)}</div>;
                   }
                   return <div className="irmNotice">No assets are registered yet. You can still complete the risk.</div>;
-                })()}<label>Linked SoA workspace<select name="soa_assessment_id" defaultValue={fieldCache.soa_assessment_id || ""}><option value="">No SoA selected</option>{assessments.map(a => <option value={a.id} key={a.id}>{(() => {
+                })()}{editingId&&<div className="irmNotice"><strong>Saved SoA links</strong>{links.filter(l=>l.risk_id===editingId&&l.assessment_id).map(l=><a key={l.id||`${l.assessment_id}:${l.control_id}`} href={soaControlHref(l.assessment_id,l.control_id)} style={{display:"block",padding:"8px 0"}}>Open linked control A.{l.control_id} →</a>)}<p>Saving controls updates only the selected SoA workspace. Links in other workspaces are retained.</p></div>}<label>Linked SoA workspace<select name="soa_assessment_id" value={fieldCache.soa_assessment_id || ""} onChange={e=>{const assessmentId=e.target.value;setFieldCache(current=>({...current,soa_assessment_id:assessmentId}));setSelectedControls(links.filter(l=>l.risk_id===editingId&&(l.assessment_id||"")===assessmentId).map(l=>({...l})));}}><option value="">No SoA selected</option>{assessments.map(a => <option value={a.id} key={a.id}>{(() => {
                         if (a.workspace_type === "soa_only") {
                           return "Standalone SoA";
                         }

@@ -1,3 +1,4 @@
+import {soaTasks} from "../../../lib/soa-workflow.mjs";
 import Link from "next/link";
 import {loadIncidentTasks} from "../../../lib/incident-tasks";
 import { createAdminClient } from "../../../lib/supabase/admin";
@@ -238,7 +239,7 @@ export default async function TasksPage({ searchParams }) {
   const incidentTasks = enabledSources.has("incident") ? await loadIncidentTasks(admin,access) : [];
   const documentSource = enabledSources.has("documents") ? await companyDocumentTasks({...access,person:me}) : {tasks:[],error:false};
   if (documentSource.error) sources.sourceErrors.push({module:"documents",label:"Document Management"});
-  const all = [...incidentTasks,...documentSource.tasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
+  const all = [...soaTasks(sources.soaEntries||[]),...incidentTasks,...documentSource.tasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
     .filter((item) => item.title && enabledSources.has(item.source))
     .map((item) => ({ ...item, due: item.due ? String(item.due).slice(0,10) : "" }))
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));

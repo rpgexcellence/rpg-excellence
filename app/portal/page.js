@@ -1,3 +1,4 @@
+import SoaPersonalTasks from "../../components/SoaPersonalTasks";
 import CompanyDocumentTasks from "../../components/CompanyDocumentTasks";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -707,6 +708,7 @@ export default async function PortalPage({ searchParams }) {
               })}
             </div>
           </section>
+          <SoaPersonalTasks/>
           <section className="pdCommandLower">
             <div className="pdPanel pdAttention">
               <div className="pdPanelHead">
