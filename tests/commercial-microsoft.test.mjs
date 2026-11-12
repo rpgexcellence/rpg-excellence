@@ -32,7 +32,7 @@ test('reviewed drafts retain exact recipient/content and reject multiple recipie
 });
 test('Graph draft creation uses fixed Graph origin, explicit HTML and never invokes sending',async()=>{
  let request;const draft=await microsoftGraph('token','/me/messages',{method:'POST',body:{subject:'Reviewed',toRecipients:[{emailAddress:{address:'test@example.com'}}]}},async(url,options)=>{request={url,options};return {ok:true,json:async()=>({id:'draft-id',isDraft:true})};});
- assert.equal(draft.isDraft,true);assert.equal(request.url,'https://graph.microsoft.com/v1.0/me/messages');assert.equal(request.options.redirect,'error');
+ assert.equal(draft.isDraft,true);assert.equal(request.url,'https://graph.microsoft.com/v1.0/me/messages');assert.equal(request.options.redirect,'manual');
  await assert.rejects(()=>microsoftGraph('token','https://evil.example'));
  const route=fs.readFileSync(new URL('../app/api/portal/marketing/microsoft/drafts/route.js',import.meta.url),'utf8');
  assert.ok(route.includes('commercialContext()'));assert.ok(route.includes('assertMicrosoftOrigin(request)'));assert.ok(route.includes('record.do_not_contact'));assert.ok(route.includes("status:'creating'"));assert.ok(route.includes("status:'unknown'"));assert.ok(!route.includes('/send'));assert.ok(!route.includes('sendMail'));

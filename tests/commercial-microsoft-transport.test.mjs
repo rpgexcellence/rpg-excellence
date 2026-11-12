@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {microsoftGraph,microsoftFailureDetails} from '../lib/commercial-microsoft.mjs';
+test('mailbox transport diagnostics classify timeout DNS TLS and connection failures without leaking raw exceptions',async()=>{
+ for(const [name,cause,expected] of [['TimeoutError','','GraphTimeout'],['TypeError','UND_ERR_CONNECT_TIMEOUT','GraphTimeout'],['TypeError','ENOTFOUND','GraphDnsFailure'],['TypeError','CERT_HAS_EXPIRED','GraphTlsFailure'],['TypeError','ECONNRESET','GraphConnectionFailure']]){let calls=0;await assert.rejects(()=>microsoftGraph('SECRET','/me/mailFolders/drafts',{timeoutMs:35000},async()=>{calls++;const e=Error('SECRET_PRIVATE_NETWORK_TRACE');e.name=name;e.cause={code:cause};throw e;}),e=>{const d=microsoftFailureDetails(e);assert.equal(d.code,expected);assert.ok(!JSON.stringify(d).includes('SECRET'));return true;});assert.equal(calls,1);}
+});
+test('Graph redirects are inspected without following or forwarding bearer tokens',async()=>{let calls=0;await assert.rejects(()=>microsoftGraph('SECRET','/me/messages',{},async(url,options)=>{calls++;assert.equal(options.redirect,'manual');return {status:302,ok:false};}),e=>e.code==='GraphRedirectBlocked'&&e.httpStatus===302);assert.equal(calls,1);});
+test('Graph time budgets are bounded and do not create automatic retries',async()=>{for(const timeoutMs of [NaN,0,36000])await assert.rejects(()=>microsoftGraph('token','/me/messages',{timeoutMs},async()=>{throw Error('must not call');}));});
