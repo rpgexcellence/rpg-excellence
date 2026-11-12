@@ -7,6 +7,7 @@ import {requirePlanAccess} from "../../../../../lib/plan-access";
 import {getPermitAccess,mayAcceptHandback,mayEditPermit,mayIssuePermit,mayReceivePermit,mayVerifyPermit} from "../../../../../lib/permitAccess";
 import {effectivePermitStatus,getPermitDefinitionBlockers,getCloseReadiness,getIssueReadiness,requireTransition} from "../../../../../lib/permitLifecycle";
 import {getPermitRule} from "../../../../../lib/permitControlRules";
+import {permitWorkflowRedirect} from "../../../../../lib/permit-workflow-feedback.mjs";
 
 const clean=value=>String(value||"").trim();
 
@@ -18,10 +19,8 @@ const personName=person=>
   person?.email||
   "Authorised user";
 
-const workflowPrompt=(id,message)=>
-  redirect(
-    `/portal/health-safety/permits/${id}?workflowError=${encodeURIComponent(message)}`
-  );
+const workflowPrompt=(id,message,stage,blockers)=>
+  redirect(permitWorkflowRedirect(id,message,stage,blockers));
 
 async function context(formData){
   const id=clean(formData.get("id"));
@@ -178,7 +177,7 @@ export async function changePermitLifecycle(formData){
     const blockers=getPermitDefinitionBlockers(permit);
     const {data:assessment,error}=await admin.from("hs_risk_assessments").select("id").eq("id",permit.linked_assessment_id||"00000000-0000-0000-0000-000000000000").eq("organization_id",permit.organization_id).in("status",["approved","communicated"]).maybeSingle();
     if(error||!assessment)blockers.push("The linked risk assessment must still be approved or communicated in this company.");
-    if(blockers.length)workflowPrompt(id,`Complete the draft before progressing: ${blockers.join(" ")} Use Edit draft permit to complete the definition.`);
+    if(blockers.length)workflowPrompt(id,"Complete the permit definition before progressing.","definition",blockers);
   }
 
   let toStatus=fromStatus;
@@ -282,7 +281,7 @@ export async function changePermitLifecycle(formData){
     if(!readiness.ready){
       workflowPrompt(
         id,
-        `The permit cannot be issued yet. ${readiness.blockers.join(" ")} Open Safety controls, complete the outstanding checks and then return to issue the permit.`
+        "The permit cannot be issued yet.","issue",readiness.blockers
       );
     }
 
@@ -413,7 +412,7 @@ export async function changePermitLifecycle(formData){
     if(!readiness.ready){
       workflowPrompt(
         id,
-        `The permit cannot be closed yet. ${readiness.blockers.join(" ")} Open Safety controls, complete controlled reinstatement and independent verification, then return to accept hand-back.`
+        "The permit cannot be closed yet. Complete controlled reinstatement and independent verification before accepting hand-back.","handback",readiness.blockers
       );
     }
 

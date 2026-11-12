@@ -2,6 +2,8 @@
 -- Authenticated grants and RLS policies are preserved; no cross-company access is added.
 begin;
 grant select, insert, update, delete on public.rca_capa_stages to service_role;
+-- Also retain the history-reader grant applied during the live C-Test retest.
+grant select on public.internal_audit_events to service_role;
 alter table public.hs_permits add column if not exists draft_form_data jsonb not null default '{}'::jsonb;
 alter table public.hs_permits alter column valid_from drop not null;
 alter table public.hs_permits alter column valid_until drop not null;
