@@ -1,6 +1,7 @@
 "use server";
 import {redirect} from "next/navigation";
 import {revalidatePath} from "next/cache";
+import {createAdminClient} from "../../../../lib/supabase/admin";
 import {createClient} from "../../../../lib/supabase/server";
 
 const clean=v=>String(v||"").trim();
@@ -30,8 +31,8 @@ export async function saveISMSRisk(fd){
  let risk,error;
 if(id){const result=await s.from("isms_risks").update(data).eq("id",id).eq("owner_id",user.id).select("id,risk_reference").single();risk=result.data;error=result.error}else{const refResult=await s.rpc("next_isms_risk_reference");const reference=refResult.data||("ISR-"+new Date().getUTCFullYear()+"-"+crypto.randomUUID().slice(0,6).toUpperCase());const result=await s.from("isms_risks").insert({...data,risk_reference:reference}).select("id,risk_reference").single();risk=result.data;error=result.error}
  if(error)throw new Error(error.message);
- await s.from("isms_risk_controls").delete().eq("risk_id",risk.id).eq("owner_id",user.id);
- if(controls.length){const{error:controlError}=await s.from("isms_risk_controls").insert(controls.map(c=>({risk_id:risk.id,owner_id:user.id,organization_id:org.id,assessment_id:soaAssessmentId,control_id:String(c.control_id),treatment_purpose:c.treatment_purpose||"Risk treatment",design_status:c.design_status||"not_assessed",operating_effectiveness:c.operating_effectiveness||"not_tested",evidence_reference:c.evidence_reference||null,review_due_date:c.review_due_date||null})));if(controlError)throw new Error(controlError.message)}
+ const {error:controlError}=await createAdminClient().rpc("replace_isms_soa_links",{p_risk:risk.id,p_actor:user.id,p_assessment:soaAssessmentId,p_controls:controls});
+ if(controlError)throw new Error("Risk controls could not be saved. Check the SoA workflow migration, then retry.");
  await s.from("isms_risk_assets").delete().eq("risk_id",risk.id).eq("owner_id",user.id);
  if(assets.length){const{error:assetError}=await s.from("isms_risk_assets").insert(assets.map(assetId=>({risk_id:risk.id,asset_id:assetId,owner_id:user.id})));if(assetError)throw new Error(assetError.message)}
  const action=clean(fd.get("treatment_action"));

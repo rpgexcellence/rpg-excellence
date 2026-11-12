@@ -1,11 +1,16 @@
+import {soaContext,soaPeople} from "../../../../../lib/soa-access";
+import SoaControlForm from "./SoaControlForm";
+import SoaPersonField from "./SoaPersonField";
+import SoaControlLinks from "./SoaControlLinks";
+import SoaEvidenceFields from "./SoaEvidenceFields";
+import "./soa-workflow.css";
 // VERIFIED_SOA_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../../../components/ControlledDeviceDrafts";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
-import { getAssessmentAccessState } from "../../../../../lib/assessment-access";
-import { provisionSoa, saveSoaControl, saveSoaRegister } from "./actions";
+import { provisionSoa, saveSoaRegister } from "./actions";
 import GuardedImplementationStatus from "./GuardedImplementationStatus";
 import ResidualRiskDecisionFields from "./ResidualRiskDecisionFields";
 const THEMES = {
@@ -115,13 +120,16 @@ function Metric({
 function ControlCard({
   row,
   canEdit,
-  findings
+  findings,
+  people=[],
+  risks=[],
+  open=false
 }) {
   const key = controlKey(row.control_id);
   const theme = THEMES[row.theme];
   const sources = row.inclusion_source ?? [];
   const complete = row.applicability !== "pending";
-  return <details style={{
+  return <details id={`soa-${key}`} open={open} style={{
     "position": "relative",
     "background": "#fff",
     "border": "1px solid " + (() => {
@@ -313,7 +321,7 @@ function ControlCard({
                 "display": "grid",
                 "gap": "7px",
                 "marginTop": "10px"
-              }}>{row.linked_risks.map(risk => <Link key={risk.id} href={"/portal/information-security/risk-management?q=" + encodeURIComponent(risk.risk_reference) + ""} style={{
+              }}>{row.linked_risks.map(risk => <Link key={risk.id} href={"/portal/information-security/risk-management?risk=" + encodeURIComponent(risk.id)} style={{
                   "display": "grid",
                   "gridTemplateColumns": "1fr auto",
                   "gap": "10px",
@@ -336,9 +344,11 @@ function ControlCard({
           })()}
           </section>
 
-          <form action={saveSoaControl}>
+          <SoaControlForm>
           <input type="hidden" name="assessment_id" value={row.assessment_id} />
           <input type="hidden" name="control_id" value={row.control_id} />
+          <input type="hidden" name="expected_updated_at" value={row.entry_updated_at||""} />
+          <SoaControlLinks row={row} risks={risks} canEdit={canEdit} />
 
           <div style={{
             "display": "grid",
@@ -403,9 +413,7 @@ function ControlCard({
             <label style={labelStyle}>Implemented control description
               <textarea name={"control_description_" + key + ""} defaultValue={row.control_description ?? ""} rows={3} style={field} disabled={!canEdit} />
             </label>
-            <label style={labelStyle}>Control owner
-              <input name={"control_owner_" + key + ""} defaultValue={row.control_owner ?? ""} style={field} disabled={!canEdit} />
-            </label>
+            <SoaPersonField people={people} name={`control_owner_person_id_${key}`} id={row.control_owner_person_id} legacy={row.control_owner} label="Control owner" canEdit={canEdit} fieldStyle={field} labelStyle={labelStyle}/>
             <label style={labelStyle}>Implementation evidence
               <textarea name={"implementation_evidence_" + key + ""} defaultValue={row.implementation_evidence ?? ""} rows={3} style={field} disabled={!canEdit} />
             </label>
@@ -424,7 +432,7 @@ function ControlCard({
                 "color": "#071a33"
               }}>Residual-risk decision guide:</strong> Low — monitor; Moderate — treat or formally accept; High — controlled treatment required; Critical — immediate escalation. High or Critical risk cannot be marked Effective.
             </div>
-            <ResidualRiskDecisionFields row={row} fieldKey={key} canEdit={canEdit} fieldStyle={field} labelStyle={labelStyle} />
+            <ResidualRiskDecisionFields row={row} fieldKey={key} canEdit={canEdit} people={people} fieldStyle={field} labelStyle={labelStyle} />
             <label style={labelStyle}>Finding reference
               <select name={"finding_reference_" + key + ""} defaultValue={row.finding_reference ?? ""} style={field} disabled={!canEdit}>
                 <option value="">No linked finding</option>
@@ -445,6 +453,7 @@ function ControlCard({
             </label>
           </div>
 
+          <SoaEvidenceFields row={row} canEdit={canEdit}/>
           {canEdit && <button style={{
             "marginTop": "16px",
             "border": 0,
@@ -457,7 +466,7 @@ function ControlCard({
           }}>
               Save A.{row.control_id}
             </button>}
-          </form>
+          </SoaControlForm>
         </div>
       </div>
     </details>;
@@ -470,27 +479,18 @@ export default async function SoaPage({
     id
   } = await params;
   const filters = await searchParams;
-  const supabase = await createClient();
-  const admin = createAdminClient();
-  const {
-    data: {
-      user
-    }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login");
-  const {
-    data: assessment,
-    error: assessmentError
-  } = await supabase.from("assessments").select("id, owner_id, organization_id, standard, status, workspace_type").eq("id", id).eq("owner_id", user.id).single();
-  if (assessmentError || !assessment) redirect("/portal");
-  if (!["ISO/IEC 27001:2022", "ISO/IEC 27001:2022/Amd 1:2024"].includes(assessment.standard)) {
-    redirect("/portal/assessments/" + id + "");
-  }
-  const access = await getAssessmentAccessState(user.id, id);
+  let ctx;
+  try{ctx=await soaContext(id);}catch{notFound();}
+  const {client:supabase,admin,user,assessment,ownerId,access}=ctx;
+  const people=await soaPeople(ctx);
+  const {data:companyRisks,error:companyRiskError}=await admin.from("isms_risks").select("id,risk_reference,title,risk_owner,residual_score,treatment_decision,status").eq("organization_id",assessment.organization_id).eq("owner_id",ownerId).neq("status","archived").order("risk_reference");
+  if(companyRiskError)throw new Error("Company risk records could not be loaded.");
+  const {data:evidenceFiles,error:evidenceError}=await admin.from("soa_control_evidence").select("id,control_id,evidence_kind,file_name,mime_type,size_bytes,created_at").eq("assessment_id",id).eq("organization_id",assessment.organization_id).eq("owner_id",ownerId).order("created_at",{ascending:false});
+  if(evidenceError)throw new Error("SoA evidence could not be loaded. Check the SoA workflow migration has been applied.");
   const {
     data: register,
     error: registerError
-  } = await admin.from("assessment_soa_registers").select("*").eq("assessment_id", id).eq("owner_id", user.id).maybeSingle();
+  } = await admin.from("assessment_soa_registers").select("*").eq("assessment_id", id).eq("owner_id", ownerId).maybeSingle();
   if (registerError) throw new Error(registerError.message);
   if (!register) {
     return <main style={{
@@ -564,9 +564,9 @@ export default async function SoaPage({
     error: riskLinksError
   }] = await Promise.all([supabase.from("iso27001_control_catalog").select("*").eq("active", true).order("control_order", {
     "ascending": true
-  }), admin.from("assessment_soa_entries").select("*").eq("assessment_id", id).eq("owner_id", user.id), admin.from("assessment_findings").select("id, question_number, finding_type, status").eq("assessment_id", id).eq("owner_id", user.id).neq("finding_type", "conformity").order("created_at", {
+  }), admin.from("assessment_soa_entries").select("*").eq("assessment_id", id).eq("owner_id", ownerId), admin.from("assessment_findings").select("id, question_number, finding_type, status").eq("assessment_id", id).eq("owner_id", ownerId).neq("finding_type", "conformity").order("created_at", {
     "ascending": true
-  }), admin.from("isms_risk_controls").select("control_id,risk_id").eq("assessment_id", id).eq("owner_id", user.id)]);
+  }), admin.from("isms_risk_controls").select("control_id,risk_id").eq("assessment_id", id).eq("owner_id", ownerId)]);
   if (catalogError) throw new Error(catalogError.message);
   if (entriesError) throw new Error(entriesError.message);
   if (findingsError) throw new Error(findingsError.message);
@@ -577,7 +577,7 @@ export default async function SoaPage({
     const {
       data,
       error
-    } = await admin.from("isms_risks").select("id,risk_reference,title,risk_owner,residual_score,treatment_decision,status").in("id", linkedRiskIds).eq("owner_id", user.id);
+    } = await admin.from("isms_risks").select("id,risk_reference,title,risk_owner,residual_score,treatment_decision,status").in("id", linkedRiskIds).eq("owner_id", ownerId);
     if (error) throw new Error(error.message);
     linkedRisks = data ?? [];
   }
@@ -589,7 +589,9 @@ export default async function SoaPage({
     ...control,
     ...entryMap.get(control.control_id),
     "assessment_id": id,
-    "linked_risks": controlRiskMap.get(control.control_id) ?? []
+    "entry_updated_at":entryMap.get(control.control_id)?.updated_at||null,
+    "linked_risks": controlRiskMap.get(control.control_id) ?? [],
+    "evidence_files":(evidenceFiles||[]).filter(file=>file.control_id===control.control_id)
   }));
   const selectedTheme = value(filters, "theme", "all");
   const selectedApplicability = value(filters, "applicability", "all");
@@ -770,7 +772,7 @@ export default async function SoaPage({
           </div>
           <form action={saveSoaRegister}>
             <input type="hidden" name="assessment_id" value={id} />
-            <fieldset disabled={!access.canEditAssessment} style={{
+            <fieldset disabled={!ctx.canApprove} style={{
               "border": 0,
               "padding": 0,
               "margin": 0
@@ -825,7 +827,7 @@ export default async function SoaPage({
                   "gridColumn": "1 / -1"
                 }}>Approval statement<textarea name="approval_statement" defaultValue={register.approval_statement ?? ""} rows={2} style={field} placeholder="Confirm that control selection, exclusions and residual risks have been reviewed and approved." /></label>
               </div>
-              {access.canEditAssessment && <button style={{
+              {ctx.canApprove && <button style={{
                 "marginTop": "14px",
                 "border": 0,
                 "borderRadius": "8px",
@@ -956,7 +958,7 @@ export default async function SoaPage({
           "display": "grid",
           "gap": "11px"
         }}>
-          {visibleRows.map(row => <ControlCard key={row.control_id} row={row} canEdit={access.canEditAssessment} findings={findings ?? []} />)}
+          {visibleRows.map(row => <ControlCard key={row.control_id} row={row} canEdit={access.canEditAssessment} findings={findings ?? []} people={people} risks={companyRisks||[]} open={filters?.control===row.control_id || filters?.saved_control===row.control_id} />)}
           {!visibleRows.length && <div style={{
             "background": "#fff",
             "border": "1px solid #d8e2ee",
