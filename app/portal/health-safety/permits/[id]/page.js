@@ -5,6 +5,7 @@ import {getPermitAccess,mayAcceptHandback,mayEditPermit,mayIssuePermit,mayReceiv
 import {effectivePermitStatus,getCloseReadiness,getIssueReadiness,PERMIT_STATUSES,statusMessage} from "../../../../../lib/permitLifecycle";
 import {COMMON_CONTROLS,getPermitRule} from "../../../../../lib/permitControlRules";
 import {changePermitLifecycle} from "./actions";
+import {permitWorkflowFeedback} from "../../../../../lib/permit-workflow-feedback.mjs";
 
 export const dynamic="force-dynamic";
 const title=value=>String(value||"").replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
@@ -37,7 +38,7 @@ export default async function PermitRecordPage({params,searchParams}){
   const close=getCloseReadiness({permit:item,isolations});
   const selected=item.permit_specific_controls?.selected||[],values=item.permit_specific_controls?.values||{};
   const labels=new Map([...COMMON_CONTROLS,...rule.controls].map(control=>[control.key,control.label]));
-  const workflowError=String(query?.workflowError||"");
+  const workflowFeedback=permitWorkflowFeedback(query,{id,canEditDefinition:mayEditPermit(access)&&status==="draft"});
 
   return <main className="pcPage"><style>{`
   *{box-sizing:border-box}
@@ -63,6 +64,9 @@ export default async function PermitRecordPage({params,searchParams}){
   .pcBox strong{display:block;margin-top:5px}
   .pcPanel{margin-top:14px;padding:21px}
   .pcPanel h2{margin:0 0 5px}
+  .pcWorkflowBlockers{margin:14px 0;padding-left:24px;line-height:1.55;columns:2;column-gap:32px}
+  .pcWorkflowBlockers li{break-inside:avoid;margin:0 0 8px;color:#74251f}
+  .pcWorkflowLink{display:inline-block;margin-top:4px}
   .pcTwo,.pcActions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .pcRecord,.pcItem{padding:12px;border-radius:9px;background:#f0f5f8;overflow-wrap:anywhere}
   .pcRecord span{display:block;font-size:10px;color:#687f93;font-weight:850}
@@ -80,6 +84,7 @@ export default async function PermitRecordPage({params,searchParams}){
   .pcButton.dark{background:#173b59}
   .pcEvent{display:grid;grid-template-columns:170px 180px 1fr;gap:12px;padding:11px;border-top:1px solid #e1e9ef;font-size:13px}
   @media(max-width:760px){
+    .pcWorkflowBlockers{columns:1}
     .pcGrid,.pcTwo,.pcActions{grid-template-columns:1fr 1fr}
     .pcEvent{grid-template-columns:1fr}
     .pcTopLinks{justify-content:flex-start}
@@ -109,12 +114,14 @@ export default async function PermitRecordPage({params,searchParams}){
       </nav>
     </header>
 
-    {workflowError&&
+    {workflowFeedback&&
       <section className="pcPanel" role="alert" style={{borderColor:"#dc6b5c",background:"#fff1ed"}}>
         <h2 style={{color:"#a3372d"}}>Action required before continuing</h2>
-        <p style={{color:"#74251f"}}>{workflowError}</p>
-        <Link className="pcBack primary" href={`/portal/health-safety/permits/${id}/controls`}>
-          Open Safety controls →
+        <p style={{color:"#74251f"}}>{workflowFeedback.message}</p>
+        {workflowFeedback.blockers.length>0&&<ul className="pcWorkflowBlockers">{workflowFeedback.blockers.map(blocker=><li key={blocker}>{blocker}</li>)}</ul>}
+        <p>{workflowFeedback.instruction}</p>
+        <Link className="pcBack primary pcWorkflowLink" href={workflowFeedback.href}>
+          {workflowFeedback.label} →
         </Link>
       </section>
     }
