@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {normalizeMicrosoftDraft,draftFingerprint,safeOutlookLink,microsoftFailureDetails,MicrosoftGraphFailure} from '../lib/commercial-microsoft.mjs';
 import {proposalEmailHtml} from '../lib/commercial-design.mjs';
 const input={requestId:'90000000-0000-4000-8000-000000000001',prospectId:'90000000-0000-4000-8000-000000000002',recipient:'contact@example.com',subject:'Reviewed subject',body:'Reviewed body',reviewed:true};
-const source=fs.readFileSync(new URL('../app/api/portal/marketing/microsoft/drafts/route.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export const dynamic=.*;\n/,'').replace('export async function POST','async function POST');
+const source=fs.readFileSync(new URL('../app/api/portal/marketing/microsoft/drafts/route.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export const (?:dynamic|maxDuration)=.*;\n/g,'').replace('export async function POST','async function POST');
 const load=new Function('deps','const {NextResponse,commercialContext,assertMicrosoftOrigin,microsoftAccessToken,normalizeMicrosoftDraft,draftFingerprint,microsoftGraph,safeOutlookLink,microsoftFailureDetails,proposalEmailHtml}=deps;'+source+';return POST;');
 function setup({record={company:'Example'},authError=false,graphError=false,saveError=false,preflightError=false}={}){
  const rows=new Map(),calls={graph:0,reservations:0};
