@@ -20,6 +20,7 @@ jobs:
       - run: npm run test:integration:db
       - run: npm run test:inspections --prefix verification
       - run: npm run test:soa --prefix verification
+      - run: npm run test:commercial --prefix verification
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co

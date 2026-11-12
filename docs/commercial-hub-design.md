@@ -1,13 +1,31 @@
-# RPG Commercial Hub design
+# RPG Commercial Hub
 
-Private interactive design at /portal/marketing. Only the server verified, email confirmed accounts r.pereszczako@sky.com and info@rpgexcellence.com can open the route. Other authenticated accounts receive not found, including other platform administrators. The navigation item follows the same access function.
+Private workspace at `/portal/marketing`. Only server-verified, email-confirmed accounts `r.pereszczako@sky.com` and `info@rpgexcellence.com` can open it, including its company detail, import and save endpoints. Other accounts receive not found or an API denial. Mailbox authorisation is separate.
 
-The supplied logo is byte identical to the existing public/rpg-report-logo.png, which this design reuses.
+The supplied logo is byte-identical to the existing `public/rpg-report-logo.png`.
 
-Seven views cover the executive overview, prospects, opportunity pipeline, campaign briefs, proposal studio, brand library and Microsoft 365 connection setup. The initial workspace is empty. An explicit sample preview loads fictional companies with reserved .example email addresses and illustrative opportunity values.
+## Company register
 
-Interactions include prospect creation and search, stage filtering, opportunity movement, service brief selection, personalised template generation, editable message and subject, branded preview, session draft saves, copy and branded HTML download. Preview state is memory only and is cleared on page reload; no prospect records or credentials are persisted. No outreach is sent, no real companies have been researched and no AI service is called by template generation.
+The register persists company identity, verified legal entity when known, structured address, general business contacts, multiple named contacts, ISO standards, service fit, research sources, qualification status and follow-up actions. Unknown details remain blank. It uses the supplier workspace's company/detail structure without reading or copying customer supplier records.
 
-Microsoft Graph OAuth, private persistent prospect storage, production draft creation, approved sending and reply synchronisation are not implemented in this design release. Their controls remain visibly unavailable, and Microsoft 365 has a setup checklist. The website account allowlist does not establish or grant mailbox access.
+Search, stage/standard/evidence filters and 20-row pagination support researched portfolios. Company detail has six sections and a recorded change history. Revisions prevent one browser session from silently overwriting another. Records are shared only between the two permitted accounts.
 
-This release changes no existing subscription or account entitlements. A production data release must repeat authorisation on every server action and export, use private database policies and server-held OAuth tokens, and include an auditable approval queue.
+JSON import validates the complete file before writing. A transaction prevents partial batches, repeat submissions are idempotent and existing companies are skipped rather than overwritten. Website hostnames are used as duplicate keys; brands sharing one hostname require review before import. Limits are 500 companies and 2 MB per import. No researched prospect data belongs in this public repository.
+
+`Researched` is distinct from qualified opportunities. Research records have no inferred deal value. Published certification or sector relevance is a potential fit, not evidence of purchase intent. Source dates and limitations remain visible. Company/contact do-not-contact flags block proposal preparation.
+
+## Database setup and release
+
+Before the persistent register release, run `supabase/migrations/20261112_commercial_prospect_register.sql` in the production Supabase SQL editor. It creates three commercial-only tables and service-role-only functions. It enables row-level security, revokes anonymous/authenticated table and function access, and independently checks the verified two-account allowlist inside save/import functions. It does not modify supplier records or subscription entitlements. The migration is rerunnable; its final check should return `ready = true`.
+
+Until the migration is applied, the interface reports setup required and disables import rather than presenting a database failure as an empty register.
+
+After deployment, sign in as an authorised account, open Prospects, choose Import research JSON, and select the prepared private research file. Verify the imported count, open a company, and refresh before treating the import as complete. The research file is delivered separately, never embedded in public source.
+
+## Remaining Microsoft integration
+
+Seven views cover overview, companies, pipeline, campaigns, proposals, brand library and Microsoft setup. Proposal generation uses local service templates, not an AI service. Email drafts remain session-only; branded HTML can be copied or downloaded. Microsoft Graph OAuth, Outlook draft creation, approved sending and reply synchronisation are not yet implemented. Connection controls remain unavailable. No outreach is sent by this release.
+
+## Validation
+
+Run `npm test`, `npm --prefix verification run test:commercial`, and `npm run build`. The database integration test applies the migration twice, rejects foreign and unconfirmed accounts, exercises transactional/idempotent imports, duplicate skipping, revision conflicts, cross-account updates, audit events and service-only privileges. Production persistence must still be verified after the manual migration and deployment.

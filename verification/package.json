@@ -9,7 +9,8 @@
     "test:owner-sites": "node owner-sites-sql.test.mjs",
     "test:documents": "node document-management-sql.test.mjs",
     "test:document-foundation": "node document-foundation-sql.test.mjs",
-    "test:soa": "node soa-workflow-sql.test.mjs"
+    "test:soa": "node soa-workflow-sql.test.mjs",
+    "test:commercial": "node commercial-prospects-sql.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11"
