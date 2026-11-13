@@ -3235,3 +3235,41 @@ a {
     font-size: 36px;
   }
 }
+
+/* Public prospectus alongside the homepage account button. */
+.homeAccountProspectusRow {
+  display: flex;
+  flex: 0 0 100%;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 11px;
+}
+.homeProspectusCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 20px;
+  border: 2px solid #10274b;
+  border-radius: 10px;
+  background: #10274b;
+  color: #fff;
+  font-weight: 900;
+  text-decoration: none;
+  box-shadow: 0 12px 24px rgba(16, 39, 75, 0.15);
+}
+.homeProspectusCta:hover { background: #1b3b68; border-color: #1b3b68; }
+.homeProspectusCta:focus-visible { outline: 3px solid #1762ef; outline-offset: 4px; }
+.homeProspectusBadge {
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+@media (max-width: 760px) {
+  .homeAccountProspectusRow { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .homeAccountProspectusRow > a { width: 100%; box-sizing: border-box; }
+}
