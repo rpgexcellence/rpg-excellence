@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BUSINESS_PLANS, businessPrice, formatPrice, licenceEnquiryHref } from '../lib/pricing-options.mjs';
 
-test('annual licence quotes apply 15% saving and show VAT only as a separate illustration', () => {
+test('annual licence quotes charge twelve full months and show VAT only as a separate illustration', () => {
   const totals = BUSINESS_PLANS.map(plan => businessPrice(plan, 'annual'));
-  assert.deepEqual(totals.map(p => p.billedPence), [80580, 202980, 406980]);
-  assert.deepEqual(totals.map(p => p.futureVatInclusivePence), [96696, 243576, 488376]);
-  assert.deepEqual(totals.map(p => formatPrice(p.monthlyEquivalentPence)), ['£67.15', '£169.15', '£339.15']);
-  assert.deepEqual(BUSINESS_PLANS.map(plan => businessPrice(plan).billedPence), [7900, 19900, 39900]);
+  assert.deepEqual(totals.map(p => p.billedPence), [94800, 298800, 598800]);
+  assert.deepEqual(totals.map(p => p.futureVatInclusivePence), [113760, 358560, 718560]);
+  assert.deepEqual(totals.map(p => formatPrice(p.monthlyEquivalentPence)), ['£79', '£249', '£499']);
+  assert.deepEqual(BUSINESS_PLANS.map(plan => businessPrice(plan).billedPence), [7900, 24900, 49900]);
 });
 
 test('licence enquiry retains the selected band, billing and locale without starting checkout', () => {
