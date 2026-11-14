@@ -47,10 +47,11 @@ const initialForm = {
   website: "",
 };
 
-export default function ContactEnquiryForm({ locale = "en", source = "contact-page", initialStandard = "", initialTopic = "" }) {
+export default function ContactEnquiryForm({ locale = "en", source = "contact-page", initialStandard = "", initialTopic = "", initialMessage = "" }) {
   const startingForm = {
     ...initialForm,
     topic: initialTopic || "",
+    message: typeof initialMessage === "string" ? initialMessage.slice(0, 3000) : "",
     standards: initialStandard && standards.includes(initialStandard) ? [initialStandard] : [],
   };
   const [form, setForm] = useState(startingForm);

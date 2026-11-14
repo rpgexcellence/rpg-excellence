@@ -21,7 +21,7 @@ export default async function Contact({ params, searchParams }) {
             <span className="kicker">Contact</span>
             <h1>Let’s discuss what your organisation needs.</h1>
             <p className="lead">Tell us which standards, assurance topic and outcome matter to you. We will use the details to prepare a focused response.</p>
-            <ContactEnquiryForm locale={locale} source="contact-page" initialStandard={query?.standard || ""} initialTopic={query?.topic || ""} />
+            <ContactEnquiryForm locale={locale} source="contact-page" initialStandard={query?.standard || ""} initialTopic={query?.topic || ""} initialMessage={typeof query?.message === "string" ? query.message.slice(0, 3000) : ""} />
           </div>
           <aside className="companyContactCard" aria-labelledby="company-details-heading">
             <span className="kicker">Company details</span>
