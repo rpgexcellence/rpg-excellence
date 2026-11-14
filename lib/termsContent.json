@@ -1,0 +1,417 @@
+{
+  "title": "Terms and Conditions",
+  "version": "2026-11-14",
+  "introduction": [
+    "These Terms govern the RPG Excellence website, RPG Intelligence software, assessments, digital publications, training and professional services supplied by RPG EXCELLENCE LTD. Clauses 1 to 32 apply together with the relevant Order and the applicable schedules. Schedule A defines software support and additional services. Schedule B applies where we process personal data on your behalf. Schedule C gives additional protections to consumers and overrides any inconsistent business provision.",
+    "Business licences and consumer purchases are different. A person is a consumer when acting wholly or mainly outside their trade, business, craft or profession. The name of a plan, the use of a personal email address or the fact that a person buys individually does not by itself determine their legal status."
+  ],
+  "sections": [
+    {
+      "number": "1",
+      "heading": "About RPG Excellence and these Terms",
+      "paragraphs": [
+        "1.1 We, us and RPG mean RPG EXCELLENCE LTD, registered in England and Wales under company number 17564662, with registered office at 71–75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ. Contact us at info@rpgexcellence.com or by post at that address. RPG Intelligence and RPG Excellence are our product and trading names.",
+        "1.2 You and Customer mean the person or legal entity contracting with us. An Order means the accepted order form, checkout confirmation or written quotation identifying the services, charges, term and any agreed limits. A Statement of Work or SOW sets out a professional-services project. Customer Content means information and materials submitted by you or your authorised users. Customer Personal Data has the meaning given in Schedule B.",
+        "1.3 A Business Day is Monday to Friday, excluding public holidays in England. A Contract Year is each successive twelve-month period from the start of the relevant Order; a shorter Order has one Contract Year. References to days otherwise mean calendar days. Writing includes email and a durable electronic record."
+      ]
+    },
+    {
+      "number": "2",
+      "heading": "Contract formation and document priority",
+      "paragraphs": [
+        "2.1 Pricing pages and discussions are invitations to enquire unless expressly stated otherwise. A business quotation becomes an Order when you accept it in writing and we confirm acceptance. An online purchase becomes a contract when we confirm acceptance electronically. An acknowledgement of receipt alone is not acceptance. Before purchase, you must be able to review the scope, total charges, term and applicable Terms. A person ordering for an organisation confirms authority to bind that organisation.",
+        "2.2 We will provide or make available a copy of the accepted Order and applicable Terms that you can save. We will identify the version applying to the Order. Account creation or website use alone does not create a paid commitment or authorise an additional charge.",
+        "2.3 Mandatory consumer rights take priority. For personal-data processing, Schedule B or a separately signed data-processing agreement prevails on that subject. Otherwise, a signed agreement expressly varying identified provisions takes priority, followed by the Order and SOW for their stated scope, these Terms, and incorporated service schedules. An Order changes liability limits only if it expressly identifies and replaces clause 24. Your purchase-order boilerplate does not amend our agreement unless we expressly accept it in writing.",
+        "2.4 We may improve the service, but will not materially reduce the contracted paid functionality during a committed term without your agreement, a reasonably equivalent alternative or an appropriate remedy under these Terms. Urgent security or legal restrictions may require proportionate changes."
+      ]
+    },
+    {
+      "number": "3",
+      "heading": "Accounts and authorised users",
+      "paragraphs": [
+        "3.1 Keep account and administrator details accurate. Each person who signs in must use their own authorised account. Credentials must not be shared, sold or used to disguise additional users. Protect credentials and promptly notify us of suspected compromise.",
+        "3.2 The Order defines the named-user allowance and permitted organisations. Unless expressly agreed otherwise, administrators, practitioners, reviewers, approvers, document readers and acknowledgers who sign in count as named users. Public anonymous reporters using a published QR reporting route do not require a paid account solely to submit a report.",
+        "3.3 You may reassign a licence when a person leaves or genuinely changes responsibilities, but not repeatedly rotate accounts to avoid the allowance. Any increase, additional organisation or paid module requires an agreed Order or variation; we will not impose an undisclosed automatic upgrade.",
+        "3.4 Your authorised company administrators control company access and company records within their permissions. You are responsible for appropriate roles, leaver arrangements and independence of reviews. We remain responsible for security failures attributable to us. Access to company records by our authorised personnel must be limited to legitimate service, support, security or legal purposes and subject to confidentiality."
+      ]
+    },
+    {
+      "number": "4",
+      "heading": "Acceptable use",
+      "paragraphs": [
+        "4.1 You must not use the services unlawfully; infringe intellectual-property, privacy or confidentiality rights; upload malware; attack or disrupt systems; evade access, payment or licence controls; impersonate others; or deliberately fabricate compliance evidence. Security testing requires our written permission except where a legal right cannot be restricted.",
+        "4.2 You must not copy, resell, sublicense or systematically extract our software or proprietary content, or reverse engineer it, except as expressly licensed or permitted by law. Reasonable use of agreed export functions for your own records is permitted. Any usage or storage allowance must be disclosed in the Order. Where use threatens service integrity, we may apply proportionate protective measures and discuss a suitable arrangement rather than impose an undisclosed fee."
+      ]
+    },
+    {
+      "number": "5",
+      "heading": "Customer responsibilities",
+      "paragraphs": [
+        "5.1 You are responsible for lawful, accurate and appropriately limited Customer Content, your instructions, authorised users and the suitability of the services for your operations. You must have a lawful basis and any additional condition required for personal data you submit, including health information.",
+        "5.2 Appoint competent people to review assessments, findings, risk evaluations, actions and decisions. Maintain suitable operational, emergency and statutory reporting arrangements outside the platform where necessary. The service is not an emergency-response service or a substitute for legally required reporting.",
+        "5.3 Do not upload passwords, secret keys, payment-card credentials, classified material or unnecessary sensitive personal information. Any higher-security or regulated-data requirement must be agreed before the relevant information is supplied. Your responsibilities do not release us from our own contractual or legal obligations."
+      ]
+    },
+    {
+      "number": "6",
+      "heading": "Assessments and decision support",
+      "paragraphs": [
+        "6.1 Assessments, readiness scores, findings and recommendations are decision-support outputs based on the information available and the methodology used. Completion, a score or closure of an action does not by itself establish compliance, maturity or effectiveness.",
+        "6.2 Evaluate outputs alongside evidence, outstanding findings, risks and competent professional judgement. You remain responsible for operational decisions, including release, approval, investigation conclusions and any regulator notification. We remain responsible for performing the services we have contracted to provide."
+      ]
+    },
+    {
+      "number": "7",
+      "heading": "ISO and certification",
+      "paragraphs": [
+        "7.1 RPG is not an accredited certification body. Our tools, reports and consultancy do not constitute accredited certification or regulatory approval, and do not guarantee certification, a successful audit, legal compliance, prevention of incidents or acceptance of evidence by a third party.",
+        "7.2 Certification and accreditation decisions belong to the relevant independent bodies. References to standards describe the service context and do not imply endorsement, official affiliation or permission to reproduce a standard. Where access to a licensed standard is necessary, the Order will state who must obtain it."
+      ]
+    },
+    {
+      "number": "8",
+      "heading": "AI and automated functionality",
+      "paragraphs": [
+        "8.1 Some functions use automation or AI assistance. The published AI Assurance and Guardrails statement describes released capabilities and their boundaries. A reference to AI does not mean that an external generative provider is used for every function.",
+        "8.2 Assisted output can be inaccurate, incomplete or unsuitable. A competent person must review it before material operational, safety, environmental, legal, financial, certification or management reliance. Automated output is not individually reviewed by an RPG consultant unless that review is expressly purchased.",
+        "8.3 We will not use Customer Content to train a generally available AI model, or send it to an external generative provider for a new purpose, without your prior documented authorisation and applicable data-processing arrangements. A proposed provider-enabled feature must identify relevant processing before use. You must follow your organisation’s policies and avoid unnecessary personal or confidential input.",
+        "8.4 These qualifications do not exclude our responsibility for our own breach, negligence or statutory duties. No blanket customer indemnity applies merely because an AI-assisted feature is used."
+      ]
+    },
+    {
+      "number": "9",
+      "heading": "Professional advice",
+      "paragraphs": [
+        "9.1 Unless expressly contracted as professional services, the platform, publications and outputs are general information and tools, not individual legal, financial, medical or regulated engineering advice. Seek appropriately qualified advice for circumstances requiring it. Purchasing a software licence does not engage RPG to audit or approve your organisation’s management system."
+      ]
+    },
+    {
+      "number": "10",
+      "heading": "Implementation and professional services",
+      "paragraphs": [
+        "10.1 Engineering support, implementation, migration, bespoke configuration, development, consultancy and structured training are additional services unless expressly included in the Order. Their scope and charges must be agreed in writing before work starts. Schedule A explains this boundary.",
+        "10.2 A SOW should identify deliverables, assumptions, exclusions, dependencies, customer responsibilities, milestones, acceptance criteria, charges and approved expenses. We will perform agreed services with reasonable care and skill. You must provide timely access, information and decisions; any resulting change in timetable or fee must be explained and agreed rather than assumed.",
+        "10.3 Changes require a written variation identifying the scope, price and timetable impact. A support enquiry does not itself authorise paid work. Additional work may be paused pending agreement. We will correct a deliverable that fails the agreed specification because of our breach without charging for that correction.",
+        "10.4 Unless the SOW states otherwise, you have ten Business Days after delivery to accept a project deliverable or identify specific nonconformities against its acceptance criteria. Silence alone does not constitute acceptance. We will investigate and remedy substantiated issues and resubmit as appropriate. Acceptance does not waive latent defects or rights that cannot be excluded.",
+        "10.5 Findings are limited by the agreed scope, information reasonably available and circumstances at the time. No consultancy engagement guarantees certification, future performance or absence of every nonconformity."
+      ]
+    },
+    {
+      "number": "11",
+      "heading": "Intellectual property and permitted use",
+      "paragraphs": [
+        "11.1 We and our licensors retain rights in the platform, software, source code, methods, reusable templates, designs and branding. Subject to the Order and payment, you receive a non-exclusive, non-transferable right to use the purchased service for the agreed term and purposes.",
+        "11.2 A normal company licence permits your organisation’s internal business use. Work for separate client organisations is permitted only under a Consultant, multi-organisation or other expressly agreed licence, within its access controls. Each client’s data and authority must be kept separate.",
+        "11.3 You retain ownership of your original content. For paid-for customer-specific reports, completed records and consultancy deliverables, you may retain and use supplied outputs for their agreed purpose after the service ends, including sharing them with your advisers, auditors, regulators and authorised clients where applicable. That permission does not transfer our underlying software or permit resale of reusable templates. The Order may expressly grant further rights.",
+        "11.4 Publications and training materials are licensed to the purchased learner or organisation for the stated use. They may not be redistributed, commercially republished or supplied to additional learners without permission. We warrant that we have the rights needed to supply the services and licences we grant."
+      ]
+    },
+    {
+      "number": "12",
+      "heading": "Customer content",
+      "paragraphs": [
+        "12.1 You grant us a non-exclusive right to host, copy, transmit, back up and otherwise process Customer Content only as reasonably necessary to provide, secure and support the contracted services, comply with law and follow your lawful instructions. You confirm that you can grant those rights.",
+        "12.2 We do not acquire ownership of Customer Content and will not sell it or use it for unrelated advertising. Processing of personal data is additionally restricted by Schedule B. Maintain copies of important exports where practical; this does not transfer our agreed backup, security or restoration responsibilities to you."
+      ]
+    },
+    {
+      "number": "13",
+      "heading": "Confidentiality",
+      "paragraphs": [
+        "13.1 Each party must protect the other’s confidential information with at least reasonable care, use it only for the agreement, and disclose it only to people and suppliers who need it and are bound by appropriate confidentiality duties. Customer Content and non-public business, technical and security information are confidential.",
+        "13.2 Exceptions apply to information lawfully public, already lawfully held without restriction, independently developed, or lawfully received from another source. A legally compelled disclosure must be limited to what is required and notified in advance where permitted.",
+        "13.3 These duties continue for five years after termination and longer for trade secrets while they remain secret. Personal-data duties continue for as long as the data is retained."
+      ]
+    },
+    {
+      "number": "14",
+      "heading": "Privacy and data processing",
+      "paragraphs": [
+        "14.1 Our Privacy Notice explains processing for purposes for which we determine the means and purposes, such as business administration, billing and lawful account-security activities. It is not a substitute for a processor contract.",
+        "14.2 Schedule B is incorporated whenever we process personal data on your behalf. A separately signed data-processing agreement may replace it. We must provide the processing and subprocessor information required by that schedule before processing under this version begins.",
+        "14.3 Each party must comply with the data-protection law applying to its role. The agreement does not remove data subjects’ rights or restrict the powers of a regulator."
+      ]
+    },
+    {
+      "number": "15",
+      "heading": "Third party services and integrations",
+      "paragraphs": [
+        "15.1 We may use contracted infrastructure and service providers, subject to our obligations and Schedule B. We remain responsible for our own obligations when using those providers. A supplier outage does not automatically release us from contractual responsibility.",
+        "15.2 Services you independently contract for, including connected mailboxes or other customer-controlled systems, remain subject to their own terms. You must authorise integrations and maintain required access. We will describe a material dependency or restriction relevant to the purchased scope. No integration gives us unrestricted authority to send communications or perform transactions on your behalf."
+      ]
+    },
+    {
+      "number": "16",
+      "heading": "Availability maintenance and security",
+      "paragraphs": [
+        "16.1 We will use reasonable care and skill to operate the paid service, apply appropriate security measures and manage reported faults. Maintenance and interruptions may occur. No fixed uptime percentage, guaranteed recovery time, round-the-clock response or service credit applies unless expressly agreed in a service-level schedule.",
+        "16.2 We will give reasonable advance notice of planned material disruption where practicable. Urgent security work may require immediate action. We will take reasonable steps to mitigate disruption, investigate material incidents and provide relevant updates.",
+        "16.3 We will not describe a technical measure, certification, hosting location or recovery capability as committed unless verified and included in the agreed service information. Customers must assess any sector-specific requirement before deployment in their operations."
+      ]
+    },
+    {
+      "number": "17",
+      "heading": "Prices payment and additional charges",
+      "paragraphs": [
+        "17.1 The Order states the charges, currency, billing frequency, initial commitment and applicable taxes. Business base prices and any VAT must be clearly distinguished. We will charge VAT only where lawfully applicable and we are entitled or required to do so; a future VAT illustration is not a present tax charge. Consumer prices must show the total payable before purchase.",
+        "17.2 Subscription fees are payable in advance for the period stated. Annual billing means a twelve-month commitment unless expressly stated otherwise. Monthly instalments do not reduce an expressly agreed annual commitment. An annual discount applies only if expressly offered in the accepted Order.",
+        "17.3 Unless the Order states otherwise, a business invoice is due fourteen days after issue. Notify us promptly of a genuine invoice dispute, with reasons, and pay undisputed amounts when due. A failure to dispute within a particular period does not remove statutory rights. We will discuss payment issues before exercising a proportionate suspension right.",
+        "17.4 Optional engineering support and professional services are charged only under a written agreement. Additional hours, travel, expenses or third-party costs require prior agreement. We will not charge retrospectively for an unapproved service or for correcting our own contractual failure.",
+        "17.5 We may propose new business prices for renewal on at least thirty days’ notice, allowing you to decline renewal. Prices during an agreed fixed term do not increase except for an agreed scope change or a lawfully applicable tax change. Existing customers retain their agreed terms until a valid renewal or variation takes effect. Consumer price changes must also comply with Schedule C and applicable law."
+      ]
+    },
+    {
+      "number": "18",
+      "heading": "Renewal trials and cancellation",
+      "paragraphs": [
+        "18.1 The Order must say whether the service ends automatically or renews, and state the renewal period and cancellation method. An annual business Order does not automatically renew unless expressly agreed. A recurring monthly subscription renews monthly only where that arrangement was clearly accepted at checkout or in the Order.",
+        "18.2 You may stop an agreed renewal through the available billing control or by emailing info@rpgexcellence.com before the renewal takes effect. We will confirm the instruction. Cancellation takes effect at the end of the paid period unless another right permits earlier termination. Business cancellation for convenience does not normally refund the current committed period; this does not affect remedies for our breach or mandatory rights.",
+        "18.3 Where annual business automatic renewal is agreed, we will send a reminder at least thirty days before renewal. We must identify any trial end date, first charge, billing frequency and cancellation route before a trial starts. A free trial converts to a paid service only where you expressly accepted that conversion and its price in advance.",
+        "18.4 Consumer cancellation and renewal protections are set out in Schedule C. A product’s agreed one-off access or record-retention entitlement is not converted into a recurring subscription without express agreement."
+      ]
+    },
+    {
+      "number": "19",
+      "heading": "Consumer rights",
+      "paragraphs": [
+        "19.1 If you are a consumer, Schedule C applies. Nothing in these Terms limits mandatory rights relating to service quality, digital content, cancellation, refunds or fair contract terms. Business-only liability exclusions, financial caps and fixed-term cancellation restrictions do not apply to you to the extent stated in Schedule C."
+      ]
+    },
+    {
+      "number": "20",
+      "heading": "Suspension",
+      "paragraphs": [
+        "20.1 We may suspend only to the extent reasonably necessary to address a serious security risk, fraud, unlawful activity, material misuse, a legal requirement, material contractual breach or an undisputed overdue business payment.",
+        "20.2 Where practicable, we will explain the reason and give a reasonable opportunity to remedy it before suspension. Urgent action may be taken first where notice would create risk or be unlawful. We will review the restriction and restore affected access when the reason has been addressed. A restriction must not be used to avoid our data-return obligations where a secure lawful alternative is possible."
+      ]
+    },
+    {
+      "number": "21",
+      "heading": "Termination and remedies",
+      "paragraphs": [
+        "21.1 Either party may terminate the affected Order for the other’s material breach if it is not remedied within fourteen days after written notice specifying the breach, where capable of remedy. A serious irremediable breach may justify immediate termination. We may terminate for serious unlawful activity or security abuse where proportionate and necessary.",
+        "21.2 If you validly terminate for our material breach, or we discontinue a paid service without your breach and without a reasonably equivalent alternative you accept, we will refund prepaid charges for the unused affected period. We will not charge an early-termination fee in those circumstances. Other legal remedies remain subject to clause 24 where applicable.",
+        "21.3 Termination ends the affected future access rights, but not rights already accrued, confidentiality, ownership, applicable liability provisions or data-return obligations. Unrelated Orders are not automatically terminated. Your failure to renew a licence is not itself a breach."
+      ]
+    },
+    {
+      "number": "22",
+      "heading": "Data export retention and deletion",
+      "paragraphs": [
+        "22.1 During the service, use available export tools and contact us about any required format or assistance. Standard available exports and the ordinary end-of-service process below are included. Bespoke conversion, migration to another platform or exceptional extraction is separately quoted, without charging for work needed to remedy our own breach or perform a non-chargeable legal duty.",
+        "22.2 Unless you request earlier deletion or a different lawful arrangement is agreed, you have thirty days after termination of the relevant data-hosting entitlement to request or take a standard export of the Customer Content we still hold. We will provide a secure practicable method; full application access is not guaranteed during that period. A necessary security restriction does not eliminate the entitlement where secure return is possible.",
+        "22.3 At your choice, we will return or delete Customer Personal Data in accordance with Schedule B. Following the export period, active service copies will be deleted within a further thirty days unless law requires retention or you have agreed a continuing service. Backup copies must be placed beyond ordinary use and removed through a documented cycle within ninety days after active deletion, unless a specific lawful retention duty applies. We will identify any required retention and protect retained data.",
+        "22.4 Expiry of an editing or assessment-completion window is not termination of a separately promised read-only retention entitlement. That entitlement continues on the accepted product terms. Any proposed change to it must follow those terms and applicable law; this clause does not silently shorten an existing promise.",
+        "22.5 We will give reasonable notice of a planned deletion affecting a paid retention entitlement and explain available export steps. Retention of our separate invoicing and legal records is governed by our Privacy Notice and legal duties."
+      ]
+    },
+    {
+      "number": "23",
+      "heading": "Warranties and service limitations",
+      "paragraphs": [
+        "23.1 We will provide paid services with reasonable care and skill and materially in accordance with the accepted description. Report a suspected fault with reasonable supporting details so we can investigate. Schedule A describes the support process.",
+        "23.2 We do not promise uninterrupted operation, instant correction of every fault, compatibility with every third-party system or a particular certification or commercial outcome. These limitations do not remove an express specification, a mandatory guarantee or responsibility for our own failure to meet the agreement.",
+        "23.3 Consumer remedies, including applicable rights to repeat performance, repair, replacement or price reduction, remain available under Schedule C and law."
+      ]
+    },
+    {
+      "number": "24",
+      "heading": "Liability for business services",
+      "paragraphs": [
+        "24.1 Nothing excludes or limits liability for death or personal injury caused by negligence, fraud or fraudulent misrepresentation, or any other liability that cannot lawfully be limited. Nothing restricts a data subject’s statutory claim or a regulator’s powers. Clauses 24.2 to 24.6 apply to business customers, not consumers.",
+        "24.2 Subject to clause 24.1 and the higher limit in clause 24.3, our total aggregate liability arising out of or in connection with an Order in each Contract Year, in contract, tort including negligence, misrepresentation, statutory duty or otherwise, is limited to the greater of £1,000 and the charges paid or contractually payable for that Order for that Contract Year. For a shorter Order, use its total agreed charges. A free business service has a £1,000 general limit.",
+        "24.3 For our breach of confidentiality, our data-protection obligations or the warranty in clause 11.4 that we have the rights to supply the licensed service, the aggregate limit for the relevant Contract Year is the greater of £5,000 and twice the general limit under clause 24.2. This replaces, rather than adds to, the general limit for those claims; the combined total for all capped claims for that year must not exceed this higher limit.",
+        "24.4 Claims are allocated to the Contract Year in which the event first giving rise to the claim occurred. Connected events with the same underlying cause are treated together. Multiple claims, users or legal grounds do not multiply a limit. We may not use this allocation to exclude a claim that cannot lawfully be limited.",
+        "24.5 Subject to clause 24.1, neither party is liable to the other for indirect or consequential loss. We are not liable for a business customer’s lost profit, revenue, anticipated savings, business opportunity or goodwill, whether direct or indirect. Reasonable direct costs of restoring or reconstructing Customer Content lost through our breach are not excluded merely because they concern data, but remain subject to the applicable financial limit.",
+        "24.6 You must take reasonable steps to mitigate loss. Nothing makes you liable for our negligence or imposes an unlimited customer indemnity. Your obligation to pay properly agreed charges is not reduced by our liability cap. A different allocation may be negotiated expressly in a signed agreement. No provision is intended to operate beyond what applicable law permits."
+      ]
+    },
+    {
+      "number": "25",
+      "heading": "Events outside reasonable control",
+      "paragraphs": [
+        "25.1 A party affected by an event genuinely beyond its reasonable control must promptly explain the material impact, take reasonable steps to mitigate it and resume performance. Ordinary staffing shortages, lack of funds and avoidable failures to maintain appropriate security or continuity measures are not automatically excused.",
+        "25.2 A provider incident or cyber incident qualifies only to the extent the affected failure was genuinely outside reasonable control and was not caused or materially worsened by breach of the affected party’s obligations. Accrued payment and data-protection duties are not generally cancelled by such an event.",
+        "25.3 If an event prevents material use of a paid service for more than thirty consecutive days, either party may end the affected Order on written notice. We will refund prepaid charges for the unused period after termination. Mandatory consumer remedies remain unaffected."
+      ]
+    },
+    {
+      "number": "26",
+      "heading": "Changes to these Terms",
+      "paragraphs": [
+        "26.1 We will identify the version and effective date of revised Terms. New Terms apply to new Orders accepted on or after that date. Publication alone does not retrospectively replace an existing signed agreement, Order or retention commitment.",
+        "26.2 For an existing business Order, material commercial changes normally take effect at renewal with at least thirty days’ notice and an opportunity to decline renewal. During a committed term, material changes require agreement unless necessary to meet a legal obligation or address an urgent security risk. In that case we will explain the change and provide advance notice where practicable; available rights and appropriate remedies remain.",
+        "26.3 Changes affecting consumers must be fair, transparent and permitted by applicable law. An update cannot remove mandatory rights. Policy updates cannot silently reduce an expressly agreed support, security or service commitment."
+      ]
+    },
+    {
+      "number": "27",
+      "heading": "Transfer of rights",
+      "paragraphs": [
+        "27.1 Neither party may transfer the agreement where doing so would materially prejudice the other without written consent, not to be unreasonably withheld for a legitimate transfer. We may transfer it with a genuine sale or restructuring of the relevant business if the successor assumes our obligations and customer rights are not materially reduced. We will notify you. Consumer rights are preserved."
+      ]
+    },
+    {
+      "number": "28",
+      "heading": "Severability and third party rights",
+      "paragraphs": [
+        "28.1 If a provision is invalid or unenforceable, the remaining provisions continue so far as lawful. No term will be rewritten to remove a consumer’s mandatory protection. Except where expressly stated, a person who is not a party has no right to enforce the agreement under the Contracts (Rights of Third Parties) Act 1999. This does not remove a data subject’s independent statutory rights."
+      ]
+    },
+    {
+      "number": "29",
+      "heading": "Notices waiver and complaints",
+      "paragraphs": [
+        "29.1 Send contractual notices and complaints to info@rpgexcellence.com or our registered office. We will use the contract or account contact you designate. An email notice is treated as received on the next Business Day after sending if no delivery failure is received; a recorded postal notice is received on delivery. Court documents follow the applicable procedural rules.",
+        "29.2 A delay or failure to enforce a right does not waive it. We will investigate complaints and aim to provide a substantive response within ten Business Days, or explain why more time is needed. This process does not suspend a statutory time limit or prevent proceedings."
+      ]
+    },
+    {
+      "number": "30",
+      "heading": "Entire agreement",
+      "paragraphs": [
+        "30.1 For business customers, the accepted Order, any signed variations or SOW, these Terms and expressly incorporated schedules form the agreement on their subject matter. Informal discussions do not create an additional service commitment unless incorporated into the agreement.",
+        "30.2 This clause does not exclude liability for fraud, unfairly remove a remedy for misrepresentation or override information that applicable law makes binding, including relevant consumer pre-contract information. Version records and accepted written commitments must be retained."
+      ]
+    },
+    {
+      "number": "31",
+      "heading": "Governing law and jurisdiction",
+      "paragraphs": [
+        "31.1 The agreement is governed by the law of England and Wales. For business customers, the courts of England and Wales have exclusive jurisdiction unless expressly agreed otherwise in writing.",
+        "31.2 A consumer retains the protections and court rights that mandatory law gives in their place of residence. A consumer living in Scotland or Northern Ireland may also bring proceedings in the courts of that part of the United Kingdom. Nothing in this clause requires a consumer to surrender a mandatory local right."
+      ]
+    },
+    {
+      "number": "32",
+      "heading": "Contact and copies",
+      "paragraphs": [
+        "32.1 Contact RPG EXCELLENCE LTD at info@rpgexcellence.com or 71–75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ. Ask for an accessible or savable copy of your applicable agreement, service scope, data-processing information or cancellation instructions."
+      ]
+    }
+  ],
+  "schedules": [
+    {
+      "id": "A",
+      "heading": "Software support and additional services",
+      "sections": [
+        {
+          "heading": "A1 Included software support",
+          "paragraphs": [
+            "Licence prices include investigation of access problems and suspected platform faults, correction of confirmed software defects in accordance with our obligations, and reasonable guidance on documented features and standard settings. Reproducing or diagnosing a fault is support; we will not require an engineering-support package merely to investigate a suspected defect or meet an existing contractual duty.",
+            "Report support issues to info@rpgexcellence.com, stating the affected function, impact and relevant non-sensitive evidence. Do not send passwords or unnecessary sensitive records. Standard support is handled on Business Days between 09:00 and 17:00 UK time. We aim to acknowledge a request within two Business Days. This is an initial-response target, not a resolution guarantee or a commitment to continuous monitoring. Urgent security concerns should be clearly identified; no emergency-response service is promised."
+          ]
+        },
+        {
+          "heading": "A2 Services charged separately",
+          "paragraphs": [
+            "Engineering support means customer-specific administrator assistance, configuration work, technical advice or managed assistance beyond standard software support. Implementation, migration, bespoke configuration or development, consultancy and structured training are also separately quoted unless expressly included. Explaining how to create an audit is support; designing or entering your audit programme for you is an additional service.",
+            "The written scope and charges must be agreed before work begins. We will explain when a request crosses the support boundary and obtain approval, rather than retrospectively bill an unapproved task. Separately paid assistance cannot replace a remedy we already owe for our own contractual failure."
+          ]
+        },
+        {
+          "heading": "A3 Optional annual engineering support",
+          "paragraphs": [
+            "An annual engineering-support package exists only where purchased under an Order. That Order must state its fee, term, included activities and hours or service credits, authorised requesters, response targets, treatment of unused allowance, additional-work rates and renewal or cancellation terms. No unlimited allowance, rollover, priority or out-of-hours cover is implied. A software renewal does not automatically renew this separate service unless expressly agreed."
+          ]
+        },
+        {
+          "heading": "A4 Service management",
+          "paragraphs": [
+            "Tell us about the business impact so we can prioritise reasonably. We may request a reproducible example, supported configuration or secure diagnostic access. We will agree any exceptional charge before carrying out chargeable work. We will not charge extra merely because a defect investigation takes longer than expected. A separate service-level agreement is needed for guaranteed availability, response commitments or service credits."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "heading": "Customer data processing agreement",
+      "sections": [
+        {
+          "heading": "B1 Roles scope and instructions",
+          "paragraphs": [
+            "This schedule applies where you are controller and RPG is processor of personal data submitted to or generated in your company workspace on your behalf. If you act as processor for another controller, you confirm authority to appoint us as subprocessor and provide the relevant instructions. It does not cover processing for which RPG independently determines purposes, as described in the Privacy Notice.",
+            "The subject matter is the provision, support, security and authorised export of the purchased business-assurance services. Processing lasts for the Order and the agreed return or deletion period. Activities include collection, recording, organisation, storage, retrieval, controlled disclosure, reporting, backup, return and deletion on documented instructions.",
+            "Data subjects may include your staff, contractors, clients, suppliers, visitors, trainees and incident reporters. Data may include business identity and contact details, roles, training and competence records, audit trails, assignments, evidence and reports. Incident modules may contain health or injury details where you lawfully instruct this processing. The Order must identify any materially different category or purpose before processing. Criminal-offence, biometric-identification, genetic or classified data must not be submitted without a specifically agreed lawful arrangement.",
+            "We will process only on your documented instructions, including transfers, unless UK law requires otherwise. We will inform you of such a legal requirement where permitted, and promptly tell you if we consider an instruction infringes applicable data-protection law. Instructions include the accepted Order, authorised use and your lawful written directions."
+          ]
+        },
+        {
+          "heading": "B2 Confidentiality security and incidents",
+          "paragraphs": [
+            "We will restrict access to authorised people bound by confidentiality and apply appropriate technical and organisational measures under applicable data-protection law, proportionate to the processing and risks. The agreed security description must cover access control, transport protection, isolation, backup and recovery arrangements, incident handling and security review. We will provide that description before processing begins; it must reflect verified practice, not an assumed certification or recovery guarantee.",
+            "We will notify you without undue delay after becoming aware of a personal-data breach affecting Customer Personal Data. We will provide available information about its nature, likely impact, contact point and mitigation, with further information in phases where needed. We will cooperate with your assessment and lawful notifications and preserve relevant evidence. We will not notify affected individuals on your behalf unless instructed or legally required."
+          ]
+        },
+        {
+          "heading": "B3 Subprocessors and international transfers",
+          "paragraphs": [
+            "Before processing under this schedule begins, we will supply an up-to-date list of the initial subprocessors, their functions and processing locations for your documented authorisation. That authorisation may be general written authorisation for the listed arrangements. We will give at least thirty days’ advance notice of a proposed addition or replacement so you can reasonably object on data-protection grounds. We will seek an appropriate solution; if none is possible, either party may end the affected service before that change, with a refund of unused prepaid charges.",
+            "We will bind subprocessors to equivalent applicable data-protection obligations and remain responsible for their performance of those obligations. Customer Personal Data may be transferred outside the UK only under your documented instructions and a legally valid transfer mechanism where required, with relevant safeguards and assessments. We will identify the arrangements to you. Independently contracted customer integrations are not automatically our subprocessors."
+          ]
+        },
+        {
+          "heading": "B4 Assistance and evidence",
+          "paragraphs": [
+            "Taking account of the processing and information available, we will assist you with data-subject requests, security obligations, breach response, impact assessments and required regulatory consultation. We will refer requests about your data to you unless legally required to respond. Reasonable charges for exceptional assistance must be agreed in advance and must not prevent a mandatory duty or charge you for remedying our own breach.",
+            "We will provide information necessary to demonstrate compliance with this schedule and allow and contribute to required audits or inspections by you or an authorised independent auditor. Ordinary audits should use available assurance information first, with reasonable notice and safeguards for other customers. Those arrangements must not obstruct a regulator, an urgent breach investigation or an audit right required by law. We will maintain records required for our role."
+          ]
+        },
+        {
+          "heading": "B5 Return deletion and responsibility",
+          "paragraphs": [
+            "At the end of processing, we will, at your choice, return or securely delete Customer Personal Data and copies, except where UK law requires storage. Clause 22 sets the ordinary export and deletion timetable. Earlier lawful deletion instructions take priority where practicable and required. Backups awaiting removal must be isolated from ordinary use; any restoration must reapply the deletion instruction. Retained data remains protected and may be used only for the lawful retention purpose.",
+            "You remain responsible for lawful instructions, notices and any required special-category condition. We remain responsible for our processor obligations. Neither this schedule nor clause 24 limits statutory rights of individuals or regulatory powers. Any liability allocation between the contracting parties applies only so far as lawful."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "heading": "Consumer purchases and cancellation",
+      "sections": [
+        {
+          "heading": "C1 Scope and information",
+          "paragraphs": [
+            "This schedule applies if you purchase as a consumer. Before you are bound, we must give the relevant service or digital-content description, total price, payment arrangements, term, cancellation information and material functionality or compatibility information. We will confirm the contract and required information in a form you can save. Any applicable statutory information or cancellation period is not shortened by these Terms."
+          ]
+        },
+        {
+          "heading": "C2 Cooling off and early supply",
+          "paragraphs": [
+            "For an eligible distance contract, you normally have fourteen days after the day the contract is made to cancel without giving a reason. If the law gives a longer period because required information was not supplied, that longer period applies. Send a clear statement to info@rpgexcellence.com or our registered office before the deadline. You may use the form in C6, but do not have to.",
+            "For a service starting within the cancellation period, we must obtain your express request for early performance. If you then cancel, a lawful proportionate charge may apply for services actually provided before cancellation, but only where the required request and information were obtained. Cancellation rights are lost on full performance only where the required express consent and acknowledgement were obtained. Logging in or accepting general Terms alone is not treated as those specific consents.",
+            "For digital content supplied without a physical medium, we will begin immediate supply only after obtaining your express consent and acknowledgement that you lose the cancellation right when supply begins, and give the required confirmation. If those conditions are not met, we will not rely on immediate access or download alone to deny cancellation. Mixed courses and services must be treated according to the rights applying to each element."
+          ]
+        },
+        {
+          "heading": "C3 Refunds and quality rights",
+          "paragraphs": [
+            "Where a valid cooling-off cancellation applies, we will make the required refund without undue delay and within fourteen days after being informed, using the same payment method unless you agree otherwise, without a refund fee. Only deductions permitted by law may be made.",
+            "Services must be performed with reasonable care and skill. Digital content must meet applicable statutory quality, fitness and description requirements. Applicable remedies for a fault may include repeat performance, repair, replacement, price reduction or refund. A digital-content cancellation waiver does not waive quality rights. Contact us promptly with the issue; this request does not reduce a statutory time limit."
+          ]
+        },
+        {
+          "heading": "C4 Consumer subscriptions and changes",
+          "paragraphs": [
+            "Any renewal, trial conversion, minimum commitment and recurring charge must be clearly accepted before purchase. We will provide cancellation methods, reminders and cooling-off rights required by the law applying to your contract. A price or material service change requires a valid, fair contractual basis and proper notice; where required, you must be able to end the affected service before it takes effect without an unfair penalty. An annual charge does not itself establish that renewal was authorised."
+          ]
+        },
+        {
+          "heading": "C5 Consumer liability and complaints",
+          "paragraphs": [
+            "The business financial caps and excluded business-loss categories in clauses 24.2 to 24.6 do not apply to consumers. We are responsible for loss or damage you suffer that is a foreseeable result of our breach or failure to use reasonable care and skill, subject to applicable law. We do not exclude liability that cannot lawfully be excluded. No term makes you responsible for our negligence.",
+            "Contact info@rpgexcellence.com about a complaint. We will explain our final position and any applicable alternative dispute-resolution information when required. We do not claim membership of an ombudsman or ADR scheme unless confirmed. You retain the right to seek independent advice and use a competent court."
+          ]
+        },
+        {
+          "heading": "C6 Optional cancellation form",
+          "paragraphs": [
+            "To RPG EXCELLENCE LTD, 71–75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ; info@rpgexcellence.com. I or we give notice that I or we cancel the contract for the following service or digital content: [identify purchase]. Ordered on: [date]. Name of consumer or consumers: [name]. Address of consumer or consumers: [address]. Signature of consumer or consumers, only if sent on paper: [signature]. Date: [date]. Delete or complete fields as appropriate."
+          ]
+        }
+      ]
+    }
+  ],
+  "effective": "14 November 2026"
+}
