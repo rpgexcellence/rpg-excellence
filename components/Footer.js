@@ -76,6 +76,7 @@ export default function Footer({ locale }) {
         </div>
 
         <div className="footerLinks">
+          <Link href={`/${locale}/industries`}>Industries</Link>
           <Link href={`/${locale}/insights`}>
             RPG Insights
           </Link>

@@ -1,3 +1,5 @@
+import WebsiteTopicMenu from "./WebsiteTopicMenu";
+import { HOW_IT_WORKS_GROUPS } from "../lib/howItWorks";
 import AccountMenu from "./AccountMenu";
 import Link from "next/link";
 import ISO9001ReleaseBar from "./ISO9001ReleaseBar";
@@ -11,6 +13,8 @@ const ISO_AT_A_GLANCE = [
   ["ISO 27001", "Information security", "iso-27001", "IS"],
 ];
 export default function Header({ locale, nav, variant = "default" }) {
+  const resources = [{ title: "Resources", links: [["Insights", "/insights"], ["Publications", "/publications"], ["Newsletter", "/insights#newsletter"], ["Training", "/pricing#learning"]] }];
+  const company = [{ title: "About RPG", links: [["Our story & approach", "/about"], ["Industries", "/industries"], ["Partners", "/partners"]] }];
   return (
     <>
       <header className={"header " + (variant === "home" ? "homeHeader" : "")}>
@@ -21,6 +25,18 @@ export default function Header({ locale, nav, variant = "default" }) {
             (variant === "home" ? "#ffffff12" : "#fff") +
             ';color:inherit;list-style:none;cursor:pointer}\n          .mobileNav>summary::-webkit-details-marker{display:none}\n          .mobileNavIcon,.mobileNavIcon:before,.mobileNavIcon:after{display:block;width:20px;height:2px;border-radius:3px;background:currentColor;content:""}\n          .mobileNavIcon{position:relative}\n          .mobileNavIcon:before{position:absolute;top:-6px}\n          .mobileNavIcon:after{position:absolute;top:6px}\n          .mobileNav[open] .mobileNavIcon{background:transparent}\n          .mobileNav[open] .mobileNavIcon:before{top:0;transform:rotate(45deg)}\n          .mobileNav[open] .mobileNavIcon:after{top:0;transform:rotate(-45deg)}\n          .mobileNavPanel{position:fixed;z-index:200;top:72px;left:12px;right:12px;max-height:calc(100vh - 88px);overflow:auto;padding:12px;border:1px solid #d6e1ec;border-radius:16px;background:#fff;color:#0a2342;box-shadow:0 24px 65px #03152d40}\n          .mobileNavPanel>a,.mobileIso>summary{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:12px 13px;border-radius:10px;color:#12385f;font-size:14px;font-weight:850;cursor:pointer;list-style:none}\n          .mobileNavPanel>a:after,.mobileIso>summary:after{content:"→";color:#1761e8}\n          .mobileNavPanel>a:hover,.mobileNavPanel>a:focus,.mobileIso>summary:hover{background:#edf4ff;outline:0}\n          .mobileIso>summary::-webkit-details-marker{display:none}\n          .mobileIsoLinks{display:grid;gap:3px;padding:4px 7px 9px 17px;border-left:2px solid #dbe7f4;margin-left:13px}\n          .mobileIsoLinks>a{padding:9px 10px;border-radius:8px;color:#365570;font-size:13px;font-weight:750}\n          .mobileIsoLinks>a:hover{background:#f1f6fc}\n          .mobileNavActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px;padding-top:12px;border-top:1px solid #e2e9f0}\n          .mobileNavActions a{min-height:44px;padding:11px;border-radius:10px;text-align:center;font-size:13px;font-weight:900}\n          .mobileSignIn{border:1px solid #cad7e4;color:#12385f}\n          .mobileStart{background:#1761e8;color:#fff}\n          .mobileYouTube{grid-column:1/-1;background:#fff1f3;color:#c70028}\n          @media(max-width:900px){\n            .isoAtGlanceMenu{left:auto;right:0;transform:translate(0,-7px)}\n            .isoAtGlance:hover .isoAtGlanceMenu,.isoAtGlance:focus-within .isoAtGlanceMenu,.isoAtGlance[open] .isoAtGlanceMenu{transform:translate(0,0)}\n          }\n          @media(min-width:1401px) and (max-width:1500px){\n            .header:not(.homeHeader) .brand,.header:not(.homeHeader) .brand img{width:220px!important}\n          }\n          @media(max-width:1800px){\n            .header .nav{display:none!important}\n            .mobileNav{display:block}\n            .headerActions{display:none!important}\n            .header .brand{width:190px!important;height:60px!important}\n            .header .brand img{width:190px!important;height:60px!important}\n          }\n        '}
         </style>
+        <style>{`
+          @media(min-width:1280px){
+            .header{padding-inline:28px;gap:18px}
+            .header .nav{display:flex!important;gap:13px;align-items:center;font-size:12px}
+            .header .mobileNav,.header .headerPartnerShortcut{display:none!important}
+            .header .brand,.header .brand img{width:170px!important;height:60px!important;max-width:170px!important}
+            .header .headerAccount{margin-left:auto;margin-right:0;min-width:0}
+            .header .rpgAccountTrigger{max-width:180px}
+          }
+          @media(min-width:1280px) and (max-width:1599px){.header .headerActions{display:none!important}}
+          @media(min-width:1600px){.header .headerActions{display:flex!important}.header .nav{gap:18px;font-size:13px}}
+        `}</style>
 
         <Link
           href={"/" + locale}
@@ -52,7 +68,7 @@ export default function Header({ locale, nav, variant = "default" }) {
         </Link>
 
         <nav className="nav homeNav">
-          <Link href={"/" + locale + "/ai-tools"}>Platform &amp; Resources</Link>
+          <Link href={"/" + locale + "/ai-tools"}>Platform</Link>
 
           <details className="isoAtGlance">
             <summary>ISO at a Glance</summary>
@@ -75,12 +91,10 @@ export default function Header({ locale, nav, variant = "default" }) {
             </div>
           </details>
 
-          <a href={"/" + locale + "#solutions"}>Solutions</a>
-          <Link href={"/" + locale + "/insights"}>Insights</Link>
-          <Link href={"/" + locale + "/publications"}>Publications</Link>
-          <Link href={"/" + locale + "/insights#newsletter"}>Newsletter</Link>
+          <WebsiteTopicMenu locale={locale} title="How it works" groups={HOW_IT_WORKS_GROUPS} wide footer={["See the full platform journey", "/#customer-journey"]} />
+          <WebsiteTopicMenu locale={locale} title="Resources" groups={resources} />
           <Link href={"/" + locale + "/pricing"}>{nav.pricing}</Link>
-          <Link href={"/" + locale + "/about"}>{nav.about}</Link>
+          <WebsiteTopicMenu locale={locale} title={nav.about} groups={company} />
           <Link href={"/" + locale + "/partners"}>Partners</Link>
           <Link href={"/" + locale + "/contact"}>{nav.contact}</Link>
         </nav>
@@ -117,12 +131,10 @@ export default function Header({ locale, nav, variant = "default" }) {
               </div>
             </details>
 
-            <a href={"/" + locale + "#solutions"}>Solutions</a>
-            <Link href={"/" + locale + "/insights"}>Insights</Link>
-            <Link href={"/" + locale + "/publications"}>Publications</Link>
-            <Link href={"/" + locale + "/insights#newsletter"}>Newsletter</Link>
+            <WebsiteTopicMenu locale={locale} title="How it works" groups={HOW_IT_WORKS_GROUPS} wide mobile footer={["See the full platform journey", "/#customer-journey"]} />
+            <WebsiteTopicMenu locale={locale} title="Resources" groups={resources} mobile />
             <Link href={"/" + locale + "/pricing"}>{nav.pricing}</Link>
-            <Link href={"/" + locale + "/about"}>{nav.about}</Link>
+            <WebsiteTopicMenu locale={locale} title={nav.about} groups={company} mobile />
             <Link href={"/" + locale + "/partners"}>Partners</Link>
           <Link href={"/" + locale + "/contact"}>{nav.contact}</Link>
 

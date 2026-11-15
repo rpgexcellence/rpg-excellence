@@ -175,6 +175,11 @@ export default async function About({ params }) {
         </section>
 
         <section className="aboutBoundary">
+          <div><span className="aboutEyebrow">WHERE RPG FITS</span><h2>Different sectors. Practical assurance.</h2></div>
+          <div><p>Explore how the current platform workflows can support manufacturing, laboratories, technical services, logistics, professional services and engineering supply chains.</p><Link href={`/${locale}/industries`} style={{color:"#007f79",fontWeight:800,display:"inline-flex",padding:"12px 0"}}>Explore industries →</Link></div>
+        </section>
+
+        <section className="aboutBoundary">
           <div><span className="aboutEyebrow">PEOPLE AND TECHNOLOGY</span><h2>Professional judgement remains with people.</h2></div>
           <p>Technology supports this work. Professional judgement and responsibility remain with the people making the decisions.</p>
         </section>

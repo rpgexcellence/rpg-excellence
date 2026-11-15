@@ -4,6 +4,7 @@ export default function sitemap() {
   const pages = [
     "",
     "/about",
+    "/industries",
     "/contact",
     "/partners",
     "/partners/apply",
