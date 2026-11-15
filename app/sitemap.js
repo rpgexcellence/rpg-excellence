@@ -5,6 +5,7 @@ export default function sitemap() {
     "",
     "/about",
     "/industries",
+    "/how-it-works",
     "/contact",
     "/partners",
     "/partners/apply",

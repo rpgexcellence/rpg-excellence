@@ -91,7 +91,7 @@ export default function Header({ locale, nav, variant = "default" }) {
             </div>
           </details>
 
-          <WebsiteTopicMenu locale={locale} title="How it works" groups={HOW_IT_WORKS_GROUPS} wide footer={["See the full platform journey", "/#customer-journey"]} />
+          <WebsiteTopicMenu locale={locale} title="How it works" groups={HOW_IT_WORKS_GROUPS} wide footer={["See real platform workflows", "/how-it-works"]} />
           <WebsiteTopicMenu locale={locale} title="Resources" groups={resources} />
           <Link href={"/" + locale + "/pricing"}>{nav.pricing}</Link>
           <WebsiteTopicMenu locale={locale} title={nav.about} groups={company} />
@@ -131,7 +131,7 @@ export default function Header({ locale, nav, variant = "default" }) {
               </div>
             </details>
 
-            <WebsiteTopicMenu locale={locale} title="How it works" groups={HOW_IT_WORKS_GROUPS} wide mobile footer={["See the full platform journey", "/#customer-journey"]} />
+            <WebsiteTopicMenu locale={locale} title="How it works" groups={HOW_IT_WORKS_GROUPS} wide mobile footer={["See real platform workflows", "/how-it-works"]} />
             <WebsiteTopicMenu locale={locale} title="Resources" groups={resources} mobile />
             <Link href={"/" + locale + "/pricing"}>{nav.pricing}</Link>
             <WebsiteTopicMenu locale={locale} title={nav.about} groups={company} mobile />
