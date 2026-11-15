@@ -32,7 +32,7 @@
 .rpgPricing .visual-plan.recommended .plan-cover-copy>span{padding-right:125px;min-height:26px}
 .rpgPricing .tools-grid>.visual-plan>.plan-content{margin-top:0}
 .rpgPricing .tools-grid .plan-cover-copy>p{max-width:420px;font-size:30px}
-.rpgPricing .tools-grid .plan-content>div:last-child{margin-top:auto}
+.rpgPricing .tools-grid .plan-content>:last-child{margin-top:auto}
 .rpgPricing .visual-plan .plan-content>ul{margin-bottom:22px}
 @media(min-width:1700px){.rpgPricing .plan-content{padding:28px}}
 @media(max-width:1100px){.rpgPricing .plan-cover{height:190px}.rpgPricing .plan-cover-copy{padding:21px}.rpgPricing .plan-content{padding:21px}.rpgPricing .plan-cover-copy>p{font-size:24px}.rpgPricing .visual-plan .plan-top{min-height:160px}.rpgPricing .visual-plan.recommended .plan-cover-copy>span{padding-right:0;max-width:130px}}
