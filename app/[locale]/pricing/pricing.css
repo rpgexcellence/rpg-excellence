@@ -12,3 +12,29 @@
 .rpgPricing #subscriptions,.rpgPricing #learning{scroll-margin-top:100px}
 
 .rpgPricing .support-note{margin-top:24px;padding:22px 24px;border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:7px;background:white}.rpgPricing .support-note h3{font-size:17px;line-height:1.4;letter-spacing:-.02em;margin:0 0 8px}.rpgPricing .support-note p{font-size:12px;line-height:1.8;margin:0;max-width:1100px}
+
+/* Photo-led covers align every access route with the Training cards. */
+.rpgPricing .plan.visual-plan,.rpgPricing .plan.visual-plan.recommended{padding:0}
+.rpgPricing .plan-cover{position:relative;isolation:isolate;height:200px;background:var(--navy);border-radius:8px 8px 0 0;overflow:hidden;flex:none}
+.rpgPricing .plan-cover>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 42%;z-index:-2}
+.rpgPricing .plan-cover:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(10,32,53,.97),rgba(10,32,53,.22) 90%);z-index:-1}
+.rpgPricing .plan-cover-copy{padding:23px 25px 20px;height:100%;display:flex;flex-direction:column;color:white}
+.rpgPricing .plan-cover-copy>span{font-size:8px;line-height:1.5;letter-spacing:.13em;color:#e0efea;text-shadow:0 1px 4px #102d50}
+.rpgPricing .plan-cover-copy>p{font:700 clamp(22px,1.8vw,28px)/1.17 Manrope,Arial,sans-serif;letter-spacing:-.035em;color:white;max-width:300px;margin:auto 0 12px;padding-top:16px;text-wrap:balance;text-shadow:0 2px 6px #0005}
+.rpgPricing .plan-cover-copy>small{font-size:8px;line-height:1.5;letter-spacing:.12em;color:#d7e9e3}
+.rpgPricing .plan-content{padding:24px;display:flex;flex-direction:column;flex:1;min-width:0}
+.rpgPricing .visual-plan .plan-top{min-height:140px}
+.rpgPricing .visual-plan h3{margin:10px 0;font-size:27px}
+.rpgPricing .visual-plan p{max-width:none}
+.rpgPricing .visual-plan .plan-top>p{margin-bottom:14px}
+.rpgPricing .visual-plan .price{margin-top:0}
+.rpgPricing .visual-plan .recommend-label{z-index:2;top:12px;right:12px;left:auto;padding:6px 10px;box-shadow:0 2px 8px #102d5030}
+.rpgPricing .visual-plan.recommended .plan-cover-copy>span{padding-right:125px;min-height:26px}
+.rpgPricing .tools-grid>.visual-plan>.plan-content{margin-top:0}
+.rpgPricing .tools-grid .plan-cover-copy>p{max-width:420px;font-size:30px}
+.rpgPricing .tools-grid .plan-content>div:last-child{margin-top:auto}
+.rpgPricing .visual-plan .plan-content>ul{margin-bottom:22px}
+@media(min-width:1700px){.rpgPricing .plan-content{padding:28px}}
+@media(max-width:1100px){.rpgPricing .plan-cover{height:190px}.rpgPricing .plan-cover-copy{padding:21px}.rpgPricing .plan-content{padding:21px}.rpgPricing .plan-cover-copy>p{font-size:24px}.rpgPricing .visual-plan .plan-top{min-height:160px}.rpgPricing .visual-plan.recommended .plan-cover-copy>span{padding-right:0;max-width:130px}}
+@media(max-width:800px){.rpgPricing .plan-cover{height:210px}.rpgPricing .plan-cover-copy{padding:24px}.rpgPricing .plan-cover-copy>p,.rpgPricing .tools-grid .plan-cover-copy>p{font-size:30px;max-width:420px}.rpgPricing .plan-content{padding:24px}.rpgPricing .visual-plan .plan-top{min-height:0}.rpgPricing .visual-plan .plan-top>p{margin-bottom:20px}.rpgPricing .visual-plan.recommended .plan-cover-copy>span{padding-right:140px;max-width:none}.rpgPricing .visual-plan .price{margin-top:2px}}
+@media(max-width:420px){.rpgPricing .plan-cover{height:200px}.rpgPricing .plan-cover-copy{padding:21px}.rpgPricing .plan-cover-copy>p,.rpgPricing .tools-grid .plan-cover-copy>p{font-size:27px;max-width:280px}.rpgPricing .plan-content{padding:22px}.rpgPricing .visual-plan.recommended .plan-cover-copy>span{padding-right:120px}.rpgPricing .visual-plan .recommend-label{font-size:7px;right:10px}}
