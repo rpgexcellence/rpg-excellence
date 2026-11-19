@@ -3,6 +3,7 @@ import {notFound} from 'next/navigation';
 import PageShell from '../../../../components/PageShell';
 import {locales} from '../../../../lib/i18n';
 import ZoneSteps from './ZoneSteps';
+import Screenshot from './Screenshot';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -28,7 +29,7 @@ export default async function BuildingsAndZones({params}) {
       </div>
       <figure className={styles.heroScreen}>
         <div className={styles.screenBar}>RPG EXCELLENCE <span>Employee zone page</span></div>
-        <div className={styles.phonePair}><img src={asset+'employee-records.jpg'} alt="Employee zone page with safety information links and a communicated risk assessment" width="454" height="323" fetchPriority="high"/><img src={asset+'employee-status.jpg'} alt="Zone page showing inspection status, available assessments and the report an incident or concern button" width="462" height="365" fetchPriority="high"/></div>
+        <div className={styles.phonePair}><Screenshot src={asset+'employee-records.jpg'} alt="Employee zone page with safety information links and a communicated risk assessment" width="454" height="323" fetchPriority="high"/><Screenshot src={asset+'employee-status.jpg'} alt="Zone page showing inspection status, available assessments and the report an incident or concern button" width="462" height="365" fetchPriority="high"/></div>
         <figcaption>Actual platform screens supplied on 19 November 2026. These are demonstration records, not instructions for an operational area.</figcaption>
       </figure>
     </header>
@@ -39,7 +40,7 @@ export default async function BuildingsAndZones({params}) {
       <p className={styles.eyebrow}>START WITH A SHARED LOCATION RECORD</p>
       <h2 id="structure-title">A site, its buildings<br/>and the areas people use.</h2>
       <p className={styles.intro}>Set up the working location once, then organise its buildings and zones. A zone can be a workshop, laboratory, kitchen, yard or another defined area. External areas can be managed without assigning them to a building.</p>
-      <div className={styles.structureGrid}><figure className={styles.screen}><a href={asset+'company-setup.jpg'} target="_blank" rel="noreferrer" aria-label="View company setup screenshot"><img src={asset+'company-setup.jpg'} alt="Company Setup navigation showing locations, buildings and zones alongside departments and people" width="1306" height="300" loading="lazy"/></a><figcaption>Company Setup brings the working locations and the people responsible for them together.</figcaption></figure><div className={styles.explanation}><h3>Use the same place across the platform.</h3><p>The controlled site record is used by operational modules such as risk assessments, permits, assets and audits. Buildings and zones add the detail needed to connect those records to a specific work area.</p><p>That shared structure helps the team find the right record and reduces ambiguity about where it applies.</p></div></div>
+      <div className={styles.structureGrid}><figure className={styles.screen}><Screenshot src={asset+'company-setup.jpg'} alt="Company Setup navigation showing locations, buildings and zones alongside departments and people" width="1306" height="300" loading="lazy"/><figcaption>Company Setup brings the working locations and the people responsible for them together.</figcaption></figure><div className={styles.explanation}><h3>Use the same place across the platform.</h3><p>The controlled site record is used by operational modules such as risk assessments, permits, assets and audits. Buildings and zones add the detail needed to connect those records to a specific work area.</p><p>That shared structure helps the team find the right record and reduces ambiguity about where it applies.</p></div></div>
     </section>
 
     <section id="workflow" className={styles.section} aria-labelledby="workflow-title"><p className={styles.eyebrow}>FROM THE REGISTER TO THE WORK AREA</p><h2 id="workflow-title">Set it up. Link the records.<br/>Publish what people need.</h2><p className={styles.intro}>Select a stage to see the real screens and how the location record becomes useful on the floor.</p><ZoneSteps/></section>
@@ -55,9 +56,9 @@ export default async function BuildingsAndZones({params}) {
         <article><h3>A stable point of access</h3><p>The permanent zone link stays with the work area while published information is updated online. Check the displayed poster revision when a replacement is required.</p></article>
       </div>
       <div className={styles.mobileGallery}>
-        <figure className={styles.screen}><a href={asset+'employee-signs.jpg'} target="_blank" rel="noreferrer" aria-label="View zone signs screenshot"><img src={asset+'employee-signs.jpg'} alt="Area signs and PPE requirements with a safety-sign review warning" width="470" height="380" loading="lazy"/></a><figcaption>Review warnings and area signs stay in view. Confirm the task requirements when a review is due.</figcaption></figure>
-        <figure className={styles.screen}><a href={asset+'employee-records.jpg'} target="_blank" rel="noreferrer" aria-label="View linked risk assessment screenshot"><img src={asset+'employee-records.jpg'} alt="Safety information links and a communicated risk assessment with version and review date" width="454" height="323" loading="lazy"/></a><figcaption>The linked assessment is identified by its reference, version, status and review date.</figcaption></figure>
-        <figure className={styles.screen}><a href={asset+'employee-inspections.jpg'} target="_blank" rel="noreferrer" aria-label="View inspection and action status screenshot"><img src={asset+'employee-inspections.jpg'} alt="Zone inspection section showing an inspection awaiting review, one open action and overdue status" width="454" height="209" loading="lazy"/></a><figcaption>Inspection completion and open actions can be read together. A completed inspection does not establish that the area is safe.</figcaption></figure>
+        <figure className={styles.screen}><Screenshot src={asset+'employee-signs.jpg'} alt="Area signs and PPE requirements with a safety-sign review warning" width="470" height="380" loading="lazy"/><figcaption>Review warnings and area signs stay in view. Confirm the task requirements when a review is due.</figcaption></figure>
+        <figure className={styles.screen}><Screenshot src={asset+'employee-records.jpg'} alt="Safety information links and a communicated risk assessment with version and review date" width="454" height="323" loading="lazy"/><figcaption>The linked assessment is identified by its reference, version, status and review date.</figcaption></figure>
+        <figure className={styles.screen}><Screenshot src={asset+'employee-inspections.jpg'} alt="Zone inspection section showing an inspection awaiting review, one open action and overdue status" width="454" height="209" loading="lazy"/><figcaption>Inspection completion and open actions can be read together. A completed inspection does not establish that the area is safe.</figcaption></figure>
       </div>
       <aside className={styles.note}><h3>Keep the information current.</h3><p>A QR code makes information easier to reach; the responsible team still needs to maintain it. Check the zone’s publication settings, linked assessments, review warnings and displayed poster revision. Expected controls and open actions need appropriate follow-up before anyone relies on them.</p></aside>
     </section>

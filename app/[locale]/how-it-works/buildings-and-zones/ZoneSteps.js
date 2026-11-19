@@ -1,6 +1,7 @@
 "use client";
 import {useRef, useState} from 'react';
 import styles from './page.module.css';
+import Screenshot from './Screenshot';
 const asset='/how-it-works/buildings-and-zones/';
 const steps=[
   {id:'site',label:'Working location',file:'sites-register.jpg',width:1024,height:290,title:'Start with the controlled site.',text:'Choose the working location from Company Setup. Each site has a reference and operating status, with its buildings, zones and departments accessible from the saved record.',value:'Give different modules the same location to work from, rather than maintaining separate lists.'},
@@ -15,6 +16,6 @@ export default function ZoneSteps(){
  function onKey(e,index){const next={ArrowRight:index+1,ArrowLeft:index-1,Home:0,End:steps.length-1}[e.key];if(next===undefined)return;e.preventDefault();select(next,true);}
  const step=steps[active];
  return <><div className={styles.tabs} role="tablist" aria-label="Buildings and zones workflow">{steps.map((s,i)=><button key={s.id} ref={node=>{refs.current[i]=node;}} type="button" role="tab" id={`zone-tab-${s.id}`} aria-controls={`zone-panel-${s.id}`} aria-selected={active===i} tabIndex={active===i?0:-1} onClick={()=>select(i)} onKeyDown={e=>onKey(e,i)}>{s.label}</button>)}</div>
- {steps.map((s,i)=><section key={s.id} className={styles.panel} role="tabpanel" id={`zone-panel-${s.id}`} aria-labelledby={`zone-tab-${s.id}`} hidden={active!==i}><div><h3>{s.title}</h3><p>{s.text}</p><aside className={styles.value}><strong>Why it helps</strong><p>{s.value}</p></aside></div><figure className={`${styles.screen} ${s.width<500?styles.portrait:''}`}><a href={asset+s.file} target="_blank" rel="noreferrer" aria-label={`View ${s.label.toLowerCase()} screenshot`}><img src={asset+s.file} alt={s.title+' Actual RPG Excellence demonstration screen.'} width={s.width} height={s.height} loading="lazy"/></a><figcaption>Actual interface. Personal details and example QR destinations are hidden where present.</figcaption></figure></section>)}
+ {steps.map((s,i)=><section key={s.id} className={styles.panel} role="tabpanel" id={`zone-panel-${s.id}`} aria-labelledby={`zone-tab-${s.id}`} hidden={active!==i}><div><h3>{s.title}</h3><p>{s.text}</p><aside className={styles.value}><strong>Why it helps</strong><p>{s.value}</p></aside></div><figure className={`${styles.screen} ${s.width<500?styles.portrait:''}`}><Screenshot src={asset+s.file} alt={s.title+' Actual RPG Excellence demonstration screen.'} width={s.width} height={s.height} loading="lazy"/><figcaption>Actual interface. Personal details and example QR destinations are hidden where present.</figcaption></figure></section>)}
  <div className={styles.controls}><button type="button" onClick={()=>select(active-1)}>Previous screen</button><span aria-live="polite">{step.label}</span><button type="button" onClick={()=>select(active+1)}>Next screen</button></div></>;
 }
