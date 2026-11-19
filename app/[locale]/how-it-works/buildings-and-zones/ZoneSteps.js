@@ -1,0 +1,20 @@
+"use client";
+import {useRef, useState} from 'react';
+import styles from './page.module.css';
+const asset='/how-it-works/buildings-and-zones/';
+const steps=[
+  {id:'site',label:'Working location',file:'sites-register.jpg',width:1024,height:290,title:'Start with the controlled site.',text:'Choose the working location from Company Setup. Each site has a reference and operating status, with its buildings, zones and departments accessible from the saved record.',value:'Give different modules the same location to work from, rather than maintaining separate lists.'},
+  {id:'zones',label:'Buildings and zones',file:'zones-register.jpg',width:1318,height:592,title:'Define the areas and their ownership.',text:'Organise the site into buildings and zones, including external areas. Select a zone to manage its instructions, link safety records and review the poster information.',value:'Make the boundary of the work area clear and give the local information an accountable owner.'},
+  {id:'publish',label:'Publish and display',file:'zones-register.jpg',width:1318,height:592,title:'Give the area a permanent connection.',text:'Save the zone, link the relevant records and publish its employee page using the intended access settings. The poster carries a permanent zone QR code and a revision. Display the reviewed poster where people can use it.',value:'Keep a consistent way into the zone’s published information as the underlying records change.'},
+  {id:'scan',label:'Scan and check',file:'employee-records.jpg',width:454,height:323,title:'Open the local controls on a phone.',text:'A scan gives personnel and leaders a direct route to the published zone page. Find local safety information and linked assessments, including their version, status and review date.',value:'Bring the relevant information into the conversation before work starts or when conditions change.'},
+  {id:'follow',label:'Follow up',file:'employee-status.jpg',width:462,height:365,title:'Keep the outstanding work visible.',text:'Read inspection status, available assessments and review warnings alongside the incident or concern reporting link. Use what the page shows to ask the right questions and follow up with the responsible team.',value:'Support a useful site visit with local records and outstanding actions close at hand.'},
+];
+export default function ZoneSteps(){
+ const [active,setActive]=useState(0);const refs=useRef([]);
+ function select(index,focus=false){const n=(index+steps.length)%steps.length;setActive(n);if(focus)refs.current[n]?.focus();}
+ function onKey(e,index){const next={ArrowRight:index+1,ArrowLeft:index-1,Home:0,End:steps.length-1}[e.key];if(next===undefined)return;e.preventDefault();select(next,true);}
+ const step=steps[active];
+ return <><div className={styles.tabs} role="tablist" aria-label="Buildings and zones workflow">{steps.map((s,i)=><button key={s.id} ref={node=>{refs.current[i]=node;}} type="button" role="tab" id={`zone-tab-${s.id}`} aria-controls={`zone-panel-${s.id}`} aria-selected={active===i} tabIndex={active===i?0:-1} onClick={()=>select(i)} onKeyDown={e=>onKey(e,i)}>{s.label}</button>)}</div>
+ {steps.map((s,i)=><section key={s.id} className={styles.panel} role="tabpanel" id={`zone-panel-${s.id}`} aria-labelledby={`zone-tab-${s.id}`} hidden={active!==i}><div><h3>{s.title}</h3><p>{s.text}</p><aside className={styles.value}><strong>Why it helps</strong><p>{s.value}</p></aside></div><figure className={`${styles.screen} ${s.width<500?styles.portrait:''}`}><a href={asset+s.file} target="_blank" rel="noreferrer" aria-label={`View ${s.label.toLowerCase()} screenshot`}><img src={asset+s.file} alt={s.title+' Actual RPG Excellence demonstration screen.'} width={s.width} height={s.height} loading="lazy"/></a><figcaption>Actual interface. Personal details and example QR destinations are hidden where present.</figcaption></figure></section>)}
+ <div className={styles.controls}><button type="button" onClick={()=>select(active-1)}>Previous screen</button><span aria-live="polite">{step.label}</span><button type="button" onClick={()=>select(active+1)}>Next screen</button></div></>;
+}
