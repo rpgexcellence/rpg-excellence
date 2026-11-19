@@ -1,11 +1,8 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import styles from "./page.module.css";
+import WorkflowSteps from "../WorkflowSteps";
 
 const imageDirectory = "/how-it-works/permit-to-work";
 const draftAuthorisation = {
-  file: "draft-authorisation-and-validity.png",
+  src: `${imageDirectory}/draft-authorisation-and-validity.png`,
   width: 1318,
   height: 248,
   title: "Authorisation and validity",
@@ -22,7 +19,7 @@ const stages = [
     action: "Submit for verification",
     detail: "Record the hazards, required precautions, validity window and permit roles before progressing the draft.",
     screenshot: {
-      file: "define-controlled-work.png",
+      src: `${imageDirectory}/define-controlled-work.png`,
       width: 1318,
       height: 633,
       title: "Define the controlled work",
@@ -43,7 +40,7 @@ const stages = [
     resolve: "Switch to the example with verified isolation",
     evidence: ["Required isolation record", "Recorded and independently verified", "Missing"],
     screenshot: {
-      file: "draft-hazards-and-controls.png",
+      src: `${imageDirectory}/draft-hazards-and-controls.png`,
       width: 1310,
       height: 285,
       title: "Identify hazards and controls",
@@ -104,100 +101,10 @@ const stages = [
 ];
 
 export default function PermitWalkthrough() {
-  const [index, setIndex] = useState(0);
-  const [showBlocker, setShowBlocker] = useState(false);
-  const heading = useRef(null);
-  const dialog = useRef(null);
-  const moved = useRef(false);
-  const stage = stages[index];
-  const screenshot = stage.screenshot;
-
-  useEffect(() => {
-    if (!moved.current) return;
-    heading.current?.focus({ preventScroll: true });
-    heading.current?.scrollIntoView({ block: "nearest" });
-  }, [index]);
-
-  function selectStage(next) {
-    if (next === index || (showBlocker && next > index)) return;
-    moved.current = true;
-    setIndex(next);
-    setShowBlocker(false);
-  }
-
-  return (
-    <section className={styles.walkthrough} aria-labelledby="permit-walkthrough-title">
-      <header className={styles.intro}>
-        <h2 id="permit-walkthrough-title">Walk through a permit</h2>
-        <p>Follow a fictional CNC permit. Stages 1–4 include screenshots of the RPG draft form. Completion, hand-back and the audit trail use example records.</p>
-      </header>
-      <div className={styles.workspace}>
-        <nav className={styles.stages} aria-label="Permit stages">
-          <ol>
-            {stages.map((item, position) => (
-              <li key={item.title}>
-                <button type="button" aria-current={index === position ? "step" : undefined} disabled={showBlocker && position > index} onClick={() => selectStage(position)}>
-                  <span aria-hidden="true">{position + 1}</span>{item.title}
-                </button>
-              </li>
-            ))}
-          </ol>
-        </nav>
-        <section className={styles.panel} aria-labelledby="permit-stage-title">
-          <div className={styles.panelHeading}>
-            <div>
-              <p className={styles.eyebrow}>{stage.role}</p>
-              <h3 id="permit-stage-title" ref={heading} tabIndex={-1}>{stage.title}</h3>
-            </div>
-            <span className={styles.status}>{stage.status}</span>
-          </div>
-          <p>{stage.text}</p>
-          {screenshot && (
-            <figure className={styles.figure}>
-              <button type="button" className={styles.imageButton} onClick={() => dialog.current?.showModal()}>
-                <img src={`${imageDirectory}/${screenshot.file}`} alt={screenshot.alt} width={screenshot.width} height={screenshot.height} />
-                <span>Enlarge screenshot</span>
-              </button>
-              <figcaption>{screenshot.caption}</figcaption>
-            </figure>
-          )}
-          {stage.detail && <p className={styles.detail}>{stage.detail}</p>}
-          {stage.evidence && (
-            <dl className={styles.example}>
-              <dt>Example record · {stage.evidence[0]}</dt>
-              <dd>{stage.evidence[showBlocker ? 2 : 1]}</dd>
-            </dl>
-          )}
-          {stage.blocker && (
-            <div className={styles.blocker}>
-              <button type="button" aria-expanded={showBlocker} aria-controls="permit-demo-blocker" onClick={() => setShowBlocker(!showBlocker)}>{showBlocker ? stage.resolve : stage.blocker}</button>
-              <p hidden={!showBlocker} id="permit-demo-blocker">{stage.feedback}</p>
-            </div>
-          )}
-          {!stage.action && (
-            <ol className={styles.audit} aria-label="Example audit trail">
-              {stages.filter(item => item.event).map(item => (
-                <li key={item.event}><span>{item.event}</span><small>{item.role}</small></li>
-              ))}
-            </ol>
-          )}
-          <div className={styles.actions}>
-            {index > 0 && <button type="button" className={styles.previous} onClick={() => selectStage(index - 1)}>Previous stage</button>}
-            {stage.action ? (
-              <button type="button" className={styles.primary} disabled={showBlocker} onClick={() => selectStage(index + 1)}>{stage.action}</button>
-            ) : (
-              <button type="button" className={styles.primary} onClick={() => selectStage(0)}>Restart walkthrough</button>
-            )}
-          </div>
-        </section>
-      </div>
-      {screenshot && <dialog className={styles.dialog} ref={dialog} aria-labelledby="permit-image-title">
-        <div className={styles.dialogHead}>
-          <h3 id="permit-image-title">{screenshot.title}</h3>
-          <form method="dialog"><button type="submit" aria-label="Close screenshot">×</button></form>
-        </div>
-        <div className={styles.dialogImage}><img src={`${imageDirectory}/${screenshot.file}`} alt={screenshot.alt} width={screenshot.width} height={screenshot.height} /></div>
-      </dialog>}
-    </section>
-  );
+  return <WorkflowSteps
+    title="Walk through a permit"
+    intro="Follow a fictional CNC permit. Stages 1–4 include screenshots of the RPG draft form. Completion, hand-back and the audit trail use example records."
+    stageLabel="Permit stages"
+    stages={stages}
+  />;
 }

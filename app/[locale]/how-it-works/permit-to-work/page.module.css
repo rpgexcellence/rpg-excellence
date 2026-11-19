@@ -98,3 +98,5 @@
   .stages ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stages button { height: 100%; }
 }
+
+.guide { max-width: 1180px; margin: 36px auto 0; border-top: 1px solid var(--line); }
