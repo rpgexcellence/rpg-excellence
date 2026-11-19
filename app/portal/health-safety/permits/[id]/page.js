@@ -222,7 +222,7 @@ export default async function PermitRecordPage({params,searchParams}){
       </div>
     </section>
 
-    {item.organization_id && mayIssuePermit(access) && <SubcontractorRequests admin={admin} permit={item} feedback={query?.subcontractor} />}
+    {item.organization_id && mayIssuePermit(access) && <SubcontractorRequests admin={admin} permit={item} organization={access.organization} feedback={query?.subcontractor} />}
 
     <section className="pcPanel">
       <h2>Permit control</h2>
