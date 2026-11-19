@@ -7,6 +7,7 @@ export default function sitemap() {
     "/industries",
     "/how-it-works",
     "/how-it-works/powra",
+    "/how-it-works/permit-to-work",
     "/contact",
     "/partners",
     "/partners/apply",

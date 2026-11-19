@@ -12,7 +12,7 @@ const ISO_AT_A_GLANCE = [
   ["ISO 22301", "Business continuity", "iso-22301", "B"],
   ["ISO 27001", "Information security", "iso-27001", "IS"],
 ];
-export default function Header({ locale, nav, variant = "default" }) {
+export default function Header({ locale, nav, variant = "default", hideAccountIdentity = false }) {
   const resources = [{ title: "Resources", links: [["Insights", "/insights"], ["Publications", "/publications"], ["Newsletter", "/insights#newsletter"], ["Training", "/pricing#learning"]] }];
   const company = [{ title: "About RPG", links: [["Our story & approach", "/about"], ["Industries", "/industries"], ["Partners", "/partners"]] }];
   return (
@@ -100,7 +100,9 @@ export default function Header({ locale, nav, variant = "default" }) {
         </nav>
 
         <Link href={`/${locale}/partners`} className="headerPartnerShortcut">Partners</Link>
-        <div className="headerAccount"><AccountMenu tone={variant === "home" ? "dark" : "light"}/></div>
+        <div className="headerAccount">
+          {hideAccountIdentity ? <Link className="btn" href="/portal">My platform</Link> : <AccountMenu tone={variant === "home" ? "dark" : "light"}/>}
+        </div>
         <style>{`
           .headerPartnerShortcut{display:none;text-decoration:none;font-size:13px;font-weight:850;border:1px solid currentColor;border-radius:8px;padding:9px 13px;flex-shrink:0;color:inherit}
           @media(min-width:1100px) and (max-width:1800px){.headerPartnerShortcut{display:inline-flex;margin-left:auto}.header .headerAccount{margin-left:0}}

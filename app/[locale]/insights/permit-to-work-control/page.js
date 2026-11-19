@@ -23,7 +23,7 @@ const article = {
   managementTest: "Would the permit still be valid if the task, people or conditions changed?",
   managementAnswer: "No. The permit authorises only the defined work under the verified conditions and within the stated validity period. Material change requires stop, review and controlled reissue.",
   productCopy: "The RPG Excellence Permit to Work workflow connects the approved assessment, hazards, verified precautions, responsible people, validity limits, issue, suspension and close-out in a traceable operational record.",
-  productHref: "/portal/health-safety/permits", productLabel: "Explore Permit to Work",
+  productHref: "/how-it-works/permit-to-work", productLabel: "Explore the Permit to Work walkthrough",
 };
 
-export default async function Page({ params }) { const { locale } = await params; if (!locales.includes(locale)) notFound(); return <HsInsightArticle locale={locale} article={article} />; }
+export default async function Page({ params }) { const { locale } = await params; if (!locales.includes(locale)) notFound(); return <HsInsightArticle locale={locale} article={{ ...article, productHref: `/${locale}${article.productHref}` }} />; }

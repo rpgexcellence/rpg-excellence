@@ -8,7 +8,6 @@ export const organizationSchema = {
   url: "https://www.rpgexcellence.com",
   description:
     "AI-powered ISO consultancy and business assurance services for organisations worldwide.",
-  email: "info@rpgexcellence.com",
   address: {
     "@type": "PostalAddress",
     streetAddress: "71-75 Shelton Street, Covent Garden",
