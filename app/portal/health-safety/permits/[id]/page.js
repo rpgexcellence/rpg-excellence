@@ -5,6 +5,7 @@ import {getPermitAccess,mayAcceptHandback,mayEditPermit,mayIssuePermit,mayReceiv
 import {effectivePermitStatus,getCloseReadiness,getIssueReadiness,PERMIT_STATUSES,statusMessage} from "../../../../../lib/permitLifecycle";
 import {COMMON_CONTROLS,getPermitRule} from "../../../../../lib/permitControlRules";
 import {changePermitLifecycle} from "./actions";
+import SubcontractorRequests from "./subcontractor/Requests";
 import {permitWorkflowFeedback} from "../../../../../lib/permit-workflow-feedback.mjs";
 
 export const dynamic="force-dynamic";
@@ -220,6 +221,8 @@ export default async function PermitRecordPage({params,searchParams}){
         )}
       </div>
     </section>
+
+    {item.organization_id && mayIssuePermit(access) && <SubcontractorRequests admin={admin} permit={item} feedback={query?.subcontractor} />}
 
     <section className="pcPanel">
       <h2>Permit control</h2>
