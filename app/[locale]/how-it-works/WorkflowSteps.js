@@ -6,11 +6,13 @@ import styles from "./permit-to-work/page.module.css";
 export default function WorkflowSteps({ title, intro, stages, stageLabel = "Workflow stages" }) {
   const [index, setIndex] = useState(0);
   const [showBlocker, setShowBlocker] = useState(false);
+  const [showPoster, setShowPoster] = useState(false);
   const heading = useRef(null);
   const dialog = useRef(null);
   const moved = useRef(false);
   const stage = stages[index];
   const screenshot = stage.screenshot;
+  const enlarged = showPoster ? stage.poster : screenshot;
   const finalStage = index === stages.length - 1;
   const headingId = useId();
   const stageId = useId();
@@ -28,6 +30,7 @@ export default function WorkflowSteps({ title, intro, stages, stageLabel = "Work
     moved.current = true;
     setIndex(next);
     setShowBlocker(false);
+    setShowPoster(false);
   }
 
   return (
@@ -57,14 +60,26 @@ export default function WorkflowSteps({ title, intro, stages, stageLabel = "Work
             <span className={styles.status}>{showBlocker && stage.blockedStatus ? stage.blockedStatus : stage.status}</span>
           </div>
           <p>{stage.text}</p>
+          {stage.routes && (
+            <ol className={styles.reportingRoutes}>
+              {stage.routes.map(route => <li key={route.title}><strong>{route.title}</strong><p>{route.text}</p></li>)}
+            </ol>
+          )}
           {screenshot && (
-            <figure className={styles.figure}>
-              <button type="button" className={styles.imageButton} onClick={() => dialog.current?.showModal()}>
-                <img src={screenshot.src} alt={screenshot.alt} width={screenshot.width} height={screenshot.height} />
-                <span>Enlarge screenshot</span>
-              </button>
-              <figcaption>{screenshot.caption}</figcaption>
-            </figure>
+            <div className={stage.poster ? styles.stageImages : undefined}>
+              {[screenshot, stage.poster].filter(Boolean).map(item => (
+                <figure className={styles.figure} key={item.src}>
+                  <button type="button" className={styles.imageButton} onClick={() => {
+                    setShowPoster(item === stage.poster);
+                    dialog.current?.showModal();
+                  }}>
+                    <img src={item.src} alt={item.alt} width={item.width} height={item.height} />
+                    <span>{item === stage.poster ? "Enlarge poster" : "Enlarge screenshot"}</span>
+                  </button>
+                  <figcaption>{item.caption}</figcaption>
+                </figure>
+              ))}
+            </div>
           )}
           {stage.detail && <p className={styles.detail}>{stage.detail}</p>}
           {stage.evidence && (
@@ -96,12 +111,12 @@ export default function WorkflowSteps({ title, intro, stages, stageLabel = "Work
           </div>
         </section>
       </div>
-      {screenshot && <dialog className={styles.dialog} ref={dialog} aria-labelledby={imageId}>
+      {enlarged && <dialog className={styles.dialog} ref={dialog} aria-labelledby={imageId}>
         <div className={styles.dialogHead}>
-          <h3 id={imageId}>{screenshot.title}</h3>
+          <h3 id={imageId}>{enlarged.title}</h3>
           <form method="dialog"><button type="submit" aria-label="Close screenshot">×</button></form>
         </div>
-        <div className={styles.dialogImage}><img src={screenshot.src} alt={screenshot.alt} width={screenshot.width} height={screenshot.height} /></div>
+        <div className={styles.dialogImage}><img src={enlarged.src} alt={enlarged.alt} width={enlarged.width} height={enlarged.height} /></div>
       </dialog>}
     </section>
   );

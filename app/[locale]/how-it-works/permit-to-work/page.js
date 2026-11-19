@@ -32,10 +32,6 @@ export default async function PermitToWorkPage({ params }) {
 
         <PermitWalkthrough />
 
-        <aside className={styles.resources} aria-label="Related resources">
-          <Link href={`/${locale}/insights/permit-to-work-control`}>Read the Permit to Work guidance</Link>
-          <Link href="/portal/health-safety/permits">Sign in to the permit register</Link>
-        </aside>
       </main>
     </PageShell>
   );
