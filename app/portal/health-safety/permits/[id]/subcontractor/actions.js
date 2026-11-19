@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../../lib/supabase/server";
 import { getPermitAccess, mayIssuePermit } from "../../../../../../lib/permitAccess";
-import { businessEmail, isRequestId, requestTable } from "../../../../../../lib/permit-subcontractor.mjs";
+import { businessEmail, hasSubcontractorScope, isRequestId, requestTable, supplierRequestEmail, supplierRequestOptions } from "../../../../../../lib/permit-subcontractor.mjs";
+import { loadPermitParticipants } from "../../../../../../lib/permitParticipants";
 import { sendPermitSubcontractorRequest } from "../../../../../../lib/people-onboarding-email";
 
 const origin = "https://www.rpgexcellence.com";
@@ -25,11 +26,28 @@ async function manageRequest(permitId, operation) {
   redirect(`/portal/health-safety/permits/${permitId}?subcontractor=${result}#subcontractor`);
 }
 
-export async function requestSubcontractorInformation(permitId, form) {
-  return manageRequest(permitId, async ({ admin, permit }, user) => {
+export async function requestSubcontractorInformation(permitId, expectedUpdatedAt, form) {
+  return manageRequest(permitId, async ({ admin, permit, organization }, user) => {
     if (permit.status !== "draft") return "draft-required";
-    const email = businessEmail(form.get("email"));
-    if (!email) return "email-required";
+    if (permit.updated_at !== expectedUpdatedAt) return "draft-changed";
+    if (!hasSubcontractorScope(permit)) return "scope-required";
+
+    const source = form.get("source");
+    let email;
+    if (source === "supplier") {
+      const supplierId = form.get("supplierId");
+      const contactId = form.get("contactId");
+      if (!isRequestId(supplierId) || !isRequestId(contactId)) return "supplier-contact-required";
+      const directory = supplierRequestOptions(await loadPermitParticipants(organization));
+      email = supplierRequestEmail(directory, supplierId, contactId);
+      if (!email) return "supplier-contact-required";
+      if (email !== form.get("reviewedEmail")) return "supplier-contact-changed";
+    } else if (source === "manual") {
+      email = businessEmail(form.get("email"));
+      if (!email) return "email-required";
+    } else {
+      return "recipient-source-required";
+    }
     const { data: row, error } = await admin.from(requestTable).insert({
       permit_id: permit.id,
       permit_updated_at: permit.updated_at,

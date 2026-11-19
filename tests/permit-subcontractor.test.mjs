@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { businessEmail, recipientMatches, requestOpen, parseSubcontractorDetails, isPdfEvidence, maxPdfBytes } from "../lib/permit-subcontractor.mjs";
+import { businessEmail, recipientMatches, requestOpen, parseSubcontractorDetails, isPdfEvidence, maxPdfBytes, supplierRequestOptions, supplierRequestEmail, hasSubcontractorScope } from "../lib/permit-subcontractor.mjs";
 
 test("only the verified recipient address opens the request", () => {
   const user = { id: "recipient", email: "Lead@Contractor.example", email_confirmed_at: "2026-11-19" };
@@ -41,4 +41,25 @@ test("subcontractor submissions permit only bounded text fields and PDF evidence
   assert.equal(isPdfEvidence(file, Buffer.from("not a PDF")), false);
   assert.equal(isPdfEvidence(file, Buffer.alloc(maxPdfBytes + 1)), false);
   assert.equal(isPdfEvidence({ ...file, name: "rams.html" }, sample), false);
+});
+
+
+test("supplier requests accept only a valid contact from the selected directory supplier", () => {
+  const options = supplierRequestOptions({
+    suppliers: [{ id: "a", legal_name: "Supplier A" }, { id: "b", legal_name: "Supplier B" }],
+    contacts: [
+      { id: "contact-a", supplier_id: "a", name: "Contact A", email: "Lead@A.example" },
+      { id: "contact-b", supplier_id: "b", name: "Contact B", email: "" },
+      { id: "other", supplier_id: "outside", name: "Other", email: "lead@other.example" },
+    ],
+  });
+  assert.deepEqual(options.map(supplier => supplier.id), ["a"]);
+  assert.equal(supplierRequestEmail(options, "a", "contact-a"), "lead@a.example");
+  assert.equal(supplierRequestEmail(options, "b", "contact-a"), null);
+  assert.equal(supplierRequestEmail(options, "a", "other"), null);
+});
+
+test("a subcontractor request requires both task and scope", () => {
+  assert.equal(hasSubcontractorScope({ task_description: "Task", scope_limits: "Scope" }), true);
+  assert.equal(hasSubcontractorScope({ task_description: "Task", scope_limits: "   " }), false);
 });
