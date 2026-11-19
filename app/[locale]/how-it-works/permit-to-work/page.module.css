@@ -55,6 +55,7 @@
 }
 .stages button:hover { background: #eaf4f8; }
 .stages button[aria-current="step"] { background: var(--teal); border-color: var(--teal); color: #fff; }
+.stages button:disabled { color: var(--muted); background: #f2f5f7; cursor: default; }
 .stages button span { flex: 0 0 1.55rem; text-align: center; }
 .panel { min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: clamp(14px, 3vw, 24px); }
 .panelHeading { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: start; justify-content: space-between; margin-bottom: 12px; }
@@ -74,6 +75,10 @@
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .actions .primary { border: 1px solid var(--teal); background: var(--teal); color: #fff; }
 .actions .primary:hover { background: #07564d; }
+.actions .primary:disabled { background: #546e7d; border-color: #546e7d; cursor: default; }
+.example { margin: 0 0 14px; padding: 11px 13px; background: #f2f7fb; border: 1px solid var(--line); border-radius: 8px; }
+.example dt { font-weight: 750; }
+.example dd { margin: 4px 0 0; color: var(--muted); }
 .audit { margin: 0; padding: 0; list-style: none; }
 .audit li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 9px; border-bottom: 1px solid var(--line); }
 .audit small { color: var(--muted); }
@@ -85,7 +90,7 @@
 .dialogHead h3 { margin: 0; font-size: 1rem; }
 .dialogHead button { min-width: 44px; min-height: 44px; background: #eef4f8; border: 1px solid var(--line); border-radius: 6px; font-size: 1.4rem; }
 .dialogImage { overflow: auto; }
-.dialogImage img { display: block; width: 1318px; height: auto; max-width: none; }
+.dialogImage img { display: block; height: auto; max-width: none; }
 
 @media (max-width: 680px) {
   .page { padding-inline: 14px; }
