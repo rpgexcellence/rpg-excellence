@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { EIGHT_D_CODE } from "../../../../lib/eight-d-publication.mjs";
+import { eightDFilesAreReady } from "../../../../lib/eight-d-publication-storage";
 import { getPublication } from "../../../../lib/publications.mjs";
 import { createClient } from "../../../../lib/supabase/server";
 function getStripe() {
@@ -107,6 +109,16 @@ export async function POST(request) {
         {
           status: 400,
         },
+      );
+    }
+    if (
+      purchaseType === "digital_publication" &&
+      publicationCode === EIGHT_D_CODE &&
+      !(await eightDFilesAreReady())
+    ) {
+      return Response.json(
+        { error: "This publication is temporarily unavailable." },
+        { status: 503 },
       );
     }
     const plan = typeof body?.plan === "string" ? body.plan.trim().toLowerCase() : "";
