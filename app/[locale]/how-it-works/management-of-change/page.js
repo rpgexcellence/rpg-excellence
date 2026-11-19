@@ -1,6 +1,7 @@
+import SafeOperationsPage from "../SafeOperationsPage";
+import { safeOperationsWorkflows } from "../safeOperationsWorkflows";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import PageShell from "../../../../components/PageShell";
 import { locales } from "../../../../lib/i18n";
 import ChangeSteps from "./ChangeSteps";
 import styles from "./page.module.css";
@@ -14,12 +15,12 @@ export const metadata = {
 export default async function ManagementOfChangeWalkthrough({ params }) {
   const { locale } = await params;
   if (!locales.includes(locale)) notFound();
-  return <PageShell locale={locale}><main className={styles.page}>
+  return <SafeOperationsPage locale={locale} workflow={safeOperationsWorkflows.change}><div className={styles.page}>
     <header className={styles.hero}>
       <div>
         <Link className={styles.back} href={`/${locale}/how-it-works`}>How it works / Management of Change</Link>
         <p className={styles.eyebrow}>PLATFORM INSIGHT · CONTROLLED CHANGE</p>
-        <h1>Before the change.<br/>Know the impact.</h1>
+        <h2>Before the change.<br/>Know the impact.</h2>
         <p className={styles.lead}>Start with what is changing. Connect the people, risk assessment and decisions needed to carry it through to a reviewed outcome.</p>
         <aside className={styles.insight}><p className={styles.eyebrow}>THE BUSINESS CONNECTION</p><h2>Make the handover visible.</h2><p>A new machine can affect capacity, quality, maintenance and the people working beside it. Bring those considerations into one change request before implementation.</p><div><span><strong>Define</strong>Scope and ownership</span><span><strong>Connect</strong>Risk and approvals</span><span><strong>Verify</strong>Evidence and outcome</span></div></aside>
         <div className={styles.actions}><Link className={styles.primary} href="/portal/health-safety/moc/new">Start a new change →</Link><Link href="/portal/health-safety/moc">Open MOC register →</Link></div>
@@ -41,5 +42,5 @@ export default async function ManagementOfChangeWalkthrough({ params }) {
     </div><aside className={styles.callout}><strong>When circumstances change, revisit the basis.</strong><p>A different machine, location, contractor method or operating condition may change the assessment. Revisit the scope, controls and applicable approvals before proceeding; a saved request is not an authorisation to start work.</p></aside></section>
 
     <footer className={styles.finish}><p className={styles.eyebrow}>START WITH THE CHANGE IN FRONT OF YOU</p><h2>Keep the proposal, risk<br/>and response connected.</h2><div className={styles.actions}><Link className={styles.primary} href="/portal/health-safety/moc/new">New change →</Link><Link href="/portal/health-safety/moc">MOC register →</Link><Link href="/portal/health-safety">H&amp;S dashboard →</Link></div><p className={styles.small}>Actual RPG Excellence screens captured on 18 November 2026. All example entries are fictional demonstration data. The fictional assessment received a demonstration approval, and MOC-2026-299EF4 was saved with RA-2026-0002 Version 2 linked. The change awaits HSE gate verification; no implementation, verified improvement or operational release is claimed. This walkthrough is platform insight, not a completed risk assessment.</p></footer>
-  </main></PageShell>;
+  </div></SafeOperationsPage>;
 }

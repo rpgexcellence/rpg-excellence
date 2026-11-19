@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import PageShell from '../../../components/PageShell';
 import { locales } from '../../../lib/i18n';
+import { HOW_IT_WORKS_GROUPS } from '../../../lib/howItWorks';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -18,8 +19,8 @@ function Steps({items}) {
 export default async function HowItWorks({params}) {
  const {locale}=await params; if(!locales.includes(locale)) notFound();
  const href=(path)=>'/'+locale+path;
- return <PageShell locale={locale}><main className={styles.page}>
- <header className={styles.hero}><p className={styles.kicker}>HOW IT WORKS · INSIDE RPG EXCELLENCE</p><h1>See the workflow.<br/>Understand the value.</h1><p className={styles.lead}>From the equipment in front of you to the concern that needs a response. Follow the actual platform screens and see where responsibility, evidence and decisions connect.</p><nav className={styles.jump} aria-label="Choose a workflow"><a href="#asset-qr">01 · Asset QR & records <span>View steps</span></a><a href="#hazard-reporting">02 · Report & respond <span>View steps</span></a></nav><p className={styles.note}>Real product screens, captured on 15 November 2026 using clearly labelled fictional demonstration records. The sample asset is retired; the demonstration reporting zone has been unpublished. Screenshots are examples, not live reporting routes.</p></header>
+ return <PageShell locale={locale} hideAccountIdentity><main className={styles.page}>
+ <header className={styles.hero}><p className={styles.kicker}>HOW IT WORKS · INSIDE RPG EXCELLENCE</p><h1>See the workflow.<br/>Understand the value.</h1><p className={styles.lead}>From the equipment in front of you to the concern that needs a response. Follow the actual platform screens and see where responsibility, evidence and decisions connect.</p><nav className={styles.jump} aria-label="Choose a workflow"><a href="#asset-qr">01 · Asset QR & records <span>View steps</span></a><a href="#hazard-reporting">02 · Report & respond <span>View steps</span></a><a href="#safe-operations">Safe Operations walkthroughs</a></nav><p className={styles.note}>Real product screens, captured on 15 November 2026 using clearly labelled fictional demonstration records. The sample asset is retired; the demonstration reporting zone has been unpublished. Screenshots are examples, not live reporting routes.</p></header>
  <section id="asset-qr" className={styles.section} aria-labelledby="asset-title"><div className={styles.heading}><div><p className={styles.kicker}>01 / ASSET MANAGEMENT</p><h2 id="asset-title">The right record.<br/>Beside the asset.</h2></div><p>Reduce the search between a label on the workshop floor and the information needed for the next decision.</p></div>
  <div className={styles.layout}><Screen file="rpg-asset-qr-record.jpg" alt="Real RPG asset record for DEMO-AST-001 showing its QR, sign-in requirement and retired status" caption="Actual authenticated asset record. The retired status remains visible and the QR requires sign-in. No maintenance completion or equipment suitability is asserted by this demonstration."/>
  <Steps items={[
@@ -37,8 +38,10 @@ export default async function HowItWorks({params}) {
  ]}/></div>
  <div className={styles.gallery}><Screen file="rpg-zone-qr.jpg" alt="Actual zone administration showing permanent QR connection and A4 and A3 poster controls" caption="Actual zone connection and poster controls before unpublishing. No physical poster display was confirmed. The sample QR is not for operational reporting."/><Screen file="rpg-hazard-case.jpg" alt="Real received demo case showing report status and stages from triage through independent verification" caption="The submitted demo report in the authorised case view. Status: reported. Investigator: not assigned. The private reporter progress key is excluded."/></div>
  <aside className={styles.callout}><strong>Reporting supports your response arrangements</strong><p>The form is not continuously monitored and does not summon emergency assistance. Follow local emergency and security response arrangements for urgent situations. The demo remains an open, clearly labelled fictional case; the zone is unpublished.</p></aside><Link className={styles.related} href={href('/hs-hub#hs-reporting-title')}>Explore the Health & Safety Hub →</Link></section>
- <aside className={styles.more}><p className={styles.kicker}>MORE INSIDE THE PLATFORM</p><h2>POWRA: the task check in practice.</h2><p>See the dashboard entry points, changing decisions and temporary device drafts.</p><Link href={href('/how-it-works/powra')}>Explore the POWRA walkthrough →</Link></aside>
- <aside className={styles.more}><p className={styles.kicker}>SAFE OPERATIONS</p><h2>Permit to Work</h2><p>Follow a CNC electrical permit through verification, issue and hand-back.</p><Link href={href('/how-it-works/permit-to-work')}>Explore the Permit to Work walkthrough</Link></aside>
+ <section id="safe-operations" className={styles.more} aria-labelledby="safe-operations-title">
+ <h2 id="safe-operations-title">Safe Operations walkthroughs</h2>
+ <ul>{HOW_IT_WORKS_GROUPS.find(group=>group.title==="Safe operations").links.map(([name,path])=><li key={path}><Link href={href(path)}>{name}</Link></li>)}</ul>
+ </section>
  <section className={styles.finish}><p className={styles.kicker}>START WITH YOUR WORKFLOW</p><h2>Where does the handover break down?</h2><p>Discuss your records, roles and evidence requirements. We can walk through the relevant workflow and agree the setup and support your organisation needs.</p><div><Link href={href('/contact')}>Discuss your requirements →</Link><Link href={href('/pricing')}>View access options →</Link></div></section>
  </main></PageShell>;
 }
