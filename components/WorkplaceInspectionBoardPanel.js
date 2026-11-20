@@ -1,7 +1,5 @@
 import Link from 'next/link';
 import WorkplaceInspectionCalendar from './WorkplaceInspectionCalendar';
-import {createAdminClient} from '../lib/supabase/admin';
-import {requireOrganizationAccess} from '../lib/organization-access';
 import {resolveInspectionAccess} from '../lib/workplace-inspection-access';
 import {companyPersonLabel} from '../lib/workplace-inspections';
 import {buildInspectionCalendarEvents} from '../lib/workplace-inspection-calendar.mjs';
@@ -16,10 +14,8 @@ async function readAll(admin,table,columns,organizationId){
   rows.push(...(result.data || []));if((result.data || []).length<500)return rows;
  }
 }
-export default async function WorkplaceInspectionBoardPanel({organizationId,access:providedAccess}) {
- const base=providedAccess || await requireOrganizationAccess('risk_management','view','/portal/health-safety/management-board');
+export async function loadWorkplaceInspectionBoard({organizationId, access:base, admin}) {
  if(base.organization?.id!==organizationId)throw new Error('The calendar organisation does not match your authorised workspace.');
- const admin=createAdminClient();
  const access=await resolveInspectionAccess(admin,base);
  const [allProgrammes,inspections,allActions,people]=await Promise.all([
   readAll(admin,'hs_inspection_programmes','id,title,next_inspection_date,risk_band,status,administration_location_label,lead_inspector_person_id',organizationId),
@@ -33,9 +29,14 @@ export default async function WorkplaceInspectionBoardPanel({organizationId,acce
  const overdue=inspections.filter(i=>['planned','due','in_progress'].includes(i.status)&&(i.planned_end_at || i.planned_start_at)?.slice(0,10)<today);
  const overdueActions=actions.filter(a=>a.target_date&&a.target_date<today);
  const critical=buildInspectionCalendarEvents({programmes,inspections,actions}).filter(e=>e.type!=='action'&&e.band==='critical');
- return <section className="wibPanel">
+ return {programmes, inspections, actions, people, today, overdue, overdueActions, critical, canAdminister:access.canAdministerInspection};
+}
+
+export default function WorkplaceInspectionBoardPanel({data}) {
+ const {programmes, inspections, actions, people, today, overdue, overdueActions, critical, canAdminister} = data;
+ return <section className="wibPanel" id="inspection-calendar">
   <header className="wibHead"><div><h2>Workplace Inspection planning</h2><p>Risk-based programme dates, scheduled fieldwork and action escalation.</p></div><Link href={ROOT}>Open Workplace Inspections →</Link></header>
   <div className="wibMetrics"><div className="wibMetric"><span>Active programmes</span><strong>{programmes.length}</strong><small>Recurring controls</small></div><div className="wibMetric"><span>Overdue inspections</span><strong className={overdue.length?'wibRed':'wibGreen'}>{overdue.length}</strong><small>Past planned fieldwork date</small></div><div className="wibMetric"><span>Critical priority</span><strong className={critical.length?'wibRed':'wibGreen'}>{critical.length}</strong><small>Accelerated planning</small></div><div className="wibMetric"><span>Overdue actions</span><strong className={overdueActions.length?'wibAmber':'wibGreen'}>{overdueActions.length}</strong><small>Leadership attention</small></div></div>
-  <WorkplaceInspectionCalendar programmes={programmes} inspections={inspections} actions={actions} people={people.map(p=>({id:p.id,label:companyPersonLabel(p),account_status:p.account_status}))} canAdminister={access.canAdministerInspection} updateAction={updateInspectionDetails} today={today}/>
+  <WorkplaceInspectionCalendar programmes={programmes} inspections={inspections} actions={actions} people={people.map(p=>({id:p.id,label:companyPersonLabel(p),account_status:p.account_status}))} canAdminister={canAdminister} updateAction={updateInspectionDetails} today={today} overdueInspectionIds={overdue.map(item=>item.id)}/>
  </section>;
 }

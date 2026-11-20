@@ -322,7 +322,6 @@ function refreshControlledViews(inspectionId) {
   revalidatePath(ROOT);
   revalidatePath("/portal/health-safety");
   revalidatePath("/portal");
-  revalidatePath("/portal/health-safety/management-board");
   revalidatePath("/portal/tasks");
   revalidatePath("/portal/management-oversight");
 }

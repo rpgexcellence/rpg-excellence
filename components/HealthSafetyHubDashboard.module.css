@@ -1,0 +1,108 @@
+.dashboard {
+  --hs-line: #d7e4ed;
+  --hs-navy: #102e48;
+  --hs-link: #08686e;
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+  max-width: 1520px;
+  margin: auto;
+  padding: 24px clamp(12px, 2vw, 28px) 50px;
+  color: #162f47;
+}
+.dashboard a { color: var(--hs-link); }
+.dashboard a:focus-visible, .dashboard summary:focus-visible { outline: 2px solid #3079a5; outline-offset: 3px; }
+.hero {
+  min-height: 145px;
+  padding: 22px;
+  color: #fff;
+  background: linear-gradient(90deg, #102e48 14%, #102e48ed 43%, #102e4896 76%, #102e48ed), url('/images/health-safety-dashboard-team.webp') center 45% / cover;
+}
+.hero h1, .dashboard h2, .kpi span, .kpi strong { font-family: Georgia, serif; }
+.hero h1 { margin: 5px 0 8px; font-size: clamp(27px, 3.2vw, 42px); }
+.hero p { margin: 0; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #b5e7e8; }
+.heroFoot, .hero nav, .scope, .panelHead, .insight header { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 13px; }
+.heroFoot, .scope, .panelHead { justify-content: space-between; }
+.heroFoot { color: #e1edf3; }
+.hero nav { gap: 6px; }
+.hero nav a { padding: 6px 9px; border: 1px solid #7b9aac; border-radius: 4px; background: #143a55; color: #fff; text-decoration: none; font-size: .78rem; font-weight: 700; }
+.hero nav a:hover { background: #095c68; }
+.scope, .panel, .insight { padding: 12px 16px; background: #fff; border: 1px solid var(--hs-line); }
+.scope { font-size: .82rem; color: #4b6378; }
+.scope strong { color: #162f47; }
+.dashboard h2 { margin: 0; font-size: 1.25rem; }
+.insight { border-left: 4px solid #168480; }
+.insight h2 { font-size: 1.45rem; }
+.insight header strong, .chips a { display: inline-block; border-radius: 4px; padding: 5px 8px; font-size: .83rem; background: var(--signal-bg); color: var(--signal-text); }
+.insight header strong::before { content: '●'; padding-right: 6px; }
+.insight .red { --signal-bg: #fbe8e8; --signal-text: #94252d; }
+.insight .orange { --signal-bg: #fff0dc; --signal-text: #784512; }
+.insight .green { --signal-bg: #dff3e8; --signal-text: #145c44; }
+.insight .neutral { --signal-bg: #edf2f6; --signal-text: #485a6a; }
+.chips, .list { list-style: none; padding: 0; margin: 8px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips b { margin-left: 4px; }
+.insight p, .panel p { margin: 7px 0; font-size: .88rem; line-height: 1.45; }
+.insight p strong { margin-right: 6px; }
+.rules { border-top: 1px solid var(--hs-line); margin-top: 8px; padding-top: 7px; }
+.insight summary { cursor: pointer; font-weight: 700; font-size: .82rem; }
+.kpis, .split, .operations { display: grid; gap: 12px; min-width: 0; }
+.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.dashboard .kpi {
+  display: grid;
+  gap: 7px;
+  border-left: 3px solid #52c3bd;
+  min-height: 109px;
+  padding: 13px 15px;
+  background: linear-gradient(93deg, #0c253de8, #0e294994), url('/images/health-safety-dashboard-kpis.webp') 0 0 / 200% 200%;
+  color: #fff;
+  text-decoration: none;
+}
+.dashboard .kpi:nth-child(2) { border-color: #f38b91; background-position: center, 100% 100%; }
+.dashboard .kpi:nth-child(3) { border-color: #eeb854; background-position: center, 100% 0%; }
+.dashboard .kpi:nth-child(4) { border-color: #7ab9dd; background-position: center, 0% 100%; }
+.kpi:hover { outline: 2px solid #79a9bd; }
+.kpi span { font-weight: 700; }
+.kpi strong { font-size: 1.8rem; }
+.kpi small { color: #d7e8f2; }
+.split { grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr); }
+.panel { min-width: 0; }
+.panelHead { padding-bottom: 9px; border-bottom: 1px solid var(--hs-line); }
+.panelHead h2::after { content: ''; display: block; width: 28px; margin-top: 5px; border-bottom: 2px solid #c6a150; }
+.panelHead a, .panel p a, .queue a { font-weight: 700; font-size: .84rem; }
+.panel p { color: #435d72; }
+.matrixScroll { overflow: auto; }
+.matrix, .queue { width: 100%; text-align: left; font-size: .81rem; }
+.matrix { min-width: 490px; border-spacing: 4px; }
+.matrix th { color: #3a556c; font-size: .72rem; }
+.matrix td { padding: 4px 6px; border-radius: 3px; min-width: 48px; }
+.matrix td strong { float: right; font-size: 1rem; }
+.matrix td span { display: block; font-size: .63rem; text-transform: capitalize; }
+.acceptable { background: #24805e; color: #fff; }
+.adequate { background: #f2c562; color: #242a2f; }
+.inadequate { background: #eb8b58; color: #202b35; }
+.unacceptable { background: #a73640; color: #fff; }
+.axis { text-align: center; font-weight: 700; }
+.performance { margin: 6px 0 12px; }
+.performance div { display: flex; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--hs-line); font-size: .87rem; }
+.performance dd { margin: 0; white-space: nowrap; color: var(--hs-link); font-weight: 700; }
+.queue { border-collapse: collapse; min-width: 480px; }
+.queue thead { background: #edf4f8; }
+.queue th, .queue td { padding: 8px; border-bottom: 1px solid var(--hs-line); }
+.operations { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.operations a { display: grid; gap: 7px; padding: 13px; background: #fff; border: 1px solid var(--hs-line); text-decoration: none; }
+.list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; padding: 8px; border-bottom: 1px solid var(--hs-line); font-size: .86rem; }
+.list a { font-weight: 700; }
+.list span { color: #435d72; }
+.pages { display: flex; justify-content: center; gap: 12px; padding-top: 7px; }
+.dashboard :global(.wibPanel) { margin: 0; min-width: 0; }
+.dashboard :global(.wibHead) h2 { font: 700 1.25rem Georgia, serif; }
+@media (max-width: 1100px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .operations { grid-template-columns: 1fr; }
+  .dashboard { padding-inline: 10px; }
+  .kpi span { font-size: .88rem; }
+}

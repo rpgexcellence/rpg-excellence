@@ -83,7 +83,7 @@ const stages = [
     ],
     "value": "Challenge whether arrangements remain effective. Combine management oversight and learning to identify weak controls, overdue reviews and competence needs.",
     "records": "Review decisions, management oversight and training evidence.",
-    "href": "/portal/health-safety/management-board",
+    "href": "/portal/health-safety",
     "action": "Explore management insight"
   },
   {
@@ -118,7 +118,7 @@ const capabilities = [
   [
     "Management insight",
     "Review exposure, overdue actions, assessment currency and competence.",
-    "/portal/health-safety/management-board"
+    "/portal/health-safety"
   ],
   [
     "POWRA",
@@ -237,7 +237,7 @@ export default function HealthSafetyLanding({ locale = "en" }) {
       <div className={styles.commercialHeading}><p className={styles.eyebrow}>START WITH YOUR PRIORITY</p><h2 id="hs-explore-title">Where do you want to start?</h2><p>Choose one starting point. Explore the detail when you need it.</p></div>
       <div className={styles.priorityGrid}>
         <article><span className={`${styles.benefitIcon} ${styles.mint}`}><BenefitIcon type="document"/></span><div><h3>Assess the work</h3><p>Move beyond a blank template. Follow a guided workflow to connect hazards, affected people, risk decisions and controls.</p><Link href="/portal/health-safety/risk-assessment/new">Explore risk assessment <span aria-hidden="true">→</span></Link></div></article>
-        <article><span className={`${styles.benefitIcon} ${styles.lavender}`}><BenefitIcon type="target"/></span><div><h3>See what needs attention</h3><p>Keep elevated risk, overdue control actions and reviews visible. Give management a clearer basis for deciding what happens next.</p><Link href="/portal/health-safety/management-board">Explore management insight <span aria-hidden="true">→</span></Link></div></article>
+        <article><span className={`${styles.benefitIcon} ${styles.lavender}`}><BenefitIcon type="target"/></span><div><h3>See what needs attention</h3><p>Keep elevated risk, overdue control actions and reviews visible. Give management a clearer basis for deciding what happens next.</p><Link href="/portal/health-safety">Explore management insight <span aria-hidden="true">→</span></Link></div></article>
         <article><span className={`${styles.benefitIcon} ${styles.apricot}`}><BenefitIcon type="people"/></span><div><h3>Build assessor competence</h3><p>Develop practical judgement through interactive scenarios, exercises and assessment. Explore initial and refresher learning.</p><Link href={training}>Explore training options <span aria-hidden="true">→</span></Link></div></article>
       </div>
     </section>
