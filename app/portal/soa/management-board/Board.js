@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { percentage, THEMES } from "./metrics.mjs";
 import styles from "./board.module.css";
+import ExecutiveInsight, { DeliveryQueue } from "./ExecutiveInsight";
 
 const boardPath = "/portal/soa/management-board";
 const riskPath = "/portal/information-security/risk-management";
@@ -34,7 +35,7 @@ function RecordList({ selection, page, link, close }) {
   </section>;
 }
 
-export default function Board({ scopes, organization, values, accessOrganizationId, today, security, controls, registers, legacy, children }) {
+export default function Board({ scopes, organization, values, accessOrganizationId, today, security, review, controls, registers, legacy, children }) {
   const { org, assessment, theme, year, quarter, detail, page } = values;
   const { activeRisks, above, unresolved, overdue, undated, cohorts, activeIncidents, serious, overdueRecovery, incidentVerification, pending, expiring, expired } = security;
   const currentRiskWorkspace = Boolean(organization && organization.id === accessOrganizationId && activeRisks);
@@ -45,9 +46,16 @@ export default function Board({ scopes, organization, values, accessOrganization
   const incidentEntry = row => ({ key: row.id, label: row.incident_reference, detail: human(row.severity) + " · " + human(row.status) + (row.target_recovery_date ? " · " + displayDate(row.target_recovery_date) : ""), href: organization.id === accessOrganizationId ? incidentPath + "/" + row.id : null });
   const controlEntry = row => ({ key: row.assessment_id + ":" + row.control_id, label: "A." + row.control_id, detail: human(row.implementation_status), href: soaLink(row.assessment_id, row.control_id) });
   const acceptanceEntry = row => ({ key: row.id, label: row.risk.risk_reference, detail: "Acceptance · " + human(row.decision) + " · " + displayDate(row.expires_at), href: riskLink(row.risk_id) });
+  const actionEntry = row => ({ ...controlEntry(row), detail: "Control action · " + human(row.action_status) + " · " + displayDate(row.target_date) });
+  const riskReviewEntry = row => ({ ...riskEntry(row), detail: "Risk review · " + displayDate(row.review_due_date) });
+  const soaReviewEntry = row => ({ key: row.id, label: "SoA v" + row.version, detail: human(row.status) + " · " + displayDate(row.review_due_at), href: soaLink(row.assessment_id) });
+  const [treatmentDates, actionDates] = review.work;
+  const future = item => [...(item.today ?? []), ...(item.upcoming ?? [])];
   const upcoming = [
+    ...future(treatmentDates).map(row => ({ ...treatmentEntry(row), key: "treatment:" + row.id, date: row.target_date, detail: "Risk treatment" })),
+    ...future(actionDates).map(row => ({ ...actionEntry(row), key: "action:" + row.id, date: row.target_date, detail: "SoA control action" })),
     ...(activeRisks ?? []).map(row => ({ ...riskEntry(row), key: "risk:" + row.id, date: row.review_due_date, detail: "Risk review" })),
-    ...registers.map(row => ({ key: "soa:" + row.id, label: "SoA v" + row.version, date: row.review_due_at?.slice(0, 10), detail: "SoA review", href: soaLink(row.assessment_id) })),
+    ...registers.filter(row => row.status !== "superseded").map(row => ({ key: "soa:" + row.id, label: "SoA v" + row.version, date: row.review_due_at?.slice(0, 10), detail: "SoA review", href: soaLink(row.assessment_id) })),
     ...(activeIncidents ?? []).map(row => ({ ...incidentEntry(row), key: "incident:" + row.id, date: row.target_recovery_date, detail: "Incident recovery target" })),
     ...(expiring ?? []).map(row => ({ ...acceptanceEntry(row), key: "acceptance:" + row.id, date: row.expires_at, detail: "Acceptance expiry" })),
   ].filter(row => row.date && row.date >= today).sort((a, b) => a.date.localeCompare(b.date));
@@ -74,6 +82,15 @@ export default function Board({ scopes, organization, values, accessOrganization
   registerSelection("expiring", "Risk acceptances expiring within 30 days", expiring, acceptanceEntry);
   registerSelection("expired", "Expired risk acceptances", expired, acceptanceEntry);
   registerSelection("verification", "Verified treatments in the selected due period", cohorts?.flatMap(group => group.verified), treatmentEntry);
+  registerSelection("soa-review-queue", "SoA registers awaiting review", review.reviewQueue, soaReviewEntry);
+  registerSelection("soa-drafts", "SoA registers in draft", review.draftRegisters, soaReviewEntry);
+  registerSelection("soa-undecided", "SoA applicability decisions outstanding", review.undecided, controlEntry);
+  const rowTypes = { treatments: treatmentEntry, actions: actionEntry, riskReviews: riskReviewEntry, soaReviews: soaReviewEntry, recovery: incidentEntry };
+  for (const item of review.work) {
+    for (const [bucket, title] of Object.entries({ today: "due today", upcoming: "due in the next 30 days", overdue: "overdue", verification: "awaiting verification", undated: "without a date" })) {
+      registerSelection(item.key + "-" + bucket, item.label + " " + title, item[bucket], rowTypes[item.key]);
+    }
+  }
   for (const group of cohorts ?? []) registerSelection("q" + group.number, "Q" + group.number + " treatment cohort", group.rows, treatmentEntry);
   for (const group of controls?.groups ?? []) registerSelection(group.key, group.label + " applicable controls", group.rows, controlEntry);
 
@@ -118,10 +135,12 @@ export default function Board({ scopes, organization, values, accessOrganization
       <button type="submit">Apply filters</button>
     </form>
     <p className={styles.scope}>As at {displayDate(today)} (Europe/London). SoA and theme filters apply to control records and the existing SoA heat map. Due period applies to treatment cohorts and verification. The heat map retains its existing authorised SoA scope.</p>
+    <ExecutiveInsight review={review} controls={controls} detailUrl={detailUrl}/>
     <section className={styles.cards} aria-label="Management KPIs">
       {headlineCards.map(({ key, ...card }) => <Card key={key} {...card} href={selections[key] && detailUrl(key)}/>)}
     </section>
     {selections[detail] && <RecordList selection={selections[detail]} page={page} link={number => detailUrl(detail, number)} close={detailUrl()}/>}
+    <DeliveryQueue review={review} detailUrl={detailUrl}/>
     <div className={styles.grid}>
       <section className={styles.panel}>
         <h2>Treatment delivery by due quarter</h2><p>Compare due treatments with those currently verified. Cancelled treatments are excluded.</p>
@@ -146,7 +165,7 @@ export default function Board({ scopes, organization, values, accessOrganization
         {cohortRows && <Link href={detailUrl("verification")}>View verified treatments</Link>}
       </section>
       <section className={styles.panel}>
-        <h2>Upcoming reviews and recovery targets</h2>
+        <h2>Next deadlines and reviews</h2>
         {upcoming.length ? <ul className={styles.records}>{upcoming.slice(0, 6).map(row => <li key={row.key}><span>{row.href ? <Link href={row.href}>{row.label}</Link> : row.label}<small>{row.detail}</small></span><time dateTime={row.date}>{displayDate(row.date)}</time></li>)}</ul> : <p>{activeRisks || controls || activeIncidents ? "No upcoming dates in the available records." : unavailable + "."}</p>}
       </section>
     </div>
