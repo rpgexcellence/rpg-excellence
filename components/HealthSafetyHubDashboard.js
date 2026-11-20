@@ -1,571 +1,184 @@
 import Link from "next/link";
+import { healthSafetyPosition, residualBand } from "../lib/health-safety-dashboard.mjs";
+import styles from "./HealthSafetyHubDashboard.module.css";
 
-const openStatuses = [
-  "open",
-  "accepted",
-  "in_progress",
-  "evidence_submitted",
-  "verification",
-  "partly_effective",
-  "not_effective",
-];
-const matrix = [
-  5, 10, 15, 20, 25, 4, 8, 12, 16, 20, 3, 6, 9, 12, 15, 2, 4, 6, 8, 10, 1, 2, 3,
-  4, 5,
-];
-const navItems = [
-  ["⌂", "Overview", "/portal/health-safety"],
-  ["▣", "Risk Assessments", "/portal/health-safety/risk-assessment"],
-  ["⚑", "POWRA", "/portal/health-safety/powra"],
-  ["◆", "Permit to Work", "/portal/health-safety/permits"],
-  ["↻", "Management of Change", "/portal/health-safety/moc"],
-  ["WPI", "Workplace Inspections", "/portal/health-safety/workplace-inspections"],
-  ["☷", "Actions", "/portal/health-safety/actions"],
-  ["◇", "Training Academy", "/portal/health-safety/training"],
-  ["▥", "Reports", "/portal/health-safety/management-board"],
-  ["□", "Templates", "/portal/health-safety/risk-assessment/new"],
-];
+const root = "/portal/health-safety";
+const assessmentPath = root + "/risk-assessment";
+const actionsPath = root + "/actions";
+const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const dates = [["today", "Due today"], ["upcoming", "Next 30 days"], ["overdue", "Overdue"]];
+const statusLabels = { red: "Red · Intervention required", orange: "Orange · Management attention", green: "Green · No escalation triggered", neutral: "Not rated · Insufficient records" };
 
-const formatDate = (value) =>
-  value
-    ? new Intl.DateTimeFormat("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }).format(new Date(value))
-    : "—";
-const titleCase = (value) =>
-  String(value || "draft")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+const count = (value, noun) => value + " " + (value === 1 ? noun : noun + "s");
+const percent = (num, den) => den ? Math.round(num / den * 100) + "%" : "—";
+const dateText = value => value ? dateFormat.format(new Date(value)) : "No date";
+const detailUrl = (key, page = 1) => root + "?insight=" + encodeURIComponent(key) + (page > 1 ? "&records=" + page : "") + "#insight-records";
 
-function Metric({ icon, title, value, tone, detail, href }) {
-  return (
-    <Link className={`hsvMetric ${tone}`} href={href}>
-      <span className="hsvMetricIcon">{icon}</span>
-      <div>
-        <small>{title}</small>
-        <strong>{value}</strong>
-        <em>{detail}</em>
-      </div>
-    </Link>
-  );
+function RecordList({ data, page }) {
+  if (!data) return null;
+  const pages = Math.max(1, Math.ceil(data.rows.length / 20));
+  const current = Math.min(page, pages);
+  return <section className={styles.panel} id="insight-records" aria-labelledby="insight-records-title">
+    <header className={styles.panelHead}><h2 id="insight-records-title">{data.label}</h2><Link href={root + "#executive-insight"}>Close records</Link></header>
+    {data.rows.length ? <ul className={styles.list}>{data.rows.slice((current - 1) * 20, current * 20).map(data.record).map(row => <li key={row.id}>
+      <Link href={row.href}>{row.label}</Link><span>{row.detail}</span>
+    </li>)}</ul> : <p>No records in this view.</p>}
+    {pages > 1 && <nav aria-label="Record pages" className={styles.pages}>
+      {current > 1 && <Link href={detailUrl(data.key, current - 1)}>Previous</Link>}
+      Page {current} of {pages}
+      {current < pages && <Link href={detailUrl(data.key, current + 1)}>Next</Link>}
+    </nav>}
+  </section>;
 }
 
-export default function HealthSafetyHubDashboard({
-  organisationName,
-  assessments = [],
-  hazards = [],
-  actions = [],
-  enrolments = [],
-  powras = [],
-  permits = [],
-  changes = [],
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const elevated = hazards.filter(
-    (item) => (item.residual_score ?? item.current_score ?? 0) >= 10,
-  );
-  const openActions = actions.filter((item) =>
-    openStatuses.includes(item.status),
-  );
-  const overdue = openActions.filter(
-    (item) => item.target_date && item.target_date < today,
-  );
-  const reviewsDue = assessments.filter(
-    (item) =>
-      item.review_date &&
-      item.review_date <= today &&
-      !["superseded", "archived"].includes(item.status),
-  );
-  const approved = assessments.filter((item) =>
-    ["approved", "communicated"].includes(item.status),
-  );
-  const trained = enrolments.filter((item) => item.status === "passed").length;
-  const assessmentById = new Map(assessments.map((item) => [item.id, item]));
-  const livePowras = powras.filter((item) =>
-    ["open", "supervisor_review", "stopped"].includes(item.status),
-  );
-  const livePermits = permits.filter(
-    (item) =>
-      item.status === "issued" && new Date(item.valid_until) >= new Date(),
-  );
-  const activeChanges = changes.filter(
-    (item) => !["closed", "rejected", "cancelled"].includes(item.status),
-  );
+function HeatMap({ hazards }) {
+  const positions = new Map();
+  for (const hazard of hazards) {
+    if (!hazard.residual_likelihood || !hazard.residual_severity) continue;
+    const key = hazard.residual_likelihood + "-" + hazard.residual_severity;
+    positions.set(key, (positions.get(key) || 0) + 1);
+  }
+  const likelihoods = ["Very unlikely", "Unlikely", "Possible", "Likely", "Very likely"];
+  const severities = ["No injury", "First aid", "LTI under 7d", "LTI 7+d", "Fatality"];
+  return <section className={styles.panel} aria-labelledby="hs-heat-map">
+    <header className={styles.panelHead}><h2 id="hs-heat-map">Live residual-risk heat map</h2><Link href={assessmentPath}>Open risk register →</Link></header>
+    <p>Hazard counts by likelihood and severity for records with a recorded residual position.</p>
+    <div className={styles.matrixScroll} role="region" tabIndex={0} aria-label="Residual-risk matrix">
+      <table className={styles.matrix}>
+        <thead><tr><th scope="col">Severity ↓</th>{likelihoods.map((label, index) => <th scope="col" key={label}>{index + 1} {label}</th>)}</tr></thead>
+        <tbody>{[5, 4, 3, 2, 1].map(severity => <tr key={severity}>
+          <th scope="row">{severity} {severities[severity - 1]}</th>
+          {likelihoods.map((_, index) => {
+            const likelihood = index + 1;
+            const score = likelihood * severity;
+            const band = residualBand(score);
+            return <td key={likelihood} className={styles[band]}><small>Score {score}</small><strong>{positions.get(likelihood + "-" + severity) || 0}</strong><span>{band}</span></td>;
+          })}
+        </tr>)}</tbody>
+      </table>
+    </div>
+    <p className={styles.axis}>Likelihood →</p>
+  </section>;
+}
 
-  return (
-    <main className="hsvPage">
-      <style>{`
-    *{box-sizing:border-box}.hsvPage{min-height:100vh;padding:20px;background:linear-gradient(135deg,#e8f2fa,#f8fafc);color:#071d3a;font-family:Arial,sans-serif}.hsvApp{max-width:1480px;min-height:850px;margin:auto;display:grid;grid-template-columns:235px minmax(0,1fr);overflow:hidden;border:1px solid #cbdbe7;border-radius:18px;background:#fff;box-shadow:0 22px 60px #0c335a20}.hsvSide{display:flex;flex-direction:column;padding:25px 15px;background:#082a54;color:#d6e4f1}.hsvBrand{padding:0 12px 22px;color:#fff;font-size:17px;font-weight:950;letter-spacing:.04em}.hsvBrand span{color:#61dbc0}.hsvNav{display:grid;gap:6px}.hsvNav a{display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;color:#c9d9e8;text-decoration:none;font-size:12px;font-weight:750}.hsvNav a:first-child,.hsvNav a:hover{background:#1762a3;color:#fff}.hsvNav i{display:grid;place-items:center;width:24px;height:24px;border:1px solid #6c8baa;border-radius:6px;font-style:normal}.hsvSideFoot{margin-top:auto;padding:17px 12px;border-top:1px solid #315276;color:#8fe4cc;font-size:13px;font-weight:850;line-height:1.4}.hsvMain{min-width:0;background:#f5f9fc}.hsvToolbar{min-height:70px;padding:13px 25px;display:flex;justify-content:space-between;align-items:center;gap:18px;border-bottom:1px solid #dbe5ed;background:#fff}.hsvSearch{width:min(410px,45vw);padding:11px 14px;border:1px solid #ccd9e4;border-radius:9px;color:#7990a5;font-size:12px}.hsvToolbarActions{display:flex;gap:9px;align-items:center}.hsvIconButton{display:grid;place-items:center;width:38px;height:38px;border:1px solid #d1dee8;border-radius:9px;background:#f5f9fc;color:#153d66;font-weight:900}.hsvContent{padding:26px}.hsvHeader{display:flex;justify-content:space-between;gap:20px;align-items:start}.hsvEyebrow{color:#087f6c;font-size:10px;font-weight:950;letter-spacing:.12em}.hsvHeader h1{margin:5px 0;font-size:32px}.hsvHeader p{margin:0;color:#607890}.hsvHeaderActions{display:flex;gap:9px;flex-wrap:wrap}.hsvButton{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-size:12px;font-weight:900}.hsvButton.secondary{border:1px solid #bfd0df;background:#fff;color:#173c61}.hsvMetrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:20px 0}.hsvMetric{min-width:0;display:grid;grid-template-columns:34px 1fr;gap:10px;padding:14px;border:1px solid #d7e3ec;border-radius:12px;background:#fff;color:#102e4e;text-decoration:none}.hsvMetricIcon{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:#e9f1ff;color:#1762ef;font-weight:950}.hsvMetric small,.hsvMetric strong,.hsvMetric em{display:block}.hsvMetric small{height:26px;color:#667d92;font-size:9px;font-weight:850}.hsvMetric strong{font-size:25px}.hsvMetric em{margin-top:2px;color:#8292a2;font-size:8px;font-style:normal}.hsvMetric.red strong{color:#ce3a32}.hsvMetric.amber strong{color:#d87c00}.hsvMetric.green strong{color:#078d65}.hsvOverview{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.55fr);gap:12px}.hsvPanel{padding:18px;border:1px solid #d7e3ec;border-radius:13px;background:#fff}.hsvPanelHead{display:flex;justify-content:space-between;gap:12px;align-items:start;margin-bottom:13px}.hsvPanelHead h2{margin:0;font-size:18px}.hsvPanelHead p{margin:4px 0 0;color:#6b8297;font-size:11px}.hsvPanelHead a{color:#1762ef;font-size:10px;font-weight:900}.hsvWorkflow{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:14px}.hsvStep{position:relative;min-height:105px;padding:11px 8px;border-radius:10px;background:#edf4ff;text-align:center}.hsvStep:after{content:"›";position:absolute;right:-7px;top:39px;z-index:2;color:#6490b5;font-size:21px;font-weight:900}.hsvStep:last-child:after{display:none}.hsvStep i{display:grid;place-items:center;width:36px;height:36px;margin:auto;border-radius:50%;background:#1762ef;color:#fff;font-style:normal;font-weight:950}.hsvStep:nth-child(3) i{background:#e7a51c}.hsvStep:nth-child(5) i{background:#07966c}.hsvStep strong,.hsvStep span{display:block}.hsvStep strong{margin-top:8px;font-size:10px}.hsvStep span{margin-top:3px;color:#698096;font-size:8px;line-height:1.3}.hsvMatrix{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:12px}.hsvMatrix span{display:grid;place-items:center;min-height:31px;border-radius:4px;color:#fff;font-size:8px;font-weight:950}.hsvMatrix .green{background:#35a875}.hsvMatrix .amber{background:#f0b72d;color:#3c2900}.hsvMatrix .orange{background:#e86133}.hsvMatrix .red{background:#bd2b21}.hsvMatrixLabels{display:flex;justify-content:space-between;margin-top:7px;color:#647b91;font-size:8px;font-weight:850}.hsvTools{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}.hsvTool{min-height:118px;padding:13px;border:1px solid #d9e4ed;border-radius:11px;background:#fff;color:#123557;text-decoration:none}.hsvTool i{display:grid;place-items:center;width:31px;height:31px;border-radius:8px;background:#e7f0ff;color:#1762ef;font-style:normal;font-weight:950}.hsvTool strong,.hsvTool span{display:block}.hsvTool strong{margin-top:9px;font-size:11px}.hsvTool span{margin-top:4px;color:#6d8296;font-size:8px;line-height:1.4}.hsvTool b{display:inline-block;margin-top:8px;color:#087f6c;font-size:8px}.hsvTraining{background:linear-gradient(145deg,#e8f8f2,#f7fffc);border-color:#a9dcca}.hsvTraining i{background:#0c9a71;color:#fff}.hsvTraining b{padding:4px 6px;border-radius:999px;background:#fff;color:#076c50}.hsvInfo{margin-top:11px;padding:10px 12px;border-left:4px solid #1762ef;border-radius:7px;background:#edf4ff;color:#536f87;font-size:9px}.hsvTablePanel{margin-top:12px}.hsvTable{display:grid}.hsvTableRow{display:grid;grid-template-columns:1.5fr .75fr .75fr .7fr .55fr auto;gap:10px;align-items:center;padding:10px;border-top:1px solid #e6edf3;color:#173957;text-decoration:none;font-size:9px}.hsvTableRow.head{border:0;border-radius:7px;background:#eef4f8;color:#678096;font-weight:850}.hsvTableRow strong,.hsvTableRow small{display:block}.hsvTableRow small{margin-top:2px;color:#7a8da0}.hsvStatus{justify-self:start;padding:5px 7px;border-radius:999px;background:#e8f2ff;color:#1756aa;font-weight:850}.hsvOpen{color:#087f6c;font-weight:950}.hsvEmpty{padding:18px;border-radius:9px;background:#eff4f8;color:#667d91;font-size:11px}.hsvAttention{display:grid;gap:7px}.hsvAlert{padding:10px;border-left:4px solid #e29b15;border-radius:7px;background:#fff6e4}.hsvAlert.red{border-color:#d43b34;background:#fff0ef}.hsvAlert strong,.hsvAlert span{display:block}.hsvAlert strong{font-size:10px}.hsvAlert span{margin-top:3px;color:#705f55;font-size:8px}.hsvPriority{margin-top:12px}.hsvAction{padding:10px 0;border-top:1px solid #e7eef3}.hsvAction:first-child{border-top:0}.hsvAction strong,.hsvAction span{display:block}.hsvAction strong{font-size:10px}.hsvAction span{margin-top:4px;color:#71869a;font-size:8px}.hsvAction b{color:#cf3c35}.hsvNoAttention{padding:14px;border-radius:8px;background:#eaf8f2;color:#087257;font-size:10px}.hsvMobileNav{display:none}@media(max-width:1120px){.hsvApp{grid-template-columns:190px minmax(0,1fr)}.hsvMetrics{grid-template-columns:repeat(3,1fr)}.hsvOverview{grid-template-columns:1fr}.hsvTools{grid-template-columns:1fr 1fr}}@media(max-width:760px){.hsvPage{padding:0}.hsvApp{display:block;border:0;border-radius:0}.hsvSide{display:none}.hsvToolbar{padding:10px 14px}.hsvSearch{width:100%}.hsvToolbarActions{display:none}.hsvContent{padding:18px 13px}.hsvHeader{display:block}.hsvHeaderActions{margin-top:14px}.hsvMetrics{grid-template-columns:1fr 1fr}.hsvWorkflow{grid-template-columns:1fr 1fr}.hsvStep:after{display:none}.hsvTools{grid-template-columns:1fr}.hsvTableRow{grid-template-columns:1fr auto}.hsvTableRow>:not(:first-child):not(:last-child){display:none}.hsvMobileNav{display:flex;position:sticky;bottom:0;z-index:5;justify-content:space-around;padding:9px;background:#082a54}.hsvMobileNav a{color:#fff;text-decoration:none;font-size:9px}}
-  `}</style>
-      <style>{`
-    .hsvPage{padding:0;background:#edf3fa}.hsvApp{max-width:none;min-height:100vh;margin:0;grid-template-columns:238px minmax(0,1fr);border:0;border-radius:0;box-shadow:none}.hsvSide{position:sticky;top:0;height:100vh;padding:28px 20px 22px;background:linear-gradient(180deg,#06264d,#071c38)}.hsvBrand{margin:0 10px 28px;padding:0;font-size:25px;letter-spacing:0}.hsvNav{gap:7px}.hsvNav a{padding:13px 14px;font-size:14px}.hsvNav i{width:12px;height:12px;border-radius:3px;font-size:0}.hsvNav a:first-child i{background:#55ded2;border-color:#55ded2;box-shadow:inset 0 0 0 3px #174e86}.hsvSideFoot{padding:18px;border:1px solid #ffffff1d;border-radius:14px;background:#ffffff09;color:#9fe3d5;font-size:12px}.hsvToolbar{display:none}.hsvMain{background:#edf3fa}.hsvContent{padding:28px clamp(20px,3vw,48px) 70px}.hsvHeader{margin-bottom:22px}.hsvEyebrow{color:#1761e8;font-size:11px}.hsvHeader h1{margin:4px 0 5px;font-size:32px;letter-spacing:-.035em}.hsvButton{min-height:42px;padding:12px 16px;border-radius:10px}.hsvCommand{display:grid;grid-template-columns:1.25fr .75fr;gap:28px;align-items:center;padding:31px 34px;border-radius:20px;background:linear-gradient(120deg,#061d3b,#0b3d73);color:#fff;box-shadow:0 16px 40px #061a3518}.hsvCommand small{color:#55e0d6;font-weight:950;letter-spacing:.1em}.hsvCommand h2{margin:7px 0 9px;color:#fff;font-size:34px}.hsvCommand p{max-width:760px;margin:0;color:#d4e2f1;line-height:1.55}.hsvCommandCount{padding:21px;border:1px solid #ffffff26;border-radius:15px;background:#ffffff10}.hsvCommandCount strong,.hsvCommandCount span{display:block}.hsvCommandCount strong{font-size:20px}.hsvCommandCount span{margin-top:6px;color:#ccdbeb;font-size:13px}.hsvMetrics{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:16px 0}.hsvMetric{position:relative;display:block;min-height:137px;padding:20px;border-top:4px solid #1761e8;border-radius:15px;box-shadow:0 8px 25px #061a3509}.hsvMetric.red{border-top-color:#d53434}.hsvMetric.amber{border-top-color:#dc8c00}.hsvMetric.green{border-top-color:#09935d}.hsvMetricIcon{position:absolute;right:18px;top:17px;width:auto;height:auto;background:none;font-size:15px}.hsvMetric small{height:auto;font-size:12px}.hsvMetric strong{margin:6px 0 5px;font-size:34px}.hsvMetric em{font-size:11px}.hsvOverview{gap:16px}.hsvPanel{padding:24px;border-radius:18px;box-shadow:0 12px 32px #061a350a}.hsvPanelHead h2{font-size:19px}.hsvPanelHead p{font-size:13px}.hsvPanelHead a{font-size:12px}.hsvStep{min-height:120px;padding:16px 10px}.hsvStep strong{font-size:12px}.hsvStep span{font-size:10px}.hsvTools{gap:12px}.hsvTool{min-height:137px;padding:17px}.hsvTool strong{font-size:13px}.hsvTool span,.hsvTool b{font-size:10px}.hsvTableRow{padding:16px 14px;font-size:12px}.hsvAssessmentLink{color:#173957;text-decoration:none}.hsvPdf{display:grid;place-items:center;width:28px;height:28px;border:1px solid #b9cde0;border-radius:7px;background:#fff;color:#1761e8;text-decoration:none;font-size:14px;font-weight:950}.hsvPdfSpace{width:28px}.hsvOpen{text-decoration:none}.hsvEmpty{padding:26px;font-size:13px}@media(max-width:1200px){.hsvMetrics{grid-template-columns:repeat(3,1fr)}}@media(max-width:1050px){.hsvApp{grid-template-columns:78px 1fr}.hsvSide{padding:24px 10px}.hsvBrand{font-size:0;margin:0 0 26px;text-align:center}.hsvBrand:first-letter{font-size:24px}.hsvNav a{justify-content:center;font-size:0}.hsvSideFoot{display:none}}@media(max-width:700px){.hsvApp{display:block}.hsvSide{position:static;width:100%;height:auto;padding:16px 20px}.hsvBrand{font-size:21px;text-align:left;margin:0}.hsvBrand:first-letter{font-size:inherit}.hsvNav{display:none}.hsvContent{padding:20px 14px 60px}.hsvCommand{grid-template-columns:1fr;padding:25px 22px}.hsvMetrics{grid-template-columns:1fr 1fr}}
-    .hsvOperational{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}.hsvControlCard{position:relative;overflow:hidden;min-height:170px;padding:22px;border:1px solid #d7e3ec;border-radius:17px;background:#fff;color:#123557;text-decoration:none;box-shadow:0 10px 28px #061a3509}.hsvControlCard:before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:#1761e8}.hsvControlCard.permit:before{background:#d58a0b}.hsvControlCard.moc:before{background:#087f6c}.hsvControlCard small{color:#687f93;font-size:10px;font-weight:900;letter-spacing:.08em}.hsvControlCard h3{margin:8px 0 6px;font-size:20px}.hsvControlCard p{margin:0;color:#687f93;font-size:11px;line-height:1.45}.hsvControlStats{display:flex;gap:22px;margin-top:18px}.hsvControlStats strong,.hsvControlStats span{display:block}.hsvControlStats strong{font-size:25px}.hsvControlStats span{color:#758a9d;font-size:9px}.hsvControlGo{position:absolute;right:19px;bottom:19px;color:#087f6c;font-size:11px;font-weight:950}@media(max-width:900px){.hsvOperational{grid-template-columns:1fr}}.hsvTableRow{grid-template-columns:1.5fr .75fr .75fr .7fr .55fr 38px auto}
-  `}</style>
-      <div className="hsvApp">
-        <aside className="hsvSide">
-          <div className="hsvBrand">
-            RPG <span>EXCELLENCE</span>
-          </div>
-          <nav className="hsvNav">
-            {navItems.map(([icon, name, href]) => (
-              <Link href={href} key={name}>
-                <i>{icon}</i>
-                {name}
-              </Link>
-            ))}
-          </nav>
-          <div className="hsvSideFoot">
-            Safer people.
-            <br />
-            Stronger businesses.
-          </div>
-        </aside>
-        <div className="hsvMain">
-          <header className="hsvToolbar">
-            <div className="hsvSearch">
-              ⌕&nbsp;&nbsp; Search assessments, actions and training...
-            </div>
-            <div className="hsvToolbarActions">
-              <Link
-                className="hsvIconButton"
-                href="/portal/health-safety/actions"
-              >
-                !
-              </Link>
-              <Link className="hsvIconButton" href="/portal">
-                ●
-              </Link>
-            </div>
-          </header>
-          <div className="hsvContent">
-            <header className="hsvHeader">
-              <div>
-                <span className="hsvEyebrow">H&amp;S CONTROL CENTRE</span>
-                <h1>Health &amp; Safety Hub</h1>
-                <p>
-                  {organisationName || "Your organisation"} · practical risk
-                  control, competence and assurance
-                </p>
-              </div>
-              <div className="hsvHeaderActions">
-                <Link className="hsvButton secondary" href="/portal">
-                  ← Product Dashboard
-                </Link>
-                <Link
-                  className="hsvButton secondary"
-                  href="/portal/health-safety/moc/new"
-                >
-                  New MOC
-                </Link>
-                <Link
-                  className="hsvButton secondary"
-                  href="/portal/health-safety/permits/new"
-                >
-                  New permit
-                </Link>
-                <Link
-                  className="hsvButton secondary"
-                  href="/portal/health-safety/powra/new"
-                >
-                  New POWRA
-                </Link>
-                <Link
-                  className="hsvButton"
-                  href="/portal/health-safety/risk-assessment/new"
-                >
-                  New risk assessment
-                </Link>
-              </div>
-            </header>
-            <section className="hsvCommand">
-              <div>
-                <small>LIVE RISK CONTROL INTELLIGENCE</small>
-                <h2>
-                  Know where exposure is controlled—and where action is required
-                </h2>
-                <p>
-                  Connect workplace hazards, risk decisions, accountable
-                  actions, competence and review in one controlled management
-                  view.
-                </p>
-              </div>
-              <div className="hsvCommandCount">
-                <strong>{assessments.length} controlled assessments</strong>
-                <span>
-                  {elevated.length} elevated risks · {overdue.length} overdue
-                  actions · {reviewsDue.length} reviews due
-                </span>
-              </div>
-            </section>
-            <section className="hsvMetrics">
-              <Metric
-                icon="▣"
-                title="Controlled assessments"
-                value={assessments.length}
-                detail="Total records"
-                tone="blue"
-                href="/portal/health-safety/risk-assessment"
-              />
-              <Metric
-                icon="△"
-                title="Elevated residual risks"
-                value={elevated.length}
-                detail="Score 10 or above"
-                tone="red"
-                href="/portal/health-safety/risk-assessment?view=elevated"
-              />
-              <Metric
-                icon="◷"
-                title="Overdue actions"
-                value={overdue.length}
-                detail="Target date passed"
-                tone="amber"
-                href="/portal/health-safety/actions?view=overdue"
-              />
-              <Metric
-                icon="▤"
-                title="Reviews due"
-                value={reviewsDue.length}
-                detail="Assessment review"
-                tone="amber"
-                href="/portal/health-safety/risk-assessment?view=review-due"
-              />
-              <Metric
-                icon="◇"
-                title="Trained assessors"
-                value={trained}
-                detail={`${approved.length} approved records`}
-                tone="green"
-                href="/portal/health-safety/training"
-              />
-            </section>
-            <section className="hsvOverview">
-              <div>
-                <section className="hsvPanel">
-                  <div className="hsvPanelHead">
-                    <div>
-                      <h2>Risk assessment</h2>
-                      <p>
-                        A controlled five-stage process from hazard to review.
-                      </p>
-                    </div>
-                    <Link href="/portal/health-safety/risk-assessment/new">
-                      Create assessment →
-                    </Link>
-                  </div>
-                  <div className="hsvWorkflow">
-                    {[
-                      ["1", "Identify", "Hazards"],
-                      ["2", "Assess", "Initial risk"],
-                      ["3", "Control", "Risk"],
-                      ["4", "Record", "Findings"],
-                      ["5", "Review", "Controls"],
-                    ].map(([number, name, detail]) => (
-                      <div className="hsvStep" key={number}>
-                        <i>{number}</i>
-                        <strong>{name}</strong>
-                        <span>{detail}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                <div className="hsvTools">
-                  <Link
-                    className="hsvTool"
-                    href="/portal/health-safety/risk-assessment/new"
-                  >
-                    <i>▣</i>
-                    <strong>Create Risk Assessment</strong>
-                    <span>Start a guided workplace assessment.</span>
-                    <b>Start assessment →</b>
-                  </Link>
-                  <Link
-                    className="hsvTool"
-                    href="/portal/health-safety/risk-assessment"
-                  >
-                    <i>☷</i>
-                    <strong>Risk Assessment Register</strong>
-                    <span>View and manage controlled records.</span>
-                    <b>Open register →</b>
-                  </Link>
-                  <Link
-                    className="hsvTool"
-                    href="/portal/health-safety/actions"
-                  >
-                    <i>◷</i>
-                    <strong>Open Actions</strong>
-                    <span>Track controls and verification.</span>
-                    <b>View actions →</b>
-                  </Link>
-                  <Link
-                    className="hsvTool hsvTraining"
-                    href="/portal/health-safety/training"
-                  >
-                    <i>◇</i>
-                    <strong>Risk Assessment Training</strong>
-                    <span>
-                      Interactive modules, practical scenarios and certificate.
-                    </span>
-                    <b>From £12.99 + VAT</b>
-                  </Link>
-                </div>
-                <div className="hsvInfo">
-                  <strong>Suitable and sufficient.</strong> Proportionate to the
-                  work, communicated to affected people and reviewed when
-                  circumstances change.
-                </div>
-              </div>
-              <aside>
-                <section className="hsvPanel">
-                  <div className="hsvPanelHead">
-                    <div>
-                      <h2>Risk matrix</h2>
-                      <p>Likelihood × severity</p>
-                    </div>
-                    <Link href="/portal/health-safety/risk-assessment/new">
-                      Use matrix →
-                    </Link>
-                  </div>
-                  <div className="hsvMatrix">
-                    {matrix.map((score, index) => (
-                      <span
-                        className={
-                          score >= 15
-                            ? "red"
-                            : score >= 10
-                              ? "orange"
-                              : score >= 5
-                                ? "amber"
-                                : "green"
-                        }
-                        key={`${score}-${index}`}
-                      >
-                        {score}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="hsvMatrixLabels">
-                    <span>Likelihood ↑</span>
-                    <span>Severity →</span>
-                  </div>
-                </section>
-                <section className="hsvPanel hsvPriority">
-                  <div className="hsvPanelHead">
-                    <div>
-                      <h2>Management attention</h2>
-                      <p>Live exceptions</p>
-                    </div>
-                  </div>
-                  <div className="hsvAttention">
-                    {elevated.length > 0 && (
-                      <div className="hsvAlert red">
-                        <strong>
-                          {elevated.length} elevated residual risk
-                          {elevated.length === 1 ? "" : "s"}
-                        </strong>
-                        <span>Confirm treatment and escalation.</span>
-                      </div>
-                    )}
-                    {overdue.length > 0 && (
-                      <div className="hsvAlert">
-                        <strong>
-                          {overdue.length} overdue action
-                          {overdue.length === 1 ? "" : "s"}
-                        </strong>
-                        <span>Review ownership and interim controls.</span>
-                      </div>
-                    )}
-                    {reviewsDue.length > 0 && (
-                      <div className="hsvAlert">
-                        <strong>
-                          {reviewsDue.length} review
-                          {reviewsDue.length === 1 ? "" : "s"} due
-                        </strong>
-                        <span>Confirm each assessment remains current.</span>
-                      </div>
-                    )}
-                    {!elevated.length &&
-                      !overdue.length &&
-                      !reviewsDue.length && (
-                        <div className="hsvNoAttention">
-                          No current exceptions requiring management attention.
-                        </div>
-                      )}
-                  </div>
-                </section>
-              </aside>
-            </section>
-            <section className="hsvOperational">
-              <Link
-                className="hsvControlCard"
-                href="/portal/health-safety/powra"
-              >
-                <small>POINT-OF-WORK CONTROL</small>
-                <h3>POWRA</h3>
-                <p>
-                  Capture dynamic task risk decisions where work is actually
-                  carried out.
-                </p>
-                <div className="hsvControlStats">
-                  <div>
-                    <strong>{powras.length}</strong>
-                    <span>TOTAL RECORDS</span>
-                  </div>
-                  <div>
-                    <strong>{livePowras.length}</strong>
-                    <span>LIVE RECORDS</span>
-                  </div>
-                </div>
-                <span className="hsvControlGo">Open POWRA →</span>
-              </Link>
-              <Link
-                className="hsvControlCard permit"
-                href="/portal/health-safety/permits"
-              >
-                <small>HIGH-RISK WORK CONTROL</small>
-                <h3>Permit to Work</h3>
-                <p>
-                  Authorise work within defined scope, precautions and validity
-                  limits.
-                </p>
-                <div className="hsvControlStats">
-                  <div>
-                    <strong>{permits.length}</strong>
-                    <span>TOTAL PERMITS</span>
-                  </div>
-                  <div>
-                    <strong>{livePermits.length}</strong>
-                    <span>LIVE PERMITS</span>
-                  </div>
-                </div>
-                <span className="hsvControlGo">Open permits →</span>
-              </Link>
-              <Link
-                className="hsvControlCard moc"
-                href="/portal/health-safety/moc"
-              >
-                <small>CHANGE ASSURANCE</small>
-                <h3>Management of Change</h3>
-                <p>
-                  Screen, approve, implement and verify operational or
-                  organisational change.
-                </p>
-                <div className="hsvControlStats">
-                  <div>
-                    <strong>{changes.length}</strong>
-                    <span>TOTAL RECORDS</span>
-                  </div>
-                  <div>
-                    <strong>{activeChanges.length}</strong>
-                    <span>ACTIVE CHANGES</span>
-                  </div>
-                </div>
-                <span className="hsvControlGo">Open MOC →</span>
-              </Link>
-            </section>
-            <section className="hsvPanel hsvTablePanel">
-              <div className="hsvPanelHead">
-                <div>
-                  <h2>Recent risk assessments</h2>
-                  <p>Latest controlled records across sites and activities.</p>
-                </div>
-                <Link href="/portal/health-safety/risk-assessment">
-                  View all →
-                </Link>
-              </div>
-              {assessments.length ? (
-                <div className="hsvTable">
-                  <div className="hsvTableRow head">
-                    <span>Assessment</span>
-                    <span>Location</span>
-                    <span>Type</span>
-                    <span>Date</span>
-                    <span>Status</span>
-                    <span>PDF</span>
-                    <span>Action</span>
-                  </div>
-                  {assessments.slice(0, 6).map((item) => (
-                    <div className="hsvTableRow" key={item.id}>
-                      <Link
-                        className="hsvAssessmentLink"
-                        href={`/portal/health-safety/risk-assessment/${item.id}`}
-                      >
-                        <strong>{item.title}</strong>
-                        <small>{item.assessment_reference}</small>
-                      </Link>
-                      <span>
-                        {item.site_location ||
-                          item.area_department ||
-                          "Not set"}
-                      </span>
-                      <span>{titleCase(item.assessment_type)}</span>
-                      <span>{formatDate(item.assessment_date)}</span>
-                      <span className="hsvStatus">
-                        {titleCase(item.status)}
-                      </span>
-                      {["approved", "communicated"].includes(item.status) ? (
-                        <a
-                          className="hsvPdf"
-                          href={`/portal/health-safety/risk-assessment/${item.id}/report`}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Open controlled PDF"
-                          aria-label={`Open PDF for ${item.title}`}
-                        >
-                          ▤
-                        </a>
-                      ) : (
-                        <span className="hsvPdfSpace" />
-                      )}
-                      <Link
-                        className="hsvOpen"
-                        href={`/portal/health-safety/risk-assessment/${item.id}`}
-                      >
-                        Open →
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="hsvEmpty">
-                  No risk assessments have been created. Start with a workplace
-                  activity, task, project, equipment item or planned change.
-                </div>
-              )}
-            </section>
-            {openActions.length > 0 && (
-              <section className="hsvPanel hsvTablePanel">
-                <div className="hsvPanelHead">
-                  <div>
-                    <h2>Priority actions</h2>
-                    <p>Open controls requiring ownership.</p>
-                  </div>
-                  <Link href="/portal/health-safety/actions">View all →</Link>
-                </div>
-                {openActions.slice(0, 4).map((action) => (
-                  <div className="hsvAction" key={action.id}>
-                    <strong>{action.action_required}</strong>
-                    <span>
-                      {action.action_reference} ·{" "}
-                      {assessmentById.get(action.assessment_id)?.title ||
-                        "Risk assessment"}{" "}
-                      · <b>{formatDate(action.target_date)}</b>
-                    </span>
-                  </div>
-                ))}
-              </section>
-            )}
-          </div>
-        </div>
-        <nav className="hsvMobileNav">
-          <Link href="/portal/health-safety">Overview</Link>
-          <Link href="/portal/health-safety/risk-assessment">Assessments</Link>
-          <Link href="/portal/health-safety/actions">Actions</Link>
-          <Link href="/portal/health-safety/training">Training</Link>
+export default function HealthSafetyHubDashboard({ organisationName, assessments, hazards, actions, enrolments, powras, permits, changes, inspections, selection, recordPage, children }) {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const data = healthSafetyPosition({ assessments, hazards, actions, inspections }, today);
+  const byId = new Map(assessments.map(row => [row.id, row]));
+  const assessmentRecord = row => ({ id: row.id, label: [row.assessment_reference, row.title].filter(Boolean).join(" · "), detail: "Review: " + dateText(row.review_date), href: assessmentPath + "/" + row.id });
+  const hazardRecord = row => ({ ...assessmentRecord(byId.get(row.assessment_id)), id: row.id, detail: (row.hazard_description || row.hazard_category || "Hazard") + " · Residual score " + row.residual_score });
+  const actionRecord = row => ({ id: row.id, label: [row.action_reference, row.action_required].filter(Boolean).join(" · "), detail: [row.priority, dateText(row.target_date), row.status.replaceAll("_", " ")].filter(Boolean).join(" · "), href: row.action_reference ? actionsPath + "?q=" + encodeURIComponent(row.action_reference) : assessmentPath + "/" + row.assessment_id });
+  const inspectionRecord = row => ({ id: row.id, label: row.title, detail: "Planned fieldwork: " + dateText(row.planned_end_at || row.planned_start_at), href: root + "/workplace-inspections/" + row.id });
+  const selections = new Map([
+    ["assessments", ["Controlled assessments", data.current, assessmentRecord]],
+    ["elevated", ["Elevated residual hazards", data.elevated, hazardRecord]],
+    ["unacceptable", ["Unacceptable residual hazards", data.unacceptable, hazardRecord]],
+    ["overdue-high", ["High-priority control actions overdue", data.overdueHigh, actionRecord]],
+    ["overdue-actions", ["Overdue control actions", data.actionDates.overdue, actionRecord]],
+    ["other-overdue-actions", ["Other control actions overdue", data.actionDates.overdue.filter(row => !data.overdueHigh.includes(row)), actionRecord]],
+    ["overdue-reviews", ["Assessment reviews overdue", data.reviewDates.overdue, assessmentRecord]],
+    ["due-reviews", ["Assessment reviews due today", data.reviewDates.today, assessmentRecord]],
+    ["upcoming-reviews", ["Assessment reviews due in the next 30 days", data.reviewDates.upcoming, assessmentRecord]],
+    ["due-actions", ["Control actions due today", data.actionDates.today, actionRecord]],
+    ["upcoming-actions", ["Control actions due in the next 30 days", data.actionDates.upcoming, actionRecord]],
+    ["verification", ["Control actions awaiting verification", data.awaiting, actionRecord]],
+    ["effective", ["Control actions verified effective", data.verified, actionRecord]],
+    ["overdue-inspections", ["Workplace inspections overdue", inspections?.overdue ?? [], inspectionRecord]],
+  ]);
+  const chosen = selections.get(selection);
+  const priority = data.exceptions.filter(row => row.tone === data.status).slice(0, 2);
+  const secondary = data.exceptions.filter(row => !priority.includes(row));
+  const adjustments = {
+    red: "Review the priority exceptions and agree the response.",
+    orange: "Confirm the next responsible action and its due date.",
+    green: "Continue monitoring controls and assessments.",
+    neutral: "Review record coverage before relying on the dashboard rating.",
+  };
+  const kpis = [
+    ["assessments", "Controlled assessments", data.current.length, data.approved.length + " approved or communicated"],
+    ["elevated", "Elevated residual hazards", data.elevated.length, data.unacceptable.length + " unacceptable"],
+    ["overdue-actions", "Overdue control actions", data.actionDates.overdue.length, data.overdueHigh.length + " high priority"],
+    ["overdue-reviews", "Assessment reviews overdue", data.reviewDates.overdue.length, data.reviewDates.today.length + " due today"],
+  ];
+  const operational = [
+    ["POWRA", "/powra", powras, powras.filter(row => ["open", "supervisor_review", "stopped"].includes(row.status))],
+    ["Permit to Work", "/permits", permits, permits.filter(row => row.status === "issued" && new Date(row.valid_until) >= now)],
+    ["Management of Change", "/moc", changes, changes.filter(row => !["closed", "rejected", "cancelled"].includes(row.status))],
+  ];
+  const exceptions = rows => rows.map(row => <li key={row.key}><Link className={styles[row.tone]} href={detailUrl(row.key)}>{row.label} <b>{row.count}</b></Link></li>);
+  const dueRows = [
+    ["Control actions", data.actionDates, ["due-actions", "upcoming-actions", "overdue-actions", "verification"]],
+    ["Assessment reviews", data.reviewDates, ["due-reviews", "upcoming-reviews", "overdue-reviews", null]],
+  ];
+
+  return <main className={styles.dashboard}>
+    <header className={styles.hero}>
+      <p>RPG Excellence / Health &amp; Safety</p>
+      <h1>Health &amp; Safety Dashboard</h1>
+      <div className={styles.heroFoot}>Risk, control delivery and workplace inspection planning
+        <nav aria-label="Create records">
+          {[[assessmentPath + "/new", "New risk assessment"], [root + "/powra/new", "New POWRA"], [root + "/permits/new", "New permit"], [root + "/moc/new", "New MOC"]].map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
         </nav>
       </div>
-    </main>
-  );
+    </header>
+    <div className={styles.scope}><strong>{organisationName} · All sites</strong><span>Authorised records · Refresh to update · {dateText(today)} (UTC)</span></div>
+    <section className={styles.insight} id="executive-insight" aria-labelledby="hs-insight">
+      <header><h2 id="hs-insight">Executive Insight</h2><strong className={styles[data.status]}>{statusLabels[data.status]}</strong></header>
+      {priority.length > 0 && <ul className={styles.chips} aria-label="Rating priorities">{exceptions(priority)}</ul>}
+      <p><strong>{priority.length ? "Decision required" : "Management action"}</strong> {priority.length ? [...new Set(priority.map(row => row.decision))].join(" ") : adjustments[data.status]}</p>
+      {secondary.length > 0 && <ul className={styles.chips} aria-label="Other exceptions">{exceptions(secondary.slice(0, 3))}</ul>}
+      {secondary.length > 3 && <details><summary>View {count(secondary.length - 3, "more exception")}</summary><ul className={styles.chips}>{exceptions(secondary.slice(3))}</ul></details>}
+      {data.status === "red" && data.missingRecords && <p>Some assessment, residual-risk or inspection records are unavailable for this rating.</p>}
+      <details className={styles.rules}><summary>How the rating is decided</summary>
+        <p>Red flags an unacceptable residual score or an overdue high-priority control action. Orange flags other overdue work, upcoming deadlines or verification still pending. Green requires available residual data and no flagged exception. If key data is incomplete, the board stays unrated unless an existing issue calls for intervention.</p>
+      </details>
+    </section>
+    <section className={styles.kpis} aria-label="H&amp;S performance">
+      {kpis.map(([key, label, value, note]) => <Link className={styles.kpi} href={detailUrl(key)} key={key}><span>{label}</span><strong>{value}</strong><small>{note}</small></Link>)}
+    </section>
+    <RecordList data={chosen && { key: selection, label: chosen[0], rows: chosen[1], record: chosen[2] }} page={Math.max(1, parseInt(recordPage, 10) || 1)}/>
+    <div className={styles.split}>
+      <HeatMap hazards={hazards}/>
+      <section className={styles.panel} aria-labelledby="control-performance">
+        <header className={styles.panelHead}><h2 id="control-performance">Control performance</h2></header>
+        <dl className={styles.performance}>
+          <div><dt>Assessments approved or communicated</dt><dd>{data.approved.length} / {data.current.length}</dd></div>
+          <div><dt>Control actions verified effective</dt><dd><Link href={detailUrl("effective")}>{data.verified.length}</Link></dd></div>
+          <div><dt>Dated open actions within target date</dt><dd>{percent(data.open.filter(row => row.target_date && row.target_date.slice(0, 10) >= today).length, data.open.filter(row => row.target_date).length)}</dd></div>
+          <div><dt>Hazards rated acceptable or adequate</dt><dd>{percent(data.scored.length - data.elevated.length, data.scored.length)}</dd></div>
+          <div><dt>My completed H&amp;S training</dt><dd><Link href={root + "/training"}>{enrolments.filter(row => row.status === "passed").length} / {enrolments.length}</Link></dd></div>
+        </dl>
+        <p><Link href={actionsPath}>Open Actions &amp; Verification →</Link></p>
+      </section>
+    </div>
+    {children}
+    <section className={styles.panel} aria-labelledby="hs-due">
+      <header className={styles.panelHead}><h2 id="hs-due">Due dates and verification</h2></header>
+      <p>Next 30 days excludes today. Overdue actions can also be awaiting verification.</p>
+      <div className={styles.matrixScroll} role="region" tabIndex={0} aria-label="Workstream deadlines">
+        <table className={styles.queue}>
+          <thead><tr><th scope="col">Workstream</th>{dates.map(([key, title]) => <th scope="col" key={key}>{title}</th>)}<th scope="col">Awaiting verification</th></tr></thead>
+          <tbody>{dueRows.map(([title, rows, keys]) => <tr key={title}>
+            <th scope="row">{title}</th>
+            {[...dates.map(([key]) => rows[key].length), keys[3] ? data.awaiting.length : null].map((value, index) => <td key={index}>{value ? <Link aria-label={title + " " + (dates[index]?.[1] ?? "awaiting verification") + ", " + value} href={detailUrl(keys[index])}>{value}</Link> : value ?? "—"}</td>)}
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </section>
+    <section className={styles.panel} aria-labelledby="hs-priority">
+      <header className={styles.panelHead}><h2 id="hs-priority">Priority assessments</h2><Link href={detailUrl("elevated")}>View elevated hazards →</Link></header>
+      {data.elevated.length ? <ul className={styles.list}>{[...new Set([...data.elevated].sort((a, b) => b.residual_score - a.residual_score).map(row => row.assessment_id))].slice(0, 8).map(id => {
+        const row = assessmentRecord(byId.get(id));
+        return <li key={id}><Link href={row.href}>{row.label}</Link><span>{row.detail}</span></li>;
+      })}</ul> : <p>No elevated residual hazards recorded in current assessments.</p>}
+    </section>
+    <section className={styles.operations} aria-label="Operational registers">
+      {operational.map(([label, path, rows, active]) => <Link href={root + path} key={path}><strong>{label}</strong><span>{active.length} active · {rows.length} total</span></Link>)}
+    </section>
+    <section className={styles.panel} aria-labelledby="recent-assessments">
+      <header className={styles.panelHead}><h2 id="recent-assessments">Recent risk assessments</h2><Link href={assessmentPath}>Open risk register →</Link></header>
+      {data.current.length ? <ul className={styles.list}>{[...data.current].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 5).map(assessmentRecord).map(row => <li key={row.id}><Link href={row.href}>{row.label}</Link><span>{row.detail}</span></li>)}</ul> : <p>No current assessments in this workspace.</p>}
+    </section>
+  </main>;
 }

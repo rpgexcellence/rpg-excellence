@@ -278,7 +278,7 @@ export default async function TasksPage({ searchParams }) {
     ["inspection","Workplace Inspections","WPI","/portal/health-safety/workplace-inspections"],
     ["rca","CAPA-8D","8D","/portal/rca"],
     ["capa","Gap Assessment / CAPA","CAPA","/portal/history"],
-    ["risk","Risk Management","RISK","/portal/health-safety/management-board"],
+    ["risk","Risk Management","RISK","/portal/health-safety"],
     ["moc","Management of Change","MOC","/portal/health-safety/moc"],
     ["bcp","Business Continuity","BCP","/portal/business-continuity"],
     ["supplier","Supplier Assurance","SUP","/portal/suppliers"],

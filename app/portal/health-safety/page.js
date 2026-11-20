@@ -1,42 +1,58 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import HealthSafetyHubDashboard from "../../../components/HealthSafetyHubDashboard";
+import WorkplaceInspectionBoardPanel, { loadWorkplaceInspectionBoard } from "../../../components/WorkplaceInspectionBoardPanel";
 import { createAdminClient } from "../../../lib/supabase/admin";
 import { requireOrganizationAccess } from "../../../lib/organization-access";
+import { getUserSubscription, hasPlanAccess } from "../../../lib/subscription";
 
-export const metadata = { title: "Health & Safety Hub | RPG Excellence" };
+export const metadata = { title: "Health & Safety Dashboard | RPG Excellence" };
 export const dynamic = "force-dynamic";
 
-export default async function HealthSafetyDashboard() {
-  const access = await requireOrganizationAccess(
-    "risk_management",
-    "view",
-    "/portal/health-safety",
-  );
-  const { user, organization: organisation } = access;
-  const admin = createAdminClient();
-
-  const [assessmentsResult, hazardsResult, actionsResult, enrolmentsResult, powraResult, permitsResult, mocResult] = await Promise.all([
-    admin.from("hs_risk_assessments").select("id,assessment_reference,title,status,assessment_type,site_location,area_department,assessor_name,assessment_date,review_date,updated_at").eq("organization_id", organisation.id).order("updated_at", { ascending: false }),
-    admin.from("hs_risk_hazards").select("id,assessment_id,hazard_category,hazard_description,current_score,current_band,residual_score,residual_band").eq("organization_id", organisation.id),
-    admin.from("hs_risk_actions").select("id,assessment_id,action_reference,action_required,responsible_name,target_date,priority,status,effectiveness_result").eq("organization_id", organisation.id).order("target_date"),
-    admin.from("hs_training_enrolments").select("id,status,progress_percent").eq("learner_id", user.id),
-    admin.from("hs_powra_assessments").select("id,status,decision,assessment_date").eq("organization_id", organisation.id),
-    admin.from("hs_permits").select("id,status,valid_until").eq("organization_id", organisation.id),
-    admin.from("hs_moc_changes").select("id,status,pathway,target_date").eq("organization_id", organisation.id),
-  ]);
-
-  for (const result of [assessmentsResult, hazardsResult, actionsResult, enrolmentsResult, powraResult, permitsResult, mocResult]) {
-    if (result.error) throw new Error(result.error.message);
+async function readDashboardRows(admin, table, fields, scopeColumn, scopeId) {
+  const rows = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await admin.from(table).select(fields).eq(scopeColumn, scopeId).order("id").range(offset, offset + 499);
+    if (error) throw new Error(error.message);
+    rows.push(...data);
+    if (data.length < 500) return rows;
   }
+}
 
-  return <HealthSafetyHubDashboard
-    organisationName={organisation?.name}
-    assessments={assessmentsResult.data || []}
-    hazards={hazardsResult.data || []}
-    actions={actionsResult.data || []}
-    enrolments={enrolmentsResult.data || []}
-    powras={powraResult.data || []}
-    permits={permitsResult.data || []}
-    changes={mocResult.data || []}
-  />;
+export default async function HealthSafetyDashboard({ searchParams }) {
+  const access = await requireOrganizationAccess("risk_management", "view", "/portal/health-safety");
+  const { user, organization } = access;
+  const admin = createAdminClient();
+  const read = (table, fields) => readDashboardRows(admin, table, fields, "organization_id", organization.id);
+  const inspectionData = getUserSubscription(user.id).then(subscription =>
+    hasPlanAccess(subscription, "professional")
+      ? loadWorkplaceInspectionBoard({ organizationId: organization.id, access, admin })
+      : undefined
+  ).catch(error => {
+    console.error("Health and safety inspection calendar unavailable", error.message);
+    return null;
+  });
+  const [query, assessments, hazards, actions, enrolments, powras, permits, changes, inspections] = await Promise.all([
+    searchParams,
+    read("hs_risk_assessments", "id,assessment_reference,title,status,site_location,area_department,review_date,updated_at"),
+    read("hs_risk_hazards", "id,assessment_id,hazard_category,hazard_description,residual_score,residual_likelihood,residual_severity"),
+    read("hs_risk_actions", "id,assessment_id,action_reference,action_required,target_date,priority,status,effectiveness_result"),
+    readDashboardRows(admin, "hs_training_enrolments", "id,status", "learner_id", user.id),
+    read("hs_powra_assessments", "id,status"),
+    read("hs_permits", "id,status,valid_until"),
+    read("hs_moc_changes", "id,status"),
+    inspectionData,
+  ]);
+  const calendar = inspections ? <WorkplaceInspectionBoardPanel data={inspections}/>
+    : <section className="wibPanel" id="inspection-calendar">
+      <h2>Workplace Inspection calendar</h2>
+      {inspections === null
+        ? <p>Inspection planning is currently unavailable.</p>
+        : <p>Workplace Inspection planning is available on the Professional plan. <Link href="/en/pricing#subscriptions">View access options</Link></p>}
+    </section>;
+
+  return <HealthSafetyHubDashboard organisationName={organization.name} assessments={assessments} hazards={hazards}
+    actions={actions} enrolments={enrolments} powras={powras} permits={permits} changes={changes} inspections={inspections}
+    selection={typeof query?.insight === "string" ? query.insight : ""} recordPage={typeof query?.records === "string" ? query.records : ""}>
+    {calendar}
+  </HealthSafetyHubDashboard>;
 }

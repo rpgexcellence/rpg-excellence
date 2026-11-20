@@ -244,7 +244,7 @@ export async function createInspectionProgramme(previousState, formData) {
 
     savedId = data.id;
     revalidatePath(ROOT);
-    revalidatePath("/portal/health-safety/management-board");
+    revalidatePath("/portal/health-safety");
   } catch (error) {
     if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
     return { error: error.message || "The inspection programme could not be saved." };
@@ -284,7 +284,7 @@ export async function updateInspectionProgramme(previousState, formData) {
 
     revalidatePath(ROOT);
     revalidatePath(`${ROOT}/programmes/${programmeId}`);
-    revalidatePath("/portal/health-safety/management-board");
+    revalidatePath("/portal/health-safety");
     return {
       success: "Programme saved. Its checklist and next date have been recalculated.",
       plan: prepared.plan,
@@ -389,7 +389,6 @@ export async function generateScheduledInspection(previousState, formData) {
     revalidatePath("/portal/tasks");
     revalidatePath("/portal");
     revalidatePath(ROOT);
-    revalidatePath("/portal/health-safety/management-board");
   } catch (error) {
     if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
     return { error: error.message || "The scheduled inspection could not be created." };
@@ -441,7 +440,7 @@ export async function refreshInspectionProgramme(previousState, formData) {
 
     revalidatePath(ROOT);
     revalidatePath(`${ROOT}/programmes/${programmeId}`);
-    revalidatePath("/portal/health-safety/management-board");
+    revalidatePath("/portal/health-safety");
     return { success: "Risk signals, checklist packs and the next inspection date were refreshed.", plan };
   } catch (error) {
     if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error;
