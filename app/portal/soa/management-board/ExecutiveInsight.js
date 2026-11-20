@@ -15,29 +15,39 @@ const workColumns = [
   ["verification", "Awaiting verification"],
 ];
 
+function exceptionLabel(item) {
+  if (item.key === "risks") return item.count === 1 ? "1 risk above appetite" : item.count + " risks above appetite";
+  if (item.key === "treatments-overdue") return item.count === 1 ? "1 overdue treatment" : item.count + " overdue treatments";
+  return item.title + " (" + item.count + ")";
+}
+
 export default function ExecutiveInsight({ review, controls, detailUrl }) {
   const [label, ask] = statusCopy[review.status];
-  const priority = review.exceptions[0];
+  const priorities = review.exceptions.filter(item => item.severity === review.status).slice(0, 2);
+  const remaining = review.exceptions.filter(item => !priorities.includes(item));
+  const decisions = [...new Set(priorities.map(item => item.decision))];
   return <section className={styles.insight} aria-labelledby="executive-insight">
     <header className={styles.insightHead}>
-      <div><h2 id="executive-insight">Executive Insight</h2><p>Management review · position, exceptions and decisions</p></div>
+      <h2 id="executive-insight">Executive Insight</h2>
       <strong className={`${styles.signal} ${styles[review.status]}`}>{label}</strong>
     </header>
-    <div className={styles.insightBody}>
-      <div>
-        <h3>Leadership decision</h3>
-        <p>{priority && <><strong><Link href={detailUrl(priority.key)}>{priority.title} ({priority.count})</Link></strong><br/></>}{priority ? priority.decision : ask}</p>
-        {review.missingSources && <p>One or more sources are unavailable in this scope. The position covers available records only.</p>}
-        {controls?.applicable.length > 0 && <p><strong>Control assurance</strong> · <Link href={detailUrl("effectiveness")}>{controls.effective.length} of {controls.applicable.length} applicable controls recorded effective</Link>. {review.unassured > 0 ? "Agree the verification plan for the remaining controls." : "Review the supporting evidence at the next checkpoint."}</p>}
-      </div>
-      {review.exceptions.length > 0 && <div>
-        <h3>Exceptions to review</h3>
-        <ul className={styles.exceptions}>{review.exceptions.slice(0, 4).map(item => <li key={item.key}>
-          <Link href={detailUrl(item.key)}><span className={`${styles.dot} ${styles[item.severity]}`} aria-label={item.severity}/>{item.title}<strong>{item.count}</strong></Link>
-        </li>)}</ul>
-        {review.exceptions.length > 4 && <details><summary>View remaining exceptions</summary><ul className={styles.exceptions}>{review.exceptions.slice(4).map(item => <li key={item.key}><Link href={detailUrl(item.key)}>{item.title}<strong>{item.count}</strong></Link></li>)}</ul></details>}
-      </div>}
-    </div>
+    {priorities.length > 0 && <ul className={styles.priorityList} aria-label="Reasons for the rating">
+      {priorities.map(item => <li key={item.key}><Link href={detailUrl(item.key)}>{exceptionLabel(item)}</Link></li>)}
+    </ul>}
+    <p className={styles.insightDecision}><strong>{priorities.length ? "Decision required" : "Management action"}</strong> {decisions.length ? decisions.join(" ") : ask}</p>
+    {remaining.length > 0 && <ul className={styles.exceptions} aria-label="Other exceptions">
+      {remaining.slice(0, 3).map(item => <li key={item.key}>
+        <Link href={detailUrl(item.key)}><span className={`${styles.dot} ${styles[item.severity]}`} aria-hidden="true"/>{item.title}<strong className={styles.exceptionCount}>{item.count}</strong></Link>
+      </li>)}
+    </ul>}
+    {remaining.length > 3 && <details className={styles.moreExceptions}>
+      <summary>View {remaining.length - 3} more {remaining.length === 4 ? "exception" : "exceptions"}</summary>
+      <ul className={styles.exceptions}>{remaining.slice(3).map(item => <li key={item.key}>
+        <Link href={detailUrl(item.key)}><span className={`${styles.dot} ${styles[item.severity]}`} aria-hidden="true"/>{item.title}<strong className={styles.exceptionCount}>{item.count}</strong></Link>
+      </li>)}</ul>
+    </details>}
+    {review.missingSources && <p className={styles.insightNote}>One or more sources are unavailable in this scope. The position covers available records only.</p>}
+    {controls?.applicable.length > 0 && <p className={styles.assuranceLine}><strong>Control assurance</strong> <Link href={detailUrl("effectiveness")}>{controls.effective.length} of {controls.applicable.length} applicable controls recorded effective</Link></p>}
     <details className={styles.ratingRules}><summary>How the rating is decided</summary>
       <p>Red covers risks above appetite, high or critical incidents, missed deadlines and expired risk acceptances. Orange covers upcoming deadlines, outstanding decisions or verification, and gaps in recorded control assurance. Green requires records in scope and no triggered rule. When records are unavailable or there is no baseline, the rating is withheld unless a red exception is already known.</p>
       <p>Uses open records as at the board date across all periods. Organisation filters apply throughout. SoA and theme filters apply to SoA records and control actions where relevant.</p>
