@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { healthSafetyPosition, residualBand } from "../lib/health-safety-dashboard.mjs";
+import HealthSafetyDashboardHeatMap from "./HealthSafetyDashboardHeatMap";
+import { healthSafetyPosition } from "../lib/health-safety-dashboard.mjs";
 import styles from "./HealthSafetyHubDashboard.module.css";
 
 const root = "/portal/health-safety";
@@ -28,36 +29,6 @@ function RecordList({ data, page }) {
       Page {current} of {pages}
       {current < pages && <Link href={detailUrl(data.key, current + 1)}>Next</Link>}
     </nav>}
-  </section>;
-}
-
-function HeatMap({ hazards }) {
-  const positions = new Map();
-  for (const hazard of hazards) {
-    if (!hazard.residual_likelihood || !hazard.residual_severity) continue;
-    const key = hazard.residual_likelihood + "-" + hazard.residual_severity;
-    positions.set(key, (positions.get(key) || 0) + 1);
-  }
-  const likelihoods = ["Very unlikely", "Unlikely", "Possible", "Likely", "Very likely"];
-  const severities = ["No injury", "First aid", "LTI under 7d", "LTI 7+d", "Fatality"];
-  return <section className={styles.panel} aria-labelledby="hs-heat-map">
-    <header className={styles.panelHead}><h2 id="hs-heat-map">Live residual-risk heat map</h2><Link href={assessmentPath}>Open risk register →</Link></header>
-    <p>Hazard counts by likelihood and severity for records with a recorded residual position.</p>
-    <div className={styles.matrixScroll} role="region" tabIndex={0} aria-label="Residual-risk matrix">
-      <table className={styles.matrix}>
-        <thead><tr><th scope="col">Severity ↓</th>{likelihoods.map((label, index) => <th scope="col" key={label}>{index + 1} {label}</th>)}</tr></thead>
-        <tbody>{[5, 4, 3, 2, 1].map(severity => <tr key={severity}>
-          <th scope="row">{severity} {severities[severity - 1]}</th>
-          {likelihoods.map((_, index) => {
-            const likelihood = index + 1;
-            const score = likelihood * severity;
-            const band = residualBand(score);
-            return <td key={likelihood} className={styles[band]}><small>Score {score}</small><strong>{positions.get(likelihood + "-" + severity) || 0}</strong><span>{band}</span></td>;
-          })}
-        </tr>)}</tbody>
-      </table>
-    </div>
-    <p className={styles.axis}>Likelihood →</p>
   </section>;
 }
 
@@ -139,7 +110,17 @@ export default function HealthSafetyHubDashboard({ organisationName, assessments
     </section>
     <RecordList data={chosen && { key: selection, label: chosen[0], rows: chosen[1], record: chosen[2] }} page={Math.max(1, parseInt(recordPage, 10) || 1)}/>
     <div className={styles.split}>
-      <HeatMap hazards={hazards}/>
+      <HealthSafetyDashboardHeatMap registerHref={assessmentPath} hazards={data.liveHazards.map(hazard => {
+        const assessment = byId.get(hazard.assessment_id);
+        return {
+          id: hazard.id,
+          assessmentId: assessment.id,
+          assessmentLabel: [assessment.assessment_reference, assessment.title].filter(Boolean).join(" · "),
+          label: hazard.hazard_description || hazard.hazard_category || "Hazard",
+          current: [hazard.current_likelihood, hazard.current_severity],
+          residual: [hazard.residual_likelihood, hazard.residual_severity],
+        };
+      })}/>
       <section className={styles.panel} aria-labelledby="control-performance">
         <header className={styles.panelHead}><h2 id="control-performance">Control performance</h2></header>
         <dl className={styles.performance}>

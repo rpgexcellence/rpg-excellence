@@ -5,9 +5,10 @@
   display: grid;
   gap: 13px;
   min-width: 0;
-  max-width: 1520px;
-  margin: auto;
-  padding: 24px clamp(12px, 2vw, 28px) 50px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px var(--rpg-workspace-gutter, clamp(12px, 2vw, 28px)) 50px;
   color: #162f47;
 }
 .dashboard a { color: var(--hs-link); }
@@ -65,24 +66,14 @@
 .kpi span { font-weight: 700; }
 .kpi strong { font-size: 1.8rem; }
 .kpi small { color: #d7e8f2; }
-.split { grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr); }
+.split { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); }
 .panel { min-width: 0; }
 .panelHead { padding-bottom: 9px; border-bottom: 1px solid var(--hs-line); }
 .panelHead h2::after { content: ''; display: block; width: 28px; margin-top: 5px; border-bottom: 2px solid #c6a150; }
 .panelHead a, .panel p a, .queue a { font-weight: 700; font-size: .84rem; }
 .panel p { color: #435d72; }
 .matrixScroll { overflow: auto; }
-.matrix, .queue { width: 100%; text-align: left; font-size: .81rem; }
-.matrix { min-width: 490px; border-spacing: 4px; }
-.matrix th { color: #3a556c; font-size: .72rem; }
-.matrix td { padding: 4px 6px; border-radius: 3px; min-width: 48px; }
-.matrix td strong { float: right; font-size: 1rem; }
-.matrix td span { display: block; font-size: .63rem; text-transform: capitalize; }
-.acceptable { background: #24805e; color: #fff; }
-.adequate { background: #f2c562; color: #242a2f; }
-.inadequate { background: #eb8b58; color: #202b35; }
-.unacceptable { background: #a73640; color: #fff; }
-.axis { text-align: center; font-weight: 700; }
+.queue { width: 100%; text-align: left; font-size: .81rem; }
 .performance { margin: 6px 0 12px; }
 .performance div { display: flex; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--hs-line); font-size: .87rem; }
 .performance dd { margin: 0; white-space: nowrap; color: var(--hs-link); font-weight: 700; }
@@ -166,3 +157,39 @@
   .dashboard { padding-inline: 10px; }
   .kpi span { font-size: .88rem; }
 }
+
+.heatPanel { border-radius: 12px; padding: 16px; }
+.heatHeader { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; }
+.heatHeader p { margin-bottom: 0; }
+.heatModes { display: flex; padding: 4px; border-radius: 9px; background: #eaf1f5; }
+.heatModes button {
+  min-height: 36px; padding: 5px 12px; border: 0; border-radius: 6px;
+  background: transparent; color: #3f5c73; font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer;
+}
+.heatModes button[aria-pressed="true"] { background: #fff; color: #103752; box-shadow: 0 1px 5px #17374b24; }
+.heatScroll { overflow-x: auto; margin: 12px 0; }
+.heatGrid { max-width: 760px; min-width: 350px; margin: 0 auto; padding: 5px; }
+.heatRow { display: grid; grid-template-columns: 56px repeat(5, minmax(0, 1fr)); gap: 4px; margin-bottom: 4px; }
+.heatSeverity { align-self: center; padding-right: 4px; text-align: right; }
+.heatSeverity small, .heatLikelihood small { display: block; font-size: .69rem; line-height: 1.25; }
+.heatCell {
+  position: relative; display: grid; align-content: center; justify-items: center; gap: 2px;
+  min-height: 65px; padding: 14px 0 4px; border: 0; border-radius: 7px; font: inherit; cursor: pointer;
+}
+.heatCell span { position: absolute; top: 4px; left: 5px; font-size: .68rem; }
+.heatCell strong { font-size: 1.35rem; line-height: 1.1; }
+.heatCell small { font-size: clamp(.55rem, .8vw, .72rem); }
+.heatCell:hover { box-shadow: inset 0 0 0 2px #102e48; }
+.heatCell[aria-pressed="true"], .heatPanel button:focus-visible, .heatScroll:focus-visible {
+  position: relative; z-index: 1; outline: 2px solid #102e48; outline-offset: 1px;
+}
+.acceptable { background: #247c56; color: #fff; }
+.adequate { background: #f0bd43; color: #312300; }
+.inadequate { background: #ed8b4a; color: #302016; }
+.unacceptable { background: #ab322e; color: #fff; }
+.heatLikelihood { text-align: center; }
+.heatAxis { margin: 8px 0 0 60px; text-align: center; font-size: .78rem; font-weight: 700; }
+.heatResults { padding: 10px 12px; border: 1px solid var(--hs-line); border-radius: 6px; background: #f3f7fa; }
+.heatResults h3 { margin: 0; font-size: .9rem; }
+.heatResults ul { max-height: 14rem; overflow: auto; margin-bottom: 0; overflow-wrap: anywhere; }
+.heatRegister { display: block; margin-top: 9px; text-align: right; font-weight: 700; font-size: .84rem; }

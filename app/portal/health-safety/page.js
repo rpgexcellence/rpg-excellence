@@ -34,7 +34,7 @@ export default async function HealthSafetyDashboard({ searchParams }) {
   const [query, assessments, hazards, actions, enrolments, powras, permits, changes, inspections] = await Promise.all([
     searchParams,
     read("hs_risk_assessments", "id,assessment_reference,title,status,site_location,area_department,review_date,updated_at"),
-    read("hs_risk_hazards", "id,assessment_id,hazard_category,hazard_description,residual_score,residual_likelihood,residual_severity"),
+    read("hs_risk_hazards", "id,assessment_id,hazard_category,hazard_description,current_likelihood,current_severity,residual_score,residual_likelihood,residual_severity"),
     read("hs_risk_actions", "id,assessment_id,action_reference,action_required,target_date,priority,status,effectiveness_result"),
     readDashboardRows(admin, "hs_training_enrolments", "id,status", "learner_id", user.id),
     read("hs_powra_assessments", "id,status"),
