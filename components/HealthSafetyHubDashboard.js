@@ -102,9 +102,9 @@ export default function HealthSafetyHubDashboard({ organisationName, assessments
     ["overdue-reviews", "Assessment reviews overdue", data.reviewDates.overdue.length, data.reviewDates.today.length + " due today"],
   ];
   const operational = [
-    ["POWRA", "/powra", powras, powras.filter(row => ["open", "supervisor_review", "stopped"].includes(row.status))],
-    ["Permit to Work", "/permits", permits, permits.filter(row => row.status === "issued" && new Date(row.valid_until) >= now)],
-    ["Management of Change", "/moc", changes, changes.filter(row => !["closed", "rejected", "cancelled"].includes(row.status))],
+    ["POWRA", "/powra", powras, powras.filter(row => ["open", "supervisor_review", "stopped"].includes(row.status)), "⚑", "Point-of-work risk assessments", "Open POWRA"],
+    ["Permit to Work", "/permits", permits, permits.filter(row => row.status === "issued" && new Date(row.valid_until) >= now), "▤", "Permits for controlled work", "Open permits"],
+    ["Management of Change", "/moc", changes, changes.filter(row => !["closed", "rejected", "cancelled"].includes(row.status)), "↻", "Changes requiring review or follow-up", "Open changes"],
   ];
   const exceptions = rows => rows.map(row => <li key={row.key}><Link className={styles[row.tone]} href={detailUrl(row.key)}>{row.label} <b>{row.count}</b></Link></li>);
   const dueRows = [
@@ -153,8 +153,8 @@ export default function HealthSafetyHubDashboard({ organisationName, assessments
       </section>
     </div>
     {children}
-    <section className={styles.panel} aria-labelledby="hs-due">
-      <header className={styles.panelHead}><h2 id="hs-due">Due dates and verification</h2></header>
+    <section className={`${styles.panel} ${styles.summaryPanel}`} aria-labelledby="hs-due">
+      <header className={styles.summaryHead}><h2 id="hs-due">Due dates and verification</h2></header>
       <p>Next 30 days excludes today. Overdue actions can also be awaiting verification.</p>
       <div className={styles.matrixScroll} role="region" tabIndex={0} aria-label="Workstream deadlines">
         <table className={styles.queue}>
@@ -166,19 +166,29 @@ export default function HealthSafetyHubDashboard({ organisationName, assessments
         </table>
       </div>
     </section>
-    <section className={styles.panel} aria-labelledby="hs-priority">
-      <header className={styles.panelHead}><h2 id="hs-priority">Priority assessments</h2><Link href={detailUrl("elevated")}>View elevated hazards →</Link></header>
+    <section className={`${styles.panel} ${styles.summaryPanel}`} aria-labelledby="hs-priority">
+      <header className={styles.summaryHead}><h2 id="hs-priority">Priority assessments</h2><Link href={detailUrl("elevated")}>View elevated hazards →</Link></header>
       {data.elevated.length ? <ul className={styles.list}>{[...new Set([...data.elevated].sort((a, b) => b.residual_score - a.residual_score).map(row => row.assessment_id))].slice(0, 8).map(id => {
         const row = assessmentRecord(byId.get(id));
         return <li key={id}><Link href={row.href}>{row.label}</Link><span>{row.detail}</span></li>;
-      })}</ul> : <p>No elevated residual hazards recorded in current assessments.</p>}
+      })}</ul> : <p className={styles.emptyNotice}>No elevated residual hazards recorded in current assessments.</p>}
     </section>
-    <section className={styles.operations} aria-label="Operational registers">
-      {operational.map(([label, path, rows, active]) => <Link href={root + path} key={path}><strong>{label}</strong><span>{active.length} active · {rows.length} total</span></Link>)}
+    <section aria-labelledby="hs-operational">
+      <h2 id="hs-operational" className={styles.operationsTitle}>Operational registers</h2>
+      <div className={styles.operations}>
+        {operational.map(([label, path, rows, active, icon, description, action]) => (
+          <Link className={styles.operationCard} href={root + path} key={path}>
+            <div className={styles.operationHeading}><h3>{label}</h3><span aria-hidden="true">{icon}</span></div>
+            <div><strong>{active.length}</strong><small>Active · {rows.length} total</small></div>
+            <p>{description}.</p>
+            <div className={styles.operationLink}>{action} <span aria-hidden="true">→</span></div>
+          </Link>
+        ))}
+      </div>
     </section>
-    <section className={styles.panel} aria-labelledby="recent-assessments">
-      <header className={styles.panelHead}><h2 id="recent-assessments">Recent risk assessments</h2><Link href={assessmentPath}>Open risk register →</Link></header>
-      {data.current.length ? <ul className={styles.list}>{[...data.current].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 5).map(assessmentRecord).map(row => <li key={row.id}><Link href={row.href}>{row.label}</Link><span>{row.detail}</span></li>)}</ul> : <p>No current assessments in this workspace.</p>}
+    <section className={`${styles.panel} ${styles.summaryPanel}`} aria-labelledby="recent-assessments">
+      <header className={styles.summaryHead}><h2 id="recent-assessments">Recent risk assessments</h2><Link href={assessmentPath}>Open risk register →</Link></header>
+      {data.current.length ? <ul className={styles.list}>{[...data.current].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 5).map(assessmentRecord).map(row => <li key={row.id}><Link href={row.href}>{row.label}</Link><span>{row.detail}</span></li>)}</ul> : <p className={styles.emptyNotice}>No current assessments in this workspace.</p>}
     </section>
   </main>;
 }
