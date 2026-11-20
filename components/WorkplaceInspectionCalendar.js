@@ -35,14 +35,16 @@ function InspectionEditor({inspection,people,action,onSaved}) {
   <button type="submit" className="wibSave" disabled={pending}>{pending?'Saving…':'Save inspection changes'}</button>
  </form>;
 }
-export default function WorkplaceInspectionCalendar({programmes=[],inspections=[],actions=[],people=[],canAdminister=false,updateAction,today}) {
+export default function WorkplaceInspectionCalendar({programmes=[],inspections=[],actions=[],people=[],canAdminister=false,updateAction,today,overdueInspectionIds=[]}) {
  const router=useRouter();
  const [month,setMonth]=useState(today.slice(0,7)),[selectedDate,setSelectedDate]=useState(null),[selectedId,setSelectedId]=useState(null),[filter,setFilter]=useState('all'),[notice,setNotice]=useState('');
  const events=useMemo(()=>buildInspectionCalendarEvents({programmes,inspections,actions}),[programmes,inspections,actions]);
  const filtered=events.filter(e=>filter==='all'||e.type===filter);
  const days=inspectionCalendarDays(month),monthEvents=eventsForMonth(filtered,month),next=nextCalendarEvent(filtered,today);
  const dayEvents=filtered.filter(e=>e.date===selectedDate);
- const priorities=filtered.filter(e=>e.date>=today).slice(0,8);
+ const overdueIds=new Set(overdueInspectionIds);
+ const overduePriority=filtered.filter(e=>e.type==='inspection'&&overdueIds.has(e.recordId)).slice(0,4);
+ const priorities=[...overduePriority,...filtered.filter(e=>e.date>=today)].slice(0,8);
  const selected=events.find(e=>e.id===selectedId);
  const record=selected?.type==='inspection'?inspections.find(i=>i.id===selected.recordId):null;
  function changeMonth(value){try{setMonth(calendarMonth(value));setSelectedDate(null);setSelectedId(null);setNotice('');}catch{}}
