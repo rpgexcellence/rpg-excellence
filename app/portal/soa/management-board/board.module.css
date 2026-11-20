@@ -99,3 +99,43 @@
   .grid { grid-template-columns: minmax(0, 1fr); }
   .hero { padding: 18px; }
 }
+
+.insight {
+  margin-bottom: 12px;
+  padding: 18px;
+  border: 1px solid #cbdbe5;
+  border-left: 4px solid #117f83;
+  background: #fff;
+}
+.insightHead, .insightBody { display: flex; gap: 14px 26px; flex-wrap: wrap; justify-content: space-between; }
+.insightHead { align-items: flex-start; }
+.insightHead h2 { font: 700 1.55rem Georgia, serif; margin: 0; }
+.insightHead p, .insightBody p, .ratingRules p { color: #465c70; font-size: .9rem; margin: 6px 0; }
+.insightBody { margin: 15px 0 10px; }
+.insightBody > div { flex: 1 1 290px; }
+.insightBody h3 { margin: 0; font-size: 1rem; }
+.insight a { color: #075c69; font-weight: 700; }
+.signal { display: inline-flex; align-items: center; gap: 7px; border-radius: 4px; padding: 8px 11px; color: var(--state-text); background: var(--state-bg); }
+.signal::before, .dot { content: ""; display: inline-block; width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: var(--state-text); }
+.red { --state-text: #9b242b; --state-bg: #fbe8e8; }
+.orange { --state-text: #874500; --state-bg: #fff0d9; }
+.green { --state-text: #176244; --state-bg: #e5f5ec; }
+.neutral { --state-text: #49586b; --state-bg: #edf2f6; }
+.exceptions { margin: 5px 0; padding: 0; list-style: none; }
+.exceptions a { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: .87rem; }
+.exceptions strong { margin-left: auto; }
+.insight summary { font-size: .85rem; font-weight: 700; cursor: pointer; }
+.ratingRules { padding-top: 8px; border-top: 1px solid #dce6ec; }
+.queue { margin-top: 12px; }
+.queueScroll { overflow-x: auto; }
+.queue table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+.queue th, .queue td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #dce6ec; }
+.queue thead th { color: #24455e; background: #edf3f8; }
+.queue td { font-variant-numeric: tabular-nums; }
+.cards .card, .attentionGrid .card {
+  background-image: linear-gradient(100deg, #102b45 12%, #143650f5 45%, #102b45b3), url('/images/isms-hub-command-centre.png');
+  background-size: cover;
+  background-position: center, 75% center;
+}
+.cards .card:nth-child(even), .attentionGrid .card:nth-child(even) { background-position: center, right bottom; }
+.cards .card[href]:hover, .attentionGrid .card[href]:hover { box-shadow: inset 0 0 0 2px #8cb9ca; }
