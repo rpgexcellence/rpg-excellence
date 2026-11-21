@@ -5,27 +5,48 @@ import Link from 'next/link';
 import { companyDocumentContext, companyDocumentRows } from '../../../lib/company-documents';
 import { createAdminClient } from '../../../lib/supabase/admin';
 import { resolvePortalAdminAccess } from '../../../lib/portal-admin-access';
-import { documentCommand } from './actions';
 import s from './documents.module.css';
 export const metadata={title:'Document Management | RPG Excellence'};
 export const dynamic='force-dynamic';
+
+const normalizeName = value => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-GB');
+
 export default async function DocumentsPage({searchParams}) {
  const q=await searchParams;
  const context=await companyDocumentContext();const {client,organization,user}=context;
  const options=await loadDocumentFormOptions(context);
  const tagLinks=await companyDocumentRows(client,'company_document_classifications','document_id,classification_key',q=>q,['document_id','classification_key']);
- const documents=await companyDocumentRows(client,'company_documents','id,document_number,title,document_type,standard,revision,status,review_date',q=>q.eq('organization_id',organization.id),['document_number','created_at','id']);
+ const documents=await companyDocumentRows(client,'company_documents','id,document_number,title,document_type,standard,revision,status,review_date,owner_person_id',q=>q.eq('organization_id',organization.id),['document_number','created_at','id']);
  const {access:rpg}=await resolvePortalAdminAccess({admin:createAdminClient(),user,allowedRoles:['admin','document_controller']});
  const all=documents||[];
  const families=options.classifications;
- const visible=all.filter(d=>(!q?.family||d.standard===q.family||tagLinks.some(t=>t.document_id===d.id&&t.classification_key===q.family))&&(!q?.status||d.status===q.status)&&(!q?.q||`${d.document_number} ${d.title}`.toLowerCase().includes(String(q.q).toLowerCase())));
- return <main className={s.page}><div className={s.shell}>
+ const ownerInput = typeof q?.owner === 'string' ? q.owner.slice(0, 150).trim() : '';
+ const ownerQuery = normalizeName(ownerInput);
+ const matchingOwners = new Set(ownerQuery ? options.people
+   .filter(person => normalizeName([person.first_name, person.last_name].filter(Boolean).join(' ')).includes(ownerQuery))
+   .map(person => person.id) : []);
+ const visible = all.filter(document =>
+   (!q?.family || document.standard === q.family || tagLinks.some(tag => tag.document_id === document.id && tag.classification_key === q.family)) &&
+   (!q?.status || document.status === q.status) &&
+   (!q?.q || `${document.document_number} ${document.title}`.toLowerCase().includes(String(q.q).toLowerCase())) &&
+   (!ownerQuery || matchingOwners.has(document.owner_person_id))
+ );
+ const hasFilters = Boolean(q?.q || q?.family || q?.status || ownerQuery);
+ return <main className={`${s.page} ${s.registerPage}`}><div className={s.shell}>
   <header className={s.header}><div><small className={s.eyebrow}>COMPANY DOCUMENT MANAGEMENT</small><h1>Document Management</h1><p>{organization.name||organization.legal_name||'Your company'} · Controlled documents, independent review and traceable distribution.</p></div><nav className={s.links}>{options.settingsAdmin?<Link href="/portal/documents/settings">Numbering settings</Link>:null}<Link href="/portal/tasks?module=documents">My document tasks</Link>{rpg?<Link href="/portal/rpg-documents/admin">RPG private document administration</Link>:null}<Link href="/portal">Dashboard</Link></nav></header>
   <div className={s.notice}>Standard access for active company users. Drafts are visible to their author, owner, assigned reviewers and document controllers. Released documents follow their distribution scope.</div>
   {q?.error?<div role="alert" className={s.error}>{q.error}</div>:null}
   <section className={s.metrics}>{[['Current',all.filter(d=>d.status==='current').length],['Drafts',all.filter(d=>d.status==='draft').length],['In review',all.filter(d=>d.status==='in_review').length],['Approved for release',all.filter(d=>d.status==='approved').length]].map(([label,count])=><div key={label} className={s.metric}><small>{label}</small><strong>{count}</strong></div>)}</section>
-  <section className={s.panel}><h2>Your company document register</h2><form method="get" className={`${s.form} ${s.inline}`}><label>Search<input name="q" defaultValue={q?.q} placeholder="Document number or title"/></label><label>Family<select name="family" defaultValue={q?.family||''}><option value="">All families</option>{families.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select></label><label>Status<select name="status" defaultValue={q?.status||''}><option value="">All accessible records</option>{['current','draft','in_review','approved','superseded','withdrawn'].map(x=><option key={x} value={x}>{x.replaceAll('_',' ')}</option>)}</select></label><button className={s.button}>Apply</button></form>
-   {!visible.length?<p className={s.muted}>No documents available in this view. Create your first company draft below.</p>:visible.map(d=><article key={d.id} className={s.row}><div><small>{d.document_number} · Rev {d.revision} · {d.document_type}</small><h3><Link href={`/portal/documents/${d.id}`}>{d.title}</Link></h3><span className={s.muted}>{d.standard||'Company documents'}</span></div><span className={`${s.badge} ${d.status==='current'?s.current:''}`}>{d.status.replaceAll('_',' ')}</span></article>)}
+  <section className={s.panel}>
+   <h2>Your company document register</h2>
+   <form method="get" className={`${s.form} ${s.inline}`}>
+    <label>Search<input name="q" defaultValue={q?.q} placeholder="Document number or title"/></label>
+    <label>Owner<input type="search" name="owner" defaultValue={ownerInput} maxLength={150} placeholder="First or last name"/></label>
+    <label>Family<select name="family" defaultValue={q?.family||''}><option value="">All families</option>{families.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select></label>
+    <label>Status<select name="status" defaultValue={q?.status||''}><option value="">All accessible records</option>{['current','draft','in_review','approved','superseded','withdrawn'].map(x=><option key={x} value={x}>{x.replaceAll('_',' ')}</option>)}</select></label>
+    <button className={s.button}>Apply</button>
+   </form>
+   {!visible.length?<p className={s.muted}>{hasFilters ? 'No accessible documents match these filters.' : 'No documents available in this view. Create your first company draft below.'}</p>:visible.map(d=><article key={d.id} className={s.row}><div><small>{d.document_number} · Rev {d.revision} · {d.document_type}</small><h3><Link href={`/portal/documents/${d.id}`}>{d.title}</Link></h3><span className={s.muted}>{d.standard||'Company documents'}</span></div><span className={`${s.badge} ${d.status==='current'?s.current:''}`}>{d.status.replaceAll('_',' ')}</span></article>)}
   </section>
   <section className={s.panel}><h2>Create a controlled document</h2><p className={s.muted}>Start a draft. The document change process here is separate from HSE Management of Change. A verifier and an approver must independently confirm before the author or owner can release it.</p><CompanyDocumentDraftForm options={options} requestId={randomUUID()} draftId={randomUUID()}/></section>
  </div></main>;
