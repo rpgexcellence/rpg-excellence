@@ -12,3 +12,27 @@
 .registerPage .inline > label {
   min-width: min(160px, 100%);
 }
+
+.filter { flex: 1 1 160px; min-width: 0; }
+.filterLabel { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 750; }
+.filter details { position: relative; }
+.filter summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 42px; padding: 8px 12px; cursor: pointer; list-style: none;
+  border: 1px solid #c4d6e8; border-radius: 8px; background: #fbfdff;
+  color: #173957; font-size: 13px; overflow-wrap: anywhere;
+}
+.filter summary::-webkit-details-marker { display: none; }
+.filter summary::after { content: ''; flex: 0 0 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.filter details[open] summary::after { transform: rotate(225deg); }
+.filterMenu {
+  position: absolute; z-index: 3; inset: calc(100% + 4px) 0 auto; padding: 8px;
+  border: 1px solid #c4d6e8; border-radius: 8px; background: #fff; box-shadow: 0 8px 20px #0b2c5022;
+}
+.filterChoices { max-height: 230px; overflow: auto; overscroll-behavior: contain; }
+.filterChoices label { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: start; gap: 8px; padding: 7px 5px; cursor: pointer; overflow-wrap: anywhere; }
+.filterChoices label:hover { background: #edf4ff; }
+.filterChoices input { width: 16px; height: 16px; margin: 0; accent-color: #1759df; }
+.filterChoices p { margin: 6px; font-size: 13px; }
+.clearFilter { padding: 7px 5px; border: 0; background: transparent; color: #1558ce; cursor: pointer; text-decoration: underline; }
+.resetFilters { align-self: center; white-space: nowrap; font-size: 13px; }
