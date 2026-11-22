@@ -7,6 +7,7 @@ import { loadAssuranceTaskSources } from "../../../lib/assurance-task-sources";
 
 import { getPortalAccess } from "../../../lib/portal-access";
 import { allowedTaskSources } from "../../../lib/task-module-access.mjs";
+import { riskAcknowledgementTasks } from "../../../lib/risk-distribution";
 import { companyDocumentTasks } from "../../../lib/company-documents";
 
 export const dynamic = "force-dynamic";
@@ -239,8 +240,16 @@ export default async function TasksPage({ searchParams }) {
   const incidentTasks = enabledSources.has("incident") ? await loadIncidentTasks(admin,access) : [];
   const documentSource = enabledSources.has("documents") ? await companyDocumentTasks({...access,person:me}) : {tasks:[],error:false};
   if (documentSource.error) sources.sourceErrors.push({module:"documents",label:"Document Management"});
-  const all = [...soaTasks(sources.soaEntries||[]),...incidentTasks,...documentSource.tasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
-    .filter((item) => item.title && enabledSources.has(item.source))
+  const acknowledgements = await riskAcknowledgementTasks(admin, organizationId, access.user.id,
+    enabledSources.has("risk") && organisationOversight).catch(() => {
+    sources.sourceErrors.push({ module: "risk", label: "Risk assessment acknowledgements" });
+    return [];
+  });
+  const activeRecipients = new Map(people.filter(person => person.account_status === "active" && person.account_type === "system")
+    .map(person => [person.id, person.user_id]));
+  const assignedBriefings = acknowledgements.filter(item => activeRecipients.get(item.assignee) === item.assigneeUserId);
+  const all = [...assignedBriefings,...soaTasks(sources.soaEntries||[]),...incidentTasks,...documentSource.tasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
+    .filter((item) => item.title && (enabledSources.has(item.source) || item.recipientOnly))
     .map((item) => ({ ...item, due: item.due ? String(item.due).slice(0,10) : "" }))
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
   const isMine = (item) => item.assignee === myPersonId || item.verifier === myPersonId || item.assigneeUserId === access.user.id;

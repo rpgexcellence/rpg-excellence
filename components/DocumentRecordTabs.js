@@ -4,7 +4,7 @@ import { createContext, useContext, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import s from '../app/portal/documents/documents.module.css';
 
-const tabs = [
+const documentTabs = [
   ['overview', 'Overview'], ['details', 'Document Details'], ['scope', 'Classification & Applicability'],
   ['approval', 'Review & Approval'], ['distribution', 'Distribution'], ['history', 'Revision History'],
 ];
@@ -14,6 +14,7 @@ const paths = {
   details: 'M12 3 21 8l-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5',
   scope: 'M12 3l7 3v6c0 4-4 7-7 9-3-2-7-5-7-9V6z M9 12l2 2 4-4',
   approval: 'M10 3h4v4h-4z M12 7v5 M5 16v-4h14v4 M3 16h4v4H3z M17 16h4v4h-4z',
+  documents: 'M12 7v10m-5-5h10M4 4h16v16H4z',
   distribution: 'M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2 M9.5 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M21 21v-2a4 4 0 0 0-2.5-3.7 M16.5 3.5a4 4 0 0 1 0 7',
   history: 'M4 11a8 8 0 1 1 1.8 6 M4 5v6h6 M12 8v5l3 2',
   download: 'M12 3v11 M8 10l4 4 4-4 M5 15v5h14v-5',
@@ -28,11 +29,11 @@ export function RecordIcon({ name }) {
 
 const TabContext = createContext(null);
 
-export function DocumentRecordTabs({ children, initial = 'overview' }) {
+export function DocumentRecordTabs({ children, initial = 'overview', tabs = documentTabs, sectionLabel = 'Document sections' }) {
   const [active, setActive] = useState(initial);
   const buttons = useRef([]);
   return <TabContext.Provider value={{ active, setActive }}>
-    <div className={s.recordTabs} role="tablist" aria-label="Document sections">
+    <div className={s.recordTabs} role="tablist" aria-label={sectionLabel}>
       {tabs.map(([key, label], index) => <button type="button" key={key} id={'record-tab-' + key} role="tab" aria-selected={active === key}
         aria-controls={'record-panel-' + key} tabIndex={active === key ? 0 : -1}
         ref={node => { buttons.current[index] = node; }}

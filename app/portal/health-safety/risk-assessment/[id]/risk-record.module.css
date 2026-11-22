@@ -1,0 +1,14 @@
+.distribution :is(input[type="search"], input[type="date"]) {
+  min-height: 36px; padding: 6px 8px; border: 1px solid #bdd0e0; border-radius: 5px; background: #fbfdff;
+}
+.distribution input[type="search"] { display: block; width: 100%; }
+.distribution legend { font-weight: 750; }
+.distributionBar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.recipientFilter { display: grid; align-content: center; min-width: 0; gap: 4px; font-size: 13px; }
+.recipientFilter details { position: relative; }
+.recipientFilter summary { padding: 8px; border: 1px solid #bdd0e0; border-radius: 5px; background: #fbfdff; }
+.recipientOptions { position: absolute; inset: calc(100% + 4px) 0 auto; z-index: 2; padding: 6px 9px; max-height: 190px; overflow: auto; border: 1px solid #bdd0e0; border-radius: 5px; background: #fff; box-shadow: 0 4px 12px #102b4620; }
+.profile { display: flex; align-items: stretch; gap: 10px; }
+.profile > div { flex: 1; min-width: 0; display: grid; gap: 3px; padding: 8px; border: 1px solid #d1e0eb; border-radius: 6px; background: #f5f9fc; }
+.profile strong { font: 700 27px Georgia, serif; }
+.heat { --hs-line: #d1e0eb; }
