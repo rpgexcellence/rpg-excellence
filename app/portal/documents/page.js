@@ -8,6 +8,7 @@ import { resolvePortalAdminAccess } from '../../../lib/portal-admin-access';
 import s from './documents.module.css';
 import DocumentRegisterFilter from './DocumentRegisterFilter';
 import DocumentHubLinks from './DocumentHubLinks';
+import DocumentReports from './DocumentReports';
 import DocumentHubOverview, { awaitingDocumentApproval, documentReviewDates, reviewAttention } from './DocumentHubOverview';
 export const metadata = { title: 'Document Control Centre | RPG Excellence' };
 export const dynamic='force-dynamic';
@@ -123,7 +124,7 @@ export default async function DocumentsPage({ searchParams }) {
   };
   const grouping = groupings.some(([value]) => value === q?.group) ? q.group : '';
   const view = q?.view === 'operational' || section === 'register' ? 'operational' : 'management';
-  const showOverview = section === 'reports' || (!section && view === 'management');
+  const showOverview = !section && view === 'management';
   const showRegister = !['create', 'links', 'reports'].includes(section);
   const groupLabels = document => {
     const keys = tags.get(document.id) ?? [];
@@ -177,10 +178,10 @@ export default async function DocumentsPage({ searchParams }) {
     return root + (query.size ? '?' + query : '') + '#register';
   }
 
-  return <main className={`${s.page} ${s.registerPage} ${s.hubPage}`}><div className={s.shell}>
+  return <main className={`${s.page} ${s.registerPage} ${s.hubPage} ${section === 'reports' ? s.reportPage : ''}`}><div className={s.shell}>
     <header className={s.hubHero}>
       <div><small>RPG EXCELLENCE / DOCUMENT MANAGEMENT</small><h1>{sectionTitles[section] || 'Document Control Centre'}</h1>
-        <p>Create, review, approve and release controlled documents.</p></div>
+        <p>{section === 'reports' ? 'Explore document status, review schedules and records requiring attention.' : 'Create, review, approve and release controlled documents.'}</p></div>
       <nav className={s.hubHeroLinks} aria-label="Document management shortcuts">
         <Link href="/portal/tasks?module=documents">My document tasks</Link>
         {options.settingsAdmin && <Link href={root + '/settings'}>Numbering settings</Link>}
@@ -190,6 +191,20 @@ export default async function DocumentsPage({ searchParams }) {
     </header>
     {typeof q?.error === 'string' && <div role="alert" className={s.error}>{q.error}</div>}
     {showOverview && <DocumentHubOverview documents={all} reviewDates={reviewDates} registerHref={registerHref} awaitingApproval={awaitingApproval}/>}
+    {section === 'reports' && <DocumentReports companyName={organization.name} asOf={reviewDates.today}
+      records={all.map(document => {
+        const applicability = (links, labels, kind) => (links.get(document.id) ?? []).map(id => ({
+          id, label: labels.get(id) ?? `${kind} name unavailable`,
+        }));
+        return {
+          id: document.id, series: document.series_id || document.id, reference: document.document_number,
+          title: document.title, revision: document.revision, status: document.status,
+          awaitingApproval: awaitingApproval.has(document.id), reviewDate: document.review_date,
+          review: reviewAttention(document, reviewDates), companyWide: document.applicability === 'company',
+          department: applicability(departments, departmentLabels, 'Department'),
+          site: applicability(sites, siteLabels, 'Site'), type: document.document_type,
+        };
+      })}/>}
     {section === 'links' && <DocumentHubLinks sites={options.sites} departments={options.departments}/>}
     {showRegister &&
     <section className={s.hubRegister} id="register" aria-labelledby="register-title">
