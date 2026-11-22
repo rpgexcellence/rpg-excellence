@@ -1,55 +1,258 @@
-import {randomUUID} from "node:crypto";
-import CompanyDocumentDraftForm from "../../../../components/CompanyDocumentDraftForm";
-import {loadDocumentFormOptions} from "../../../../lib/company-structure";
+import { randomUUID } from 'node:crypto';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import CompanyDocumentDraftForm from '../../../../components/CompanyDocumentDraftForm';
+import { DocumentRecordPanel, DocumentRecordTabButton, DocumentRecordTabs, DocumentPreview, RecordIcon } from '../../../../components/DocumentRecordTabs';
+import { loadDocumentFormOptions } from '../../../../lib/company-structure';
 import { companyDocumentContext, companyDocumentRows } from '../../../../lib/company-documents';
-import { createAdminClient } from '../../../../lib/supabase/admin';
+import { companyDocumentPreviewType } from '../../../../lib/company-document-preview.mjs';
 import { documentCommand } from '../actions';
+import { awaitingDocumentApproval } from '../DocumentHubOverview';
 import s from '../documents.module.css';
-export const dynamic='force-dynamic';
-const name=p=>p?[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email:'Former company user';
-const date=x=>x?new Date(x).toLocaleString('en-GB',{timeZone:'Europe/London'}):'—';
-function Operation({id,command,label,children,danger=false}){return <form action={documentCommand} className={s.form}><input type="hidden" name="document_id" value={id}/><input type="hidden" name="command" value={command}/>{children}<button className={`${s.button} ${danger?s.danger:''}`} style={{justifySelf:'start'}}>{label}</button></form>;}
-export default async function DocumentPage({params,searchParams}){
- const {id}=await params,q=await searchParams;
- const context=await companyDocumentContext();const {client,organization,user}=context;
- const {data:d,error}=await client.from('company_documents').select('*').eq('id',id).eq('organization_id',organization.id).maybeSingle();
- if(error||!d)notFound();
- const [reviews,recipients,events,{data:controller,error:ce},people]=await Promise.all([
-  companyDocumentRows(client,'company_document_reviews','*',q=>q.eq('document_id',id)),companyDocumentRows(client,'company_document_recipients','*',q=>q.eq('document_id',id),['document_id','person_id']),
-  companyDocumentRows(client,'company_document_events','*',q=>q.eq('document_id',id),['created_at','id']),
-  client.rpc('company_document_controller',{p_org:organization.id}),
-  companyDocumentRows(createAdminClient(),'organization_people','id,user_id,first_name,last_name,email,account_status,account_type',q=>q.eq('organization_id',organization.id)),
- ]);
- if(ce)throw new Error('Document workflow could not be loaded.');
- const me=people.find(p=>p.user_id===user.id&&p.account_status==='active'&&p.account_type==='system');
- const owner=people.find(p=>p.id===d.owner_person_id),author=people.find(p=>p.user_id===d.author_user_id);
- const isAuthorOwner=d.author_user_id===user.id||d.owner_person_id===me?.id;
- const canEdit=isAuthorOwner||controller;
- const active=people.filter(p=>p.account_status==='active'&&p.account_type==='system'&&p.user_id);
- const independent=active.filter(p=>p.user_id!==d.author_user_id&&p.id!==d.owner_person_id);
- const mine=(reviews||[]).filter(r=>r.person_id===me?.id&&!r.decision);
- const acknowledged=(recipients||[]).find(r=>r.person_id===me?.id)?.acknowledged_at;
- const [formOptions,classificationLinks,siteLinks,departmentLinks]=await Promise.all([loadDocumentFormOptions(context),companyDocumentRows(client,'company_document_classifications','classification_key',q=>q.eq('document_id',id),['classification_key']),companyDocumentRows(client,'company_document_sites','site_id',q=>q.eq('document_id',id),['site_id']),companyDocumentRows(client,'company_document_departments','department_id',q=>q.eq('document_id',id),['department_id'])]);
- const linkedSites = formOptions.sites.filter(site => siteLinks.some(link => link.site_id === site.id));
- return <main className={s.page}><div className={s.shell}>
-  <header className={s.header}><div><small className={s.eyebrow}>CONTROLLED COMPANY DOCUMENT</small><h1>{d.document_number} · Rev {d.revision}</h1><p>{d.title}</p><span className={`${s.badge} ${d.status==='current'?s.current:''}`}>{d.status.replaceAll('_',' ')}</span></div><nav className={s.links}><Link href="/portal/documents">Document register</Link><Link href="/portal/tasks?module=documents">My document tasks</Link>{d.file_path?<a href={`/portal/documents/${id}/download`}>Download {d.status==='current'?'current document':'controlled copy'}</a>:null}</nav></header>
-  {q?.error?<div className={s.error} role="alert">{q.error}</div>:null}{q?.saved?<div className={s.success} role="status">Document workflow updated: {q.saved.replaceAll('_',' ')}.</div>:null}
-  <section className={s.panel}><h2>Document change control</h2><p className={s.muted}>This process controls documented information independently of HSE Management of Change. Review decisions are tied to the submitted revision; editing a returned draft resets its assignments and approvals.</p><dl className={s.details}>{[['Author',name(author)],['Document owner',name(owner)],['Reason for issue / change',d.change_reason],['Impact / implementation',d.change_impact],['Distribution',d.distribution==='company'?'Whole company':'Selected company users'],['Issued',date(d.issued_at)],['Next document review',d.review_date||'Not set'],['File',d.file_name||'No file uploaded']].map(([label,v])=><div key={label}><dt>{label}</dt><dd>{v}</dd></div>)}</dl></section>
-  {linkedSites.length > 0 && <section className={s.panel} aria-labelledby="document-sites">
-    <h2 id="document-sites">Applicable sites</h2>
-    <ul className={s.hubAttention}>{linkedSites.map(site => <li key={site.id}>
-      <Link href={`/portal/company/sites/${site.id}/zones`}><span>{site.site_name}</span><b>Buildings &amp; Zones →</b></Link>
-    </li>)}</ul>
-  </section>}
-  {canEdit&&d.status==='draft'?<section className={s.panel}><h2>1. Prepare draft, reviewers and distribution</h2><CompanyDocumentDraftForm document={d} options={formOptions} reviews={reviews||[]} recipients={recipients||[]} selected={{classifications:classificationLinks.map(t=>t.classification_key),sites:siteLinks.map(t=>t.site_id),departments:departmentLinks.map(t=>t.department_id)}} requestId={randomUUID()} draftId={d.id}/></section>:null}
-  <section className={s.panel}><h2>2. Verification and approval</h2><div className={s.scroll}><table className={s.table}><thead><tr><th>Assigned stakeholder</th><th>Role</th><th>Accepted</th><th>Decision</th><th>Comments</th></tr></thead><tbody>{(reviews||[]).map(r=><tr key={r.id}><td>{name(people.find(p=>p.id===r.person_id))}</td><td>{r.role}</td><td>{date(r.accepted_at)}</td><td>{r.decision?.replaceAll('_',' ')||'Pending'}</td><td>{r.comments||'—'}</td></tr>)}</tbody></table></div>{d.status==='in_review'?mine.map(r=><div className={s.panel} key={r.id}><h3>Your {r.role} assignment</h3>{!r.accepted_at?<Operation id={id} command="accept" label="Accept this assignment"><input type="hidden" name="role" value={r.role}/></Operation>:<><Operation id={id} command="confirm" label={r.role==='verifier'?'Confirm verification':'Approve this revision'}><input type="hidden" name="role" value={r.role}/><label>Decision comments *<textarea name="comments" required/></label></Operation><hr/><Operation id={id} command="changes_required" label="Return draft for changes" danger><input type="hidden" name="role" value={r.role}/><label>Required changes *<textarea name="comments" required/></label></Operation></>}</div>):null}{!(reviews||[]).length?<p className={s.muted}>No stakeholders assigned yet.</p>:null}</section>
-  {canEdit&&['in_review','approved'].includes(d.status)?<details className={s.panel}><summary>Recall this submission for changes</summary><p className={s.muted}>Recalling returns the document to draft and invalidates every acceptance and approval. The previous current revision remains available.</p><Operation id={id} command="recall" label="Recall to draft" danger><label>Recall reason *<textarea name="comments" required/></label></Operation></details>:null}
-  {d.status==='approved'&&isAuthorOwner?<section className={s.panel}><h2>3. Release and communicate</h2><p className={s.muted}>All assigned stakeholders have confirmed. Releasing publishes this revision to its distribution scope, supersedes the previous current revision and creates recipient acknowledgement tasks.</p><Operation id={id} command="release" label="Release approved document"/></section>:null}
-  {d.status==='current'?<section className={s.panel}><h2>4. Read and acknowledge</h2>{acknowledged?<p className={s.success}>You acknowledged this revision on {date(acknowledged)}.</p>:(d.distribution==='company'||(recipients||[]).some(r=>r.person_id===me?.id))?<Operation id={id} command="acknowledge" label="I have read and understood this revision"><p>Read the released document before confirming your acknowledgement.</p></Operation>:<p className={s.muted}>You are not on the acknowledgement distribution list.</p>}{canEdit?<><h3>Distribution record</h3><ul>{(recipients||[]).map(r=><li key={r.person_id}>{name(people.find(p=>p.id===r.person_id))} — {r.acknowledged_at?`Acknowledged ${date(r.acknowledged_at)}`:'Awaiting acknowledgement'}</li>)}</ul></>:null}</section>:null}
-  {d.status==='current'&&canEdit?<section className={s.panel}><h2>Create a new controlled revision</h2><p className={s.muted}>The current document remains available until its replacement completes verification, approval and release.</p><Operation id={id} command="revise" label="Create new revision draft"><label>New revision *<input name="revision" required/></label><label>Reason for change *<textarea name="change_reason" required/></label><label>Impact / implementation considerations *<textarea name="change_impact" required/></label></Operation></section>:null}
-  {canEdit&&['draft','approved','current'].includes(d.status)?<details className={s.panel}><summary>Withdraw document</summary><Operation id={id} command="withdraw" label="Withdraw this revision" danger><label>Withdrawal reason *<textarea name="comments" required/></label></Operation></details>:null}
-  <section className={s.panel}><h2>Controlled history</h2>{d.previous_document_id?<p><Link href={`/portal/documents/${d.previous_document_id}`}>Previous revision (subject to historical access)</Link></p>:null}<ol className={s.timeline}>{(events||[]).map(e=><li key={e.id}><strong>{e.event_type.replaceAll('_',' ')}</strong> · {date(e.created_at)} · {name(people.find(p=>p.user_id===e.actor_user_id))}{e.details?.reason?<p>{e.details.reason}</p>:null}</li>)}</ol></section>
- </div></main>;
+
+export const dynamic = 'force-dynamic';
+
+const root = '/portal/documents';
+const name = person => person ? [person.first_name, person.last_name].filter(Boolean).join(' ') || 'Company user' : 'Company user unavailable';
+const humanize = value => String(value || '').replaceAll('_', ' ');
+const dateTimeFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' });
+const dayFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' });
+const dateTime = value => value ? dateTimeFormat.format(new Date(value)) : '—';
+const day = value => value ? dayFormat.format(new Date(value)) : '—';
+
+function statusLabel(document, reviews) {
+  return {
+    draft: 'Draft',
+    in_review: awaitingDocumentApproval(document, reviews) ? 'Awaiting Approval' : 'Under Verification',
+    approved: 'Approved for Release',
+    current: `Current (v${document.revision})`,
+    superseded: 'Superseded',
+    withdrawn: 'Withdrawn',
+  }[document.status] ?? humanize(document.status);
+}
+
+function decisionDate(reviews, role) {
+  const assigned = reviews.filter(review => review.role === role);
+  if (!assigned.length || assigned.some(review => review.decision !== 'confirmed' || !review.decided_at)) return null;
+  return assigned.map(review => review.decided_at).sort().at(-1);
+}
+
+function Lifecycle({ document, reviews }) {
+  const currentDecisions = document.status === 'draft' ? [] : reviews;
+  const verification = decisionDate(currentDecisions, 'verifier');
+  const approval = decisionDate(currentDecisions, 'approver');
+  const current = document.status === 'current' && document.issued_at;
+  const steps = [
+    ['Draft prepared', document.created_at, document.status === 'draft' ? 'active' : document.created_at ? 'done' : '', 'Date not recorded'],
+    ['Verification (Independent)', verification, verification ? 'done' : '', document.status === 'draft' ? 'Pending submission' : 'Decision not recorded'],
+    ['Approval (Independent)', approval, approval ? 'done' : '', verification ? 'Decision not recorded' : 'Pending verification'],
+    [current ? 'Released (Current)' : 'Released', document.issued_at, current ? 'released' : document.issued_at ? 'done' : '', 'Pending release'],
+    ['Next review', document.review_date, '', 'Not scheduled'],
+  ];
+  return <section className={s.recordPanel}><h2>Lifecycle &amp; compliance</h2>
+    <ol className={s.recordMilestones}>{steps.map(([label, value, state, fallback]) => <li key={label}
+      data-state={state} aria-current={['active','released'].includes(state) ? 'step' : undefined}>
+      <span className={s.recordMilestone}>{state === 'done' && <RecordIcon name="check"/>}</span>
+      <strong>{label}</strong>{value ? <time dateTime={value}>{day(value)}</time> : <span>{fallback}</span>}
+    </li>)}</ol>
+  </section>;
+}
+
+function Operation({ id, command, label, children, danger = false }) {
+  return <form action={documentCommand} className={s.form}>
+    <input type="hidden" name="document_id" value={id}/><input type="hidden" name="command" value={command}/>
+    {children}<button className={`${s.recordButton} ${danger ? s.danger : ''}`} style={{ justifySelf: 'start' }}>{label}</button>
+  </form>;
+}
+
+function Facts({ entries }) {
+  return <dl className={s.recordFacts}>{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
+}
+
+function Chips({ values, empty }) {
+  return values.length ? <div className={s.recordChips}>{values.map(value => <span className={s.recordChip} key={value}>{value}</span>)}</div> : <p className={s.muted}>{empty}</p>;
+}
+
+export default async function DocumentPage({ params, searchParams }) {
+  const { id } = await params;
+  const q = await searchParams;
+  const context = await companyDocumentContext();
+  const { client, organization, user } = context;
+  const { data: d, error } = await client.from('company_documents').select('*').eq('id', id).eq('organization_id', organization.id).maybeSingle();
+  if (error || !d) notFound();
+
+  const read = (table, fields, order) => companyDocumentRows(client, table, fields, query => query.eq('document_id', id), order);
+  const [reviews, recipients, events, {data: controller, error: controllerError}, options, classificationLinks, siteLinks, departmentLinks] = await Promise.all([
+    read('company_document_reviews', '*', ['document_id', 'person_id', 'role']),
+    read('company_document_recipients', '*', ['document_id', 'person_id']),
+    read('company_document_events', '*', ['created_at', 'id']),
+    client.rpc('company_document_controller', { p_org: organization.id }),
+    loadDocumentFormOptions(context),
+    read('company_document_classifications', 'classification_key', ['classification_key']),
+    read('company_document_sites', 'site_id', ['site_id']),
+    read('company_document_departments', 'department_id', ['department_id']),
+  ]);
+  if (controllerError) throw new Error('Document workflow could not be loaded.');
+
+  const people = new Map(options.people.map(person => [person.id, person]));
+  const byAccount = new Map(options.people.map(person => [person.user_id, person]));
+  const me = options.people.find(person => person.user_id === user.id && person.account_status === 'active' && person.account_type === 'system');
+  const isAuthorOwner = d.author_user_id === user.id || d.owner_person_id === me?.id;
+  const canEdit = isAuthorOwner || controller;
+  const editable = canEdit && d.status === 'draft';
+  const mine = !isAuthorOwner && d.status === 'in_review' ? reviews.filter(review => review.person_id === me?.id && !review.decision) : [];
+  const acknowledged = recipients.find(recipient => recipient.person_id === me?.id)?.acknowledged_at;
+  const verificationComplete = reviews.some(review => review.role === 'verifier') && reviews.filter(review => review.role === 'verifier').every(review => review.decision === 'confirmed');
+  const selection = { classifications: classificationLinks.map(row => row.classification_key), sites: siteLinks.map(row => row.site_id), departments: departmentLinks.map(row => row.department_id) };
+  const linkedSites = options.sites.filter(site => selection.sites.includes(site.id));
+  const linkedDepartments = options.departments.filter(department => selection.departments.includes(department.id));
+  const classifications = options.classifications.filter(item => selection.classifications.includes(item.key));
+  const standards = classifications.filter(item => item.kind === 'standard').map(item => item.label);
+  const families = classifications.filter(item => item.kind !== 'standard').map(item => item.label);
+  const file = d.file_path ? (d.file_name || 'Controlled document') : null;
+  const canPreview = file && companyDocumentPreviewType(file);
+  const preview = `${root}/${id}/preview`;
+  const download = `${root}/${id}/download`;
+  const status = statusLabel(d, reviews);
+  const initial = ['accept', 'confirm', 'submit', 'submitted_for_review', 'changes_required', 'recall', 'release'].includes(q?.saved)
+    ? 'approval' : q?.saved === 'acknowledge' ? 'distribution' : typeof q?.error === 'string' && d.status === 'in_review' ? 'approval' : 'overview';
+  const details = [
+    ['Reference', d.document_number], ['Type', d.document_type], ['Revision', d.revision],
+    ['Owner', name(people.get(d.owner_person_id))], ['Next review', day(d.review_date)], ['Published', day(d.issued_at)],
+  ];
+  const sites = <div className={s.recordChips}>{linkedSites.map(site => <Link className={s.recordChip} key={site.id}
+    href={`/portal/company/sites/${site.id}/zones`} title="Open Buildings & Zones"><RecordIcon name="scope"/>{site.site_name}</Link>)}</div>;
+  const applicability = <>
+    <p>{d.applicability === 'company' ? 'Whole company' : 'Selected sites or departments'}</p>
+    {sites}<Chips values={linkedDepartments.map(department => department.name)} empty="No departments specified."/>
+    <p className={s.muted}>Recipient access is managed separately under Distribution.</p>
+  </>;
+
+  return <main className={`${s.page} ${s.registerPage} ${s.recordPage}`}><div className={s.shell}>
+    <p className={s.recordBreadcrumb}><Link href={root}>Document Control Centre</Link> / <Link href={root + '?section=register'}>Document Register</Link> / {d.document_number}</p>
+    <header className={`${s.hubHero} ${s.recordHero}`}>
+      <div className={s.recordTitle}><span className={s.recordTitleIcon}><RecordIcon name="overview"/></span><div>
+        <small>{d.document_number} · REV {d.revision}</small><h1>{d.title}</h1><p>{name(people.get(d.owner_person_id))} · {d.document_type}</p>
+      </div></div>
+      <div className={s.recordHeaderActions}>
+        <span className={s.recordStatus} data-status={d.status}>{d.status === 'current' && <RecordIcon name="check"/>}{status}</span>
+        {editable && <><button className={s.recordButton} form="editable-document" name="intent" value="draft">Save Draft</button>
+          <button className={s.recordPrimary} form="editable-document" name="intent" value="submit">Submit for Review</button></>}
+        {file && <a className={s.recordButton} href={download}><RecordIcon name="download"/>{/\.pdf$/i.test(file) ? 'Download PDF' : 'Download controlled copy'}</a>}
+        {canPreview && <a className={s.recordButton} href={preview} target="_blank" rel="noopener noreferrer"><RecordIcon name="open"/>Open</a>}
+        <details className={s.recordMenu}><summary className={s.recordButton} aria-label="More document actions"><RecordIcon name="more"/></summary>
+          <Link href="/portal/tasks?module=documents">My document tasks</Link><Link href={root + '?section=register'}>Document register</Link>
+        </details>
+      </div>
+    </header>
+    {typeof q?.error === 'string' && <div className={s.error} role="alert">{q.error}</div>}
+    {typeof q?.saved === 'string' && <div className={s.success} role="status">Document workflow updated: {humanize(q.saved)}.</div>}
+    <DocumentRecordTabs key={`${id}:${q?.saved || ''}:${d.updated_at}`} initial={initial}>
+      <DocumentRecordPanel name="overview">
+        {editable && <p className={s.notice}><strong>Independent verification and approval are required.</strong> <DocumentRecordTabButton name="approval">Review assignments →</DocumentRecordTabButton></p>}
+        <div className={s.recordOverview}>
+          <section className={s.recordPanel}><h2>Document preview</h2>
+            <div className={s.recordFile}><div className={s.recordCover}><RecordIcon name="overview"/><b>{d.document_type}</b><small>Rev {d.revision}</small></div>
+              <div><strong>{file || 'No file uploaded'}</strong>
+                {canPreview ? <><p className={s.muted}>{/\.docx$/i.test(file) ? 'Text preview · Use the download for the original layout.' : 'Controlled copy · Revision ' + d.revision}</p>
+                  <DocumentPreview url={preview} filename={file}/></> : file && <p className={s.muted}>Use the controlled download to read this file.</p>}
+              </div>
+            </div>
+          </section>
+          <section className={s.recordPanel}><h2>Document details</h2><Facts entries={details}/></section>
+          <Lifecycle document={d} reviews={reviews}/>
+        </div>
+        <div className={s.recordOverview}>
+          <section className={s.recordPanel}><h2>Applicable standards</h2><Chips values={standards} empty="No standards selected."/></section>
+          <section className={s.recordPanel}><h2>Operational families</h2><Chips values={families} empty="No families selected."/></section>
+          <section className={s.recordPanel}><h2>Applicability</h2>{applicability}</section>
+        </div>
+        <section className={s.recordPanel}><h2>Purpose and scope</h2><p className={s.recordProse}>{d.description || 'No description recorded.'}</p></section>
+      </DocumentRecordPanel>
+      {editable ? <CompanyDocumentDraftForm document={d} options={options} reviews={reviews} recipients={recipients} selected={selection}
+        requestId={randomUUID()} draftId={id} recordLayout/> : <>
+        <DocumentRecordPanel name="details">
+          <section className={s.recordPanel}><h2>Document details</h2>
+            <Facts entries={[...details, ['Author', name(byAccount.get(d.author_user_id))], ['Review / acknowledgement due', day(d.due_date)], ['File', file || '—']]}/>
+          </section>
+          <section className={s.recordPanel}><h2>Change control</h2><div className={s.grid}>
+            <div><h3>Reason for issue / change</h3><p className={s.recordProse}>{d.change_reason || '—'}</p></div>
+            <div><h3>Impact and implementation</h3><p className={s.recordProse}>{d.change_impact || '—'}</p></div>
+          </div></section>
+        </DocumentRecordPanel>
+        <DocumentRecordPanel name="scope">
+          <div className={s.grid}><section className={s.recordPanel}><h2>Applicable standards</h2><Chips values={standards} empty="No standards selected."/></section>
+            <section className={s.recordPanel}><h2>Operational families</h2><Chips values={families} empty="No families selected."/></section></div>
+          <section className={s.recordPanel}><h2>Site and department applicability</h2>{applicability}</section>
+          {d.legacy_standard_text && !classifications.length && <p className={s.notice}>Previously recorded classification: {d.legacy_standard_text}</p>}
+        </DocumentRecordPanel>
+        <DocumentRecordPanel name="approval">
+          <div className={s.grid}>{[['verifier','Independent verification'], ['approver','Independent approval']].map(([role, title]) => {
+            const assigned = reviews.filter(review => review.role === role);
+            return <section className={s.recordPanel} key={role}><h2><RecordIcon name="approval"/> {title}</h2>
+              {assigned.length ? <ul className={s.recordDecisions}>{assigned.map(review => <li key={review.person_id}>
+                <strong>{name(people.get(review.person_id))}</strong><span>{review.decision ? humanize(review.decision) : review.accepted_at ? 'Accepted · Decision pending' : 'Awaiting acceptance'}</span>
+                <small>{review.decided_at ? dateTime(review.decided_at) : review.accepted_at ? 'Accepted ' + dateTime(review.accepted_at) : ''}</small>
+                {review.comments && <p className={s.recordProse}>{review.comments}</p>}
+              </li>)}</ul> : <p className={s.muted}>No assignments recorded.</p>}
+            </section>;
+          })}</div>
+          {mine.map(review => <section className={s.recordPanel} key={review.role}>
+            <h2>Your {review.role} assignment</h2>
+            {!review.accepted_at ? <Operation id={id} command="accept" label="Accept this assignment"><input type="hidden" name="role" value={review.role}/></Operation> : <>
+              {review.role === 'verifier' || verificationComplete
+                ? <Operation id={id} command="confirm" label={review.role === 'verifier' ? 'Confirm verification' : 'Approve this revision'}>
+                    <input type="hidden" name="role" value={review.role}/><label>Decision comments *<textarea name="comments" required/></label>
+                  </Operation>
+                : <p className={s.notice}>All required verifiers must confirm before approval.</p>}
+              <details><summary>Return draft for changes</summary><Operation id={id} command="changes_required" label="Return draft for changes" danger>
+                <input type="hidden" name="role" value={review.role}/><label>Required changes *<textarea name="comments" required/></label>
+              </Operation></details>
+            </>}
+          </section>)}
+          {canEdit && ['in_review', 'approved'].includes(d.status) && <details className={s.recordPanel}><summary>Recall this submission for changes</summary>
+            <p className={s.muted}>Recalling returns the revision to Draft and clears its review decisions.</p>
+            <Operation id={id} command="recall" label="Recall to Draft" danger><label>Recall reason *<textarea name="comments" required/></label></Operation>
+          </details>}
+          {d.status === 'approved' && isAuthorOwner
+            ? <section className={s.recordPanel}><h2>Release and communicate</h2><p>Release publishes this revision to the selected audience and creates acknowledgement tasks.</p>
+                <Operation id={id} command="release" label="Release approved document"/></section>
+            : ['draft', 'in_review'].includes(d.status) && <p className={s.notice}>Release is locked until the required independent decisions are recorded.</p>}
+        </DocumentRecordPanel>
+        <DocumentRecordPanel name="distribution">
+          <section className={s.recordPanel}><h2>Distribution and acknowledgement</h2>
+            <p>{d.distribution === 'company' ? 'Whole company' : 'Selected company users'}</p>
+            {d.status === 'current' && (acknowledged ? <p className={s.success}>You acknowledged this revision on {dateTime(acknowledged)}.</p>
+              : d.distribution === 'company' || recipients.some(recipient => recipient.person_id === me?.id)
+                ? <Operation id={id} command="acknowledge" label="I have read and understood this revision"><p>Read the released document before confirming your acknowledgement.</p></Operation>
+                : <p className={s.muted}>You are not on the acknowledgement distribution list.</p>)}
+            {canEdit && recipients.length > 0 && <><h3>Distribution record</h3><ul className={s.recordDecisions}>{recipients.map(recipient => <li key={recipient.person_id}>
+              <strong>{name(people.get(recipient.person_id))}</strong><span>{recipient.acknowledged_at ? 'Acknowledged ' + dateTime(recipient.acknowledged_at) : d.status === 'current' ? 'Awaiting acknowledgement' : 'Selected for release'}</span>
+            </li>)}</ul></>}
+          </section>
+        </DocumentRecordPanel>
+      </>}
+      <DocumentRecordPanel name="history">
+        <section className={s.recordPanel}><h2>Revision History</h2>
+          {d.previous_document_id && <p><Link href={`${root}/${d.previous_document_id}`}>Open previous revision →</Link></p>}
+          <ol className={s.recordHistory}>{events.map(event => <li key={event.id}>
+            <div><strong>{humanize(event.event_type)}</strong> · {name(byAccount.get(event.actor_user_id))}</div><time dateTime={event.created_at}>{dateTime(event.created_at)}</time>
+            {event.details?.reason && <p className={s.recordProse}>{event.details.reason}</p>}
+          </li>)}</ol>
+          {!events.length && <p className={s.muted}>No revision events are visible for this record.</p>}
+          {d.file_sha256 && <p className={s.recordFingerprint}>Controlled file SHA-256 <code>{d.file_sha256}</code></p>}
+        </section>
+        {d.status === 'current' && canEdit && <section className={s.recordPanel}><h2>Create a new controlled revision</h2>
+          <p>The current document remains published until its replacement completes verification, approval and release.</p>
+          <Operation id={id} command="revise" label="Create new revision draft">
+            <label>New revision *<input name="revision" required/></label><label>Reason for change *<textarea name="change_reason" required/></label>
+            <label>Impact / implementation considerations *<textarea name="change_impact" required/></label>
+          </Operation>
+        </section>}
+        {canEdit && ['draft', 'approved', 'current'].includes(d.status) && <details className={s.recordPanel}><summary>Withdraw document</summary>
+          <Operation id={id} command="withdraw" label="Withdraw this revision" danger><label>Withdrawal reason *<textarea name="comments" required/></label></Operation>
+        </details>}
+      </DocumentRecordPanel>
+    </DocumentRecordTabs>
+  </div></main>;
 }
