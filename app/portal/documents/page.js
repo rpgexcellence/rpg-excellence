@@ -232,7 +232,7 @@ export default async function DocumentsPage({ searchParams }) {
         ? <DocumentTable documents={visible} grouping={grouping} groupLabels={groupLabels} ownerLabels={ownerLabels} standards={standardLabels} reviewDates={reviewDates} awaitingApproval={awaitingApproval}/>
         : <p className={s.muted}>{hasFilters ? 'No accessible documents match these filters.' : 'No documents available in this view.'}</p>}
     </section>}
-    {(!section || section === 'create') && <section className={s.panel} id="create-document"><h2>Create a controlled document</h2>
+    {section === 'create' && <section className={s.panel} id="create-document"><h2>Create a controlled document</h2>
       <p className={s.muted}>Start a draft. A verifier and an approver must independently confirm before the author or owner can release it.</p>
       <CompanyDocumentDraftForm options={options} requestId={randomUUID()} draftId={randomUUID()}/>
     </section>}

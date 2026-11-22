@@ -123,3 +123,88 @@
 .hubRegister > .hubTabs + .hubTabs { margin-top: 7px; }
 .hubAttention a { border-left-color: var(--hub-accent, #5397c9); }
 .hubStatusBadge[data-status='awaiting-approval'] { background: #fff0ce; color: #805017; }
+
+/* Individual controlled record */
+.recordPage { padding-top: 16px; }
+.recordPage [hidden] { display: none !important; }
+.recordBreadcrumb { margin: 0 0 9px; color: #48657d; font-size: .82rem; overflow-wrap: anywhere; }
+.recordHero { min-height: 110px; align-items: center; background: linear-gradient(115deg, #102b46, #1e4568); }
+.recordTitle { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.recordTitle div { min-width: 0; overflow-wrap: anywhere; }
+.recordTitle h1 { font-size: clamp(22px, 2.4vw, 36px); }
+.recordTitleIcon { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border: 1px solid #6d98bb; border-radius: 8px; background: #204e77; }
+.recordIcon { width: 16px; height: 16px; flex: none; vertical-align: middle; }
+.recordTitleIcon .recordIcon { width: 27px; height: 27px; }
+.recordHeaderActions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.recordButton, .recordPrimary, .recordStatus, .recordChip { display: inline-flex; align-items: center; gap: 5px; }
+.recordButton, .recordPrimary {
+  min-height: 36px; padding: 7px 10px; border: 1px solid #bdd0e0; border-radius: 5px; background: #fff;
+  color: #173d61; font: inherit; font-size: .85rem; font-weight: 700; text-decoration: none; cursor: pointer;
+}
+.recordButton:hover, .recordPrimary:hover { box-shadow: inset 0 0 0 1px currentColor; }
+.recordButton:disabled, .recordPrimary:disabled { opacity: .65; cursor: default; }
+.recordPrimary { background: #215483; color: #fff; border-color: #6d98bb; }
+.recordStatus { padding: 4px 9px; border-radius: 999px; background: #e5effc; color: #184d7f; font-size: .8rem; font-weight: 750; white-space: nowrap; }
+.recordStatus[data-status='current'] { background: #e1f5e5; color: #116237; }
+.recordStatus[data-status='approved'], .recordStatus[data-status='in_review'] { background: #fff0ce; color: #75460b; }
+.recordStatus[data-status='superseded'], .recordStatus[data-status='withdrawn'] { background: #ebeff3; color: #3e5569; }
+.recordMenu { position: relative; }
+.recordMenu summary { list-style: none; }
+.recordMenu summary::-webkit-details-marker { display: none; }
+.recordMenu[open] { z-index: 4; }
+.recordMenu a { position: absolute; top: 39px; right: 0; width: max-content; padding: 8px; background: #fff; color: #173d61; border: 1px solid #bdd0e0; font-size: .84rem; }
+.recordMenu a:last-child { top: 72px; }
+.recordTabs { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0; padding: 5px; background: #fff; border: 1px solid #d1e0eb; border-radius: 7px; }
+.recordTabs button { display: inline-flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; min-height: 36px; border: 0; border-radius: 4px; background: #eaf1f7; color: #244b6c; padding: 6px 9px; font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; }
+.recordTabs button[aria-selected='true'] { background: #1a416a; color: #fff; }
+.recordPage :is(button,a,summary):focus-visible { outline: 2px solid #2684ba; outline-offset: 2px; }
+.recordPanel { padding: 14px; margin-bottom: 11px; background: #fff; border: 1px solid #d1e0eb; border-radius: 8px; min-width: 0; }
+.recordPanel h2 { margin: 0 0 10px; font: 700 19px/1.2 Georgia, serif; }
+.recordPanel h3 { margin: 12px 0 6px; font-size: .95rem; }
+.recordPanel p { margin: 7px 0; }
+.recordPanel label { margin-block: 7px; }
+.recordOverview { display: grid; grid-template-columns: minmax(0,.94fr) minmax(0,1fr) minmax(0,1.1fr); gap: 11px; }
+.recordFile { display: grid; grid-template-columns: 84px minmax(0,1fr); align-items: center; gap: 12px; overflow-wrap: anywhere; }
+.recordCover { display: grid; align-content: center; justify-items: start; gap: 8px; min-height: 112px; padding: 9px; border: 1px solid #d4e4ef; border-radius: 5px; color: #133955; background: linear-gradient(145deg,#fff 65%,#d9edf8 65% 84%,#2a5277 84%); font-size: .8rem; }
+.recordCover .recordIcon { width: 23px; height: 23px; }
+.recordPreviewFrame { width: 100%; min-height: 340px; margin-top: 9px; border: 1px solid #ccddeb; border-radius: 5px; background: #fff; }
+.recordFacts { margin: 0; }
+.recordFacts div { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1fr); gap: 8px; padding: 5px 0; border-bottom: 1px solid #e4edf4; }
+.recordFacts dd { margin: 0; overflow-wrap: anywhere; font-weight: 700; }
+.recordFacts dt { color: #526b81; }
+.recordMilestones { list-style: none; margin: 0; padding: 0; }
+.recordMilestones li { position: relative; display: grid; grid-template-columns: 20px minmax(0,1fr) auto; align-items: center; gap: 8px; min-height: 36px; padding: 5px 6px; border-bottom: 1px solid #e1e9f0; font-size: .86rem; }
+.recordMilestones li:not(:last-child)::after { content: ''; position: absolute; top: 25px; left: 14px; height: calc(100% - 16px); border-left: 1px solid #9eb0c0; }
+.recordMilestones li[data-state='done']::after { border-color: #69c570; }
+.recordMilestone { position: relative; z-index: 1; display: grid; place-items: center; width: 17px; height: 17px; border: 1.5px solid #75899a; border-radius: 50%; background: #fff; }
+.recordMilestone .recordIcon { width: 12px; height: 12px; }
+.recordMilestones [data-state='done'] .recordMilestone { color: #fff; background: #24933b; border-color: #24933b; }
+.recordMilestones [data-state='active'] .recordMilestone { background: #2f7bab; border-color: #2f7bab; }
+.recordMilestones [data-state='released'] .recordMilestone { background: #24933b; border: 2px solid white; box-shadow: 0 0 0 1px #24933b; }
+.recordMilestones li[data-state='released'] { background: #e1f6e4; border-radius: 6px; border-bottom-color: transparent; }
+.recordMilestones time, .recordMilestones li>span:last-child { color: #526b81; font-size: .75rem; text-align: right; }
+.recordMilestones [data-state='released'] time { color: #126135; font-weight: 700; }
+.recordProse { white-space: pre-wrap; overflow-wrap: anywhere; }
+.recordChips { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0; }
+.recordChip { padding: 4px 8px; border: 1px solid #c1d7ea; border-radius: 999px; background: #eaf4fd; color: #255477; font-size: .8rem; text-decoration: none; }
+button.recordChip { cursor: pointer; }
+.recordChipGroup .check { display: inline-flex !important; margin: 4px 5px 4px 0; padding: 4px 8px; border: 1px solid #d4e3ed; border-radius: 999px; background: #f4f7fa; }
+.recordChipGroup .check:has(input:checked) { background: #e0f0ff; border-color: #75a9d2; }
+.recordPicker { padding: 8px; border: 1px solid #d1e0eb; border-radius: 6px; background: #fbfdff; }
+.recordPicker summary, .recordPanel summary { font-weight: 700; cursor: pointer; }
+.recordPickerList { max-height: 165px; overflow-y: auto; }
+.recordAssignment { background: #f8fbfd; }
+.recordAssignment legend .recordIcon { margin-right: 5px; }
+.recordTextButton { border: 0; background: transparent; font: inherit; font-weight: 700; text-decoration: underline; color: inherit; cursor: pointer; }
+.recordDecisions, .recordHistory { list-style: none; padding: 0; margin: 0; }
+.recordDecisions li, .recordHistory li { padding: 8px 0; border-bottom: 1px solid #e4edf4; overflow-wrap: anywhere; }
+.recordDecisions span, .recordDecisions small, .recordHistory time { margin-left: 8px; color: #526b81; font-size: .82rem; }
+.recordHistory li { position: relative; margin-left: 7px; padding-left: 15px; border-left: 1px solid #adc5d8; }
+.recordHistory li::before { position: absolute; left: -4px; top: 13px; content: ''; width: 7px; height: 7px; border-radius: 50%; background: #4587b1; }
+.recordFingerprint { font-size: .8rem; overflow-wrap: anywhere; }
+.recordActionBar { display: flex; align-items: center; justify-content: space-between; gap: 9px 14px; flex-wrap: wrap; position: sticky; bottom: 0; z-index: 3; padding: 9px 12px; background: #f9fcff; border: 1px solid #d1e0eb; border-radius: 7px; box-shadow: 0 -3px 12px #193b5810; font-size: .84rem; }
+.recordActionBar .links { flex: none; }
+@media (min-width: 1101px) { .recordActionBar { padding-right: 200px; } }
+@media (max-width: 1100px) { .recordOverview { grid-template-columns: 1fr 1fr; }.recordOverview > :last-child { grid-column: 1/-1; } }
+@media (max-width: 630px) { .recordOverview, .recordPage .grid { grid-template-columns: 1fr; }.recordOverview > :last-child { grid-column: auto; } }
+.recordPicker [hidden] { display: none !important; }
