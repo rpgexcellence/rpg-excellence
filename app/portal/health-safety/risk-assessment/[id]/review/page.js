@@ -7,6 +7,8 @@ import { createClient } from "../../../../../../lib/supabase/server";
 import { createAdminClient } from "../../../../../../lib/supabase/admin";
 import { requireOrganizationAccess } from "../../../../../../lib/organization-access";
 
+import { distributionRows } from "../../../../../../lib/risk-distribution";
+
 export const metadata = { title: "Risk Assessment Review & Approval | RPG Excellence" };
 export const dynamic = "force-dynamic";
 
@@ -93,16 +95,19 @@ async function recordReviewDecision(formData) {
   revalidatePath("/portal/health-safety/risk-assessment/" + id);
 }
 
-async function markCommunicated(formData) {
+async function markLegacyCommunicated(formData) {
   "use server";
   const access = await requireOrganizationAccess("risk_management", "contribute", "/portal/health-safety/risk-assessment");
   const { user, organization } = access;
   const supabase = createAdminClient();
   const id = String(formData.get("assessment_id") || "");
+  const distribution = await distributionRows(supabase, organization.id, query => query.eq("assessment_id", id));
+  if (distribution !== null) redirect("/portal/health-safety/risk-assessment/" + id + "?tab=distribution");
   const { data: assessment } = await supabase.from("hs_risk_assessments").select("owner_id,organization_id,status").eq("id", id).eq("organization_id", organization.id).single();
   if (!assessment || assessment.status !== "approved") throw new Error("Only an approved assessment can be marked as communicated.");
-  const { error } = await supabase.from("hs_risk_assessments").update({ status: "communicated", communicated_at: new Date().toISOString() }).eq("id", id).eq("organization_id", organization.id);
+  const { data: updated, error } = await supabase.from("hs_risk_assessments").update({ status: "communicated", communicated_at: new Date().toISOString() }).eq("id", id).eq("organization_id", organization.id).eq("status", "approved").select("id").maybeSingle();
   if (error) throw new Error(error.message);
+  if (!updated) return;
   await supabase.from("hs_risk_events").insert({ assessment_id: id, owner_id: assessment.owner_id, organization_id: assessment.organization_id, actor_id: user.id, event_type: "communicated", event_summary: "Approved risk assessment marked as communicated" });
   revalidatePath("/portal/health-safety/risk-assessment/" + id + "/review");
 }
@@ -126,6 +131,9 @@ export default async function ReviewApprovalPage({ params }) {
   const canApprove = (levels[access.level] || 0) >= levels.approve;
   const canEdit = canContribute && ["draft", "changes_required"].includes(assessment.status);
 
+  const distributionReady = canContribute && assessment.status === "approved"
+    ? (await distributionRows(supabase, access.organization.id, query => query.eq("assessment_id", id))) !== null
+    : true;
   return <main className="rrPage"><style>{`
     *{box-sizing:border-box}.rrPage{min-height:100vh;padding:34px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.rrShell{max-width:1120px;margin:auto}.rrTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.rrTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.rrTop h1{font-size:34px;margin:7px 0}.rrTop p{margin:0;color:#657b93}.rrBack{padding:11px 15px;border:1px solid #ccd9e4;border-radius:9px;background:#fff;color:#173b59;text-decoration:none;font-weight:850}.rrGate{display:grid;grid-template-columns:1fr repeat(4,.45fr);gap:12px;margin:24px 0}.rrStatus,.rrMetric{padding:18px;border:1px solid #d6e2ea;border-radius:13px;background:#fff}.rrStatus span,.rrStatus strong,.rrMetric span,.rrMetric strong{display:block}.rrStatus span,.rrMetric span{font-size:11px;color:#657b91;font-weight:850}.rrStatus strong{font-size:21px;margin-top:7px}.rrMetric strong{font-size:28px;margin-top:7px}.rrPanel{padding:24px;border:1px solid #d6e2ea;border-radius:16px;background:#fff;margin-top:15px}.rrHead{margin-bottom:17px}.rrHead h2{margin:0}.rrHead p{margin:6px 0 0;color:#6b8096}.rrChecks{display:grid;gap:8px}.rrCheck{display:flex;gap:12px;align-items:flex-start;padding:13px;border-radius:10px;background:#eef8f4;color:#176148}.rrCheck.fail{background:#fff0ee;color:#a22c26}.rrCheck b{font-size:18px}.rrReady{padding:18px;border-left:5px solid #079468;border-radius:10px;background:#eaf8f2;color:#126044;font-weight:850}.rrForm{display:grid;grid-template-columns:1fr 1fr;gap:14px}.rrField{display:grid;gap:7px}.rrField.full{grid-column:1/-1}.rrField label{font-size:12px;font-weight:900;color:#294a66}.rrField input,.rrField select,.rrField textarea{width:100%;padding:12px;border:1px solid #cbd8e5;border-radius:9px;background:#fff;font:inherit}.rrField textarea{min-height:95px}.rrDecisions{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap}.rrButton{padding:13px 18px;border:0;border-radius:9px;background:#087f6c;color:#fff;font-weight:900;cursor:pointer}.rrButton.red{background:#bd3a32}.rrButton.blue{background:#1762ef}.rrButton:disabled{opacity:.45;cursor:not-allowed}.rrHistory{display:grid;gap:8px}.rrHistory div{display:flex;justify-content:space-between;gap:15px;padding:12px;border-bottom:1px solid #e4ebf0}.rrHistory span{color:#667d93}@media(max-width:780px){.rrGate{grid-template-columns:1fr 1fr}.rrStatus{grid-column:1/-1}.rrForm{grid-template-columns:1fr}.rrField.full,.rrDecisions{grid-column:auto}}
     .rrTopActions{display:flex;gap:9px;flex-wrap:wrap}.rrPdf{border-color:#087f6c;background:#087f6c;color:#fff}
@@ -136,7 +144,14 @@ export default async function ReviewApprovalPage({ params }) {
     <section className="rrPanel"><h2>PPE specifications for review</h2>{hazards.map(hazard=><div key={hazard.id}><h3>{hazard.hazard_description}</h3><PPERequirements requirements={hazard.ppe_requirements||[]}/></div>)}</section>
     {canEdit && <section className="rrPanel"><div className="rrHead"><h2>Submit for competent review</h2><p>Submission locks the assessment content while the approval decision is recorded.</p></div><form action={submitForReview}><input type="hidden" name="assessment_id" value={id}/><button className="rrButton blue" disabled={failures.length > 0}>Submit for review →</button></form></section>}
     {canApprove && assessment.status === "in_review" && <section className="rrPanel"><div className="rrHead"><h2>Record review decision</h2><p>The approver confirms suitability and sets the controlled review arrangements based on the residual-risk position and expected change.</p></div><form className="rrForm" action={recordReviewDecision}><input type="hidden" name="assessment_id" value={id}/><div className="rrField"><label htmlFor="approver_person_id">Competent approver name *</label><select id="approver_person_id" name="approver_person_id" required defaultValue=""><option value="" disabled>{peopleResult.data?.length ? "Select active company user" : "No active company users available"}</option>{(peopleResult.data || []).filter((person) => person.id !== assessment.assessor_person_id).map((person) => <option value={person.id} key={person.id}>{[person.first_name, person.last_name].filter(Boolean).join(" ")} · {person.position || person.email}</option>)}</select><small>Linked to Administration → People, Roles &amp; Access. The assessor is excluded to preserve independent approval.</small></div><div className="rrField"><label htmlFor="review_date">Planned review date *</label><input id="review_date" name="review_date" type="date" defaultValue={assessment.review_date || ""} required/></div><div className="rrField"><label htmlFor="review_frequency_months">Review frequency *</label><select id="review_frequency_months" name="review_frequency_months" defaultValue={assessment.review_frequency_months ? String(assessment.review_frequency_months) : ""} required><option value="" disabled>Select review arrangement</option><option value="event_based">Event-based / following significant change</option><option value="3">Every 3 months</option><option value="6">Every 6 months</option><option value="12">Every 12 months</option><option value="24">Every 24 months</option><option value="36">Every 36 months</option></select></div><div className="rrField full"><label htmlFor="approval_comment">Approval comment / changes required</label><textarea id="approval_comment" name="approval_comment"/></div><div className="rrDecisions"><button className="rrButton" name="decision" value="approved">Approve controlled assessment</button><button className="rrButton red" name="decision" value="changes_required">Return for changes</button></div></form></section>}
-    {canContribute && assessment.status === "approved" && <section className="rrPanel"><div className="rrHead"><h2>Communicate the approved controls</h2><p>Brief affected people through an appropriate method and retain acknowledgement evidence where required.</p></div><form action={markCommunicated}><input type="hidden" name="assessment_id" value={id}/><button className="rrButton">Confirm communicated →</button></form></section>}
+    {canContribute && ["approved", "communicated"].includes(assessment.status) && <section className="rrPanel">
+      <div className="rrHead"><h2>Communicate the approved controls</h2><p>Select affected people and track their acknowledgement of this version.</p></div>
+      {distributionReady ? <Link className="rrButton" href={`/portal/health-safety/risk-assessment/${id}?tab=distribution`}>Open Distribution</Link> :
+        <form action={markLegacyCommunicated}><input type="hidden" name="assessment_id" value={id}/>
+          <p>Recipient tracking is awaiting database setup. Record an external briefing here.</p>
+          <button className="rrButton">Record external communication</button>
+        </form>}
+    </section>}
     {["approved", "communicated"].includes(assessment.status) && <section className="rrPanel"><div className="rrHead"><h2>Controlled approval record</h2></div><div className="rrHistory"><div><strong>Approved by</strong><span>{assessment.approver_name || "—"}</span></div><div><strong>Approved</strong><span>{formatDate(assessment.approved_at)}</span></div><div><strong>Review date</strong><span>{formatDate(assessment.review_date)}</span></div><div><strong>Review frequency</strong><span>{assessment.review_frequency_months ? `Every ${assessment.review_frequency_months} months` : "Event-based / following significant change"}</span></div><div><strong>Approval comment</strong><span>{assessment.approval_comment || "No additional comment"}</span></div>{assessment.communicated_at && <div><strong>Communicated</strong><span>{formatDate(assessment.communicated_at)}</span></div>}</div></section>}
   </div></main>;
 }
