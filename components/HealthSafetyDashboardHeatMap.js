@@ -17,9 +17,14 @@ const bands = {
   unacceptable: "Unacceptable",
 };
 
-export default function HealthSafetyDashboardHeatMap({ hazards, registerHref }) {
+export default function HealthSafetyDashboardHeatMap({ hazards, registerHref, registerAnchor, selection, onSelection, className = "" }) {
   const [mode, setMode] = useState("residual");
-  const [selected, setSelected] = useState("");
+  const [localSelected, setSelected] = useState("");
+  const selected = selection ?? localSelected;
+  const changeSelection = key => {
+    setSelected(key);
+    onSelection?.(key ? { key, mode } : null);
+  };
   const { cells, total } = useMemo(() => {
     const cells = new Map();
     let total = 0;
@@ -37,7 +42,7 @@ export default function HealthSafetyDashboardHeatMap({ hazards, registerHref }) 
   const viewCount = selected ? matching.length : total;
   const [selectedLikelihood, selectedSeverity] = selected.split("-");
 
-  return <section className={`${styles.panel} ${styles.heatPanel}`} aria-labelledby="hs-heat-map">
+  return <section className={`${styles.panel} ${styles.heatPanel} ${className}`} aria-labelledby="hs-heat-map">
     <header className={styles.heatHeader}>
       <div>
         <h2 id="hs-heat-map">Risk heat map</h2>
@@ -47,7 +52,7 @@ export default function HealthSafetyDashboardHeatMap({ hazards, registerHref }) 
         {modes.map(([value, label]) => <button type="button" key={value} aria-pressed={mode === value} onClick={() => {
           if (mode === value) return;
           setMode(value);
-          setSelected("");
+          changeSelection("");
         }}>{label}</button>)}
       </div>
     </header>
@@ -62,7 +67,7 @@ export default function HealthSafetyDashboardHeatMap({ hazards, registerHref }) 
             const size = cells.get(key)?.length ?? 0;
             return <button type="button" className={`${styles.heatCell} ${styles[band]}`} key={key}
               aria-label={`Likelihood ${likelihood}, severity ${severity}, score ${score}, ${bands[band]}, ${size} ${size === 1 ? "hazard" : "hazards"}`}
-              aria-pressed={selected === key} onClick={() => setSelected(previous => previous === key ? "" : key)}>
+              aria-pressed={selected === key} onClick={() => changeSelection(selected === key ? "" : key)}>
               <span>{score}</span><strong>{size}</strong><small>{bands[band]}</small>
             </button>;
           })}
@@ -80,6 +85,7 @@ export default function HealthSafetyDashboardHeatMap({ hazards, registerHref }) 
         <span>{hazard.label}</span>
       </li>)}</ul> : <p>No recorded hazards in this cell.</p>}
     </div>}
-    <Link className={styles.heatRegister} href={registerHref}>Open risk register →</Link>
+    {registerAnchor ? <a className={styles.heatRegister} href={registerAnchor}>{selected ? "See matching assessments ↓" : "View assessment register ↓"}</a>
+      : <Link className={styles.heatRegister} href={registerHref}>Open risk register →</Link>}
   </section>;
 }
