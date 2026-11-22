@@ -36,3 +36,90 @@
 .filterChoices p { margin: 6px; font-size: 13px; }
 .clearFilter { padding: 7px 5px; border: 0; background: transparent; color: #1558ce; cursor: pointer; text-decoration: underline; }
 .resetFilters { align-self: center; white-space: nowrap; font-size: 13px; }
+
+.hubPage { padding-top: 18px; }
+.hubHero {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px 20px;
+  min-height: 146px; padding: 24px 27px; border-radius: 8px; color: #fff;
+  background: linear-gradient(90deg, #0e2c49 14%, #0e2c49eb 38%, #0e2c4977 72%, #0e2c49b0),
+    url('/images/health-safety-dashboard-team.webp') center 46% / cover;
+}
+.hubHero h1 { margin: 3px 0 5px; font: 700 clamp(29px, 3vw, 44px)/1.12 Georgia, serif; color: #fff; }
+.hubHero p { margin: 0; color: #e4f0f6; }
+.hubHero small { color: #afe8e8; letter-spacing: .09em; font-weight: 800; }
+.hubHeroLinks, .hubTabs, .hubFilterActions { display: flex; flex-wrap: wrap; gap: 5px; }
+.hubHeroLinks a, .hubTabs a, .hubApply, .hubCreate {
+  display: inline-flex; align-items: center; min-height: 34px; padding: 7px 10px;
+  border: 1px solid transparent; border-radius: 4px; background: #eaf1f6; color: #1b4263;
+  font: 700 12px/1.25 Arial, sans-serif; text-decoration: none;
+}
+.hubHeroLinks a { background: #153b5b; border-color: #9cb7cc; color: #fff; }
+.hubTabs a[aria-current], .hubCreate { background: #193f67; color: #fff; }
+.hubHeroLinks a:hover, .hubTabs a:hover, .hubCreate:hover, .hubApply:hover { box-shadow: inset 0 0 0 1px currentColor; }
+.hubPage :is(a, button, summary, [tabindex]):focus-visible { outline: 2px solid #2780ad; outline-offset: 2px; }
+.hubCards, .hubSummary { display: grid; gap: 10px; margin: 12px 0; }
+.hubCards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.hubSummary { grid-template-columns: minmax(0, 1.1fr) minmax(0, .95fr) minmax(0, 1.1fr); }
+.hubCard, .hubPanel, .hubRegister { min-width: 0; background: #fff; border: 1px solid #d3e2ec; border-radius: 7px; }
+.hubCard {
+  display: grid; align-content: start; gap: 2px; padding: 11px 13px;
+  border-top: 3px solid var(--hub-accent); color: #102d47; text-decoration: none;
+}
+.hubCard:hover, .hubAttention a:hover { background: #eaf3fa; }
+.hubCard strong { font: 700 30px/1.1 Georgia, serif; }
+.hubCard span { font-size: .9rem; font-weight: 750; }
+.hubCard small { color: #536e83; font-size: .74rem; }
+.hubPanel, .hubRegister { padding: 14px; }
+.hubPanel h2, .hubRegister h2 { margin: 0 0 10px; font: 700 19px/1.15 Georgia, serif; color: #102d47; }
+.hubStatus { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.hubRing { display: grid; place-items: center; width: 92px; height: 92px; border-radius: 50%; flex: 0 0 92px; }
+.hubRing div { display: grid; place-content: center; width: 71px; height: 71px; border-radius: 50%; background: #fff; text-align: center; }
+.hubRing strong, .coverageNumber { font: 700 27px/1.05 Georgia, serif; }
+.hubRing small { font-size: .66rem; }
+.hubLegend, .hubAttention { display: grid; gap: 4px; list-style: none; padding: 0; margin: 0; }
+.hubLegend { flex: 1 1 145px; font-size: .74rem; }
+.hubLegend li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.hubLegend i { height: 8px; border-radius: 50%; }
+.hubPanel p, .hubPanel > a { margin: 5px 0; font-size: .82rem; }
+.hubPanel > a { color: #1c5284; }
+.hubPanel meter { display: block; width: 100%; height: 13px; margin-bottom: 7px; accent-color: #238a69; }
+.hubAttention a {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px;
+  border-left: 3px solid var(--hub-accent); border-radius: 3px; background: #f2f6fa;
+  color: #214664; font-size: .76rem; text-decoration: none;
+}
+.hubAttention a > b { white-space: nowrap; }
+.hubRegister { margin-top: 12px; }
+.hubRegisterHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.hubRegisterHead h2 { margin: 0; font-size: 22px; }
+.hubFilters { margin-top: 9px; }
+.hubFilters .filter { min-width: min(140px, 100%); }
+.hubFilterActions { gap: 7px; }
+.hubApply, .hubCreate { min-height: 42px; cursor: pointer; }
+.hubScope { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding: 8px 0; color: #506b81; font-size: .76rem; }
+.hubScope a { color: #1c5284; }
+.hubTableWrap { overflow-x: auto; border: 1px solid #dbe6ef; border-radius: 5px; }
+.hubTable { width: 100%; min-width: 860px; border-collapse: collapse; text-align: left; font-size: .8rem; }
+.hubTable th, .hubTable td { padding: 8px 9px; border-bottom: 1px solid #e1eaf1; }
+.hubTable thead, .hubGroup { background: #eaf1f6; }
+.hubTable tbody tr:nth-child(even):not(.hubGroup) { background: #f8fbfd; }
+.hubTable :is(th,td):last-child, .hubTable th[scope='row'], .hubTable time { white-space: nowrap; }
+.hubTable a { color: #1c5284; font-weight: 700; }
+.hubStatusBadge { display: inline-block; padding: 3px 7px; border-radius: 12px; background: #e6ecf2; color: #455c71; font-size: .72rem; font-weight: 700; }
+.hubStatusBadge[data-status='current'] { background: #dff3e8; color: #146448; }
+.hubStatusBadge[data-status='approved'] { background: #fff0ce; color: #805017; }
+.hubStatusBadge[data-status='in_review'] { background: #ebe3f7; color: #5e3d86; }
+.hubStatusBadge[data-status='draft'] { background: #e0efff; color: #1d5578; }
+.hubOverdue { color: #a0363b; font-weight: 700; }
+.hubRegister, .hubPage :global(#create-document) { scroll-margin-top: 84px; }
+@media (max-width: 1080px) { .hubSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .hubCards, .hubSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hubHero { padding: 20px; }
+  .hubSummary > :last-child { grid-column: 1/-1; }
+}
+@media (max-width: 490px) { .hubSummary { grid-template-columns: 1fr; } }
+
+.hubRegister > .hubTabs + .hubTabs { margin-top: 7px; }
+.hubAttention a { border-left-color: var(--hub-accent, #5397c9); }
+.hubStatusBadge[data-status='awaiting-approval'] { background: #fff0ce; color: #805017; }
