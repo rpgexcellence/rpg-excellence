@@ -208,3 +208,22 @@ button.recordChip { cursor: pointer; }
 @media (max-width: 1100px) { .recordOverview { grid-template-columns: 1fr 1fr; }.recordOverview > :last-child { grid-column: 1/-1; } }
 @media (max-width: 630px) { .recordOverview, .recordPage .grid { grid-template-columns: 1fr; }.recordOverview > :last-child { grid-column: auto; } }
 .recordPicker [hidden] { display: none !important; }
+
+.recipientFilters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 8px 0; }
+.recipientFilters > label { margin: 0; align-content: start; }
+.recipientFilter > span { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 750; }
+.recipientFilter .recordPicker { min-height: 42px; border-radius: 8px; border-color: #c4d6e8; }
+.recipientFilter summary { padding: 2px 0; font-size: .85rem; }
+.recipientFilter .recordTextButton { padding: 5px 0; font-size: .8rem; }
+@media (max-width: 760px) { .recipientFilters { grid-template-columns: 1fr; } }
+
+.recordHistoryHeading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 9px; }
+.recordEventBadge {
+  display: inline-block; padding: 3px 9px; border: 1px solid transparent; border-radius: 6px;
+  background: #eaf0f5; color: #384f64; font-size: .8rem; font-weight: 750;
+}
+.recordEventBadge[data-tone='green'] { background: #e2f5eb; border-color: #bbdfcb; color: #146044; }
+.recordEventBadge[data-tone='blue'] { background: #e5f0fc; border-color: #c8dbef; color: #194d7a; }
+.recordEventBadge[data-tone='amber'] { background: #fff1d4; border-color: #f2ddaa; color: #76470e; }
+.recordEventBadge[data-tone='red'] { background: #fde9e8; border-color: #efc5c3; color: #9b3137; }
+.recordHistory time { display: block; margin: 3px 0 0; }

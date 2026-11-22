@@ -7,6 +7,24 @@ import { DocumentRecordPanel, RecordIcon, useDocumentRecordValidation } from './
 import s from '../app/portal/documents/documents.module.css';
 const personName=p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||'Company user';
 function flip(values,id){return values.includes(id)?values.filter(x=>x!==id):[...values,id];}
+function RecipientFilter({ label, allLabel, items, selected, setSelected }) {
+ return <div className={s.recipientFilter}>
+   <span>{label}</span>
+   <details className={s.recordPicker}>
+     <summary aria-label={label + ': ' + (selected.length ? selected.length + ' selected' : allLabel)}>
+       {selected.length ? selected.length + ' selected' : allLabel}
+     </summary>
+     <div className={s.recordPickerList} role="group" aria-label={label}>
+       {items.map(({ id, label: choice }) => <label key={id} className={s.check}>
+         <input type="checkbox" checked={selected.includes(id)} onChange={() => setSelected(previous => flip(previous, id))}/>{choice}
+       </label>)}
+       {!items.length && <p className={s.muted}>No options available.</p>}
+     </div>
+     {selected.length > 0 && <button type="button" className={s.recordTextButton} onClick={() => setSelected([])}>Clear {label.toLowerCase()}</button>}
+   </details>
+ </div>;
+}
+
 function ClassificationPicker({ label, items, selected, toggle }) {
  const [search, setSearch] = useState('');
  const query = search.trim().toLowerCase();
@@ -32,9 +50,17 @@ export default function CompanyDocumentDraftForm({document=null,options,selected
  const [approvers,setApprovers]=useState(reviews.filter(r=>r.role==='approver').map(r=>r.person_id));
  const [distribution,setDistribution]=useState(document?.distribution||'selected');
  const [recipientIds,setRecipientIds]=useState(recipients.map(r=>r.person_id));
- const [recipientSite,setRecipientSite]=useState(''),[recipientDepartment,setRecipientDepartment]=useState(''),[recipientSearch,setRecipientSearch]=useState('');
+ const [recipientSites,setRecipientSites]=useState([]),[recipientDepartments,setRecipientDepartments]=useState([]),[recipientSearch,setRecipientSearch]=useState('');
  const candidates=active.filter(p=>p.id!==owner&&p.user_id!==(document?.author_user_id||me?.user_id));
- const shownRecipients=active.filter(p=>(!recipientSite||p.site_id===recipientSite)&&(!recipientDepartment||p.department_id===recipientDepartment)&&personName(p).toLowerCase().includes(recipientSearch.trim().toLowerCase()));
+ const siteChoices=options.sites.filter(site=>site.status==='active').map(site=>({id:site.id,label:site.site_name}));
+ const departmentChoices=options.departments.filter(department=>department.status==='active').map(department=>({id:department.id,label:department.name}));
+ if(active.some(person=>!person.site_id)) siteChoices.push({id:'',label:'Across locations'});
+ if(active.some(person=>!person.department_id)) departmentChoices.push({id:'',label:'Department not assigned'});
+ const recipientQuery=recipientSearch.trim().toLowerCase();
+ const shownRecipients=active.filter(person=>
+   (!recipientSites.length || recipientSites.includes(person.site_id || '')) &&
+   (!recipientDepartments.length || recipientDepartments.includes(person.department_id || '')) &&
+   personName(person).toLowerCase().includes(recipientQuery));
  const applicableDepartments=options.departments.filter(d=>d.status==='active'&&(scope==='company'||d.all_sites||!siteIds.length||d.site_ids.some(id=>siteIds.includes(id))));
  const changedOwner=id=>{setOwner(id);setVerifiers(v=>v.filter(x=>x!==id));setApprovers(v=>v.filter(x=>x!==id));};
  return <form id={recordLayout ? "editable-document" : undefined} action={action} className={s.form} onInvalid={revealInvalid}>
@@ -56,7 +82,24 @@ export default function CompanyDocumentDraftForm({document=null,options,selected
  <DocumentRecordPanel name="approval"><div className={recordLayout ? s.recordPanel : undefined}><p className={s.notice}><strong>Release locked.</strong> All required independent decisions must be confirmed before the authorised author or owner can publish this revision.</p> <h3>Independent verification and approval</h3><div className={s.grid}>{[['verifier','Independent verifiers',verifiers,setVerifiers],['approver','Independent approvers',approvers,setApprovers]].map(([role,label,values,set])=><fieldset key={role} className={s.recordAssignment}><legend><RecordIcon name="approval"/>{label}</legend><p className={s.muted}>{values.length ? `${values.length} assigned · Pending submission` : "No independent users assigned"}</p>{candidates.map(p=><label key={p.id} className={s.check}><input type="checkbox" name={role==='verifier'?'verifiers':'approvers'} value={p.id} checked={values.includes(p.id)} onChange={()=>{set(v=>flip(v,p.id));if(role==='verifier')setApprovers(v=>v.filter(x=>x!==p.id));else setVerifiers(v=>v.filter(x=>x!==p.id));}}/>{personName(p)}</label>)}</fieldset>)}</div>{candidates.length<2?<p className={s.notice}>Two additional active company users are needed for independent verification and approval. <Link href="/portal/company/people">Manage company users</Link>. You can save the draft before assigning them.</p>:null}<small>The verifier and approver must be different active users, independent of author and owner. Each accepts and records their own decision.</small>
 </div></DocumentRecordPanel>
  <DocumentRecordPanel name="distribution"><div className={recordLayout ? s.recordPanel : undefined}> <h3>Distribution list</h3><label>Released document audience<select name="distribution" value={distribution} onChange={e=>setDistribution(e.target.value)}><option value="selected">Selected company users</option><option value="company">Whole company</option></select></label>
- {distribution==='selected'?<fieldset><legend>Choose recipients ({recipientIds.length} selected)</legend><div className={s.grid}><label>Find recipients<input type="search" value={recipientSearch} onChange={event => setRecipientSearch(event.target.value)}/></label><label>Filter by site<select value={recipientSite} onChange={e=>setRecipientSite(e.target.value)}><option value="">All sites</option>{options.sites.filter(s=>s.status==='active').map(s=><option key={s.id} value={s.id}>{s.site_name}</option>)}</select></label><label>Filter by department<select value={recipientDepartment} onChange={e=>setRecipientDepartment(e.target.value)}><option value="">All departments</option>{options.departments.filter(d=>d.status==='active').map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div><div className={s.links}><button type="button" onClick={()=>setRecipientIds(v=>[...new Set([...v,...shownRecipients.map(p=>p.id)])])}>Select all matching</button><button type="button" onClick={()=>setRecipientIds(v=>v.filter(id=>!shownRecipients.some(p=>p.id===id)))}>Clear matching</button></div>{shownRecipients.map(p=><label className={s.check} key={p.id}><input type="checkbox" checked={recipientIds.includes(p.id)} onChange={()=>setRecipientIds(v=>flip(v,p.id))}/>{personName(p)} · {options.departments.find(d=>d.id===p.department_id)?.name||'Department not assigned'} · {options.sites.find(s=>s.id===p.site_id)?.site_name||'Across locations'}</label>)}{recipientIds.map(id=><input key={id} type="hidden" name="recipients" value={id}/>)}</fieldset>:<p className={s.muted}>Release will publish to active company users and create acknowledgement tasks. Future active users can access and acknowledge the current whole-company document.</p>}
+ {distribution==='selected' ? <fieldset>
+   <legend>Choose recipients ({recipientIds.length} selected)</legend>
+   <div className={s.recipientFilters}>
+     <label>Find recipients<input type="search" value={recipientSearch} onChange={event => setRecipientSearch(event.target.value)}/></label>
+     <RecipientFilter label="Filter by site" allLabel="All sites" items={siteChoices} selected={recipientSites} setSelected={setRecipientSites}/>
+     <RecipientFilter label="Filter by department" allLabel="All departments" items={departmentChoices} selected={recipientDepartments} setSelected={setRecipientDepartments}/>
+   </div>
+   <div className={s.links}>
+     <button type="button" disabled={!shownRecipients.length} onClick={()=>setRecipientIds(previous=>[...new Set([...previous,...shownRecipients.map(person=>person.id)])])}>Select all matching</button>
+     <button type="button" disabled={!shownRecipients.length} onClick={()=>setRecipientIds(previous=>previous.filter(id=>!shownRecipients.some(person=>person.id===id)))}>Clear matching</button>
+   </div>
+   {shownRecipients.map(person=><label className={s.check} key={person.id}>
+     <input type="checkbox" checked={recipientIds.includes(person.id)} onChange={()=>setRecipientIds(previous=>flip(previous,person.id))}/>
+     {personName(person)} · {options.departments.find(department=>department.id===person.department_id)?.name||'Department not assigned'} · {options.sites.find(site=>site.id===person.site_id)?.site_name||'Across locations'}
+   </label>)}
+   {!shownRecipients.length && <p className={s.muted}>No recipients match these filters.</p>}
+   {recipientIds.map(id=><input key={id} type="hidden" name="recipients" value={id}/>)}
+ </fieldset> : <p className={s.muted}>Release will publish to active company users and create acknowledgement tasks. Future active users can access and acknowledge the current whole-company document.</p>}
 </div></DocumentRecordPanel>
  <div className={recordLayout ? s.recordActionBar : s.links}>
   {recordLayout && <strong>Draft · Independent verification and approval required before release</strong>}

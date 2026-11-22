@@ -20,6 +20,31 @@ const dayFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'sho
 const dateTime = value => value ? dateTimeFormat.format(new Date(value)) : '—';
 const day = value => value ? dayFormat.format(new Date(value)) : '—';
 
+const historyLabels = new Map([
+  ['save', ['Saved', 'green']],
+  ['classification_and_scope_saved', ['Classification and scope saved', 'blue']],
+  ['create', ['Created', 'blue']],
+  ['revise', ['Revision created', 'blue']],
+  ['submit', ['Submitted for review', 'amber']],
+  ['accept', ['Assignment accepted', 'blue']],
+  ['changes_required', ['Changes requested', 'amber']],
+  ['recall', ['Recalled to draft', 'amber']],
+  ['release', ['Released', 'green']],
+  ['acknowledge', ['Acknowledged', 'green']],
+  ['withdraw', ['Withdrawn', 'red']],
+]);
+
+function HistoryEntry({ event, actor }) {
+  const [label, tone] = event.event_type === 'confirm'
+    ? [event.details?.role === 'approver' ? 'Approved' : event.details?.role === 'verifier' ? 'Verified' : 'Decision confirmed', 'green']
+    : historyLabels.get(event.event_type) ?? [humanize(event.event_type) || 'Document event', 'neutral'];
+  return <li>
+    <div className={s.recordHistoryHeading}><strong className={s.recordEventBadge} data-tone={tone}>{label}</strong><span>{actor}</span></div>
+    <time dateTime={event.created_at}>{dateTime(event.created_at)}</time>
+    {event.details?.reason && <p className={s.recordProse}>{event.details.reason}</p>}
+  </li>;
+}
+
 function statusLabel(document, reviews) {
   return {
     draft: 'Draft',
@@ -235,10 +260,7 @@ export default async function DocumentPage({ params, searchParams }) {
       <DocumentRecordPanel name="history">
         <section className={s.recordPanel}><h2>Revision History</h2>
           {d.previous_document_id && <p><Link href={`${root}/${d.previous_document_id}`}>Open previous revision →</Link></p>}
-          <ol className={s.recordHistory}>{events.map(event => <li key={event.id}>
-            <div><strong>{humanize(event.event_type)}</strong> · {name(byAccount.get(event.actor_user_id))}</div><time dateTime={event.created_at}>{dateTime(event.created_at)}</time>
-            {event.details?.reason && <p className={s.recordProse}>{event.details.reason}</p>}
-          </li>)}</ol>
+          <ol className={s.recordHistory}>{events.map(event => <HistoryEntry key={event.id} event={event} actor={name(byAccount.get(event.actor_user_id))}/>)}</ol>
           {!events.length && <p className={s.muted}>No revision events are visible for this record.</p>}
           {d.file_sha256 && <p className={s.recordFingerprint}>Controlled file SHA-256 <code>{d.file_sha256}</code></p>}
         </section>
