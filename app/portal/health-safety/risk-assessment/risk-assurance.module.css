@@ -18,9 +18,10 @@
 .kpi strong { display: block; font: 700 29px/1.1 Georgia, serif; }
 .kpi b { display: block; margin-top: 3px; font-size: 13px; }
 .kpi small { display: block; margin-top: 2px; color: #4a647c; font-size: 11px; }
-.dashboard { display: grid; grid-template-columns: minmax(0, 1.47fr) minmax(0, 1fr) minmax(0, 1.03fr); align-items: start; gap: 11px; }
+.dashboard { display: grid; grid-template-columns: minmax(0, 1.47fr) minmax(0, 1fr) minmax(0, 1.03fr); align-items: stretch; gap: 11px; }
 .panel, .page .heat { min-width: 0; padding: 13px; background: #fff; border: 1px solid #cfdeeb; border-radius: 7px; }
-.panel h2 { margin: 0; font: 700 21px/1.2 Georgia, serif; }
+.dashboardColumn { display: grid; grid-template-rows: auto 1fr; gap: 11px; min-width: 0; }
+.page .heat h2, .panel h2 { margin: 0; font: 700 21px/1.2 Georgia, serif; }
 .sub { margin: 4px 0 9px; color: #4a647c; font-size: 12px; }
 .panelHead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px; }
 .drillList { display: grid; gap: 5px; }
@@ -40,13 +41,29 @@
 
 .register { margin-top: 12px; scroll-margin-top: 110px; }
 .filterRow { display: grid; grid-template-columns: minmax(200px, 1.3fr) repeat(2, minmax(100px, 1fr)) auto; align-items: end; gap: 8px; margin: 9px 0; }
-.filterRow label { display: grid; gap: 4px; min-width: 0; font-size: 12px; font-weight: 700; }
-.filterRow :is(input, select) { width: 100%; min-width: 0; min-height: 35px; padding: 6px 8px; border: 1px solid #b9cde0; border-radius: 5px; background: #f8fbfd; color: inherit; font: 400 13px Arial, sans-serif; }
+.filterRow input[type=search] { width: 100%; padding: 8px; margin-bottom: 6px; border: 1px solid #b9cde0; border-radius: 5px; }
+.filterActions :is(button, a) { min-height: 42px; }
+
+.profileTrack button, .profileBands button { --band: #677f93; }
+.profile [data-band='acceptable'] { --band: #247c56; }
+.profile [data-band='adequate'] { --band: #f0bd43; }
+.profile [data-band='inadequate'] { --band: #ed8b4a; }
+.profile [data-band='unacceptable'] { --band: #ab322e; }
+.profileTrack button { border: 0; padding: 0; background: var(--band); cursor: pointer; }
+.profileTrack button:hover { filter: brightness(.85); }
+.profileTrack button:focus-visible, .profileTrack button[aria-pressed=true] { outline: 2px solid #14395b; outline-offset: -2px; }
+.profileBands { display: grid; gap: 4px; }
+.profileBands button { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 5px 7px; border: 1px solid transparent; border-radius: 4px; background: #f2f6fa; color: #102d47; text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
+.profileBands button:hover, .profileBands button[aria-pressed=true] { background: #e0edf6; border-color: #adc7d9; }
+.profileBands i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: var(--band); }
+.profileBands strong { white-space: nowrap; }
+.profileBands small { color: #4a647c; }
+
 .selection { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 9px 0; color: #4a647c; font-size: 12px; }
 .selection strong { padding: 3px 6px; border-radius: 4px; background: #e8f1f8; color: #245983; }
 .tableWrap { overflow-x: auto; }
-.records { width: 100%; min-width: 870px; border-collapse: collapse; text-align: left; font-size: 12px; }
-.records :is(th, td) { padding: 8px; border-bottom: 1px solid #dce7f0; text-align: left; vertical-align: top; }
+.records { width: 100%; min-width: 950px; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 12px; }
+.records :is(th, td) { padding: 8px; border-bottom: 1px solid #dce7f0; text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
 .records thead, .records .groupHead { background: #e9f1f6; }
 .records tbody tr:nth-child(even) { background: #f8fbfd; }
 .records small { display: block; color: #4a647c; font-size: 11px; font-weight: 400; }
