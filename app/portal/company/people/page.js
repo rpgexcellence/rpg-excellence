@@ -1,20 +1,18 @@
 import {loadCompanyStructure} from "../../../../lib/company-structure";
 import crypto from "node:crypto";
-import {loadOrganizationSites} from "../../../../lib/organization-sites";
 import {personSiteLabel} from "../../../../lib/company-person-site.mjs";
-import CompanySetupNav from "../../../../components/CompanySetupNav";
-// RPG PEOPLE PAGE FIX V3 — NULL-SAFE DATA HANDLING — 2026-09-23
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import QRCode from "qrcode";
-import ProfessionalFunctionIcon from "../../../../components/ProfessionalFunctionIcon";
 import { createAdminClient } from "../../../../lib/supabase/admin";
 import { createClient } from "../../../../lib/supabase/server";
 import { functionLabel } from "../../../../lib/people-access";
 import PeopleAccessForm from "./PeopleAccessForm";
 import { sendPasswordReset, suspendPerson } from "./actions";
 import "./people-access-readable.css";
+import hub from "./people-register.module.css";
+import { filterFields, matchesStatus, peopleRegister, personName, registerHref, registerPath, statuses } from "./people-register.mjs";
 
 export const metadata = { title: "People, Roles & Access | RPG Excellence" };
 export const dynamic = "force-dynamic";
@@ -43,52 +41,73 @@ export default async function PeopleAccessPage({ searchParams }) {
   const {sites,departments} = await loadCompanyStructure(organization.id);
   const sitesById = new Map(sites.map(site => [site.id, site]));
   const departmentsById=new Map(departments.map(department=>[department.id,department]));
-  const [peopleResult, authorizationsResult, permissionsResult, invitationsResult] = await Promise.all([
+  const activitySince = new Date(Date.now() - 30 * 86400000).toISOString();
+  const activityTypes = [
+    ["person_access_updated", "Access changes"],
+    ["account_activated", "Account activations"],
+    ["access_suspended", "Suspensions"],
+  ];
+  const [peopleResult, authorizationsResult, permissionsResult, invitationsResult, siteDetails, ...activity] = await Promise.all([
     admin.from("organization_people").select("*").eq("organization_id", organization.id).order("last_name"),
     admin.from("organization_person_authorizations").select("*").eq("organization_id", organization.id),
     admin.from("organization_person_permissions").select("*").eq("organization_id", organization.id),
     admin.from("organization_invitations").select("id,person_id,status,expires_at,invitation_reference").eq("organization_id", organization.id).order("created_at", { ascending: false }),
+    admin.from("organization_sites").select("id,city").eq("organization_id", organization.id),
+    ...activityTypes.map(([type]) => admin.from("organization_access_events").select("id", { count: "exact", head: true })
+      .eq("organization_id", organization.id).eq("event_type", type).gte("created_at", activitySince)),
   ]);
   const people = peopleResult.data || [];
   const myPerson = people.find(person => person.user_id === user.id);
   const authorizations = authorizationsResult.data || [];
   const permissions = permissionsResult.data || [];
   const invitations = invitationsResult.data || [];
-  const setupError = [peopleResult, authorizationsResult, permissionsResult, invitationsResult].find((result) => result.error)?.error || null;
-  const byPerson = (rows, personId) => {
-    const matches = [];
-    for (const item of Array.isArray(rows) ? rows : []) {
-      if (item?.person_id === personId) matches.push(item);
-    }
-    return matches;
-  };
-  const accessByPerson = (rows, personId) => {
-    const matches = [];
-    for (const item of Array.isArray(rows) ? rows : []) {
-      if (item?.person_id === personId && item?.access_level !== "none") matches.push(item);
-    }
-    return matches;
-  };
-  let active = 0;
-  let invited = 0;
-  let directory = 0;
-  for (const person of people) {
-    if (person?.account_status === "active") active += 1;
-    if (person?.account_status === "invited") invited += 1;
-    if (person?.account_type === "directory") directory += 1;
+  const setupError = [peopleResult, authorizationsResult, permissionsResult, invitationsResult].find(result => result.error)?.error;
+  const locationCities = new Map((siteDetails.data ?? []).map(site => [site.id, site.city]));
+  const { status, filters, options, visible } = peopleRegister(people, sitesById, departmentsById, params);
+  const totals = new Map(statuses.map(([value]) => [value, people.filter(person => matchesStatus(person, value)).length]));
+  const currentMs = Date.now();
+  const liveInvitations = invitations.filter(item => item.status === "active" && new Date(item.expires_at).getTime() > currentMs);
+  const shownInvitations = new Map();
+  for (const invitation of liveInvitations) {
+    if (!shownInvitations.has(invitation.person_id)) shownInvitations.set(invitation.person_id, invitation);
   }
+  const createOpen = !people.length || params?.new === "1";
+  const statusHref = (key, keepFilters = true) => registerHref({ ...(keepFilters ? filters : {}), status: key }, "#people-register");
+  const baseQuery = { ...filters, status };
   let invitePreview = null;
-  if (params?.invite) {
+  if (typeof params?.invite === "string" && params.invite) {
     const { data: invitation } = await admin.from("organization_invitations").select("*,organization_people(first_name,last_name,email,position)").eq("organization_id", organization.id).eq("token_hash", hash(params.invite)).eq("status", "active").maybeSingle();
     if (invitation) {
       const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.rpgexcellence.com";
       invitePreview = { ...invitation, qr: await QRCode.toDataURL(`${site}/join/${params.invite}`, { width: 700, margin: 2, errorCorrectionLevel: "M", color: { dark: "#082a54", light: "#ffffff" } }) };
     }
   }
-  return <main className="paPage"><style>{styles}</style><div className="paShell"><CompanySetupNav section="people"/>
-    <header className="paTop"><div><span>RPG EXCELLENCE · COMPANY GOVERNANCE</span><h1>People, Roles &amp; Access</h1><p>Control people, reporting relationships, illustrated professional functions, module permissions and QR onboarding from one auditable company register.</p></div><Link href="/portal">← Customer portal</Link></header>
-    {myPerson && <div className="paNotice success"><b>Your existing login is linked to your company profile.</b><span>{!myPerson.first_name || !myPerson.last_name ? "Complete your name, job details and location; no new invitation is needed." : "Manage your job details and location using your existing account."}</span><Link href={`/portal/company/people/${myPerson.id}/edit`}>Edit my profile</Link></div>}
-    <section className="paMetrics"><article><span>People</span><b>{people.length}</b></article><article><span>Active users</span><b>{active}</b></article><article><span>Awaiting activation</span><b>{invited}</b></article><article><span>Directory only</span><b>{directory}</b></article></section>
+  return <main className={`paPage ${hub.page}`}><style>{styles}</style><div className="paShell">
+    <header className={hub.hero}>
+      <div>
+        <small>RPG EXCELLENCE / COMPANY GOVERNANCE</small>
+        <h1>People, Roles &amp; Access</h1>
+        <p>Manage people, reporting lines, professional authorisations and module access.</p>
+      </div>
+      <nav aria-label="People workspace shortcuts" className={hub.heroLinks}>
+        <Link href="/portal">Customer portal</Link>
+        {myPerson && <Link href={`${registerPath}/${myPerson.id}/edit`}>Edit my profile</Link>}
+        <Link href={registerHref({ ...baseQuery, new: "1" }, "#create-person")}>+ Create person or system user</Link>
+      </nav>
+    </header>
+    <section className={hub.metrics} aria-label="People and access summary">
+      {[
+        ["", "People", "people", "blue"],
+        ["active", "Active users", "person", "green"],
+        ["invited", "Awaiting activation", "clock", "amber"],
+        ["directory", "Directory only", "folder", "blue"],
+      ].map(([value, label, icon, tone]) => (
+        <Link key={label} href={statusHref(value, false)} data-tone={tone} className={hub.metric}>
+          <span className={hub.metricIcon}><Icon name={icon}/></span>
+          <span><span className={hub.metricLabel}>{label}</span><strong>{peopleResult.error ? "—" : totals.get(value)}</strong></span>
+        </Link>
+      ))}
+    </section>
     {params?.created === "directory" && <div className="paNotice success"><b>Directory person created.</b><span>The person can now be selected as an owner, manager, deputy or escalation contact.</span></div>}
     {params?.suspended && <div className="paNotice"><b>Access suspended.</b><span>Active QR invitations were revoked and the event was added to the audit trail.</span></div>}
     {params?.updated && <div className="paNotice success"><b>Person and access updated.</b><span>Profile details, professional authorisations and module permissions were saved in the controlled audit trail.</span></div>}
@@ -97,11 +116,154 @@ export default async function PeopleAccessPage({ searchParams }) {
     {params?.password_reset === "unavailable" && <div className="paError" role="alert"><b>Password recovery is unavailable.</b><span>Only active or invited system users can receive a recovery email.</span></div>}
     {setupError && <div className="paError" role="alert"><b>People &amp; Access database setup is incomplete</b><span>{setupError.message}. Run the complete File 1 migration in the Supabase SQL Editor, then refresh this page.</span></div>}
     {invitePreview && <section className="paQr"><div><span>SECURE QR INVITATION</span><h2>{invitePreview.organization_people.first_name} {invitePreview.organization_people.last_name}</h2><p>{invitePreview.organization_people.email} · {invitePreview.organization_people.position || "Position not recorded"}</p><dl><div><dt>Reference</dt><dd>{invitePreview.invitation_reference}</dd></div><div><dt>Expires</dt><dd>{date(invitePreview.expires_at)}</dd></div><div><dt>Email</dt><dd>{params.email === "sent" ? "Invitation sent" : "Email not sent — download and issue the QR securely"}</dd></div></dl><p className="paSecurity">The QR is restricted to the approved email, can be used once and contains no personal information.</p></div><div className="paQrImage"><Image src={invitePreview.qr} width={260} height={260} alt={`Personal RPG invitation QR for ${invitePreview.organization_people.first_name} ${invitePreview.organization_people.last_name}`} unoptimized/><a href={invitePreview.qr} download={`${invitePreview.invitation_reference}.png`}>Download QR as PNG</a></div></section>}
-    <details className="paCreate" open={people.length === 0 || Boolean(params?.new)}><summary><span>＋</span><div><b>Create person or system user</b><small>Build the profile, organisational connections, functions, permissions and QR invitation.</small></div></summary><PeopleAccessForm people={people} sites={sites} departments={departments} companyName={organization.name}/></details>
-    <section className="paRegister"><header><div><span>CONTROLLED REGISTER</span><h2>Company people and access</h2></div><b>{people.length} records</b></header>
-      {people.length ? <div className="paPeople">{people.map((person) => { const functions = byPerson(authorizations, person.id); const access = accessByPerson(permissions, person.id); const manager = people.find((item) => item.id === person.manager_person_id); const invitation = invitations.find((item) => item.person_id === person.id && item.status === "active"); const canRecover = person.account_type === "system" && !['suspended','closed'].includes(person.account_status); return <article key={person.id}><div className="paIdentity"><div className="paInitials">{person.first_name[0]}{person.last_name[0]}</div><div><h3>{[person.first_name, person.last_name].filter(Boolean).join(" ") || person.email}</h3><p>{person.position || "Position not recorded"}{person.department ? ` · ${person.department}` : ""}</p><small>{person.email}</small></div><span className={`status ${person.account_status}`}>{person.account_status}</span></div><div className="paRelations"><span><b>Reports to</b>{manager ? `${manager.first_name} ${manager.last_name}` : "Not assigned"}</span><span><b>Site</b>{sitesById.has(person.site_id) ? personSiteLabel(sitesById.get(person.site_id)) : person.site || "Not assigned / works across locations"}</span><span><b>Module access</b>{person.user_id === organization.owner_id ? "Company owner" : `${access.length} modules`}</span></div><div className="paFunctionStrip">{functions.length ? functions.map((item) => <div key={item.id} title={`${functionLabel(item.function_key)} — ${item.status}`}><ProfessionalFunctionIcon type={item.function_key} label={functionLabel(item.function_key)} size={45}/><span>{functionLabel(item.function_key)}</span><small>{item.status}</small></div>) : <p>No professional function assigned.</p>}</div><footer><span>{invitation ? `QR ${invitation.invitation_reference} expires ${date(invitation.expires_at)}` : person.account_type === "directory" ? "Directory record — no login" : "No active QR invitation"}</span><div className="paPersonActions"><Link className="editAccess" href={`/portal/company/people/${person.id}/edit`}>Edit profile &amp; access</Link>{canRecover && <form action={sendPasswordReset}><input type="hidden" name="person_id" value={person.id}/><button className="recover">Send password reset</button></form>}{!['suspended','closed'].includes(person.account_status) && <form action={suspendPerson}><input type="hidden" name="person_id" value={person.id}/><button>Revoke / suspend</button></form>}</div></footer></article>; })}</div> : <div className="paEmpty">No people have been added. Open “Create person or system user” to begin.</div>}
+    {createOpen && <section className="paCreate" id="create-person" aria-labelledby="create-person-title">
+      <div className={hub.createHeading}>
+        <h2 id="create-person-title">Create person or system user</h2>
+        {people.length > 0 && <Link href={registerHref(baseQuery, "#people-register")}>Close form</Link>}
+      </div>
+      <PeopleAccessForm people={people} sites={sites} departments={departments} companyName={organization.name}/>
+    </section>}
+    <section id="people-register" className={hub.register} aria-labelledby="people-register-title">
+      <header className={hub.registerHeader}>
+        <h2 id="people-register-title">Company people and access</h2>
+        {!peopleResult.error && <span>{visible.length} of {people.length} people</span>}
+      </header>
+      <nav className={hub.tabs} aria-label="Filter by account status">
+        {statuses.map(([key, label]) => (
+          <Link key={key} href={statusHref(key)} aria-current={status === key ? "page" : undefined}>
+            {label}{!peopleResult.error && ` (${totals.get(key)})`}
+          </Link>
+        ))}
+      </nav>
+      <form className={hub.filters} action={registerPath + "#people-register"} aria-label="People register filters">
+        {status && <input type="hidden" name="status" value={status}/>}
+        {filterFields.map(([key, label, all]) => (
+          <label key={key} htmlFor={`people-${key}`}>
+            {label}
+            <select key={filters[key]} id={`people-${key}`} name={key} defaultValue={filters[key]}>
+              <option value="">{all}</option>
+              {options[key].map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+            </select>
+          </label>
+        ))}
+        <div className={hub.filterActions}>
+          <button className={hub.primary} type="submit">Apply</button>
+          <a className={hub.button} href={statusHref(status, false)}>Clear filters</a>
+        </div>
+      </form>
+      <div className={hub.registerLayout}>
+        <div className={hub.people}>
+          {visible.map(({ person, assignments }) => (
+            <PersonCard key={person.id} person={person} assignments={assignments}
+              site={sitesById.get(person.site_id)} city={locationCities.get(person.site_id)}
+              functions={authorizations.filter(item => item.person_id === person.id)}
+              accessCount={permissions.filter(item => item.person_id === person.id && item.access_level !== "none").length}
+              invitation={shownInvitations.get(person.id)} ownerId={organization.owner_id}/>
+          ))}
+          {!visible.length && <p className={hub.empty}>{peopleResult.error ? "The people register is unavailable."
+            : people.length ? "No people match these filters." : "No people have been added. Use the form above to create the first record."}</p>}
+        </div>
+        <aside className={hub.side} aria-label="Access overview">
+          <section className={hub.sidePanel} aria-labelledby="people-activity-title">
+            <h3 id="people-activity-title"><Icon name="activity"/>Access activity</h3>
+            <p>Last 30 days</p>
+            <dl className={hub.activity}>
+              {activityTypes.map(([key, label], index) => (
+                <div key={key}><dt>{label}</dt><dd>{activity[index]?.count ?? "Unavailable"}</dd></div>
+              ))}
+            </dl>
+          </section>
+          <section className={hub.sidePanel} aria-labelledby="people-onboarding-title">
+            <h3 id="people-onboarding-title"><Icon name="folder"/>Access onboarding</h3>
+            <dl className={hub.activity}>
+              <div><dt>Awaiting activation</dt><dd>{peopleResult.error ? "Unavailable" : totals.get("invited")}</dd></div>
+              <div><dt>Active QR invitations</dt><dd>{invitationsResult.error ? "Unavailable" : shownInvitations.size}</dd></div>
+            </dl>
+            <Link href={statusHref("invited", false)}>View pending accounts →</Link>
+          </section>
+          <section className={hub.sidePanel} aria-labelledby="people-actions-title">
+            <h3 id="people-actions-title"><Icon name="bolt"/>Key actions</h3>
+            <div className={hub.keyActions}>
+              <Link href={statusHref("suspended", false)}>Review suspended accounts <strong>{peopleResult.error ? "—" : totals.get("suspended")}</strong></Link>
+              <Link href={statusHref("invited", false)}>Follow up on pending activation <strong>{peopleResult.error ? "—" : totals.get("invited")}</strong></Link>
+              <Link href={statusHref("active", false)}>Review active user access <span aria-hidden="true">→</span></Link>
+            </div>
+          </section>
+        </aside>
+      </div>
     </section>
   </div></main>;
 }
 
-const styles = `*{box-sizing:border-box}.paPage{min-height:100vh;padding:34px 20px 80px;background:linear-gradient(145deg,#eaf3fb,#f7fafc 48%,#edf8f5);color:#08294f;font-family:Arial,sans-serif}.paShell{max-width:1450px;margin:auto}.paTop{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}.paTop>div>span,.paRegister header span,.paQr>div>span{color:#315fe6;font-size:10px;font-weight:950;letter-spacing:.14em}.paTop h1{margin:8px 0;font-size:42px;line-height:1.05}.paTop p{max-width:850px;margin:0;color:#60758b;line-height:1.55}.paTop>a{padding:11px 14px;border:1px solid #cbd9e6;border-radius:9px;background:#fff;color:#173b60;text-decoration:none;font-weight:850}.paMetrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0}.paMetrics article{padding:18px;border:1px solid #d6e2ed;border-radius:14px;background:#fff}.paMetrics span,.paMetrics b{display:block}.paMetrics span{color:#687e94;font-size:11px;font-weight:850}.paMetrics b{margin-top:8px;font-size:30px}.paNotice,.paError{display:grid;gap:4px;margin:14px 0;padding:14px 16px;border:1px solid #efc688;border-radius:10px;background:#fff7e8;color:#784c00}.paNotice.success{border-color:#9bd8bd;background:#edfbf4;color:#08714f}.paNotice span,.paError span{font-size:12px}.paQr{display:grid;grid-template-columns:1fr 300px;gap:25px;align-items:center;margin:18px 0;padding:25px;border:1px solid #9fc5ec;border-radius:18px;background:linear-gradient(135deg,#fff,#edf6ff);box-shadow:0 14px 34px #173f6912}.paQr h2{margin:8px 0 4px;font-size:27px}.paQr p{color:#63798f}.paQr dl{display:flex;gap:10px;flex-wrap:wrap}.paQr dl div{min-width:150px;padding:11px;border-radius:9px;background:#fff}.paQr dt{color:#6c8196;font-size:9px;text-transform:uppercase}.paQr dd{margin:4px 0 0;font-size:12px;font-weight:850}.paQr .paSecurity{font-size:11px}.paQrImage{text-align:center}.paQrImage img{display:block;width:260px;height:260px;margin:auto;border:10px solid #fff;border-radius:12px}.paQrImage a{display:inline-block;margin-top:9px;color:#155dca;font-size:12px;font-weight:900}.paCreate,.paRegister{margin-top:18px;border:1px solid #d5e1ec;border-radius:17px;background:#fff;box-shadow:0 12px 30px #173f6910}.paCreate>summary{display:flex;gap:13px;align-items:center;padding:20px;cursor:pointer;list-style:none}.paCreate>summary>span{display:grid;place-items:center;width:38px;height:38px;border-radius:9px;background:#315fe6;color:#fff;font-size:22px}.paCreate>summary b,.paCreate>summary small{display:block}.paCreate>summary small{margin-top:4px;color:#6c8094}.paForm{padding:0 20px 22px}.paSection{margin-top:13px;padding:19px;border:1px solid #dce6ef;border-radius:14px;background:#f9fbfd}.paSection>header{display:flex;gap:11px;align-items:flex-start;margin-bottom:16px}.paSection>header>span{display:grid;place-items:center;min-width:31px;height:31px;border:1px solid #b9cde1;border-radius:8px;color:#315fe6;font-size:10px;font-weight:950}.paSection h2{margin:0;font-size:18px}.paSection header p{margin:4px 0 0;color:#718499;font-size:11px}.paGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.paGrid label,.paFunctionControl label,.paPermissions label{display:grid;gap:6px}.paGrid label>span,.paFunctionControl label,.paPermissions label>span{font-size:10px;font-weight:900}.paGrid .wide,.paFunctionControl .wide{grid-column:1/-1}.paGrid input,.paGrid select,.paGrid textarea,.paFunctionControl input,.paFunctionControl select,.paPermissions select{width:100%;min-height:43px;padding:10px;border:1px solid #c8d6e4;border-radius:8px;background:#fff;color:#102f51;font:inherit}.paChoice{display:grid;grid-template-columns:1fr 1fr;gap:12px}.paChoice label{position:relative;padding:16px;border:1px solid #cbd9e5;border-radius:11px;background:#fff;cursor:pointer}.paChoice label.selected{border-color:#315fe6;box-shadow:0 0 0 3px #315fe614}.paChoice input{position:absolute;right:13px}.paChoice b,.paChoice small{display:block}.paChoice small{margin-top:5px;color:#718499}.paFunctions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.paFunctions article{border:1px solid #d4e0eb;border-radius:12px;background:#fff;overflow:hidden}.paFunctions article.selected{border-color:#315fe6}.paFunctions button{width:100%;min-height:180px;padding:14px;border:0;background:transparent;color:#12385f;text-align:left;cursor:pointer}.paFunctions svg{display:block;margin-bottom:7px;color:#1762cf}.paFunctions button b,.paFunctions button small,.paFunctions button span{display:block}.paFunctions button small{min-height:31px;margin-top:5px;color:#718499;font-size:10px;line-height:1.4}.paFunctions button span{margin-top:9px;color:#315fe6;font-size:10px;font-weight:900}.paFunctionControl{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;background:#edf4ff}.paFunctionControl label{font-size:9px}.paPermissions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.paPermissions label{padding:11px;border:1px solid #d7e2ec;border-radius:9px;background:#fff}.paSection.disabled{opacity:.55}.paSubmit{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:20px 0 3px}.paSubmit b,.paSubmit span{display:block}.paSubmit span{margin-top:4px;color:#72859a;font-size:11px}.paSubmit button{padding:14px 18px;border:0;border-radius:9px;background:#315fe6;color:#fff;font-weight:900;cursor:pointer}.paSubmit button:disabled{opacity:.55}.paError{border-color:#eba69f;background:#fff0ee;color:#922f26}.paRegister{padding:22px}.paRegister>header{display:flex;justify-content:space-between;align-items:end;margin-bottom:15px}.paRegister h2{margin:5px 0 0}.paRegister>header>b{padding:7px 10px;border-radius:999px;background:#edf3ff;color:#315fe6;font-size:11px}.paPeople{display:grid;grid-template-columns:1fr 1fr;gap:12px}.paPeople>article{padding:17px;border:1px solid #d9e3ec;border-radius:13px;background:#fbfdff}.paIdentity{display:grid;grid-template-columns:45px 1fr auto;gap:11px;align-items:center}.paInitials{display:grid;place-items:center;width:45px;height:45px;border-radius:9px;background:#092d57;color:#fff;font-weight:900}.paIdentity h3{margin:0;font-size:16px}.paIdentity p,.paIdentity small{display:block;margin:3px 0 0;color:#6f8295;font-size:10px}.status{padding:6px 8px;border-radius:999px;background:#e9eef4;color:#62768a;font-size:9px;font-weight:900;text-transform:uppercase}.status.active{background:#e3f7ed;color:#087553}.status.invited{background:#fff1d9;color:#8a5b00}.status.suspended{background:#ffe8e5;color:#a52d23}.paRelations{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:13px}.paRelations span{padding:9px;border-radius:8px;background:#eef4f9;font-size:10px}.paRelations b{display:block;margin-bottom:3px;color:#678097;font-size:8px;text-transform:uppercase}.paFunctionStrip{display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding:10px 0;border-top:1px solid #e4eaf0}.paFunctionStrip>div{min-width:88px;text-align:center;color:#155dcc}.paFunctionStrip svg{display:block;margin:auto}.paFunctionStrip span,.paFunctionStrip small{display:block;color:#173b60;font-size:8px}.paFunctionStrip small{color:#74879a;text-transform:capitalize}.paFunctionStrip p{color:#7a8da0;font-size:10px}.paPeople footer{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:10px;border-top:1px solid #e4eaf0;color:#718499;font-size:9px}.paPersonActions{display:flex;gap:7px;align-items:center}.paPeople footer button{padding:7px 9px;border:1px solid #e0a69f;border-radius:7px;background:#fff4f2;color:#982f25;font-size:9px;font-weight:850;cursor:pointer}.paPeople footer button.recover{border-color:#9dbce0;background:#eef6ff;color:#155dca}.paEmpty{padding:35px;text-align:center;color:#718499}@media(max-width:1000px){.paFunctions,.paPermissions,.paGrid{grid-template-columns:1fr 1fr}.paPeople{grid-template-columns:1fr}}@media(max-width:700px){.paPage{padding:22px 12px 60px}.paTop{display:block}.paTop>a{display:inline-block;margin-top:15px}.paTop h1{font-size:34px}.paMetrics{grid-template-columns:1fr 1fr}.paQr{grid-template-columns:1fr}.paGrid,.paFunctions,.paPermissions,.paChoice{grid-template-columns:1fr}.paSubmit{align-items:stretch;flex-direction:column}.paSubmit button{width:100%}.paRelations{grid-template-columns:1fr}.paIdentity{grid-template-columns:45px 1fr}.paIdentity>.status{grid-column:2}.paPeople footer{align-items:flex-start;flex-direction:column}.paPersonActions{flex-wrap:wrap}}`;
+function PersonCard({ person, assignments, site, city, functions, accessCount, invitation, ownerId }) {
+  const name = personName(person);
+  const initials = [person.first_name?.trim()[0], person.last_name?.trim()[0]].filter(Boolean).join("") || name.slice(0, 1);
+  const accountState = person.account_status;
+  const stateLabel = statuses.find(([key]) => key === accountState)?.[1] ?? (accountState === "closed" ? "Closed" : "Unknown");
+  const canSuspend = !["suspended", "closed"].includes(accountState);
+  const canRecover = person.account_type === "system" && canSuspend;
+  const facts = [
+    ["Reports to", assignments.manager.value === "unassigned" ? "Not assigned" : assignments.manager.label, "person"],
+    ["Location", city || assignments.location.label, "location"],
+    ["Site", site ? personSiteLabel(site) : "—", "site"],
+    ["Module access", person.user_id && person.user_id === ownerId ? "Company owner" : `${accessCount} ${accessCount === 1 ? "module" : "modules"}`, "layers"],
+  ];
+  return <article className={hub.personCard}>
+    <div className={hub.identity}>
+      <div className={hub.initials} aria-hidden="true">{initials.toUpperCase()}</div>
+      <div>
+        <h3>{name}</h3>
+        <p>{person.position || "Position not recorded"}{assignments.department.value !== "unassigned" && ` · ${assignments.department.label}`}</p>
+        {person.email && person.email !== name && <small>{person.email}</small>}
+      </div>
+      <span className={hub.status} data-status={accountState}>{stateLabel}</span>
+    </div>
+    <dl className={hub.facts}>
+      {facts.map(([label, value, icon]) => (
+        <div key={label}><Icon name={icon}/><div><dt>{label}</dt><dd>{value}</dd></div></div>
+      ))}
+    </dl>
+    <footer className={hub.footer}>
+      <div>
+        {functions.length > 0 && <ul className={hub.functions} aria-label="Professional functions">
+          {functions.map(item => (
+            <li key={item.id} data-authorised={item.status === "authorised"}>
+              {functionLabel(item.function_key)}{item.status === "authorised" ? <span className={hub.srOnly}> · Authorised</span> : ` · ${item.status}`}
+            </li>
+          ))}
+        </ul>}
+        <small>{invitation ? `QR ${invitation.invitation_reference} expires ${date(invitation.expires_at)}`
+          : person.account_type === "directory" ? "Directory record · No login" : "No active QR invitation"}</small>
+      </div>
+      <div className={hub.personActions}>
+        <Link className={hub.button} href={`${registerPath}/${person.id}/edit`}>Edit profile &amp; access</Link>
+        {(canRecover || canSuspend) && <details className={hub.more}>
+          <summary className={hub.button}><span aria-hidden="true">•••</span><span className={hub.srOnly}>More actions for {name}</span></summary>
+          <div>
+            {canRecover && <form action={sendPasswordReset}><input type="hidden" name="person_id" value={person.id}/><button type="submit">Send password reset</button></form>}
+            {canSuspend && <form action={suspendPerson}><input type="hidden" name="person_id" value={person.id}/><button type="submit" className={hub.danger}>Revoke / suspend</button></form>}
+          </div>
+        </details>}
+      </div>
+    </footer>
+  </article>;
+}
+
+const iconPaths = {
+  people: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-4M13 3a4 4 0 0 1 0 8m5-8a4 4 0 0 1 0 8M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
+  person: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2Zm-4-14a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
+  clock: "M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
+  folder: "M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z",
+  location: "M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Zm-5 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+  site: "M2 22h20M4 22V3h10v19m0-13h6v13M7 7h4m-4 4h4m-4 4h4",
+  layers: "m12 2 10 5-10 5L2 7Zm10 10-10 5-10-5m20 5-10 5-10-5",
+  activity: "M3 3v18h18M8 16v-4m5 4V7m5 9v-6",
+  bolt: "m13 2-9 12h7l-1 8 10-12h-7Z",
+};
+
+function Icon({ name }) {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+    strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={iconPaths[name]}/></svg>;
+}
+
+const styles = `.paPage{min-height:100vh;font-family:Arial,sans-serif}.paQr>div>span{color:#315fe6;font-size:10px;font-weight:950;letter-spacing:.14em}.paNotice,.paError{display:grid;gap:4px;margin:14px 0;padding:14px 16px;border:1px solid #efc688;border-radius:10px;background:#fff7e8;color:#784c00}.paNotice.success{border-color:#9bd8bd;background:#edfbf4;color:#08714f}.paNotice span,.paError span{font-size:12px}.paQr{display:grid;grid-template-columns:1fr 300px;gap:25px;align-items:center;margin:18px 0;padding:25px;border:1px solid #9fc5ec;border-radius:18px;background:linear-gradient(135deg,#fff,#edf6ff);box-shadow:0 14px 34px #173f6912}.paQr h2{margin:8px 0 4px;font-size:27px}.paQr p{color:#63798f}.paQr dl{display:flex;gap:10px;flex-wrap:wrap}.paQr dl div{min-width:150px;padding:11px;border-radius:9px;background:#fff}.paQr dt{color:#6c8196;font-size:9px;text-transform:uppercase}.paQr dd{margin:4px 0 0;font-size:12px;font-weight:850}.paQr .paSecurity{font-size:11px}.paQrImage{text-align:center}.paQrImage img{display:block;width:260px;height:260px;margin:auto;border:10px solid #fff;border-radius:12px}.paQrImage a{display:inline-block;margin-top:9px;color:#155dca;font-size:12px;font-weight:900}.paCreate{margin-top:18px;border:1px solid #d5e1ec;border-radius:17px;background:#fff;box-shadow:0 12px 30px #173f6910}.paForm{padding:0 20px 22px}.paSection{margin-top:13px;padding:19px;border:1px solid #dce6ef;border-radius:14px;background:#f9fbfd}.paSection>header{display:flex;gap:11px;align-items:flex-start;margin-bottom:16px}.paSection>header>span{display:grid;place-items:center;min-width:31px;height:31px;border:1px solid #b9cde1;border-radius:8px;color:#315fe6;font-size:10px;font-weight:950}.paSection h2{margin:0;font-size:18px}.paSection header p{margin:4px 0 0;color:#718499;font-size:11px}.paGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.paGrid label,.paFunctionControl label,.paPermissions label{display:grid;gap:6px}.paGrid label>span,.paFunctionControl label,.paPermissions label>span{font-size:10px;font-weight:900}.paGrid .wide,.paFunctionControl .wide{grid-column:1/-1}.paGrid input,.paGrid select,.paGrid textarea,.paFunctionControl input,.paFunctionControl select,.paPermissions select{width:100%;min-height:43px;padding:10px;border:1px solid #c8d6e4;border-radius:8px;background:#fff;color:#102f51;font:inherit}.paChoice{display:grid;grid-template-columns:1fr 1fr;gap:12px}.paChoice label{position:relative;padding:16px;border:1px solid #cbd9e5;border-radius:11px;background:#fff;cursor:pointer}.paChoice label.selected{border-color:#315fe6;box-shadow:0 0 0 3px #315fe614}.paChoice input{position:absolute;right:13px}.paChoice b,.paChoice small{display:block}.paChoice small{margin-top:5px;color:#718499}.paFunctions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.paFunctions article{border:1px solid #d4e0eb;border-radius:12px;background:#fff;overflow:hidden}.paFunctions article.selected{border-color:#315fe6}.paFunctions button{width:100%;min-height:180px;padding:14px;border:0;background:transparent;color:#12385f;text-align:left;cursor:pointer}.paFunctions svg{display:block;margin-bottom:7px;color:#1762cf}.paFunctions button b,.paFunctions button small,.paFunctions button span{display:block}.paFunctions button small{min-height:31px;margin-top:5px;color:#718499;font-size:10px;line-height:1.4}.paFunctions button span{margin-top:9px;color:#315fe6;font-size:10px;font-weight:900}.paFunctionControl{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;background:#edf4ff}.paFunctionControl label{font-size:9px}.paPermissions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.paPermissions label{padding:11px;border:1px solid #d7e2ec;border-radius:9px;background:#fff}.paSection.disabled{opacity:.55}.paSubmit{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:20px 0 3px}.paSubmit b,.paSubmit span{display:block}.paSubmit span{margin-top:4px;color:#72859a;font-size:11px}.paSubmit button{padding:14px 18px;border:0;border-radius:9px;background:#315fe6;color:#fff;font-weight:900;cursor:pointer}.paSubmit button:disabled{opacity:.55}.paError{border-color:#eba69f;background:#fff0ee;color:#922f26}@media(max-width:1000px){.paFunctions,.paPermissions,.paGrid{grid-template-columns:1fr 1fr}}@media(max-width:700px){.paQr{grid-template-columns:1fr}.paGrid,.paFunctions,.paPermissions,.paChoice{grid-template-columns:1fr}.paSubmit{align-items:stretch;flex-direction:column}.paSubmit button{width:100%}}`;
