@@ -5,8 +5,9 @@ import { useRef, useState } from "react";
 import HealthSafetyDashboardHeatMap from "../../../../components/HealthSafetyDashboardHeatMap";
 import {
   actionsPath, isControlled, isHistoric, matchesRegister, matchesSlice, movement, priorityActions,
-  readable, registerCsv, registerPath, riskBand, riskLabels,
+  readable, registerCsv, registerPath, residualProfile, riskBand, riskLabels,
 } from "./register-data.mjs";
+import DocumentRegisterFilter from "../../documents/DocumentRegisterFilter";
 import s from "./risk-assurance.module.css";
 
 const groupViews = [
@@ -23,7 +24,11 @@ const sliceLabels = {
   approved: "Approved or communicated", verification: "Awaiting verification", archived: "Archived and superseded",
   ...Object.fromEntries(movementBands.map(([key, label]) => [key, label])),
 };
-const blankScope = { query: "", site: "", department: "" };
+const blankScope = { query: "", sites: [], departments: [], assessments: [] };
+const profileBands = [
+  ["acceptable", "1–4"], ["adequate", "5–9"], ["inadequate", "10–14"],
+  ["unacceptable", "15–25"], ["unrated", ""],
+];
 const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const displayDate = value => value ? dateFormat.format(new Date(value + "T00:00:00Z")) : "—";
 const recordHref = (id, suffix = "") => registerPath + "/" + encodeURIComponent(id) + suffix;
@@ -93,6 +98,32 @@ function DrillButton({ value, label, count, colour, active, onSelect }) {
     aria-pressed={active === value} onClick={() => onSelect(value)}><span>{label}</span><strong>{count} →</strong></button>;
 }
 
+function ResidualProfile({ hazards, active, onSelect }) {
+  const counts = residualProfile(hazards);
+  const hasHazards = hazards.length > 0;
+  return <section className={`${s.panel} ${s.profile}`} aria-labelledby="residual-profile-title">
+    <h2 id="residual-profile-title">Residual Risk Profile</h2>
+    <p className={s.sub}>{hasHazards ? `${hazards.length - counts.unrated} of ${hazards.length} hazards rated. Select a band to filter assessments.`
+      : "No hazards recorded in this scope."}</p>
+    {hasHazards && <>
+      <div className={`${s.track} ${s.profileTrack}`} role="group" aria-label="Residual risk distribution">
+        {profileBands.filter(([band]) => counts[band]).map(([band]) => (
+          <button key={band} type="button" data-band={band} style={{ flexGrow: counts[band] }}
+            aria-label={`${riskLabels[band]}, ${counts[band]} hazards`} aria-pressed={active === "profile:" + band}
+            onClick={() => onSelect("profile:" + band)}/>
+        ))}
+      </div>
+      <div className={s.profileBands}>
+        {profileBands.map(([band, range]) => <button type="button" key={band} data-band={band}
+          aria-pressed={active === "profile:" + band} onClick={() => onSelect("profile:" + band)}>
+          <span><i aria-hidden="true"/>{riskLabels[band]}{range && <small> · {range}</small>}</span>
+          <strong>{counts[band]} · {Math.round(100 * counts[band] / hazards.length)}%</strong>
+        </button>)}
+      </div>
+    </>}
+  </section>;
+}
+
 function CoverageDialog({ dialog, coverage, rate }) {
   return <dialog ref={dialog} className={s.dialog} aria-labelledby="coverage-title">
     <header className={s.panelHead}>
@@ -120,7 +151,7 @@ function exportRows(rows) {
 
 export default function RiskAssuranceCentre({ data, initialView, initialQuery, canContribute }) {
   const [scope, setScope] = useState({ ...blankScope, query: initialQuery });
-  const [draft, setDraft] = useState(scope);
+  const [filterVersion, setFilterVersion] = useState(0);
   const [groupView, setGroupView] = useState("all");
   const [slice, setSlice] = useState(initialView === "all" ? null : initialView);
   const [cell, setCell] = useState(null);
@@ -129,7 +160,9 @@ export default function RiskAssuranceCentre({ data, initialView, initialQuery, c
 
   const base = data.latest.filter(row => matchesRegister(row, scope));
   const hazards = base.flatMap(row => row.hazards);
-  const hazardIds = cell ? new Set(hazards.filter(hazard => hazard[cell.mode].join("-") === cell.key).map(hazard => hazard.id)) : null;
+  const profileBand = slice?.startsWith("profile:") ? slice.slice("profile:".length) : null;
+  const hazardIds = cell ? new Set(hazards.filter(hazard => hazard[cell.mode].join("-") === cell.key).map(hazard => hazard.id))
+    : profileBand ? new Set(hazards.filter(hazard => riskBand(hazard.residualScore) === profileBand).map(hazard => hazard.id)) : null;
   const source = slice === "archived" ? data.archive.filter(row => matchesRegister(row, scope)) : base;
   const visible = source.filter(row => matchesSlice(row, slice) && (!hazardIds || row.hazards.some(hazard => hazardIds.has(hazard.id))));
   const elevated = base.filter(row => matchesSlice(row, "elevated"));
@@ -147,8 +180,24 @@ export default function RiskAssuranceCentre({ data, initialView, initialQuery, c
   };
   const clearDrill = () => { setCell(null); setSlice(null); };
   const chip = cell ? `${cell.mode === "current" ? "Initial" : "Residual"} heat map · L${cell.key[0]} × S${cell.key[2]}`
-    : sliceLabels[slice];
-  const scopeOptions = key => [...new Set([...data.latest, ...data.archive].map(row => row[key]))].sort((a, b) => a.localeCompare(b, "en-GB"));
+    : profileBand ? "Residual profile · " + riskLabels[profileBand] : sliceLabels[slice];
+  const filterRows = slice === "archived" ? data.archive : data.latest;
+  const assessmentOptions = filterRows.map(row => ({ value: row.id, label: row.reference + " · " + row.title }));
+  const choices = key => [...new Set([...data.latest, ...data.archive].map(row => row[key]))]
+    .sort((a, b) => a.localeCompare(b, "en-GB")).map(value => ({ value, label: value }));
+  function applyFilters(event) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    setScope({
+      query: String(values.get("q") ?? ""),
+      sites: values.getAll("site"),
+      departments: values.getAll("department"),
+      assessments: values.getAll("assessment"),
+    });
+    const openMenu = event.currentTarget.querySelector("details[open]");
+    if (openMenu) openMenu.open = false;
+    setFilterVersion(version => version + 1);
+  }
 
   return <main className={s.page}>
     <header className={s.hero}>
@@ -183,24 +232,27 @@ export default function RiskAssuranceCentre({ data, initialView, initialQuery, c
       <HealthSafetyDashboardHeatMap className={s.heat} hazards={hazards} registerHref={registerPath}
         registerAnchor="#risk-assessments" selection={cell?.key ?? ""}
         onSelection={value => { setCell(value); if (value) setSlice(null); }}/>
-      <section className={s.panel} aria-labelledby="movement-title">
-        <h2 id="movement-title">Risk movement</h2>
-        <p className={s.sub}>Initial and residual scores for the same hazards.</p>
-        <div className={s.track} aria-hidden="true">
-          {changes.map(([key, , colour, count]) => <span key={key} style={{ background: colour, flexGrow: count }}/>)}
-        </div>
-        <div className={s.drillList}>
-          {changes.map(([key, label, colour, count]) => <DrillButton key={key}
-            value={key} label={label} count={count} colour={colour} active={slice} onSelect={select}/>)}
-        </div>
-        <div className={s.coverage}>
-          <button type="button" onClick={() => dialog.current?.showModal()} className={s.coverageButton}>
-            <span>Controlled assessment position</span><strong>{rate === null ? "—" : rate + "%"}</strong>
-          </button>
-          {rate !== null && <div className={s.track} aria-hidden="true"><span style={{ width: rate + "%", background: "#149d91" }}/></div>}
-          <p className={s.sub}>{data.coverage.approved.length} approved or communicated out of {data.coverage.total} register-wide records. <button type="button" className={s.linkButton} onClick={() => dialog.current?.showModal()}>View calculation →</button></p>
-        </div>
-      </section>
+      <div className={s.dashboardColumn}>
+        <section className={s.panel} aria-labelledby="movement-title">
+          <h2 id="movement-title">Risk movement</h2>
+          <p className={s.sub}>Initial and residual scores for the same hazards.</p>
+          <div className={s.track} aria-hidden="true">
+            {changes.map(([key, , colour, count]) => <span key={key} style={{ background: colour, flexGrow: count }}/>)}
+          </div>
+          <div className={s.drillList}>
+            {changes.map(([key, label, colour, count]) => <DrillButton key={key}
+              value={key} label={label} count={count} colour={colour} active={slice} onSelect={select}/>)}
+          </div>
+          <div className={s.coverage}>
+            <button type="button" onClick={() => dialog.current?.showModal()} className={s.coverageButton}>
+              <span>Controlled assessment position</span><strong>{rate === null ? "—" : rate + "%"}</strong>
+            </button>
+            {rate !== null && <div className={s.track} aria-hidden="true"><span style={{ width: rate + "%", background: "#149d91" }}/></div>}
+            <p className={s.sub}>{data.coverage.approved.length} approved or communicated out of {data.coverage.total} register-wide records. <button type="button" className={s.linkButton} onClick={() => dialog.current?.showModal()}>View calculation →</button></p>
+          </div>
+        </section>
+        <ResidualProfile hazards={hazards} active={slice} onSelect={select}/>
+      </div>
       <section className={s.panel} aria-labelledby="intelligence-title">
         <h2 id="intelligence-title">Risk intelligence</h2>
         <p className={s.sub}>Priority risks and controls within the selected scope.</p>
@@ -216,8 +268,9 @@ export default function RiskAssuranceCentre({ data, initialView, initialQuery, c
         <ul className={s.priorities}>
           {priorities.map(hazard => <li key={hazard.id}><Link href={recordHref(hazard.assessmentId)}>{hazard.label}</Link>
             <Score value={hazard.residualScore}/><small>{hazard.assessmentLabel}</small></li>)}
-          {overdue[0] && <li><Link href={actionHref("overdue", overdue[0].action.reference || overdue[0].row.reference)}>{overdue[0].action.label}</Link>
-            <small>Priority overdue action · {displayDate(overdue[0].action.target)}</small></li>}
+          {overdue.slice(0, 3).map(({ action, row }) => <li key={action.id}>
+            <Link href={actionsPath + "/" + encodeURIComponent(action.id)}>{action.reference ? action.reference + " · " : ""}{action.label}</Link>
+            <small>{row.reference} · Due {displayDate(action.target)}</small></li>)}
         </ul>
         {!priorities.length && !overdue.length && <p className={s.sub}>No elevated residual hazards or overdue actions in this scope.</p>}
       </section>
@@ -234,18 +287,18 @@ export default function RiskAssuranceCentre({ data, initialView, initialQuery, c
           aria-pressed={key === groupView} onClick={() => setGroupView(key)}>{label}</button>)}
         <button type="button" className={s.button} aria-pressed={slice === "archived"} onClick={() => select("archived")}>Archived</button>
       </div>
-      <form className={s.filterRow} onSubmit={event => { event.preventDefault(); setScope(draft); }}>
-        <label>Search<input type="search" value={draft.query} placeholder="Reference, assessment, assessor or hazard"
-          onChange={event => setDraft({ ...draft, query: event.target.value })}/></label>
-        {[["site", "Site", "All sites"], ["department", "Department", "All departments"]].map(([key, label, empty]) => (
-          <label key={key}>{label}<select value={draft[key]} onChange={event => setDraft({ ...draft, [key]: event.target.value })}>
-            <option value="">{empty}</option>
-            {scopeOptions(key).map(option => <option key={option}>{option}</option>)}
-          </select></label>
-        ))}
+      <form className={s.filterRow} onSubmit={applyFilters}>
+        <DocumentRegisterFilter key={`assessment-${filterVersion}-${slice === "archived"}`} label="Search" name="assessment"
+          choices={assessmentOptions}
+          selected={scope.assessments} emptyLabel="All assessments"
+          search={{ name: "q", value: scope.query, placeholder: "Find an assessment or type a search" }}/>
+        <DocumentRegisterFilter key={`site-${filterVersion}`} label="Site" name="site" choices={choices("site")}
+          selected={scope.sites} emptyLabel="All sites"/>
+        <DocumentRegisterFilter key={`department-${filterVersion}`} label="Department" name="department" choices={choices("department")}
+          selected={scope.departments} emptyLabel="All departments"/>
         <div className={s.filterActions}>
           <button type="submit" className={s.primary}>Apply</button>
-          <button type="button" className={s.button} onClick={() => { setDraft(blankScope); setScope(blankScope); clearDrill(); }}>Clear filters</button>
+          <button type="button" className={s.button} onClick={() => { setScope(blankScope); setFilterVersion(version => version + 1); clearDrill(); }}>Clear filters</button>
         </div>
       </form>
       <div className={s.selection}>
@@ -254,6 +307,7 @@ export default function RiskAssuranceCentre({ data, initialView, initialQuery, c
       </div>
       {visible.length ? <div className={s.tableWrap} role="region" aria-label="Assessment records" tabIndex={0}>
         <table className={s.records}>
+          <colgroup>{[21, 24, 11, 15, 13, 16].map((width, index) => <col key={index} style={{ width: width + "%" }}/>)}</colgroup>
           <thead><tr>{["Assessment", "Site, department & assessor", "Approval status", "Initial → residual risk", "Actions & review date", "Quick actions"]
             .map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
           {groupRows(visible, groupView, hazardIds).map(([name, rows]) => <tbody key={name}>

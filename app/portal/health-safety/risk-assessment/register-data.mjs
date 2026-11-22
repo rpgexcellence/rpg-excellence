@@ -17,6 +17,10 @@ export const isControlled = row => ["approved", "communicated"].includes(row.sta
 export const isHistoric = row => historic.has(row.status);
 export const validViews = ["all", "active", "elevated", "review-due", "approved", "archived"];
 const nonblank = value => typeof value === "string" && value.trim() ? value.trim() : null;
+const actionTitle = value => {
+  const title = nonblank(value);
+  return !title || /^(?:none|n\/a|not applicable)$/i.test(title) ? "Control action" : title;
+};
 const dateKey = value => typeof value === "string" ? value.slice(0, 10) : "";
 
 function coordinate(likelihood, severity) {
@@ -85,7 +89,7 @@ export function buildRegister(assessments, hazards, actions, events, today) {
       };
     });
     const openActions = (actionIndex.get(row.id) ?? []).filter(action => open.has(action.status)).map(action => ({
-      id: action.id, reference: action.action_reference, label: nonblank(action.action_required) || "Control action",
+      id: action.id, reference: action.action_reference, label: actionTitle(action.action_required),
       target: dateKey(action.target_date), priority: action.priority,
       awaiting: awaitingVerification.has(action.status),
       overdue: Boolean(dateKey(action.target_date) && dateKey(action.target_date) < today),
@@ -119,14 +123,25 @@ export function movement(hazard) {
   return residualScore < initialScore ? "lower" : residualScore > initialScore ? "higher" : "same";
 }
 
-export function matchesRegister(row, { query, site, department }) {
+export function matchesRegister(row, { query, sites, departments, assessments }) {
   const term = query.trim().toLowerCase();
-  return (!site || row.site === site) && (!department || row.department === department) &&
+  return (!assessments.length || assessments.includes(row.id)) &&
+    (!sites.length || sites.includes(row.site)) && (!departments.length || departments.includes(row.department)) &&
     (!term || [row.reference, row.title, row.site, row.department, row.assessor, readable(row.type),
       ...row.hazards.flatMap(hazard => [hazard.label, hazard.type])].some(value => value?.toLowerCase().includes(term)));
 }
 
+export function residualProfile(hazards) {
+  const counts = Object.fromEntries(Object.keys(riskLabels).map(band => [band, 0]));
+  for (const hazard of hazards) counts[riskBand(hazard.residualScore)]++;
+  return counts;
+}
+
 export function matchesSlice(row, slice) {
+  if (slice?.startsWith("profile:")) {
+    const selectedBand = slice.slice("profile:".length);
+    return row.hazards.some(hazard => riskBand(hazard.residualScore) === selectedBand);
+  }
   switch (slice) {
     case "active": return active.has(row.status);
     case "elevated": return row.residualScore >= 10;
