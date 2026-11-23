@@ -7,6 +7,7 @@ import { RecordIcon } from "../../../../../components/DocumentRecordTabs";
 import { DecisionBadge, PowraFacts, PowraHero } from "../PowraUI";
 import { closePowra, stopPowra } from "./actions";
 import PrintPowra from "./PrintPowra";
+import PowraRecordContext from "./PowraRecordContext";
 import styles from "../powra.module.css";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +16,27 @@ const tabs = {
   details:["Assessment details","details"],
   hazards:["Hazards & controls","scope"],
   learning:["Verification & learning","checkCircle"],
-  links:["Linked records","open"],
+  links:["Documents & Applicability","documents"],
   history:["Decision history","history"],
 };
-const reviewFields = [["conditions_changed","Did conditions change?"],["new_hazards","Were new hazards identified?"],["controls_effective","Were controls effective?"],["incident","Incident or near miss?"]];
+const reviewFields = [
+  ["conditions_changed", "Did conditions change?", "history"],
+  ["new_hazards", "Were new hazards identified?", "alert"],
+  ["controls_effective", "Were controls effective?", "scope"],
+  ["incident", "Incident or near miss?", "alert"],
+];
+const reviewNotes = [
+  ["Closure notes", "comments", "conversation"],
+  ["Follow-up action", "follow_up", "clipboard"],
+  ["Evidence reference", "evidence_reference", "documents"],
+  ["Incident reference", "incident_reference", "overview"],
+];
+const decisionFacts = (item) => [
+  ["Decision notes", item.decision_reason, "conversation"],
+  ["Supervisor", item.supervisor_name, "person"],
+  ["Supervisor review recorded", item.supervisor_approved_at ? powraTime(item.supervisor_approved_at) : null, "approval"],
+  ["Closed at", item.closed_at ? powraTime(item.closed_at) : null, "calendar"],
+];
 const display = {yes:"Yes",no:"No",na:"Not applicable"};
 const notices = {changed:"This record changed. Check the latest decision before continuing.", stop:"Record the Stop Work reason and any escalation.",closure:"Select an eligible outcome and record the closure notes."};
 
@@ -51,14 +69,12 @@ export default async function PowraRecordPage({params,searchParams}) {
     [item.status === "cancelled" ? "Record cancelled" : "Record closed",item.closed_at],
   ];
   const currentMilestone = milestones.findLastIndex(([, date]) => Boolean(date));
-  const related = [
-    ["Risk assessment",item.linked_assessment_id ? "/portal/health-safety/risk-assessment/"+item.linked_assessment_id : "/portal/health-safety/risk-assessment",item.linked_assessment_id ? "Open linked assessment" : "Browse assessments"],
-    ["Permit to work","/portal/health-safety/permits",item.linked_permit_reference],
-    ["Workplace inspection","/portal/health-safety/workplace-inspections",work.inspection_reference],
-    ["Incident reporting","/portal/incidents",review.incident_reference],
+  const assessmentFacts = [
+    ["Reference",item.powra_reference,"overview"],["Task",item.task,"permit"],
+    ["Assessor",item.completed_by,"person"],["Team",item.team_members,"distribution"],
+    ["Location",item.site_location,"pin"],["Work area",item.work_area,"pin"],
+    ["Assessment date",powraDate(item.assessment_date),"calendar"],["Recorded at",powraTime(item.created_at),"history"],
   ];
-  const assessmentFacts = [["Assessor",item.completed_by],["Team",item.team_members],["Location",item.site_location],["Work area",item.work_area],
-    ["Assessment date",powraDate(item.assessment_date)],["Recorded at",powraTime(item.created_at)]];
   return <main className={styles.page}>
     <PowraHero title={item.task} reference={[item.powra_reference,"Point of Work Risk Assessment"].filter(Boolean).join(" · ")} description={workplace || "Workplace not recorded"}>
       <span className={styles.recordStatus}>{status}</span>
@@ -107,60 +123,53 @@ export default async function PowraRecordPage({params,searchParams}) {
         <Link href={href+"?tab=learning"}>View verification and close-out</Link>
       </section>
       <section className={styles.panel}>
-        <h2>Workplace &amp; linked records</h2>
+        <h2>Documents &amp; Applicability</h2>
         <p>{workplace || "Workplace not recorded"}</p>
-        <Link href={href+"?tab=links"}>View workplace and linked records</Link>
+        <Link href={href+"?tab=links"}>View documents and applicability</Link>
       </section>
       <section className={styles.panel+" "+styles.recordScope}>
         <h2>Task and scope</h2><p>{[item.task,workplace].filter(Boolean).join(" · ") || "Not recorded"}</p>
       </section>
     </div>}
-    {tab==="details" && <div className={styles.grid}>
-      <section className={styles.panel}><h2><RecordIcon name="overview"/>Assessment details</h2><PowraFacts rows={[["Reference",item.powra_reference],["Task",item.task],...assessmentFacts]}/></section>
-      <section className={styles.panel}><h2><RecordIcon name="scope"/>Decision and review</h2><PowraFacts rows={[
-        ["Decision notes",item.decision_reason],["Supervisor",item.supervisor_name],["Supervisor review recorded",item.supervisor_approved_at ? powraTime(item.supervisor_approved_at) : null],
-        ["Closed at",item.closed_at ? powraTime(item.closed_at) : null],
-      ]}/></section>
-    </div>}
-    {tab==="hazards" && <div className={styles.grid}>
-      <section className={styles.panel}><h2>Pre-start checks</h2><PowraFacts rows={checks.map(row => [row.question,display[row.answer]])}/></section>
-      <section className={styles.panel}><h2>Hazards and controls</h2>
-        {hazards.length ? <ul className={styles.questions}>{hazards.map((hazard,i) => <li key={i}>
-          <strong>{hazard.name}</strong><p>{hazard.control || "Control not recorded"}</p><p>Remaining risk: {hazard.remaining_risk || "Not recorded"}</p>
-          <span className={styles.label+" "+(hazard.verified === true ? styles.safe : styles.controls)}>{hazard.verified === true ? "Control verified" : hazard.verified === false ? "Verification outstanding" : "Verification not recorded"}</span>
-          {hazard.changed && <p>New or significantly changed hazard</p>}
-        </li>)}</ul> : <p>{work.no_additional_hazards ? "No additional hazards identified at the point of work." : "No hazards recorded."}</p>}
-      </section>
-    </div>}
-    {tab==="learning" && <section className={styles.panel}><h2>Verification and end-of-job learning</h2>
-      {!open ? <PowraFacts rows={[...reviewFields.map(([name,label])=>[label,display[review[name]]]),["Closure notes",review.comments],
-        ["Follow-up action",review.follow_up],["Evidence reference",review.evidence_reference],["Incident reference",review.incident_reference]]}/>
+    {tab==="details" && <section className={styles.panel}>
+      <h2><RecordIcon name="overview"/>Assessment details</h2>
+      <div className={styles.recordGroups}>
+        <section className={styles.recordGroup}><h3>Assessment context</h3>
+          <PowraFacts rows={assessmentFacts.filter(([label])=>["Task","Team","Location","Work area"].includes(label))}/>
+        </section>
+        <section className={styles.recordGroup}><h3>Record information</h3>
+          <PowraFacts rows={assessmentFacts.filter(([label])=>!["Task","Team","Location","Work area"].includes(label))}/>
+        </section>
+        <section className={styles.recordGroup}><h3>Decision and review</h3><PowraFacts rows={decisionFacts(item)}/></section>
+      </div>
+    </section>}
+    {(tab==="hazards" || tab==="links") && <PowraRecordContext tab={tab} item={item} hazards={hazards} checks={checks} work={work} review={review}/>}
+    {tab==="learning" && <section className={styles.panel}><h2><RecordIcon name="checkCircle"/>Verification and end-of-job learning</h2>
+      {!open ? <PowraFacts rows={[...reviewFields.map(([name,label,icon])=>[label,display[review[name]],icon]),
+        ...reviewNotes.map(([label,name,icon])=>[label,review[name],icon])]}/>
         : <form action={closePowra.bind(null,id)}>
-          <label className={styles.field}>Closure outcome<select name="outcome" required defaultValue=""><option value="" disabled>Select actual outcome</option>
+          <label className={styles.field}><span className={styles.factIcon}><RecordIcon name="checkCircle"/>Closure outcome</span><select name="outcome" required defaultValue=""><option value="" disabled>Select actual outcome</option>
             {closureOptions(decision).map(key=><option key={key} value={key}>{closureLabels[key]}</option>)}
           </select></label>
-          <div className={styles.grid}>{reviewFields.map(([key,label])=><label className={styles.field} key={key}>{label}
+          <div className={styles.grid}>{reviewFields.map(([key,label,icon])=><label className={styles.field} key={key}><span className={styles.factIcon}><RecordIcon name={icon}/>{label}</span>
             <select name={key} defaultValue={review[key] || ""}><option value="">Not recorded</option>{Object.entries(display).map(([value,name])=><option key={value} value={value}>{name}</option>)}</select>
           </label>)}</div>
-          <label className={styles.field}>Closure notes and interventions<textarea name="comments" required maxLength={3000} defaultValue={review.comments}/></label>
-          <label className={styles.field}>Follow-up action<textarea name="follow_up" maxLength={3000}/></label>
-          <label className={styles.field}>Evidence reference<input name="evidence_reference" maxLength={300}/></label>
-          <label className={styles.field}>Incident or near-miss reference<input name="incident_reference" maxLength={100}/></label>
+          <label className={styles.field}><span className={styles.factIcon}><RecordIcon name="conversation"/>Closure notes and interventions</span><textarea name="comments" required maxLength={3000} defaultValue={review.comments}/></label>
+          <label className={styles.field}><span className={styles.factIcon}><RecordIcon name="clipboard"/>Follow-up action</span><textarea name="follow_up" maxLength={3000}/></label>
+          <label className={styles.field}><span className={styles.factIcon}><RecordIcon name="documents"/>Evidence reference</span><input name="evidence_reference" maxLength={300}/></label>
+          <label className={styles.field}><span className={styles.factIcon}><RecordIcon name="overview"/>Incident or near-miss reference</span><input name="incident_reference" maxLength={100}/></label>
           <button className={styles.primary}>Record closure</button>
         </form>}
     </section>}
-    {tab==="links" && <div className={styles.grid}>
-      <section className={styles.panel}><h2>Workplace</h2><PowraFacts rows={[["Location",item.site_location],["Work area",item.work_area]]}/></section>
-      <section className={styles.panel}><h2>Linked records</h2><ul className={styles.questions}>
-      {related.map(([label,url,reference])=><li key={url}><strong>{label}</strong><p><Link href={url}>{reference || "Open module"}</Link></p></li>)}
-      {work.reassessment_of && UUID.test(work.reassessment_of) && <li><Link href={POWRA_ROOT+"/"+work.reassessment_of}>Open earlier POWRA</Link></li>}
-    </ul></section></div>}
-    {tab==="history" && <section className={styles.panel}><h2>Decision history</h2>
+    {tab==="history" && <section className={styles.panel}><h2><RecordIcon name="history"/>Decision history</h2>
       <PowraFacts rows={[
-        ["Initial decision",decisionDetails[stop?.previous_decision || decision]?.[0]],["Assessment recorded",powraTime(item.created_at)],
-        ["Initial decision notes",stop ? stop.previous_reason : item.decision_reason],["Stop Work recorded",stop?.at ? powraTime(stop.at) : null],
-        ["Stop Work reason",decision === "stop_work" ? item.decision_reason : null],
-        ["Closed",item.closed_at ? powraTime(item.closed_at) : null],["Closure outcome",closureLabels[review.outcome]],
+        ["Initial decision",decisionDetails[stop?.previous_decision || decision]?.[0],"scope"],
+        ["Assessment recorded",powraTime(item.created_at),"calendar"],
+        ["Initial decision notes",stop ? stop.previous_reason : item.decision_reason,"conversation"],
+        ["Stop Work recorded",stop?.at ? powraTime(stop.at) : null,"alert"],
+        ["Stop Work reason",decision === "stop_work" ? item.decision_reason : null,"conversation"],
+        ["Closed",item.closed_at ? powraTime(item.closed_at) : null,"history"],
+        ["Closure outcome",closureLabels[review.outcome],"checkCircle"],
       ]}/>
     </section>}
     {open && <div className={styles.dock}>
