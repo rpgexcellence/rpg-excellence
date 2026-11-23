@@ -37,6 +37,7 @@ const paths = {
   testing: 'M9 3h6 M10 3v7L4 18a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-6-8V3 M7 15h10',
   handover: 'M3 7h17m-4-4 4 4-4 4M21 17H4m4-4-4 4 4 4',
   workflow: 'M10 3h4v4h-4z M12 7v5 M5 16v-4h14v4 M3 16h4v4H3z M17 16h4v4h-4z',
+  play: 'M8 4l13 8-13 8z',
   circle: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z',
   noise: 'M3 10v4h4l5 4V6l-5 4z M16 9c2 2 2 4 0 6 M19 6c4 4 4 8 0 12',
   calendar: 'M4 6h16v14H4z M8 3v6 M16 3v6 M4 10h16 M8 14h2 M14 14h2 M8 17h2',
