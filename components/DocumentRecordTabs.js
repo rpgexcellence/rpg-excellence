@@ -21,6 +21,16 @@ const paths = {
   open: 'M14 4h6v6 M20 4l-9 9 M11 6H5v13h13v-6',
   check: 'M5 12l4 4 10-10',
   more: 'M5 12h.01 M12 12h.01 M19 12h.01',
+  alert: 'M12 3 2 20h20z M12 9v4 M12 16h.01',
+  electrical: 'M13 2 4 14h7l-1 8 10-12h-7z',
+  chemical: 'M9 3h6 M10 3v7L4 18a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-6-8V3 M7 15h10',
+  fire: 'M12 2c2 5 7 8 7 13a7 7 0 0 1-14 0c0-3 2-5 3-6 0 3 2 4 2 4 2-3 3-7 2-11z M12 14c-2 2-3 4-2 6',
+  mechanical: 'M4 4l4 1 2 3-2 2-3-2z M9 9l11 11 M15 10l5-5 M16 4l4 4 M9 15l-5 5',
+  height: 'M8 3v18 M16 3v18 M8 6h8 M8 10h8 M8 14h8 M8 18h8',
+  pin: 'M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0z M14 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0z',
+  qr: 'M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M13 13h4v4h-4z M21 13v4 M13 21h8v-3',
+  permit: 'M7 4h10v17H7z M10 4V2h4v2 M9 12l2 2 4-4',
+  noise: 'M3 10v4h4l5 4V6l-5 4z M16 9c2 2 2 4 0 6 M19 6c4 4 4 8 0 12',
 };
 
 export function RecordIcon({ name }) {

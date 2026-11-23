@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { healthSafetyPosition, residualBand } from "../lib/health-safety-dashboard.mjs";
+import { healthSafetyPosition, residualBand, riskMatrixPosition } from "../lib/health-safety-dashboard.mjs";
+
+test("matrix links retain distinct likelihood and severity cells with the same score", () => {
+  const positions = [[1, 4], [2, 2], [4, 1]].map(([likelihood, severity]) => riskMatrixPosition(likelihood, severity));
+  assert.deepEqual(positions.map(position => position.cell), ["1-4", "2-2", "4-1"]);
+  assert.ok(positions.every(position => position.score === 4 && residualBand(position.score) === "acceptable"));
+  for (const input of [[null, 4], [1, 0], [6, 5], [2.5, 4]]) {
+    assert.equal(riskMatrixPosition(...input), null);
+  }
+});
 
 const today = "2026-11-20";
 const current = { id: "current", status: "approved", review_date: today };

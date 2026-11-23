@@ -8,7 +8,13 @@
 .recipientFilter details { position: relative; }
 .recipientFilter summary { padding: 8px; border: 1px solid #bdd0e0; border-radius: 5px; background: #fbfdff; }
 .recipientOptions { position: absolute; inset: calc(100% + 4px) 0 auto; z-index: 2; padding: 6px 9px; max-height: 190px; overflow: auto; border: 1px solid #bdd0e0; border-radius: 5px; background: #fff; box-shadow: 0 4px 12px #102b4620; }
-.profile { display: flex; align-items: stretch; gap: 10px; }
-.profile > div { flex: 1; min-width: 0; display: grid; gap: 3px; padding: 8px; border: 1px solid #d1e0eb; border-radius: 6px; background: #f5f9fc; }
-.profile strong { font: 700 27px Georgia, serif; }
+.profile { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .heat { --hs-line: #d1e0eb; }
+.matrixAnchor { scroll-margin-top: 5rem; }
+.iconTitle { display: flex; align-items: center; gap: 7px; }
+.documentsGrid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; }
+.qrPanel { align-self: start; padding: 0 12px 12px; border: 1px solid #d1e0eb; border-radius: 7px; background: #f5f9fc; }
+.qrCards { list-style: none; display: grid; gap: 9px; margin: 0; padding: 0; }
+.qrCards li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border: 1px solid #d1e0eb; border-radius: 7px; background: #fff; padding: 8px; }
+.qrCards img { display: block; max-width: 100%; height: auto; }
+@media (max-width: 760px) { .documentsGrid { grid-template-columns: 1fr; } }
