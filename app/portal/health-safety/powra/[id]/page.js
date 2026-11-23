@@ -79,6 +79,7 @@ export default async function PowraRecordPage({params,searchParams}) {
     <PowraHero title={item.task} reference={[item.powra_reference,"Point of Work Risk Assessment"].filter(Boolean).join(" · ")} description={workplace || "Workplace not recorded"}>
       <span className={styles.recordStatus}>{status}</span>
       <Link className={styles.button} href={POWRA_ROOT}>POWRA register</Link>
+      <a className={styles.button} href={href+"/pdf"}><RecordIcon name="download"/>Download POWRA PDF</a>
       <PrintPowra/>
       {decision !== "safe_to_start" && <Link className={styles.primary} href={POWRA_ROOT+"/new?reassess="+id}>Start reassessment</Link>}
     </PowraHero>

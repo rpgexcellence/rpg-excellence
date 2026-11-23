@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { createAdminClient } from "../../../../../lib/supabase/admin";
 import { getOrganizationAccess } from "../../../../../lib/organization-access";
 import { riskMatrixPosition } from "../../../../../lib/health-safety-dashboard.mjs";
+import { resolvePowraLink, permitRoot, inspectionRoot, riskAssessmentRoot as riskRoot } from "../../../../../lib/powra-links";
 import { POWRA_ROOT } from "../../../../../lib/powra-workflow.mjs";
 import { zoneUrl } from "../../../../../lib/site-zones";
 import { UUID } from "../../../../../lib/zone-policy.mjs";
@@ -11,7 +12,6 @@ import { RecordIcon } from "../../../../../components/DocumentRecordTabs";
 import { PowraFacts } from "../PowraUI";
 import styles from "../powra.module.css";
 
-const riskRoot = "/portal/health-safety/risk-assessment";
 const checkLabels = { yes:"Yes", no:"No", na:"Not applicable" };
 const riskLabels = { low:["Low","safe"], medium:["Medium","controls"], high:["High","stop"] };
 
@@ -75,7 +75,7 @@ async function WorkplaceQR({ item, zoneId }) {
   </div>;
 }
 
-export default function PowraRecordContext({ tab,item,hazards,checks,work,review }) {
+export default async function PowraRecordContext({ tab,item,hazards,checks,work,review }) {
   if (tab === "hazards") return <>
     <section className={styles.panel}>
       <h2><RecordIcon name="alert"/>Hazards and risk decisions</h2>
@@ -104,10 +104,19 @@ export default function PowraRecordContext({ tab,item,hazards,checks,work,review
     </section>
   </>;
   const reference = item.linked_assessment_id;
+  const access = await getOrganizationAccess("risk_management", "view");
+  const org = access.allowed && access.organization?.id === item.organization_id ? item.organization_id : null;
+  const resolveDocument = (kind, key, reference) => Object.hasOwn(work,key)
+    ? work[key] ? resolvePowraLink(kind,org,item.administration_location_id,{id:work[key]}) : null
+    : resolvePowraLink(kind,org,item.administration_location_id,{reference});
+  const [permit, inspection] = await Promise.all([
+    resolveDocument("permit","permit_id",item.linked_permit_reference),
+    resolveDocument("inspection","inspection_id",work.inspection_reference),
+  ]);
   const related = [
     ["Risk assessment","overview", reference ? riskRoot+"/"+reference : riskRoot, reference ? "Open linked assessment" : null],
-    ["Permit to work","permit","/portal/health-safety/permits",item.linked_permit_reference],
-    ["Workplace inspection","clipboard","/portal/health-safety/workplace-inspections",work.inspection_reference],
+    ["Permit to work","permit",permit ? permitRoot+"/"+permit.id : permitRoot,item.linked_permit_reference,Boolean(permit)],
+    ["Workplace inspection","clipboard",inspection ? inspectionRoot+"/"+inspection.id : inspectionRoot,work.inspection_reference,Boolean(inspection)],
     ["Incident reporting","alert","/portal/incidents",review.incident_reference],
   ];
   if (work.reassessment_of && UUID.test(work.reassessment_of)) {
@@ -118,9 +127,13 @@ export default function PowraRecordContext({ tab,item,hazards,checks,work,review
     <div className={styles.documentsLayout}>
       <div>
         <h3>Linked documents</h3>
-        <ul className={styles.questions}>{related.map(([label,icon,url,record]) => <li key={label}>
+        <ul className={styles.questions}>{related.map(([label,icon,url,record,direct=true]) => <li key={label}>
           <strong className={styles.factIcon}><RecordIcon name={icon}/>{label}</strong>
-          <p>{record ? <Link href={url}>{record}</Link> : <><small>No reference recorded</small> · <Link href={url}>Open module</Link></>}</p>
+          <p>{!record && <><small>No reference recorded</small> · </>}
+            {record && !direct && <><span>{record}</span> · </>}
+            <Link href={url}>{record && direct ? record : record ? "Open register" : "Open module"}</Link>
+            {label === "Risk assessment" && reference && <><span> · </span><a href={url+"/report"} download>Download PDF</a></>}
+          </p>
         </li>)}</ul>
         <h3 className={styles.factIcon}><RecordIcon name="pin"/>Applicability</h3>
         <PowraFacts rows={[
