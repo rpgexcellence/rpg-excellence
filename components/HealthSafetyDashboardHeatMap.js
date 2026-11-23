@@ -48,6 +48,7 @@ export default function HealthSafetyDashboardHeatMap({ hazards, registerHref, re
       <div>
         <h2 id="hs-heat-map">Risk heat map</h2>
         <p>Select a cell to see its hazards · <span role="status">{viewCount} {viewCount === 1 ? "hazard" : "hazards"} in view</span></p>
+        <p>Large numbers count hazards. The corner number is the risk score.</p>
       </div>
       <div className={styles.heatModes} role="group" aria-label="Risk stage">
         {modes.map(([value, label]) => <button type="button" key={value} aria-pressed={mode === value} onClick={() => {

@@ -69,15 +69,18 @@ export default async function PowraRegisterPage({ searchParams }) {
       </form>
       {filtered.length ? <div className={styles.tableWrap}><table className={styles.table}>
         <thead><tr>{headings.map(heading => <th scope="col" key={heading}>{heading}</th>)}</tr></thead>
-        <tbody>{filtered.map(row => <tr key={row.id}>
-          <td><Link href={POWRA_ROOT+"/"+row.id}>{row.task}</Link><br/>{row.powra_reference}</td>
-          <td data-label="Location">{[row.site_location,row.work_area].filter(Boolean).join(" · ") || "Not recorded"}</td>
-          <td data-label="Assessor">{row.completed_by}</td>
-          <td data-label="Assessment time">{row.created_at ? powraTime(row.created_at) : powraDate(row.assessment_date)}</td>
-          <td data-label="Safety decision"><DecisionBadge decision={powraDecision(row)}/></td>
-          <td data-label="Controls outstanding">{powraOutstanding(row) ?? "Not recorded"}</td>
-          <td data-label="Record status">{powraStatus(row)}</td>
-        </tr>)}</tbody>
+        <tbody>{filtered.map(row => {
+          const outstanding = powraOutstanding(row);
+          return <tr key={row.id}>
+            <td><Link href={POWRA_ROOT+"/"+row.id}>{row.task}</Link><br/>{row.powra_reference}</td>
+            <td data-label="Location">{[row.site_location,row.work_area].filter(Boolean).join(" · ") || "Not recorded"}</td>
+            <td data-label="Assessor">{row.completed_by}</td>
+            <td data-label="Assessment time">{row.created_at ? powraTime(row.created_at) : powraDate(row.assessment_date)}</td>
+            <td data-label="Safety decision"><DecisionBadge decision={powraDecision(row)}/></td>
+            <td data-label="Controls outstanding">{outstanding === 0 ? "None outstanding" : outstanding ?? "Not recorded"}</td>
+            <td data-label="Record status">{powraStatus(row)}</td>
+          </tr>;
+        })}</tbody>
       </table></div> : <p className={styles.empty}>{records.length ? "No assessments match these filters." : "No POWRA records have been created."}</p>}
     </section>
   </main>;
