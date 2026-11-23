@@ -20,6 +20,6 @@ export function DecisionBadge({ decision }) {
 }
 
 export function PowraFacts({ rows }) {
-  return <dl className={styles.facts}>{rows.map(([label, value]) =>
-    <div key={label}><dt>{label}</dt><dd>{value || "Not recorded"}</dd></div>)}</dl>;
+  return <dl className={styles.facts}>{rows.map(([label, value, icon]) =>
+    <div key={label}><dt className={icon ? styles.factIcon : undefined}>{icon && <RecordIcon name={icon}/>}<span>{label}</span></dt><dd>{value || value === 0 ? value : "Not recorded"}</dd></div>)}</dl>;
 }
