@@ -1,13 +1,14 @@
 import Link from "next/link";
 import {notFound,redirect} from "next/navigation";
 import {createClient} from "../../../../../../lib/supabase/server";
-import {getPermitAccess,mayEditPermit} from "../../../../../../lib/permitAccess";
+import {getPermitAccess,mayEditPermit,mayVerifyPermit} from "../../../../../../lib/permitAccess";
 import {
   addAtmosphereTest,
   addIsolation,
   recordHandover,
   reinstateIsolation
 } from "./actions";
+import {effectivePermitStatus} from "../../../../../../lib/permitLifecycle";
 import PermitHandoverForm from "../../../../../../components/PermitHandoverForm";
 
 export const dynamic="force-dynamic";
@@ -759,11 +760,11 @@ export default async function PermitControlsPage({
             permit and the issuer reauthorises it.
           </p>
 
-          <PermitHandoverForm
+          {mayVerifyPermit(access) && effectivePermitStatus(access.permit)==="handover_required" && <PermitHandoverForm
             action={recordHandover}
             permitId={id}
             people={people}
-          />
+          />}
 
           <div
             className="ctGrid"

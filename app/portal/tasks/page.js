@@ -8,6 +8,8 @@ import { loadAssuranceTaskSources } from "../../../lib/assurance-task-sources";
 import { getPortalAccess } from "../../../lib/portal-access";
 import { allowedTaskSources } from "../../../lib/task-module-access.mjs";
 import { riskAcknowledgementTasks } from "../../../lib/risk-distribution";
+import { createClient } from "../../../lib/supabase/server";
+import { loadPermitTasks } from "../../../lib/permit-tasks";
 import { companyDocumentTasks } from "../../../lib/company-documents";
 
 export const dynamic = "force-dynamic";
@@ -223,9 +225,10 @@ export default async function TasksPage({ searchParams }) {
   const enabledSources = allowedTaskSources(await getPortalAccess(access.user));
   const admin = createAdminClient();
   const organizationId = access.organization.id;
-  const [peopleResult, sources] = await Promise.all([
+  const [peopleResult, sources, permits] = await Promise.all([
     admin.from("organization_people").select("*").eq("organization_id", organizationId).neq("account_status", "closed"),
     loadAssuranceTaskSources(admin, organizationId, enabledSources),
+    enabledSources.has("permit") ? createClient().then(client => loadPermitTasks(client, organizationId)) : {tasks:[],error:false},
   ]);
   if (peopleResult.error) throw new Error(peopleResult.error.message);
   const people = peopleResult.data || [];
@@ -248,7 +251,8 @@ export default async function TasksPage({ searchParams }) {
   const activeRecipients = new Map(people.filter(person => person.account_status === "active" && person.account_type === "system")
     .map(person => [person.id, person.user_id]));
   const assignedBriefings = acknowledgements.filter(item => activeRecipients.get(item.assignee) === item.assigneeUserId);
-  const all = [...assignedBriefings,...soaTasks(sources.soaEntries||[]),...incidentTasks,...documentSource.tasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
+  if (permits.error) sources.sourceErrors.push({module:"permit",label:"Permit to Work"});
+  const all = [...permits.tasks,...assignedBriefings,...soaTasks(sources.soaEntries||[]),...incidentTasks,...documentSource.tasks,...sources.riskActions.map((row)=>normalize(row,"risk")), ...sources.mocActions.map((row)=>normalize(row,"moc")), ...capaTasks(sources), ...sources.rcaActions.map((row)=>normalize(row,"rca")), ...sources.supplierActions.map((row)=>normalize(row,"supplier")), ...sources.ismsTreatments.map((row)=>normalize(row,"isms")), ...securityIncidentTasks(sources), ...maintenanceTasks(sources), ...bcpTasks(sources), ...auditTasks(sources,people), ...inspectionTasks(sources)]
     .filter((item) => item.title && (enabledSources.has(item.source) || item.recipientOnly))
     .map((item) => ({ ...item, due: item.due ? String(item.due).slice(0,10) : "" }))
     .map((item) => ({ ...item, assigneePerson:personMap.get(item.assignee), verifierPerson:personMap.get(item.verifier), overdue:Boolean(item.due && item.due < today && !CLOSED.has(item.status)) }));
@@ -280,7 +284,7 @@ export default async function TasksPage({ searchParams }) {
   const overdue = open.filter((item)=>item.overdue);
   const dueSoon = open.filter((item)=>item.due && item.due >= today && item.due <= dueSoonDate);
   const verification = open.filter((item)=>needsDecision(item));
-  const moduleOptions = [...new Map(baseScope.map((item)=>[item.source,item.module])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
+  const moduleOptions = [...new Map([...(enabledSources.has("permit") ? [["permit","Permit to Work"]] : []), ...baseScope.map((item)=>[item.source,item.module])]).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const workspaceCards = [
     ["incident","Accident, Incident & Near Misses","INC","/portal/incidents"],
     ["audit","Internal Audit","AUD","/portal/internal-audits"],
@@ -288,6 +292,7 @@ export default async function TasksPage({ searchParams }) {
     ["rca","CAPA-8D","8D","/portal/rca"],
     ["capa","Gap Assessment / CAPA","CAPA","/portal/history"],
     ["risk","Risk Management","RISK","/portal/health-safety"],
+    ["permit","Permit to Work","PTW","/portal/health-safety/permits"],
     ["moc","Management of Change","MOC","/portal/health-safety/moc"],
     ["bcp","Business Continuity","BCP","/portal/business-continuity"],
     ["supplier","Supplier Assurance","SUP","/portal/suppliers"],

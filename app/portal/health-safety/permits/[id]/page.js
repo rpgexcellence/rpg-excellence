@@ -2,15 +2,16 @@ import Link from "next/link";
 import {notFound,redirect} from "next/navigation";
 import {createClient} from "../../../../../lib/supabase/server";
 import {getPermitAccess,mayAcceptHandback,mayEditPermit,mayIssuePermit,mayReceivePermit,mayVerifyPermit} from "../../../../../lib/permitAccess";
-import {effectivePermitStatus,getCloseReadiness,getIssueReadiness,PERMIT_STATUSES,statusMessage} from "../../../../../lib/permitLifecycle";
+import {effectivePermitStatus,permitAuthorityWithControls,permitControlEvidence,currentPermitControls,getCloseReadiness,getIssueReadiness,PERMIT_STATUSES,statusMessage} from "../../../../../lib/permitLifecycle";
 import {COMMON_CONTROLS,getPermitRule} from "../../../../../lib/permitControlRules";
 import {changePermitLifecycle} from "./actions";
 import SubcontractorRequests from "./subcontractor/Requests";
+import PermitValidityRefresh from "./PermitValidityRefresh";
 import {permitWorkflowFeedback} from "../../../../../lib/permit-workflow-feedback.mjs";
 
 export const dynamic="force-dynamic";
 const title=value=>String(value||"").replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
-const date=value=>value?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"—";
+const date=value=>value?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/London"}).format(new Date(value)):"—";
 
 function Action({id,intent,label,tone="blue",field,confirmation=false}){
   return <form action={changePermitLifecycle} className="pcAction"><input type="hidden" name="id" value={id}/><input type="hidden" name="intent" value={intent}/>{field&&<label>{field}<textarea name={confirmation?"confirmation":"reason"} required/></label>}<button className={`pcButton ${tone}`}>{label}</button></form>;
@@ -32,16 +33,22 @@ export default async function PermitRecordPage({params,searchParams}){
   ]);
   if(permitResult.error)throw new Error(permitResult.error.message);
   const item=permitResult.data,isolations=isolationResult.data||[],tests=testResult.data||[],handovers=handoverResult.data||[],events=eventResult.data||[],conflicts=conflictResult.data||[],people=peopleResult.data||[];
+  const [powraResult,relatedPermits]=await Promise.all([
+    item.organization_id ? supabase.from("hs_powra_assessments").select("id,powra_reference,task,end_review")
+      .eq("organization_id",item.organization_id).contains("end_review",{point_of_work:{permit_id:id}}).order("created_at",{ascending:false}) : {data:[]},
+    item.organization_id && item.linked_permit_ids?.length ? supabase.from("hs_permits").select("id,permit_reference,task_description")
+      .eq("organization_id",item.organization_id).in("id",item.linked_permit_ids) : {data:[]},
+  ]);
   const peopleById=new Map(people.map(person=>[person.id,person]));
   const displayControlValue=value=>{const person=peopleById.get(String(value||""));if(!person)return String(value);const display=[person.first_name,person.last_name].filter(Boolean).join(" ").trim()||person.email;return `${display}${person.position?` — ${person.position}`:""}`};
-  const status=effectivePermitStatus(item),definition=PERMIT_STATUSES[status],rule=getPermitRule(item.permit_type);
+  const status=effectivePermitStatus(item),authorityStatus=permitAuthorityWithControls(item,currentPermitControls(permitControlEvidence(item,isolations,tests,!isolationResult.error&&!testResult.error))),definition=PERMIT_STATUSES[authorityStatus],rule=getPermitRule(item.permit_type);
   const issue=getIssueReadiness({permit:item,rule,isolations,atmosphereTests:tests,relatedConflicts:conflicts});
   const close=getCloseReadiness({permit:item,isolations});
   const selected=item.permit_specific_controls?.selected||[],values=item.permit_specific_controls?.values||{};
   const labels=new Map([...COMMON_CONTROLS,...rule.controls].map(control=>[control.key,control.label]));
   const workflowFeedback=permitWorkflowFeedback(query,{id,canEditDefinition:mayEditPermit(access)&&status==="draft"});
 
-  return <main className="pcPage"><style>{`
+  return <main className="pcPage"><PermitValidityRefresh checkedAt={Date.now()} boundaries={item.status==="issued" ? [item.valid_from,item.valid_until,...tests.map(test=>test.expires_at)] : []}/><style>{`
   *{box-sizing:border-box}
   .pcPage{min-height:100vh;padding:30px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}
   .pcShell{width:100%;max-width:1500px;margin:auto}
@@ -129,7 +136,7 @@ export default async function PermitRecordPage({params,searchParams}){
 
     <section className={`pcStatus ${definition.tone}`}>
       <strong>{definition.label}</strong>
-      <span>{statusMessage(status,item)}</span>
+      <span>{statusMessage(authorityStatus,item)}</span>
     </section>
 
     <section className="pcGrid">
@@ -222,6 +229,30 @@ export default async function PermitRecordPage({params,searchParams}){
       </div>
     </section>
 
+    <section className="pcPanel" aria-labelledby="permit-related">
+      <h2 id="permit-related">Linked safety records</h2>
+      {(powraResult.error||relatedPermits.error) && <p>Some related records could not be loaded.</p>}
+      <div className="pcActions">
+        {item.linked_assessment_id && <Link className="pcBack" href={`/portal/health-safety/risk-assessment/${item.linked_assessment_id}`}>Open risk assessment</Link>}
+        <Link className="pcBack" href={`/portal/health-safety/permits/${id}/documents`}>Open supporting evidence</Link>
+      </div>
+      <ul>
+        {(powraResult.data||[]).map(row => <li key={row.id}>
+          <Link href={`/portal/health-safety/powra/${row.id}`}>{row.powra_reference} · {row.task}</Link>{row.end_review?.point_of_work?.inspection_id &&
+            <> · <Link href={`/portal/health-safety/workplace-inspections/${encodeURIComponent(row.end_review.point_of_work.inspection_id)}`}>Inspection linked through POWRA</Link></>}
+        </li>)}
+        {(relatedPermits.data||[]).map(row => <li key={row.id}><Link href={`/portal/health-safety/permits/${row.id}`}>{row.permit_reference} · {row.task_description}</Link></li>)}
+      </ul>
+    </section>
+
+    {handovers.length>0 && <section className="pcPanel">
+      <h2>Handover and validity history</h2>
+      <ul>{handovers.map(row => <li key={row.id}>
+        {date(row.handed_over_at)} · {row.outgoing_person_name} to {row.incoming_person_name}
+        {row.revised_valid_until && <> · Revised expiry {date(row.revised_valid_until)}</>}
+      </li>)}</ul>
+    </section>}
+
     {item.organization_id && mayIssuePermit(access) && <SubcontractorRequests admin={admin} permit={item} organization={access.organization} feedback={query?.subcontractor} />}
 
     <section className="pcPanel">
@@ -254,15 +285,15 @@ export default async function PermitRecordPage({params,searchParams}){
           <Action id={id} intent="request_handover" label="Start handover" tone="amber" field="Work state and outstanding controls"/>
         }
 
-        {status==="issued"&&mayReceivePermit(access)&&
-          <Action id={id} intent="complete_work" label="Declare work complete" tone="dark" field="Completion confirmation" confirmation/>
+        {["issued","expired"].includes(status)&&mayReceivePermit(access)&&
+          <Action id={id} intent="complete_work" label={status==="expired"?"Request handback after expiry":"Declare work ended and request handback"} tone="dark" field="Work outcome and safe condition" confirmation/>
         }
 
         {status==="awaiting_handback"&&mayAcceptHandback(access)&&
           <Action id={id} intent="accept_handback" label="Accept hand-back and close" tone="dark" field="Reinstatement confirmation" confirmation/>
         }
 
-        {["draft","awaiting_verification","awaiting_acceptance","suspended","handover_required","expired"].includes(status)&&mayIssuePermit(access)&&
+        {["draft","awaiting_verification","awaiting_acceptance","suspended","handover_required"].includes(status)&&mayIssuePermit(access)&&
           <Action id={id} intent="cancel" label="Cancel permit" tone="red" field="Cancellation reason"/>
         }
       </div>

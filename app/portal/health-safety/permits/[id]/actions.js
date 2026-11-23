@@ -353,7 +353,7 @@ export async function changePermitLifecycle(formData){
   }else if(intent==="complete_work"){
     if(!mayReceivePermit(access)){
       throw new Error(
-        "The nominated person in charge must declare the work complete."
+        "The nominated person in charge must declare that work has ended."
       );
     }
 
@@ -364,7 +364,7 @@ export async function changePermitLifecycle(formData){
 
     if(!confirmation){
       throw new Error(
-        "Confirm how the worksite was left safe and account for people, tools and materials."
+        "Confirm whether work was completed or stopped, how the worksite was left safe, and that people, tools and materials are accounted for."
       );
     }
 
@@ -469,14 +469,19 @@ export async function changePermitLifecycle(formData){
     values.status=toStatus;
   }
 
-  const {error}=await admin
+  const {data:changed,error}=await admin
     .from("hs_permits")
     .update(values)
-    .eq("id",id);
+    .eq("id",id)
+    .eq("updated_at",permit.updated_at)
+    .select("id")
+    .maybeSingle();
 
   if(error){
     throw new Error(error.message);
   }
+
+  if(!changed)throw new Error("This permit changed. Refresh it before retrying.");
 
   await event(
     admin,
@@ -495,4 +500,5 @@ export async function changePermitLifecycle(formData){
   revalidatePath(
     "/portal/health-safety/permits"
   );
+  revalidatePath("/portal/tasks");
 }

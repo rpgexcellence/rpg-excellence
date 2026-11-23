@@ -1,12 +1,12 @@
 import {notFound,redirect} from "next/navigation";
 import {createClient} from "../../../../../../lib/supabase/server";
 import {getPermitAccess} from "../../../../../../lib/permitAccess";
-import {effectivePermitStatus,PERMIT_STATUSES,statusMessage} from "../../../../../../lib/permitLifecycle";
+import {permitAuthorityWithControls,permitControlEvidence,currentPermitControls,PERMIT_STATUSES,statusMessage} from "../../../../../../lib/permitLifecycle";
 import {COMMON_CONTROLS,getPermitRule} from "../../../../../../lib/permitControlRules";
 
 export const dynamic="force-dynamic";
 const title=value=>String(value||"").replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
-const date=value=>value?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"—";
+const date=value=>value?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/London"}).format(new Date(value)):"—";
 const Cell=({label,children,wide=false})=><div className={`ppCell ${wide?"wide":""}`}><span>{label}</span><strong>{children||"Not recorded"}</strong></div>;
 
 export default async function PermitPrintPage({params}){
@@ -21,7 +21,7 @@ export default async function PermitPrintPage({params}){
   ]);
   if(permitResult.error)throw new Error(permitResult.error.message);
   const item=permitResult.data,isolations=isolationResult.data||[],tests=testResult.data||[],handovers=handoverResult.data||[],documents=documentResult.data||[];
-  const status=effectivePermitStatus(item),definition=PERMIT_STATUSES[status],rule=getPermitRule(item.permit_type),selected=item.permit_specific_controls?.selected||[],values=item.permit_specific_controls?.values||{};
+  const status=permitAuthorityWithControls(item,currentPermitControls(permitControlEvidence(item,isolations,tests,!isolationResult.error&&!testResult.error))),definition=PERMIT_STATUSES[status],rule=getPermitRule(item.permit_type),selected=item.permit_specific_controls?.selected||[],values=item.permit_specific_controls?.values||{};
   const labels=new Map([...COMMON_CONTROLS,...rule.controls].map(control=>[control.key,control.label]));
   return <main className="ppPage"><style>{`@page{size:A4;margin:12mm}*{box-sizing:border-box}.ppPage{max-width:900px;margin:auto;padding:20px;color:#071d3a;background:#fff;font:12px Arial,sans-serif}.ppHead{display:grid;grid-template-columns:1fr auto;gap:18px;padding-bottom:12px;border-bottom:4px solid #0a7e6c}.ppBrand{font-size:19px;font-weight:900}.ppHead h1{margin:6px 0 3px;font-size:25px}.ppStatus{min-width:170px;padding:13px;border-radius:9px;background:#173b59;color:#fff;text-align:center}.ppStatus strong{display:block;font-size:18px}.ppStatus span{display:block;margin-top:4px}.ppWarning{margin:12px 0;padding:10px;border:2px solid #ad3328;background:#fff1ed;color:#8e291f;font-weight:900;text-align:center}.ppSection{margin-top:13px;break-inside:avoid}.ppSection h2{margin:0;padding:8px 10px;background:#0a2e56;color:#fff;font-size:14px}.ppGrid{display:grid;grid-template-columns:1fr 1fr;border-left:1px solid #b9c9d5}.ppCell{min-height:52px;padding:8px;border-right:1px solid #b9c9d5;border-bottom:1px solid #b9c9d5}.ppCell.wide{grid-column:1/-1}.ppCell span,.ppCell strong{display:block}.ppCell span{font-size:9px;color:#60768a;font-weight:900}.ppCell strong{margin-top:4px;white-space:pre-wrap}.ppList{margin:0;padding:8px 8px 8px 28px;border:1px solid #b9c9d5;border-top:0}.ppList li{margin:5px 0}.ppTable{width:100%;border-collapse:collapse}.ppTable th,.ppTable td{padding:7px;border:1px solid #b9c9d5;text-align:left;vertical-align:top}.ppTable th{background:#edf4f8;font-size:9px}.ppSign{height:75px}.ppFooter{margin-top:14px;padding-top:8px;border-top:1px solid #aebfca;color:#5d7183;font-size:9px}.ppPrint{position:fixed;right:20px;bottom:20px;padding:12px 18px;border:0;border-radius:8px;background:#087f6c;color:#fff;font-weight:900;cursor:pointer}@media print{.ppPage{max-width:none;padding:0}.ppPrint{display:none}.ppSection{break-inside:avoid}}@media(max-width:600px){.ppHead,.ppGrid{grid-template-columns:1fr}.ppCell.wide{grid-column:auto}.ppPrint{position:static;width:100%;margin-top:15px}}`}</style>
   <header className="ppHead"><div><div className="ppBrand">RPG Excellence</div><h1>Permit to Work</h1><div>{item.permit_reference} · {title(item.permit_type)} · Version {item.version||1}</div></div><div className="ppStatus"><strong>{definition.label}</strong><span>{statusMessage(status,item)}</span></div></header>{status!=="issued"&&<div className="ppWarning">NOT VALID FOR WORK — STATUS: {definition.label.toUpperCase()}</div>}
