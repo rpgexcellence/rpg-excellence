@@ -8,6 +8,7 @@ import { requirePlanAccess } from "../../../../../lib/plan-access";
 import { loadPowraAdministrationOptions, resolvePowraCompanySelection } from "../../../../../lib/powraCompanyOptions";
 import { resolvePowraZone } from "../../../../../lib/powra-zones";
 import { decidePowra, POWRA_ROOT } from "../../../../../lib/powra-workflow.mjs";
+import { resolvePowraLink } from "../../../../../lib/powra-links";
 import { UUID } from "../../../../../lib/zone-policy.mjs";
 
 export async function createPowra(previousState, formData) {
@@ -54,18 +55,29 @@ export async function createPowra(previousState, formData) {
     const priorId = text("reassessment_of");
     const zoneId = text("zone_id");
     if ([linkedId,priorId,zoneId].some(id => id && !UUID.test(id))) throw new Error("Select valid linked records.");
-    const [linked,prior,zone] = await Promise.all([
+    const permitChoice = text("linked_permit_reference_id");
+    const inspectionChoice = text("inspection_reference_id");
+    const [linked,prior,zone,permit,inspection] = await Promise.all([
       linkedId ? supabase.from("hs_risk_assessments").select("id,administration_location_id").eq("id",linkedId).eq("owner_id",user.id)
         .eq("organization_id",organization.id).in("status",["approved","communicated"]).maybeSingle() : { data:null },
       priorId ? supabase.from("hs_powra_assessments").select("id").eq("id",priorId).eq("owner_id",user.id)
         .eq("organization_id",organization.id).in("decision",["stop_work","supervisor_review"]).maybeSingle() : { data:null },
       zoneId ? resolvePowraZone(organization.id,zoneId,[site.id]) : null,
+      permitChoice && permitChoice !== "manual" ? resolvePowraLink("permit",organization.id,site.id,{id:permitChoice}) : null,
+      inspectionChoice && inspectionChoice !== "manual" ? resolvePowraLink("inspection",organization.id,site.id,{id:inspectionChoice}) : null,
     ]);
     if (linkedId && (linked.error || !linked.data || (linked.data.administration_location_id && linked.data.administration_location_id !== site.id))) {
       throw new Error("Select an approved risk assessment applicable to this company site.");
     }
     if (zoneId && !zone) throw new Error("Select a published workplace zone at the selected site.");
     if (priorId && (prior.error || !prior.data)) throw new Error("The earlier POWRA is unavailable for reassessment.");
+    if (permitChoice && permitChoice !== "manual" && !permit) throw new Error("Select a permit to work at this company site.");
+    if (inspectionChoice && inspectionChoice !== "manual" && !inspection) throw new Error("Select a workplace inspection at this company site.");
+    const permitReference = permit?.reference || text("linked_permit_reference");
+    const inspectionReference = inspection?.reference || text("inspection_reference");
+    if ((permitChoice === "manual" && !permitReference) || (inspectionChoice === "manual" && !inspectionReference)) {
+      throw new Error("Enter a reference for each document marked for manual entry.");
+    }
     const decision = decidePowra(prestartChecks,hazards,{ linked: Boolean(linked.data), noHazards:text("no_hazards")==="yes", stop:text("manual_stop")==="yes" });
     const reason = text("decision_reason");
     if (decision === "pending") throw new Error("Confirm each check and complete the hazards and remaining-risk section.");
@@ -78,7 +90,8 @@ export async function createPowra(previousState, formData) {
     const status = decision === "stop_work" ? "stopped" : decision === "safe_to_start" ? "open" : "supervisor_review";
     const pointOfWork = {
       zone, additional_controls:hold, reassessment_of:prior.data?.id ?? null,
-      inspection_reference:text("inspection_reference") || null,
+      permit_id:permit?.id ?? null, inspection_id:inspection?.id ?? null,
+      inspection_reference:inspectionReference || null,
       no_additional_hazards:!hazards.length && text("no_hazards")==="yes",
     };
     const {data,error} = await supabase.from("hs_powra_assessments").insert({
@@ -87,7 +100,7 @@ export async function createPowra(previousState, formData) {
       work_area:[zone && [zone.reference,zone.name].join(" · "),text("work_area")].filter(Boolean).join(" · ") || null,
       completed_by:person.name, completed_by_person_id:person.id, team_member_ids:members.map(row=>row.id),
       team_members:[...members.map(row=>row.name),text("additional_team_members")].filter(Boolean).join("; ") || null,
-      linked_assessment_id:linked.data?.id || null, linked_permit_reference:text("linked_permit_reference") || null,
+      linked_assessment_id:linked.data?.id || null, linked_permit_reference:permitReference || null,
       prestart_checks:prestartChecks, hazards, additional_controls:hazards.filter(row=>row.control),
       decision:storedDecision, decision_reason:reason || null, supervisor_name:supervisor?.name || null,
       end_review:{point_of_work:pointOfWork}, status,

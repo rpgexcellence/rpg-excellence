@@ -6,6 +6,7 @@ import { loadPowraAdministrationOptions } from "../../../../../lib/powraCompanyO
 import { listPowraZones, resolvePowraZone } from "../../../../../lib/powra-zones";
 import { POWRA_ROOT } from "../../../../../lib/powra-workflow.mjs";
 import { UUID } from "../../../../../lib/zone-policy.mjs";
+import { loadPowraLinkOptions } from "../../../../../lib/powra-links";
 import PowraForm from "../../../../../components/PowraForm";
 import { createClient } from "../../../../../lib/supabase/server";
 import { PowraHero } from "../PowraUI";
@@ -27,11 +28,12 @@ export default async function NewPowraPage({ searchParams }) {
   const zoneLink = typeof query?.zone === "string" ? query.zone.trim() : "";
   const token = zoneLink.match(/^(?:https?:\/\/[^/]+)?\/area\/([\da-f-]{36})(?:[?#].*)?$/i)?.[1] || zoneLink;
   const priorId = typeof query?.reassess === "string" && UUID.test(query.reassess) ? query.reassess : null;
-  const [assessments, zones, initialZone, prior] = await Promise.all([
+  const [assessments, zones, initialZone, prior, linkOptions] = await Promise.all([
     supabase.from("hs_risk_assessments").select("id,assessment_reference,title").eq("owner_id",user.id).eq("organization_id",organization.id).in("status",["approved","communicated"]).order("updated_at",{ascending:false}),
     listPowraZones(organization.id, siteIds),
     zoneLink ? resolvePowraZone(organization.id, token, siteIds, true) : null,
     priorId ? supabase.from("hs_powra_assessments").select("id,task,powra_reference,administration_location_id,end_review").eq("id",priorId).eq("owner_id",user.id).eq("organization_id",organization.id).in("decision",["stop_work","supervisor_review"]).maybeSingle() : { data:null },
+    loadPowraLinkOptions(organization.id, siteIds),
   ]);
   if (assessments.error || prior.error) throw assessments.error || prior.error;
   return <ControlledDeviceDrafts userId={user.id} organizationId={organization.id} recordKey={`powra:new:workflow:${prior.data?.id || initialZone?.id || "manual"}`} label="POWRA"
@@ -55,7 +57,7 @@ export default async function NewPowraPage({ searchParams }) {
         <p className={styles.notice}>The earlier workplace zone is unavailable. Confirm the location before reassessment.</p>}
       <PowraForm action={createPowra} sites={sites} people={people} zones={zones} prior={prior.data}
         initialZone={initialZone || zones.find(zone => zone.id === prior.data?.end_review?.point_of_work?.zone?.id)}
-        numbering={organization} assessments={assessments.data ?? []} today={new Date().toISOString().slice(0,10)}/>
+        numbering={organization} {...linkOptions} assessments={assessments.data ?? []} today={new Date().toISOString().slice(0,10)}/>
     </main>
   </ControlledDeviceDrafts>;
 }
