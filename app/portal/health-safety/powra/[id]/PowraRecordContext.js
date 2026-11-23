@@ -18,14 +18,15 @@ const riskLabels = { low:["Low","safe"], medium:["Medium","controls"], high:["Hi
 async function LinkedRiskHeatMap({ assessmentId, organizationId }) {
   if (!UUID.test(assessmentId || "")) return null;
   const access = await getOrganizationAccess("risk_management", "view");
-  if (!access.allowed || !organizationId || access.organization?.id !== organizationId) return null;
+  const org = access.organization?.id;
+  if (!access.allowed || !org || (organizationId && org !== organizationId)) return null;
   const admin = createAdminClient();
   const assessment = await admin.from("hs_risk_assessments").select("assessment_reference")
-    .eq("organization_id",organizationId).eq("id",assessmentId).maybeSingle();
+    .eq("organization_id",org).eq("id",assessmentId).maybeSingle();
   if (assessment.error || !assessment.data) return null;
   const { data, error } = await admin.from("hs_risk_hazards")
     .select("id,hazard_description,hazard_category,current_likelihood,current_severity,residual_likelihood,residual_severity")
-    .eq("organization_id",organizationId).eq("assessment_id",assessmentId).order("display_order");
+    .eq("organization_id",org).eq("assessment_id",assessmentId).order("display_order");
   if (error) return null;
   const href = riskRoot+"/"+assessmentId+"?tab=scope";
   const hazards = (data ?? []).map(hazard => ({

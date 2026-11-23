@@ -88,7 +88,7 @@ export default async function PowraRecordPage({params,searchParams}) {
     </nav>
     {tab==="overview" && <div className={styles.recordOverview}>
       <section className={styles.panel}>
-        <h2>Decision profile</h2>
+        <h2><RecordIcon name="scope"/>Decision profile</h2>
         <div className={styles.decisionTiles}>
           <div className={styles.decisionTile+" "+styles.recordedDecision+" "+styles[tone]}>
             <span>{decision === "safe_to_start" && <RecordIcon name="check"/>}Recorded decision</span><strong>{decisionLabel}</strong>
@@ -99,12 +99,12 @@ export default async function PowraRecordPage({params,searchParams}) {
         <Link href={href+"?tab=history"}>View decision history</Link>
       </section>
       <section className={styles.panel}>
-        <h2>Assessment details</h2>
+        <h2><RecordIcon name="overview"/>Assessment details</h2>
         <PowraFacts rows={[["Reference",item.powra_reference],["Assessor",item.completed_by],["Location",item.site_location],
           ["Work area",item.work_area],["Assessment date",powraDate(item.assessment_date)]]}/>
       </section>
       <section className={styles.panel}>
-        <h2>Lifecycle &amp; compliance</h2>
+        <h2><RecordIcon name="history"/>Lifecycle &amp; compliance</h2>
         <ol className={styles.timeline}>
           {milestones.map(([label,date], index) => <li key={label} aria-current={index === currentMilestone ? "step" : undefined}>
             <span className={styles.lifecycleMarker} data-recorded={Boolean(date)} aria-hidden="true">{date && <RecordIcon name="check"/>}</span>
@@ -113,22 +113,22 @@ export default async function PowraRecordPage({params,searchParams}) {
         </ol>
       </section>
       <section className={styles.panel}>
-        <h2>Hazards &amp; controls</h2>
+        <h2><RecordIcon name="alert"/>Hazards &amp; controls</h2>
         <p>{checks.length} pre-start {checks.length === 1 ? "check" : "checks"} · {hazards.length} {hazards.length === 1 ? "hazard" : "hazards"} recorded</p>
         <Link href={href+"?tab=hazards"}>Open hazards and controls</Link>
       </section>
       <section className={styles.panel}>
-        <h2>Verification &amp; learning</h2>
+        <h2><RecordIcon name="checkCircle"/>Verification &amp; learning</h2>
         <p>Closure outcome <strong>{outcome}</strong></p>
         <Link href={href+"?tab=learning"}>View verification and close-out</Link>
       </section>
       <section className={styles.panel}>
-        <h2>Documents &amp; Applicability</h2>
+        <h2><RecordIcon name="documents"/>Documents &amp; Applicability</h2>
         <p>{workplace || "Workplace not recorded"}</p>
         <Link href={href+"?tab=links"}>View documents and applicability</Link>
       </section>
       <section className={styles.panel+" "+styles.recordScope}>
-        <h2>Task and scope</h2><p>{[item.task,workplace].filter(Boolean).join(" · ") || "Not recorded"}</p>
+        <h2><RecordIcon name="permit"/>Task and scope</h2><p>{[item.task,workplace].filter(Boolean).join(" · ") || "Not recorded"}</p>
       </section>
     </div>}
     {tab==="details" && <section className={styles.panel}>
