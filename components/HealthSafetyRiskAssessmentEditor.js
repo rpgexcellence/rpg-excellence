@@ -6,43 +6,26 @@ import { useActionState, useState, useRef, useEffect } from "react";
 import HazardPPEFields from './HazardPPEFields';
 import HazardPPEEditor from './HazardPPEEditor';
 import PPERequirements from './PPERequirements';
+import HealthSafetyRiskScore from './HealthSafetyRiskScore';
+import styles from './HealthSafetyRiskScore.module.css';
+import { RecordIcon } from './DocumentRecordTabs';
+import { riskMatrixPosition } from '../lib/health-safety-dashboard.mjs';
 const categories = ["Physical", "Mechanical", "Chemical", "Environmental", "Biological", "Human", "Electrical", "Fire / Explosion", "Radiation", "Work at Height", "Manual Handling", "Noise / Vibration", "Temperature", "Confined Space", "Ergonomic / DSE", "Psychosocial", "Other"];
 const hierarchy = ["Eliminate", "Substitute", "Engineering controls", "Administrative controls", "PPE"];
 const peopleGroups = ["Employees", "Contractors", "Visitors", "Members of the public", "Young persons", "New or expectant mothers", "Disabled persons", "Lone workers", "Others"];
 const likelihoodOptions = [[1, "Very unlikely — exceptional circumstances"], [2, "Unlikely — could occur but is not expected"], [3, "Possible — may occur occasionally"], [4, "Likely — expected in normal circumstances"], [5, "Very likely — expected frequently or repeatedly"]];
 const severityOptions = [[1, "No injury or negligible harm"], [2, "First-aid injury"], [3, "Short-term absence injury"], [4, "Major injury or long-term harm"], [5, "Fatality or multiple serious injuries"]];
 const decisions = [["reduce", "Reduce — further controls required"], ["avoid", "Avoid — do not undertake the exposure"], ["share_transfer", "Share / transfer with controlled oversight"], ["accept", "Accept with formal authority"], ["stop_work", "Stop work / immediate escalation"]];
-function riskBand(score) {
-  if (!score) return {
-    "label": "Not scored",
-    "tone": "none"
-  };
-  if (score >= 15) return {
-    "label": "Unacceptable",
-    "tone": "red"
-  };
-  if (score >= 10) return {
-    "label": "Inadequate",
-    "tone": "orange"
-  };
-  if (score >= 5) return {
-    "label": "Adequate",
-    "tone": "amber"
-  };
-  return {
-    "label": "Acceptable",
-    "tone": "green"
-  };
+const hazardIcons = {
+  Electrical: 'electrical', Chemical: 'chemical', 'Fire / Explosion': 'fire',
+  Mechanical: 'mechanical', 'Work at Height': 'height', 'Noise / Vibration': 'noise',
+  Human: 'distribution', 'Manual Handling': 'distribution', 'Ergonomic / DSE': 'distribution',
+};
+
+function ScoreCard({ title, severity, likelihood }) {
+  return <HealthSafetyRiskScore title={title} position={riskMatrixPosition(Number(likelihood), Number(severity))}/>;
 }
-function ScoreCard({
-  title,
-  severity,
-  likelihood
-}) {
-  const score = Number(severity) * Number(likelihood);
-  const band = riskBand(score);
-  return <div className={"hreScore " + band.tone}><span>{title}</span><strong>{score || "—"}</strong><small>{band.label}</small></div>;
-}
+
 export default function HealthSafetyRiskAssessmentEditor({
   assessmentId,
   hazards = [],
@@ -50,6 +33,7 @@ export default function HealthSafetyRiskAssessmentEditor({
   addHazardAction,
   updatePPEAction,
   zones = [],
+  heatMapHref,
   readOnly = false
 }) {
   const formRef = useRef(null),
@@ -90,13 +74,35 @@ export default function HealthSafetyRiskAssessmentEditor({
   }, null);
   const elevated = residualScore >= 10;
   const responsiblePerson = companyPeople.find(person => person.id === responsiblePersonId);
-  return <section className="hreWrap"><style>{"\n    .hreWrap{display:grid;gap:15px}.hreList{display:grid;gap:10px}.hreHazard{display:grid;grid-template-columns:1.35fr .55fr .55fr auto;gap:14px;align-items:center;padding:17px;border:1px solid #dce6ed;border-radius:12px;background:#fff}.hreHazard strong,.hreHazard small{display:block}.hreHazard small{color:#74899c;margin-top:4px}.hreBand{justify-self:start;padding:7px 9px;border-radius:999px;font-size:11px;font-weight:900}.hreBand.red{background:#ffe8e6;color:#bd2c25}.hreBand.orange{background:#fff0e6;color:#ba4d13}.hreBand.amber{background:#fff5d8;color:#805d00}.hreBand.green{background:#e3f7ed;color:#087149}.hreHazard>a{color:#087f6c;font-weight:900;text-decoration:none}.hreEmpty{padding:24px;border-radius:12px;background:#f2f7fa;color:#637a91}.hreAdd{padding:0;border:1px solid #d5e2ea;border-radius:16px;background:#fff;overflow:hidden}.hreAddHead{width:100%;padding:20px 23px;border:0;background:#fff;color:#102f4b;display:flex;justify-content:space-between;gap:20px;align-items:center;text-align:left;cursor:pointer}.hreAddHead strong{font-size:19px}.hreAddHead span{color:#087f6c;font-weight:900}.hreForm{padding:4px 23px 24px;border-top:1px solid #e2eaf0}.hreStep{padding:22px 0;border-bottom:1px solid #e5ecf1}.hreStep:last-of-type{border-bottom:0}.hreStepHead{margin-bottom:16px}.hreStepHead span{color:#1762ef;font-size:11px;font-weight:900;letter-spacing:.09em}.hreStepHead h3{margin:5px 0}.hreStepHead p{margin:0;color:#6b8095}.hreGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.hreField{display:grid;gap:7px}.hreField.full{grid-column:1/-1}.hreField label,.hreLegend{font-size:12px;font-weight:900;color:#294a66}.hreField input,.hreField select,.hreField textarea{width:100%;padding:12px;border:1px solid #cbd8e5;border-radius:9px;background:#fff;color:#102e49;font:inherit}.hreField textarea{min-height:88px;resize:vertical}.hrePrompt{display:block;margin-top:7px;color:#9a4b14;font-size:11px;font-weight:800}.hreScoreGrid{display:grid;grid-template-columns:1fr 1fr 180px;gap:13px;align-items:end}.hreScore{min-height:75px;padding:11px 15px;border-radius:10px;background:#edf2f6;display:grid;grid-template-columns:1fr auto;align-items:center}.hreScore span{font-size:11px;font-weight:900}.hreScore strong{font-size:29px}.hreScore small{grid-column:1/-1;font-weight:850}.hreScore.red{background:#bd2d27;color:#fff}.hreScore.orange{background:#e66732;color:#fff}.hreScore.amber{background:#f2ba38;color:#302200}.hreScore.green{background:#2ca46f;color:#fff}.hreChecks{display:flex;gap:8px;flex-wrap:wrap}.hreCheck{display:flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid #d2deea;border-radius:9px;font-size:12px;font-weight:750}.hreCheck input{width:auto;accent-color:#087f6c}.hreGuidance{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}.hreGuide{padding:14px;border-radius:10px;background:#f2f6f9}.hreGuide strong{display:block;margin-bottom:7px;font-size:12px}.hreGuide span{display:block;margin-top:4px;color:#60758a;font-size:10px;line-height:1.35}.hreWarning{margin-top:13px;padding:13px;border-left:5px solid #c8342c;border-radius:8px;background:#fff0ef;color:#8c2722;font-size:12px;font-weight:850}.hreAction{padding:18px;border:1px solid #f0c660;border-radius:12px;background:#fff9e8}.hreSubmit{display:flex;justify-content:flex-end;margin-top:20px}.hreSubmit button{padding:13px 19px;border:0;border-radius:9px;background:#087f6c;color:#fff;font-weight:900;cursor:pointer}@media(max-width:760px){.hreHazard{grid-template-columns:1fr auto}.hreHazard>:nth-child(2),.hreHazard>:nth-child(3){display:none}.hreGrid,.hreScoreGrid,.hreGuidance{grid-template-columns:1fr}.hreField.full{grid-column:auto}}\n  "}</style>
+  return <section className="hreWrap"><style>{"\n    .hreWrap{display:grid;gap:15px}.hreList{display:grid;gap:10px}.hreHazard{display:grid;grid-template-columns:minmax(0,1.7fr) repeat(2,minmax(105px,.55fr));gap:12px;align-items:center;padding:14px;border:1px solid #dce6ed;border-radius:9px;background:#fff;scroll-margin-top:5rem}.hreHazard:target{outline:2px solid #276397;outline-offset:2px}.hreHazardIdentity{display:flex;align-items:flex-start;gap:10px;overflow-wrap:anywhere}.hreHazardIcon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:6px;background:#e8f0f8;color:#174670}.hreHazardIdentity small{display:block;color:#48627b;margin-top:4px}.hreEmpty{padding:24px;border-radius:12px;background:#f2f7fa;color:#637a91}.hreAdd{padding:0;border:1px solid #d5e2ea;border-radius:16px;background:#fff;overflow:hidden}.hreAddHead{width:100%;padding:20px 23px;border:0;background:#fff;color:#102f4b;display:flex;justify-content:space-between;gap:20px;align-items:center;text-align:left;cursor:pointer}.hreAddHead strong{font-size:19px}.hreAddHead span{color:#087f6c;font-weight:900}.hreForm{padding:4px 23px 24px;border-top:1px solid #e2eaf0}.hreStep{padding:22px 0;border-bottom:1px solid #e5ecf1}.hreStep:last-of-type{border-bottom:0}.hreStepHead{margin-bottom:16px}.hreStepHead span{color:#1762ef;font-size:11px;font-weight:900;letter-spacing:.09em}.hreStepHead h3{margin:5px 0}.hreStepHead p{margin:0;color:#6b8095}.hreGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.hreField{display:grid;gap:7px}.hreField.full{grid-column:1/-1}.hreField label,.hreLegend{font-size:12px;font-weight:900;color:#294a66}.hreField input,.hreField select,.hreField textarea{width:100%;padding:12px;border:1px solid #cbd8e5;border-radius:9px;background:#fff;color:#102e49;font:inherit}.hreField textarea{min-height:88px;resize:vertical}.hrePrompt{display:block;margin-top:7px;color:#9a4b14;font-size:11px;font-weight:800}.hreScoreGrid{display:grid;grid-template-columns:1fr 1fr 180px;gap:13px;align-items:end}.hreChecks{display:flex;gap:8px;flex-wrap:wrap}.hreCheck{display:flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid #d2deea;border-radius:9px;font-size:12px;font-weight:750}.hreCheck input{width:auto;accent-color:#087f6c}.hreGuidance{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}.hreGuide{padding:14px;border-radius:10px;background:#f2f6f9}.hreGuide strong{display:block;margin-bottom:7px;font-size:12px}.hreGuide span{display:block;margin-top:4px;color:#60758a;font-size:10px;line-height:1.35}.hreWarning{margin-top:13px;padding:13px;border-left:5px solid #c8342c;border-radius:8px;background:#fff0ef;color:#8c2722;font-size:12px;font-weight:850}.hreAction{padding:18px;border:1px solid #f0c660;border-radius:12px;background:#fff9e8}.hreSubmit{display:flex;justify-content:flex-end;margin-top:20px}.hreSubmit button{padding:13px 19px;border:0;border-radius:9px;background:#087f6c;color:#fff;font-weight:900;cursor:pointer}@media(max-width:760px){.hreHazard{grid-template-columns:repeat(2,minmax(0,1fr))}.hreHazardIdentity{grid-column:1/-1}.hreGrid,.hreScoreGrid,.hreGuidance{grid-template-columns:1fr}.hreField.full{grid-column:auto}}\n  "}</style>
     {hazards.length ? <div className="hreList">{hazards.map(hazard => {
-        const score = hazard.residual_score ?? hazard.current_score;
-        const band = riskBand(score);
-        return <article className="hreHazard" key={hazard.id}><div><strong>{hazard.hazard_category}: {hazard.hazard_description}</strong><small>{hazard.people_exposed || "People exposed not recorded"}</small></div><div><strong>{hazard.current_score || "—"}</strong><small>Initial risk</small></div><div><strong>{hazard.residual_score || "—"}</strong><small>Residual risk</small></div><span className={"hreBand " + band.tone}>{band.label}</span>{(hazard.ppe_requirements || []).length > 0 && <div style={{
-            "gridColumn": '1 / -1'
-          }}><PPERequirements requirements={hazard.ppe_requirements} /></div>}{!readOnly && updatePPEAction && <HazardPPEEditor hazard={hazard} zones={zones} action={updatePPEAction} />}</article>;
+        const initial = riskMatrixPosition(hazard.current_likelihood, hazard.current_severity);
+        const residual = riskMatrixPosition(hazard.residual_likelihood, hazard.residual_severity);
+        const title = [hazard.hazard_category, hazard.hazard_description].filter(Boolean).join(': ');
+        const icon = Object.hasOwn(hazardIcons, hazard.hazard_category) ? hazardIcons[hazard.hazard_category] : 'alert';
+        const decisionLabel = decisions.find(([value]) => value === hazard.risk_decision)?.[1];
+        return <article className="hreHazard" id={'hazard-' + hazard.id} key={hazard.id}>
+          <div className="hreHazardIdentity">
+            <span className="hreHazardIcon"><RecordIcon name={icon}/></span>
+            <div><strong>{title || 'Hazard'}</strong><small>{hazard.people_exposed || "People exposed not recorded"}</small></div>
+          </div>
+          <HealthSafetyRiskScore title="Initial risk" position={initial}
+            href={initial && heatMapHref ? `${heatMapHref}&stage=current&cell=${initial.cell}#risk-matrix` : undefined}/>
+          <HealthSafetyRiskScore title="Residual risk" position={residual}
+            href={residual && heatMapHref ? `${heatMapHref}&stage=residual&cell=${residual.cell}#risk-matrix` : undefined}/>
+          {(hazard.existing_controls || hazard.additional_controls || decisionLabel) && <details className={styles.controls}>
+            <summary><RecordIcon name="scope"/> Controls &amp; risk decision</summary>
+            <dl>
+              {hazard.existing_controls && <div><dt>Existing controls</dt><dd>{hazard.existing_controls}</dd></div>}
+              {hazard.additional_controls && <div><dt>Additional controls</dt><dd>{hazard.additional_controls}</dd></div>}
+              {decisionLabel && <div><dt>Recorded decision</dt><dd>{decisionLabel}</dd></div>}
+            </dl>
+          </details>}
+          {(hazard.ppe_requirements || []).length > 0 && <div style={{ gridColumn: '1 / -1' }}>
+            <PPERequirements requirements={hazard.ppe_requirements} />
+          </div>}
+          {!readOnly && updatePPEAction && <HazardPPEEditor hazard={hazard} zones={zones} action={updatePPEAction} />}
+        </article>;
       })}</div> : <div className="hreEmpty">No hazards have been recorded. Add the first significant hazard below.</div>}
     {!readOnly && <section className="hreAdd">
       <button className="hreAddHead" type="button" onClick={() => setOpen(!open)} aria-expanded={open}><strong>Add a significant hazard</strong><span>{open ? "Close ×" : "Open editor +"}</span></button>

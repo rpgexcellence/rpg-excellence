@@ -1,0 +1,24 @@
+.score {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: .82rem;
+  line-height: 1.2;
+}
+.score:link, .score:visited { text-decoration: none; }
+.score:hover:link { text-decoration: underline; }
+.score:focus-visible { outline: 2px solid #184b78; outline-offset: 2px; }
+.score strong { font: 700 26px/1 Georgia, serif; }
+.title { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 700; }
+.title svg { width: 13px; height: 13px; }
+.unrated { background: #eaf1f5; color: #344e63; border-color: #d1e0eb; }
+.controls { grid-column: 1 / -1; border-top: 1px solid #dce6ed; padding-top: 9px; }
+.controls summary { cursor: pointer; font-size: .85rem; font-weight: 700; }
+.controls dl { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 12px; }
+.controls dl > div { flex: 1 1 190px; padding: 8px 10px; border-radius: 6px; background: #f2f7fa; }
+.controls dt { font-weight: 700; font-size: .82rem; }
+.controls dd { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

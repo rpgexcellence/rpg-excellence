@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { residualBand } from "../lib/health-safety-dashboard.mjs";
+import { residualBand, riskMatrixPosition } from "../lib/health-safety-dashboard.mjs";
 import styles from "./HealthSafetyHubDashboard.module.css";
 
 const likelihoods = ["Very unlikely", "Unlikely", "Possible", "Likely", "Very likely"];
@@ -17,9 +17,9 @@ const bands = {
   unacceptable: "Unacceptable",
 };
 
-export default function HealthSafetyDashboardHeatMap({ hazards, registerHref, registerAnchor, selection, onSelection, className = "" }) {
-  const [mode, setMode] = useState("residual");
-  const [localSelected, setSelected] = useState("");
+export default function HealthSafetyDashboardHeatMap({ hazards, registerHref, registerAnchor, selection, onSelection, initialMode = "residual", initialCell = "", className = "" }) {
+  const [mode, setMode] = useState(initialMode);
+  const [localSelected, setSelected] = useState(initialCell);
   const selected = selection ?? localSelected;
   const changeSelection = key => {
     setSelected(key);
@@ -30,8 +30,9 @@ export default function HealthSafetyDashboardHeatMap({ hazards, registerHref, re
     let total = 0;
     for (const hazard of hazards) {
       const [likelihood, severity] = hazard[mode];
-      if (!levels.includes(likelihood) || !levels.includes(severity)) continue;
-      const key = likelihood + "-" + severity;
+      const position = riskMatrixPosition(likelihood, severity);
+      if (!position) continue;
+      const key = position.cell;
       if (!cells.has(key)) cells.set(key, []);
       cells.get(key).push(hazard);
       total++;
@@ -81,7 +82,7 @@ export default function HealthSafetyDashboardHeatMap({ hazards, registerHref, re
     {selected && <div className={styles.heatResults}>
       <h3>Likelihood {selectedLikelihood} × severity {selectedSeverity}</h3>
       {matching.length ? <ul className={styles.list}>{matching.map(hazard => <li key={hazard.id}>
-        <Link href={registerHref + "/" + encodeURIComponent(hazard.assessmentId)}>{hazard.assessmentLabel || "Open assessment"}</Link>
+        <Link href={hazard.href ?? registerHref + "/" + encodeURIComponent(hazard.assessmentId)}>{hazard.assessmentLabel || "Open assessment"}</Link>
         <span>{hazard.label}</span>
       </li>)}</ul> : <p>No recorded hazards in this cell.</p>}
     </div>}

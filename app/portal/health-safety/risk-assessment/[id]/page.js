@@ -12,7 +12,11 @@ import { requireOrganizationAccess } from "../../../../../lib/organization-acces
 import HealthSafetyRiskAssessmentEditor from "../../../../../components/HealthSafetyRiskAssessmentEditor";
 import { DocumentRecordPanel, DocumentRecordTabButton, DocumentRecordTabs, RecordIcon } from "../../../../../components/DocumentRecordTabs";
 import HealthSafetyDashboardHeatMap from "../../../../../components/HealthSafetyDashboardHeatMap";
-import { residualBand } from "../../../../../lib/health-safety-dashboard.mjs";
+import { riskMatrixPosition } from "../../../../../lib/health-safety-dashboard.mjs";
+import { zoneUrl } from "../../../../../lib/site-zones";
+import { readableAssessment } from "../../../../../lib/zone-policy.mjs";
+import HealthSafetyRiskScore from "../../../../../components/HealthSafetyRiskScore";
+import QRCode from "qrcode";
 import RecordDistribution from "./RecordDistribution";
 import s from "../../../documents/documents.module.css";
 import styles from "./risk-record.module.css";
@@ -428,23 +432,63 @@ function Lifecycle({ assessment }) {
   </section>;
 }
 
-function Profile({ initial, residual, comparable }) {
+function Profile({ initial, residual, comparable, heatMapHref }) {
+  const change = comparable ? Math.round(Math.abs(initial.score - residual.score) * 100 / initial.score) : null;
   return <section className={s.recordPanel}><h2>Risk profile</h2>
     <div className={styles.profile}>
-      {[["Initial risk", initial], ["Residual risk", residual]].map(([name, value]) => <div key={name}>
-        <span>{name}</span><strong>{value || "—"}</strong><span>{value ? label(residualBand(value)) : "Unrated"}</span>
-      </div>)}
+      <HealthSafetyRiskScore title="Initial risk" position={initial}
+        href={initial ? `${heatMapHref}&stage=current&cell=${initial.cell}#risk-matrix` : undefined}/>
+      <HealthSafetyRiskScore title="Residual risk" position={residual}
+        href={residual ? `${heatMapHref}&stage=residual&cell=${residual.cell}#risk-matrix` : undefined}/>
     </div>
-    {comparable && initial && residual ? <p><strong>{Math.round(Math.abs(initial - residual) * 100 / initial)}% {residual > initial ? "increase" : "reduction"}</strong> in highest recorded score</p> :
+    {change !== null ? <p><strong>{change === 0 ? "No change" : `${change}% ${residual.score > initial.score ? "increase" : "reduction"}`}</strong> in highest recorded score</p> :
       <p className={s.muted}>Highest recorded score at each stage.</p>}
     <DocumentRecordTabButton name="scope">View hazards and risk matrix</DocumentRecordTabButton>
   </section>;
+}
+
+async function WorkplaceQR({ admin, org, assessment, zones }) {
+  const siteId = assessment.administration_location_id;
+  const zoneIds = zones.filter(zone => zone.site_id === siteId && zone.status === "published").map(zone => zone.id);
+  let codes = [];
+  if (readableAssessment(assessment) && zoneIds.length) {
+    const [site, published] = await Promise.all([
+      admin.from("organization_sites").select("id").eq("organization_id", org).eq("id", siteId).eq("status", "active").maybeSingle(),
+      admin.from("organization_zones").select("reference,name,public_token,access_mode")
+        .eq("organization_id", org).eq("site_id", siteId).eq("status", "published").eq("show_assessments", true)
+        .in("id", zoneIds).order("reference"),
+    ]);
+    if (site.error || published.error) {
+      return <p className={s.muted}>Workplace QR codes are temporarily unavailable.</p>;
+    }
+    if (site.data) {
+      try {
+        codes = await Promise.all((published.data ?? []).filter(zone => zone.public_token).map(async zone => {
+          const url = zoneUrl(zone.public_token);
+          return { zone, url, image: await QRCode.toDataURL(url, { width: 360, margin: 4, errorCorrectionLevel: "M" }) };
+        }));
+      } catch {
+        return <p className={s.muted}>Workplace QR codes are temporarily unavailable.</p>;
+      }
+    }
+  }
+  if (!codes.length) return <p className={s.muted}>QR access requires an approved or communicated assessment linked to a published zone that shows risk assessments.</p>;
+  return <ul className={styles.qrCards}>
+    {codes.map(({ zone, url, image }) => <li key={url}>
+      <img src={image} width={132} height={132} alt={`Workplace QR code for ${zone.reference} · ${zone.name}`}/>
+      <div><strong>{zone.reference} · {zone.name}</strong>
+        <p>{zone.access_mode === "company" ? "Company sign-in required" : "Employee zone page"}</p>
+        <Link className={s.recordButton} href={url + "#assessments"}><RecordIcon name="open"/>Open workplace zone</Link>
+      </div>
+    </li>)}
+  </ul>;
 }
 
 export default async function RiskAssessmentWorkspacePage({ params, searchParams }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const root = "/portal/health-safety/risk-assessment";
   const href = root + "/" + id;
+  const heatMapHref = href + "?tab=scope";
   const access = await requireOrganizationAccess("risk_management", "view", href);
   const admin = createAdminClient();
   const org = access.organization.id;
@@ -468,21 +512,25 @@ export default async function RiskAssessmentWorkspacePage({ params, searchParams
     ? await admin.from("organization_people").select("id,first_name,last_name,email,position").eq("organization_id", org).eq("account_status", "active").order("last_name")
     : { data: [] };
   if (peopleError) throw peopleError;
-  const initial = hazards.reduce((highest, hazard) => Math.max(highest, hazard.current_score ?? 0), 0);
-  const residual = hazards.reduce((highest, hazard) => Math.max(highest, hazard.residual_score ?? 0), 0);
-  const comparable = hazards.length > 0 && hazards.every(hazard => hazard.current_score > 0 && hazard.residual_score > 0);
-  const elevated = hazards.filter(hazard => hazard.residual_score >= 10).length;
+  const initialPositions = hazards.map(hazard => riskMatrixPosition(hazard.current_likelihood, hazard.current_severity));
+  const residualPositions = hazards.map(hazard => riskMatrixPosition(hazard.residual_likelihood, hazard.residual_severity));
+  const highestPosition = positions => positions.reduce((highest, position) =>
+    position && position.score > (highest?.score ?? 0) ? position : highest, null);
+  const initial = highestPosition(initialPositions);
+  const residual = highestPosition(residualPositions);
+  const comparable = Boolean(initial && residual && initialPositions.every(Boolean) && residualPositions.every(Boolean));
+  const elevated = residualPositions.filter(position => position?.score >= 10).length;
   const openActions = actions.filter(action => !["effective", "cancelled"].includes(action.status));
   const verifiedActions = actions.filter(action => action.status === "effective" || action.effectiveness_result === "effective_verified");
   const summary = [["Reference", assessment.assessment_reference], ["Type", label(assessment.assessment_type)], ["Version", assessment.version],
     ["Assessor", assessment.assessor_name], ["Assessed", formatDate(assessment.assessment_date)], ["Next review", formatDate(assessment.review_date)]];
   const attachments = await Promise.all([
-    ["Permit to work", assessment.permit_reference, assessment.permit_document_path, assessment.permit_document_name],
-    ["Safe system of work", assessment.safe_system_reference, assessment.ssow_document_path, assessment.ssow_document_name],
-    ["COSHH / Safety data", assessment.coshh_msds_reference, assessment.coshh_document_path, assessment.coshh_document_name],
-  ].map(async ([name, reference, path, filename]) => {
+    ["Permit to work", "permit", assessment.permit_reference, assessment.permit_document_path, assessment.permit_document_name],
+    ["Safe system of work", "overview", assessment.safe_system_reference, assessment.ssow_document_path, assessment.ssow_document_name],
+    ["COSHH / Safety data", "chemical", assessment.coshh_msds_reference, assessment.coshh_document_path, assessment.coshh_document_name],
+  ].map(async ([name, icon, reference, path, filename]) => {
     const { data } = path ? await admin.storage.from("hs-risk-assessment-evidence").createSignedUrl(path, 3600) : {};
-    return [name, reference, data?.signedUrl, filename];
+    return [name, icon, reference, data?.signedUrl, filename];
   }));
   const parentId = events.find(event => event.event_type === "revision_created")?.event_data?.source_assessment_id;
   const { data: previous, error: previousError } = parentId
@@ -490,6 +538,8 @@ export default async function RiskAssessmentWorkspacePage({ params, searchParams
     : { data: null };
   if (previousError) throw previousError;
   const tab = riskTabs.some(([key]) => key === query?.tab) ? query.tab : "overview";
+  const matrixMode = query?.stage === "current" ? "current" : "residual";
+  const matrixCell = tab === "scope" && typeof query?.cell === "string" && /^[1-5]-[1-5]$/.test(query.cell) ? query.cell : "";
   const layout = <main className={`${s.page} ${s.registerPage} ${s.recordPage}`}><div className={s.shell}>
     <p className={s.recordBreadcrumb}><Link href="/portal/health-safety">Health &amp; Safety</Link> / <Link href={root}>Risk Assessments</Link> / {assessment.assessment_reference}</p>
     <header className={`${s.hubHero} ${s.recordHero}`}>
@@ -509,7 +559,7 @@ export default async function RiskAssessmentWorkspacePage({ params, searchParams
     <DocumentRecordTabs key={`${tab}:${assessment.updated_at}:${query?.distribution ?? ""}`} initial={tab} tabs={riskTabs} sectionLabel="Risk assessment sections">
       <DocumentRecordPanel name="overview">
         <div className={s.recordOverview}>
-          <Profile initial={initial} residual={residual} comparable={comparable}/>
+          <Profile initial={initial} residual={residual} comparable={comparable} heatMapHref={heatMapHref}/>
           <section className={s.recordPanel}><h2>Assessment details</h2><Facts entries={summary}/></section>
           <Lifecycle assessment={assessment}/>
         </div>
@@ -531,13 +581,14 @@ export default async function RiskAssessmentWorkspacePage({ params, searchParams
         ]}/></section>
       </DocumentRecordPanel>
       <DocumentRecordPanel name="scope">
-        <section className={s.recordPanel}><h2>Hazards and risk decisions</h2>
+        <section className={s.recordPanel}><h2 className={styles.iconTitle}><RecordIcon name="alert"/>Hazards and risk decisions</h2>
           <HealthSafetyRiskAssessmentEditor assessmentId={id} hazards={hazards} companyPeople={people ?? []}
-            addHazardAction={addHazard} updatePPEAction={updateHazardPPE} zones={zones} readOnly={!editable}/>
+            addHazardAction={addHazard} updatePPEAction={updateHazardPPE} zones={zones} readOnly={!editable} heatMapHref={heatMapHref}/>
         </section>
-        <section className={s.recordPanel}>
-          <HealthSafetyDashboardHeatMap className={styles.heat} registerHref={root} hazards={hazards.map(hazard => ({
-            id: hazard.id, assessmentId: id, assessmentLabel: assessment.assessment_reference,
+        <section id="risk-matrix" className={`${s.recordPanel} ${styles.matrixAnchor}`}>
+          <HealthSafetyDashboardHeatMap key={`${matrixMode}:${matrixCell}`} initialMode={matrixMode} initialCell={matrixCell}
+            className={styles.heat} registerHref={root} hazards={hazards.map(hazard => ({
+            id: hazard.id, assessmentId: id, assessmentLabel: "View hazard", href: "#hazard-" + hazard.id,
             label: hazard.hazard_description || hazard.hazard_category || "Hazard",
             current: [hazard.current_likelihood, hazard.current_severity],
             residual: [hazard.residual_likelihood, hazard.residual_severity],
@@ -561,20 +612,27 @@ export default async function RiskAssessmentWorkspacePage({ params, searchParams
           </section>
         </div>
       </DocumentRecordPanel>
-      <DocumentRecordPanel name="documents"><div className={s.grid}>
-        <section className={s.recordPanel}><h2>Linked documents</h2><ul className={s.recordDecisions}>
-          {attachments.map(([name, reference, url, filename]) => <li key={name}><strong>{name}</strong><span>{reference || "No reference recorded"}</span>
-            {url && <Link href={url} download={filename || true}>Download file</Link>}</li>)}
-        </ul></section>
-        <section className={s.recordPanel}><h2>Applicability &amp; workplace QR</h2>
+      <DocumentRecordPanel name="documents"><section className={s.recordPanel}>
+        <h2 className={styles.iconTitle}><RecordIcon name="documents"/>Documents &amp; Applicability</h2>
+        <div className={styles.documentsGrid}><div>
+          <h3>Linked documents</h3><ul className={s.recordDecisions}>
+            {attachments.map(([name, icon, reference, url, filename]) => <li key={name}>
+              <strong className={styles.iconTitle}><RecordIcon name={icon}/>{name}</strong><span>{reference || "No reference recorded"}</span>
+              {url && <Link href={url} download={filename || true}><RecordIcon name="download"/> Download file</Link>}
+            </li>)}
+          </ul>
+          <h3 className={styles.iconTitle}><RecordIcon name="pin"/>Applicability</h3>
           <p>{assessment.site_location || "Location not set"}</p>
           {zones.length ? <ul className={s.recordDecisions}>{zones.map(zone => <li key={zone.id}>
             <strong>{zone.reference} · {zone.name}</strong><span>{zoneScope.buildings.find(building => building.id === zone.building_id)?.name || "External / no building"}</span>
           </li>)}</ul> : <p>No individual zones linked.</p>}
-          <p className={s.muted}>Linked workplace zones use the existing employee QR access rules for approved or communicated versions.</p>
           {editable && <Link className={s.recordButton} href={href + "/edit"}>Edit workplace scope</Link>}
-        </section>
-      </div></DocumentRecordPanel>
+        </div>
+        <div className={styles.qrPanel}>
+          <h3 className={styles.iconTitle}><RecordIcon name="qr"/>Workplace access (QR)</h3>
+          <WorkplaceQR admin={admin} org={org} assessment={assessment} zones={zones}/>
+        </div></div>
+      </section></DocumentRecordPanel>
       <DocumentRecordPanel name="distribution">
         <RecordDistribution assessment={assessment} access={access} canContribute={canContribute} result={query?.distribution}/>
       </DocumentRecordPanel>
