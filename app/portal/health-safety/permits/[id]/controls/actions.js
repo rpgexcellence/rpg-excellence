@@ -5,6 +5,8 @@ import {redirect} from "next/navigation";
 import {createClient} from "../../../../../../lib/supabase/server";
 import {getPermitAccess,mayEditPermit,mayVerifyPermit} from "../../../../../../lib/permitAccess";
 
+import {effectivePermitStatus} from "../../../../../../lib/permitLifecycle";
+
 const clean=value=>String(value||"").trim();
 const name=person=>[person.first_name,person.last_name].filter(Boolean).join(" ").trim()||person.email;
 
@@ -64,6 +66,8 @@ async function audit(ctx,eventType,eventData={}){
 function refresh(id){
   revalidatePath(`/portal/health-safety/permits/${id}`);
   revalidatePath(`/portal/health-safety/permits/${id}/controls`);
+  revalidatePath("/portal/health-safety/permits");
+  revalidatePath("/portal/tasks");
 }
 
 export async function addIsolation(formData){
@@ -304,6 +308,10 @@ export async function recordHandover(formData){
     throw new Error(
       "Issuer or reviewer authority is required to approve handover."
     );
+  }
+
+  if(effectivePermitStatus(ctx.permit)!=="handover_required"){
+    throw new Error("Start handover from the active permit before recording a transfer.");
   }
 
   const text=key=>clean(formData.get(key));

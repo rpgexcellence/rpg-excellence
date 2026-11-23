@@ -1,15 +1,78 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
-import {effectivePermitStatus,PERMIT_STATUSES} from "../../../../lib/permitLifecycle";
+import { getOrganizationAccess } from "../../../../lib/organization-access";
+import { UUID } from "../../../../lib/zone-policy.mjs";
+import { permitControlEvidence } from "../../../../lib/permitLifecycle";
+import { createAdminClient } from "../../../../lib/supabase/admin";
+import { PERMITS_ROOT, permitMatchesZone } from "../../../../lib/permit-register.mjs";
+import PermitRegister from "./PermitRegister";
 
-export const metadata={title:"Permit to Work Register | RPG Excellence"};export const dynamic="force-dynamic";
-const title=value=>String(value||"").replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
-const date=value=>value?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"—";
-export default async function PermitRegisterPage(){
-  const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)redirect("/portal/login?next=/portal/health-safety/permits");
-  const {data,error}=await supabase.from("hs_permits").select("*").order("created_at",{ascending:false});if(error)throw new Error(error.message);
-  const items=(data||[]).map(item=>({...item,status:effectivePermitStatus(item)}));
-  const issued=items.filter(item=>item.status==="issued").length,pending=items.filter(item=>["draft","awaiting_verification","awaiting_acceptance","handover_required"].includes(item.status)).length,attention=items.filter(item=>["suspended","expired","awaiting_handback"].includes(item.status)).length,closed=items.filter(item=>["closed","cancelled"].includes(item.status)).length;
-  return <main className="prPage"><style>{`*{box-sizing:border-box}.prPage{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.prShell{max-width:1260px;margin:auto}.prTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.prTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.prTop h1{margin:6px 0;font-size:34px}.prTop p{margin:0;color:#657b91}.prButton{display:inline-flex;padding:12px 16px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:900}.prMetrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}.prMetric{padding:18px;border:1px solid #d5e1e9;border-top:4px solid #1762ef;border-radius:13px;background:#fff}.prMetric.green{border-top-color:#08865f}.prMetric.amber{border-top-color:#d68a00}.prMetric.red{border-top-color:#c83b32}.prMetric span,.prMetric strong{display:block}.prMetric span{font-size:11px;color:#667d91;font-weight:850}.prMetric strong{margin-top:5px;font-size:29px}.prPanel{padding:21px;border:1px solid #d5e1e9;border-radius:15px;background:#fff}.prPanel h2{margin:0 0 4px}.prPanel>p{margin:0 0 16px;color:#687f94}.prRow{display:grid;grid-template-columns:1.3fr .8fr .8fr 1fr .8fr 150px;gap:12px;align-items:center;padding:13px;border-top:1px solid #e3eaf0}.prRow.head{border:0;border-radius:8px;background:#eef4f8;color:#667e93;font-size:11px;font-weight:850}.prRow strong,.prRow small{display:block}.prRow small{margin-top:3px;color:#74899c}.prStatus{justify-self:start;padding:6px 8px;border-radius:999px;background:#e7f2ff;color:#1759ad;font-size:11px;font-weight:850}.prStatus.green{background:#e5f7f0;color:#087257}.prStatus.red{background:#fff0e8;color:#a64024}.prStatus.amber{background:#fff5dc;color:#925c00}.prLinks{display:flex;gap:8px;flex-wrap:wrap}.prOpen{color:#087f6c;text-decoration:none;font-weight:900}.prEmpty{padding:24px;border-radius:10px;background:#f0f5f8;color:#687e92}@media(max-width:850px){.prMetrics{grid-template-columns:1fr 1fr}.prRow{grid-template-columns:1fr auto}.prRow>:not(:first-child):not(:last-child){display:none}}@media(max-width:480px){.prPage{padding:20px 12px 70px}.prMetrics{grid-template-columns:1fr 1fr}}`}</style><div className="prShell"><header className="prTop"><div><small>H&amp;S HUB · LIVE PERMIT BOARD</small><h1>Permit to Work Register</h1><p>Company permits visible according to your assigned role and H&amp;S access.</p></div><Link className="prButton" href="/portal/health-safety/permits/new">＋ New permit</Link></header><section className="prMetrics"><div className="prMetric green"><span>ACTIVE</span><strong>{issued}</strong></div><div className="prMetric"><span>IN PREPARATION / HANDOVER</span><strong>{pending}</strong></div><div className="prMetric red"><span>REQUIRING ATTENTION</span><strong>{attention}</strong></div><div className="prMetric amber"><span>CLOSED / CANCELLED</span><strong>{closed}</strong></div></section><section className="prPanel"><h2>Controlled permits</h2><p>Expired permits are calculated dynamically; work must stop when validity ends.</p>{items.length?<div><div className="prRow head"><span>Permit / task</span><span>Type</span><span>Location / asset</span><span>Validity</span><span>Status</span><span>Actions</span></div>{items.map(item=>{const definition=PERMIT_STATUSES[item.status]||PERMIT_STATUSES.draft;return <div className="prRow" key={item.id}><div><strong>{item.task_description}</strong><small>{item.permit_reference} · {item.receiver_name}</small></div><span>{title(item.permit_type)}</span><span>{item.site_location}<small>{item.asset_reference||item.equipment_asset}</small></span><span>{date(item.valid_until)}</span><span className={`prStatus ${definition.tone}`}>{definition.label}</span><div className="prLinks"><Link className="prOpen" href={`/portal/health-safety/permits/${item.id}`}>Open</Link><Link className="prOpen" href={`/portal/health-safety/permits/${item.id}/controls`}>Controls</Link></div></div>})}</div>:<div className="prEmpty">No permits are available to your account.</div>}</section></div></main>;
+export const metadata = { title: "Permit Control Centre | RPG Excellence" };
+export const dynamic = "force-dynamic";
+
+const fields = "id,organization_id,administration_location_id,organization_asset_id,permit_reference,permit_type,task_description,site_location,work_area,asset_reference,contractor_company,issuer_name,receiver_name,valid_from,valid_until,status,issued_at,issuer_declaration,receiver_declaration,verification_completed_at,emergency_arrangements,permit_specific_controls,hazards";
+
+async function evidenceByPermit(supabase, rows, table, columns) {
+  const groups = new Map();
+  for (let start = 0; start < rows.length; start += 100) {
+    const batch = rows.slice(start, start + 100).map(row => row.id);
+    const result = await supabase.from(table).select(columns).in("permit_id", batch);
+    if (result.error) return null;
+    for (const item of result.data || []) {
+      if (!groups.has(item.permit_id)) groups.set(item.permit_id, []);
+      groups.get(item.permit_id).push(item);
+    }
+  }
+  return groups;
+}
+
+async function publishedZone(admin, organizationId, token) {
+  if (!organizationId || !token) return null;
+  const { data: zone, error } = await admin.from("organization_zones").select("id,organization_id,site_id,reference,name")
+    .eq("organization_id", organizationId).eq("public_token", token).eq("status", "published").maybeSingle();
+  if (error || !zone) return null;
+  const [site, siblings] = await Promise.all([
+    admin.from("organization_sites").select("id").eq("id", zone.site_id)
+      .eq("organization_id", organizationId).eq("status", "active").maybeSingle(),
+    admin.from("organization_zones").select("id,reference,name").eq("site_id", zone.site_id).eq("organization_id", organizationId),
+  ]);
+  if (!site.data || site.error || siblings.error) return null;
+  const normalize = value => value.trim().replace(/\s+/g, " ").toLowerCase();
+  const duplicates = (siblings.data || []).filter(peer => peer.id !== zone.id);
+  return {
+    ...zone, matches: [zone.reference, zone.name].filter(label =>
+      !duplicates.some(peer => [peer.reference, peer.name].some(value => normalize(value) === normalize(label)))),
+  };
+}
+
+export default async function PermitRegisterPage({ searchParams }) {
+  const params = await searchParams;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/portal/login?next=" + encodeURIComponent(PERMITS_ROOT));
+  const token = typeof params?.zone === "string" && UUID.test(params.zone) ? params.zone : "";
+  const admin = createAdminClient();
+  const access = token ? await getOrganizationAccess() : null;
+  const zone = await publishedZone(admin, access?.organization?.id, token);
+  const rejectedZone = Boolean(params?.zone && !zone);
+  let result = { data: [] };
+  if (!rejectedZone) {
+    let query = supabase.from("hs_permits").select(fields).order("created_at", { ascending: false });
+    if (zone) query = query.eq("organization_id", zone.organization_id).eq("administration_location_id", zone.site_id);
+    result = await query;
+  }
+  if (result.error) throw new Error(result.error.message);
+  const rows = (result.data || []).filter(row => !zone || permitMatchesZone(row, zone));
+  const relevant = rows.filter(row => !["closed", "cancelled", "draft"].includes(row.status));
+  // Read only evidence for permit IDs already returned by the signed-in RLS query.
+  const [isolations, tests] = await Promise.all([
+    evidenceByPermit(admin, relevant, "hs_permit_isolations", "permit_id,applied_by,applied_by_name,applied_at,verified_by,verified_by_name,verified_at,verification_method,reinstated_at"),
+    evidenceByPermit(admin, relevant, "hs_permit_atmosphere_tests", "permit_id,parameter,result,tested_at,created_at,expires_at,calibration_due"),
+  ]);
+  const permits = rows.map(row => {
+    const evidence = permitControlEvidence(row, isolations?.get(row.id), tests?.get(row.id), Boolean(isolations && tests));
+    const { hazards, permit_specific_controls, emergency_arrangements, ...summary } = row;
+    return { ...summary, evidence };
+  });
+  return <PermitRegister permits={permits} initialTime={Date.now()} zone={zone ? { reference: zone.reference, name: zone.name } : null} rejectedZone={rejectedZone}/>;
 }
