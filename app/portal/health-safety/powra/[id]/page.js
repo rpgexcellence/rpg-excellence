@@ -10,7 +10,14 @@ import PrintPowra from "./PrintPowra";
 import styles from "../powra.module.css";
 
 export const dynamic = "force-dynamic";
-const tabs = {overview:"Overview",hazards:"Hazards & controls",learning:"Verification & learning",links:"Linked records",history:"Decision history"};
+const tabs = {
+  overview:["Overview","overview"],
+  details:["Assessment details","details"],
+  hazards:["Hazards & controls","scope"],
+  learning:["Verification & learning","checkCircle"],
+  links:["Linked records","open"],
+  history:["Decision history","history"],
+};
 const reviewFields = [["conditions_changed","Did conditions change?"],["new_hazards","Were new hazards identified?"],["controls_effective","Were controls effective?"],["incident","Incident or near miss?"]];
 const display = {yes:"Yes",no:"No",na:"Not applicable"};
 const notices = {changed:"This record changed. Check the latest decision before continuing.", stop:"Record the Stop Work reason and any escalation.",closure:"Select an eligible outcome and record the closure notes."};
@@ -32,7 +39,18 @@ export default async function PowraRecordPage({params,searchParams}) {
   const review = item.end_review || {};
   const work = review.point_of_work ?? {};
   const stop = review.stop_event;
-  const tab = Object.hasOwn(tabs,query?.tab) ? query.tab : "overview";
+  const tab = typeof query?.tab === "string" && Object.hasOwn(tabs,query.tab) ? query.tab : "overview";
+  const status = powraStatus(item);
+  const outcome = closureLabels[review.outcome] || "Not recorded";
+  const [decisionLabel, tone] = decisionDetails[decision];
+  const workplace = [item.site_location,item.work_area].filter(Boolean).join(" · ");
+  const milestones = [
+    ["Assessment recorded",item.created_at],
+    ["Supervisor review",item.supervisor_approved_at],
+    ...(decision === "stop_work" ? [["Stop Work recorded",stop?.at || item.created_at]] : []),
+    [item.status === "cancelled" ? "Record cancelled" : "Record closed",item.closed_at],
+  ];
+  const currentMilestone = milestones.findLastIndex(([, date]) => Boolean(date));
   const related = [
     ["Risk assessment",item.linked_assessment_id ? "/portal/health-safety/risk-assessment/"+item.linked_assessment_id : "/portal/health-safety/risk-assessment",item.linked_assessment_id ? "Open linked assessment" : "Browse assessments"],
     ["Permit to work","/portal/health-safety/permits",item.linked_permit_reference],
@@ -42,22 +60,63 @@ export default async function PowraRecordPage({params,searchParams}) {
   const assessmentFacts = [["Assessor",item.completed_by],["Team",item.team_members],["Location",item.site_location],["Work area",item.work_area],
     ["Assessment date",powraDate(item.assessment_date)],["Recorded at",powraTime(item.created_at)]];
   return <main className={styles.page}>
-    <PowraHero title={item.task} reference={item.powra_reference} description="Point of Work Risk Assessment">
+    <PowraHero title={item.task} reference={[item.powra_reference,"Point of Work Risk Assessment"].filter(Boolean).join(" · ")} description={workplace || "Workplace not recorded"}>
+      <span className={styles.recordStatus}>{status}</span>
       <Link className={styles.button} href={POWRA_ROOT}>POWRA register</Link>
       <PrintPowra/>
       {decision !== "safe_to_start" && <Link className={styles.primary} href={POWRA_ROOT+"/new?reassess="+id}>Start reassessment</Link>}
     </PowraHero>
     {!!notices[query?.notice] && Object.hasOwn(notices,query.notice) && <p className={styles.notice} role="alert">{notices[query.notice]}</p>}
-    <section className={styles.summary} aria-label="Decision and closure">
-      <div className={styles.panel}><h2>Recorded decision</h2><DecisionBadge decision={decision}/></div>
-      <div className={styles.panel}><h2>Record status</h2>{powraStatus(item)}</div>
-      <div className={styles.panel}><h2>Closure outcome</h2>{closureLabels[review.outcome] || "Not recorded"}</div>
-    </section>
     <nav className={styles.tabs+" "+styles.recordTabs} aria-label="POWRA record views">
-      {Object.entries(tabs).map(([key,label]) => <Link key={key} href={href+"?tab="+key} aria-current={tab===key ? "page" : undefined}>{label}</Link>)}
+      {Object.entries(tabs).map(([key,[label,icon]]) => <Link key={key} href={href+"?tab="+key} aria-current={tab===key ? "page" : undefined}><RecordIcon name={icon}/>{label}</Link>)}
     </nav>
-    {tab==="overview" && <div className={styles.grid}>
-      <section className={styles.panel}><h2><RecordIcon name="overview"/>Assessment details</h2><PowraFacts rows={assessmentFacts}/></section>
+    {tab==="overview" && <div className={styles.recordOverview}>
+      <section className={styles.panel}>
+        <h2>Decision profile</h2>
+        <div className={styles.decisionTiles}>
+          <div className={styles.decisionTile+" "+styles.recordedDecision+" "+styles[tone]}>
+            <span>{decision === "safe_to_start" && <RecordIcon name="check"/>}Recorded decision</span><strong>{decisionLabel}</strong>
+          </div>
+          <div className={styles.decisionTile}><span>Record status</span><strong>{status}</strong></div>
+        </div>
+        <p>Closure outcome <strong>{outcome}</strong></p>
+        <Link href={href+"?tab=history"}>View decision history</Link>
+      </section>
+      <section className={styles.panel}>
+        <h2>Assessment details</h2>
+        <PowraFacts rows={[["Reference",item.powra_reference],["Assessor",item.completed_by],["Location",item.site_location],
+          ["Work area",item.work_area],["Assessment date",powraDate(item.assessment_date)]]}/>
+      </section>
+      <section className={styles.panel}>
+        <h2>Lifecycle &amp; compliance</h2>
+        <ol className={styles.timeline}>
+          {milestones.map(([label,date], index) => <li key={label} aria-current={index === currentMilestone ? "step" : undefined}>
+            <span className={styles.lifecycleMarker} data-recorded={Boolean(date)} aria-hidden="true">{date && <RecordIcon name="check"/>}</span>
+            <strong>{label}</strong><span>{date ? <time dateTime={date}>{powraTime(date)}</time> : "Not recorded"}</span>
+          </li>)}
+        </ol>
+      </section>
+      <section className={styles.panel}>
+        <h2>Hazards &amp; controls</h2>
+        <p>{checks.length} pre-start {checks.length === 1 ? "check" : "checks"} · {hazards.length} {hazards.length === 1 ? "hazard" : "hazards"} recorded</p>
+        <Link href={href+"?tab=hazards"}>Open hazards and controls</Link>
+      </section>
+      <section className={styles.panel}>
+        <h2>Verification &amp; learning</h2>
+        <p>Closure outcome <strong>{outcome}</strong></p>
+        <Link href={href+"?tab=learning"}>View verification and close-out</Link>
+      </section>
+      <section className={styles.panel}>
+        <h2>Workplace &amp; linked records</h2>
+        <p>{workplace || "Workplace not recorded"}</p>
+        <Link href={href+"?tab=links"}>View workplace and linked records</Link>
+      </section>
+      <section className={styles.panel+" "+styles.recordScope}>
+        <h2>Task and scope</h2><p>{[item.task,workplace].filter(Boolean).join(" · ") || "Not recorded"}</p>
+      </section>
+    </div>}
+    {tab==="details" && <div className={styles.grid}>
+      <section className={styles.panel}><h2><RecordIcon name="overview"/>Assessment details</h2><PowraFacts rows={[["Reference",item.powra_reference],["Task",item.task],...assessmentFacts]}/></section>
       <section className={styles.panel}><h2><RecordIcon name="scope"/>Decision and review</h2><PowraFacts rows={[
         ["Decision notes",item.decision_reason],["Supervisor",item.supervisor_name],["Supervisor review recorded",item.supervisor_approved_at ? powraTime(item.supervisor_approved_at) : null],
         ["Closed at",item.closed_at ? powraTime(item.closed_at) : null],
@@ -90,10 +149,12 @@ export default async function PowraRecordPage({params,searchParams}) {
           <button className={styles.primary}>Record closure</button>
         </form>}
     </section>}
-    {tab==="links" && <section className={styles.panel}><h2>Linked records</h2><ul className={styles.questions}>
+    {tab==="links" && <div className={styles.grid}>
+      <section className={styles.panel}><h2>Workplace</h2><PowraFacts rows={[["Location",item.site_location],["Work area",item.work_area]]}/></section>
+      <section className={styles.panel}><h2>Linked records</h2><ul className={styles.questions}>
       {related.map(([label,url,reference])=><li key={url}><strong>{label}</strong><p><Link href={url}>{reference || "Open module"}</Link></p></li>)}
       {work.reassessment_of && UUID.test(work.reassessment_of) && <li><Link href={POWRA_ROOT+"/"+work.reassessment_of}>Open earlier POWRA</Link></li>}
-    </ul></section>}
+    </ul></section></div>}
     {tab==="history" && <section className={styles.panel}><h2>Decision history</h2>
       <PowraFacts rows={[
         ["Initial decision",decisionDetails[stop?.previous_decision || decision]?.[0]],["Assessment recorded",powraTime(item.created_at)],
