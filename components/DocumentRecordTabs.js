@@ -31,6 +31,11 @@ const paths = {
   qr: 'M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M13 13h4v4h-4z M21 13v4 M13 21h8v-3',
   permit: 'M7 4h10v17H7z M10 4V2h4v2 M9 12l2 2 4-4',
   noise: 'M3 10v4h4l5 4V6l-5 4z M16 9c2 2 2 4 0 6 M19 6c4 4 4 8 0 12',
+  calendar: 'M4 6h16v14H4z M8 3v6 M16 3v6 M4 10h16 M8 14h2 M14 14h2 M8 17h2',
+  person: 'M4 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+  conversation: 'M20 4H4v12h4l4 4v-4h8z M8 8h8 M8 12h5',
+  book: 'M12 6c-2-2-5-2-9-2v14c4 0 7 0 9 2 2-2 5-2 9-2V4c-4 0-7 0-9 2v14',
+  matrix: 'M4 4h16v16H4z M4 9h16 M4 15h16 M9 4v16 M15 4v16',
 };
 
 export function RecordIcon({ name }) {
