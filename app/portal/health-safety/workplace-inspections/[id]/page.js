@@ -133,7 +133,7 @@ export default async function WorkplaceInspectionRecordPage({
 
     
 
-    <WorkplaceInspectionAdministration inspection={inspection} people={people} canAdminister={access.canAdministerInspection} canStart={canStartInspection(access,inspection)} startAction={startInspection} updateAction={updateInspectionDetails} stageTitle={stageTitle} leadName={personLabel(peopleById.get(inspection.lead_inspector_person_id))}/>
+    <div id="inspection-start" style={{scrollMarginTop:24}}><WorkplaceInspectionAdministration inspection={inspection} people={people} canAdminister={access.canAdministerInspection} canStart={canStartInspection(access,inspection)} startAction={startInspection} updateAction={updateInspectionDetails} stageTitle={stageTitle} leadName={personLabel(peopleById.get(inspection.lead_inspector_person_id))}/></div>
     <section id="inspection-review-actions" aria-label="Inspection review and action closure" style={{
           "marginTop": 20,
           "scrollMarginTop": 24
@@ -142,8 +142,8 @@ export default async function WorkplaceInspectionRecordPage({
       <WorkplaceInspectionControlWorkflow inspection={inspection} actions={actions} currentPersonId={access.person?.id || null} reviewAction={reviewInspection} completeAction={completeInspectionAction} verifyAction={verifyInspectionAction} />
     </section>
 
-    <section style={{
-          "marginTop": 14
+    <section id="inspection-checklist" style={{
+          "marginTop": 14,scrollMarginTop:24
         }}><WorkplaceInspectionFieldwork action={saveInspectionFieldwork} inspection={inspection} responses={responses} readOnly={readOnly} /></section>
 
     <section style={{
