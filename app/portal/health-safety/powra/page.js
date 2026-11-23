@@ -1,18 +1,83 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
+import { POWRA_ROOT, powraDate, powraDecision, powraOutstanding, powraStatus, powraTime, powraViews } from "../../../../lib/powra-workflow.mjs";
+import { RecordIcon } from "../../../../components/DocumentRecordTabs";
+import { DecisionBadge, PowraHero } from "./PowraUI";
+import styles from "./powra.module.css";
 
-export const metadata={title:"POWRA Register | RPG Excellence"};
-export const dynamic="force-dynamic";
-const title=value=>String(value||"").replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
-const formatDate=value=>value?new Intl.DateTimeFormat("en-GB",{dateStyle:"medium"}).format(new Date(value)):"-";
+export const metadata = {title:"POWRA Register | RPG Excellence"};
+export const dynamic = "force-dynamic";
 
-export default async function PowraRegisterPage(){
-  const supabase=await createClient();
-  const {data:{user}}=await supabase.auth.getUser();
-  if(!user) redirect("/portal/login?next=/portal/health-safety/powra");
-  const {data:records,error}=await supabase.from("hs_powra_assessments").select("*").eq("owner_id",user.id).order("created_at",{ascending:false});
-  if(error) throw new Error(error.message);
-  const items=records||[], stopped=items.filter(item=>item.status==="stopped").length, review=items.filter(item=>item.status==="supervisor_review").length, open=items.filter(item=>item.status==="open").length;
-  return <main className="prPage"><style>{`*{box-sizing:border-box}.prPage{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.prShell{max-width:1200px;margin:auto}.prTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.prTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.prTop h1{margin:6px 0;font-size:34px}.prTop p{margin:0;color:#657b91}.prButton{display:inline-flex;padding:12px 16px;border-radius:9px;background:#087f6c;color:#fff;text-decoration:none;font-weight:900}.prMetrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}.prMetric{padding:18px;border:1px solid #d5e1e9;border-top:4px solid #1762ef;border-radius:13px;background:#fff}.prMetric.red{border-top-color:#c83b32}.prMetric.amber{border-top-color:#d68a00}.prMetric.green{border-top-color:#08865f}.prMetric span,.prMetric strong{display:block}.prMetric span{font-size:11px;color:#667d91;font-weight:850}.prMetric strong{margin-top:5px;font-size:29px}.prPanel{padding:21px;border:1px solid #d5e1e9;border-radius:15px;background:#fff}.prPanel h2{margin:0 0 4px}.prPanel>p{margin:0 0 16px;color:#687f94}.prRow{display:grid;grid-template-columns:1.3fr .8fr .7fr .7fr .7fr auto;gap:12px;align-items:center;padding:13px;border-top:1px solid #e3eaf0}.prRow.head{border:0;border-radius:8px;background:#eef4f8;color:#667e93;font-size:11px;font-weight:850}.prRow strong,.prRow small{display:block}.prRow small{margin-top:3px;color:#74899c}.prStatus{justify-self:start;padding:6px 8px;border-radius:999px;background:#e7f2ff;color:#1759ad;font-size:11px;font-weight:850}.prOpen{color:#087f6c;text-decoration:none;font-weight:900}.prEmpty{padding:24px;border-radius:10px;background:#f0f5f8;color:#687e92}@media(max-width:760px){.prMetrics{grid-template-columns:1fr 1fr}.prRow{grid-template-columns:1fr auto}.prRow>:not(:first-child):not(:last-child){display:none}}`}</style><div className="prShell"><header className="prTop"><div><small>H&amp;S HUB · DYNAMIC RISK CONTROL</small><h1>POWRA Register</h1><p>Point-of-work decisions, stop-work interventions and end-of-job learning.</p></div><Link className="prButton" href="/portal/health-safety/powra/new">New POWRA</Link></header><section className="prMetrics"><div className="prMetric"><span>TOTAL POWRA</span><strong>{items.length}</strong></div><div className="prMetric green"><span>SAFE TO START / OPEN</span><strong>{open}</strong></div><div className="prMetric amber"><span>SUPERVISOR REVIEW</span><strong>{review}</strong></div><div className="prMetric red"><span>STOP WORK</span><strong>{stopped}</strong></div></section><section className="prPanel"><h2>Point-of-work assessments</h2><p>Open a record to review checks, controls and the final decision.</p>{items.length?<div><div className="prRow head"><span>POWRA</span><span>Location</span><span>Completed by</span><span>Date</span><span>Status</span><span>Action</span></div>{items.map(item=><div className="prRow" key={item.id}><div><strong>{item.task}</strong><small>{item.powra_reference}</small></div><span>{item.site_location}</span><span>{item.completed_by}</span><span>{formatDate(item.assessment_date)}</span><span className="prStatus">{title(item.status)}</span><Link className="prOpen" href={`/portal/health-safety/powra/${item.id}`}>Open →</Link></div>)}</div>:<div className="prEmpty">No POWRA records have been created.</div>}</section></div></main>;
+const views = { all:"All POWRA", active:"Active", review:"Awaiting Supervisor", stop:"Stop Work", completed:"Completed", closed:"Closed" };
+const cards = [
+  ["Total POWRA","neutral","all", () => true],
+  ["Safe to Start","safe","safe", row => row.status === "open" && powraDecision(row) === "safe_to_start"],
+  ["Additional Controls Required","controls","controls", row => row.status === "supervisor_review" && powraDecision(row) === "additional_controls"],
+  ["Stop Work","stop","stop", row => row.status === "stopped"],
+  ["Supervisor Review","review","review", row => powraViews(row).includes("review")],
+];
+const headings = ["Task / reference","Location","Assessor","Assessment time","Safety decision","Controls outstanding","Record status"];
+
+export default async function PowraRegisterPage({ searchParams }) {
+  const query = await searchParams;
+  const supabase = await createClient();
+  const {data:{user}} = await supabase.auth.getUser();
+  if (!user) redirect("/portal/login?next=" + POWRA_ROOT);
+  const { data, error } = await supabase.from("hs_powra_assessments").select("*").eq("owner_id",user.id).order("created_at",{ascending:false});
+  if (error) throw error;
+  const records = data ?? [];
+  const view = Object.hasOwn(views, query?.view) ? query.view : "all";
+  const selectedCard = cards.find(card => card[2] === query?.focus);
+  const keyword = typeof query?.q === "string" ? query.q.trim() : "";
+  const site = typeof query?.site === "string" ? query.site : "";
+  const assessor = typeof query?.assessor === "string" ? query.assessor : "";
+  const filtered = records.filter(row =>
+    (view === "all" || powraViews(row).includes(view)) && (!selectedCard || selectedCard[3](row)) &&
+    (!site || site === row.site_location) && (!assessor || assessor === row.completed_by) &&
+    [row.powra_reference,row.task,row.work_area,row.site_location,row.completed_by].join(" ").toLowerCase().includes(keyword.toLowerCase()));
+  const options = key => [...new Set(records.map(row => row[key]).filter(Boolean))].sort();
+  const listHref = (next, focus) => {
+    const params = new URLSearchParams({ view:next });
+    if (keyword) params.set("q", keyword);
+    if (site) params.set("site",site);
+    if (assessor) params.set("assessor",assessor);
+    if (focus) params.set("focus",focus);
+    return POWRA_ROOT + "?" + params;
+  };
+  return <main className={styles.page}>
+    <PowraHero title="POWRA Operational Control Centre" description="Point-of-work checks, decisions and follow-up">
+      <Link className={styles.button} href={POWRA_ROOT + "/new?scan=1"}><RecordIcon name="qr"/>Zone QR</Link>
+      <Link className={styles.primary} href={POWRA_ROOT + "/new"}><RecordIcon name="overview"/>Start New POWRA</Link>
+    </PowraHero>
+    <section className={styles.metrics} aria-label="Operational status">
+      {cards.map(([label,tone,key,filter]) => <Link key={key} href={listHref("all",key)} className={styles.metric + " " + styles[tone]} aria-current={selectedCard?.[2] === key}>
+        <strong>{records.filter(filter).length}</strong>{label}
+      </Link>)}
+    </section>
+    <section className={styles.panel}>
+      <h2><RecordIcon name="overview"/>POWRA register</h2>
+      <nav className={styles.tabs} aria-label="Register views">{Object.entries(views).map(([key,label]) =>
+        <Link key={key} href={listHref(key)} aria-current={view === key && !selectedCard ? "page" : undefined}>{label}</Link>)}</nav>
+      <form className={styles.filters} action={POWRA_ROOT}>
+        <input type="hidden" name="view" value={view}/>{selectedCard && <input type="hidden" name="focus" value={selectedCard[2]}/>}
+        <label>Search<input name="q" type="search" defaultValue={keyword} placeholder="Reference, task, location or assessor"/></label>
+        <label>Site<select name="site" defaultValue={site}><option value="">All sites</option>{options("site_location").map(value => <option key={value}>{value}</option>)}</select></label>
+        <label>Assessor<select name="assessor" defaultValue={assessor}><option value="">All assessors</option>{options("completed_by").map(value => <option key={value}>{value}</option>)}</select></label>
+        <button className={styles.primary}>Apply</button><Link className={styles.button} href={POWRA_ROOT}>Clear</Link>
+      </form>
+      {filtered.length ? <div className={styles.tableWrap}><table className={styles.table}>
+        <thead><tr>{headings.map(heading => <th scope="col" key={heading}>{heading}</th>)}</tr></thead>
+        <tbody>{filtered.map(row => <tr key={row.id}>
+          <td><Link href={POWRA_ROOT+"/"+row.id}>{row.task}</Link><br/>{row.powra_reference}</td>
+          <td data-label="Location">{[row.site_location,row.work_area].filter(Boolean).join(" · ") || "Not recorded"}</td>
+          <td data-label="Assessor">{row.completed_by}</td>
+          <td data-label="Assessment time">{row.created_at ? powraTime(row.created_at) : powraDate(row.assessment_date)}</td>
+          <td data-label="Safety decision"><DecisionBadge decision={powraDecision(row)}/></td>
+          <td data-label="Controls outstanding">{powraOutstanding(row) ?? "Not recorded"}</td>
+          <td data-label="Record status">{powraStatus(row)}</td>
+        </tr>)}</tbody>
+      </table></div> : <p className={styles.empty}>{records.length ? "No assessments match these filters." : "No POWRA records have been created."}</p>}
+    </section>
+  </main>;
 }
