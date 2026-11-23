@@ -411,9 +411,40 @@ async function updateHazardPPE(_state, formData) {
     };
   }
 }
-function Facts({ entries }) {
-  return <dl className={s.recordFacts}>{entries.map(([name, value]) =>
-    <div key={name}><dt>{name}</dt><dd>{value ?? "—"}</dd></div>)}</dl>;
+function Facts({ entries, className = "", empty = "—", showIcons = false }) {
+  return <dl className={`${s.recordFacts} ${className}`}>{entries.map(([name, value, icon]) =>
+    <div key={name}><dt>{showIcons && icon ? <><RecordIcon name={icon}/><span>{name}</span></> : name}</dt><dd>{value || value === 0 ? value : empty}</dd></div>)}</dl>;
+}
+
+function AssessmentDetails({ assessment, summary }) {
+  const context = [
+    ["Activities / tasks", assessment.task_description, "permit"],
+    ["People at risk", assessment.persons_at_risk?.join(", ") || null, "distribution"],
+    ["Emergency arrangements", assessment.emergency_arrangements, "scope"],
+    ["Associated documents", assessment.associated_documents, "book"],
+    ["Assessment method", "5 × 5 risk matrix (likelihood × severity)", "matrix"],
+    ["Consultation", assessment.consultation_summary, "conversation"],
+  ];
+  const record = [
+    ...summary,
+    ["Area / department", assessment.area_department, "pin"],
+    ["Section / lab", assessment.section_lab, "pin"],
+  ];
+  return <section className={s.recordPanel} aria-labelledby="assessment-details-heading">
+    <h2 id="assessment-details-heading" className={styles.detailsHeading}>
+      <span><RecordIcon name="overview"/></span>Assessment Details
+    </h2>
+    <div className={styles.detailsGrid}>
+      <section className={styles.detailsGroup} aria-labelledby="assessment-context-heading">
+        <h3 id="assessment-context-heading">Assessment context</h3>
+        <Facts entries={context} className={styles.detailsFacts} empty="Not recorded" showIcons/>
+      </section>
+      <section className={styles.detailsGroup} aria-labelledby="assessment-record-heading">
+        <h3 id="assessment-record-heading">Record information</h3>
+        <Facts entries={record} className={styles.detailsFacts} empty="Not recorded" showIcons/>
+      </section>
+    </div>
+  </section>;
 }
 
 function Lifecycle({ assessment }) {
@@ -522,8 +553,9 @@ export default async function RiskAssessmentWorkspacePage({ params, searchParams
   const elevated = residualPositions.filter(position => position?.score >= 10).length;
   const openActions = actions.filter(action => !["effective", "cancelled"].includes(action.status));
   const verifiedActions = actions.filter(action => action.status === "effective" || action.effectiveness_result === "effective_verified");
-  const summary = [["Reference", assessment.assessment_reference], ["Type", label(assessment.assessment_type)], ["Version", assessment.version],
-    ["Assessor", assessment.assessor_name], ["Assessed", formatDate(assessment.assessment_date)], ["Next review", formatDate(assessment.review_date)]];
+  const summary = [["Reference", assessment.assessment_reference, "overview"], ["Type", label(assessment.assessment_type), "details"],
+    ["Version", assessment.version, "history"], ["Assessor", assessment.assessor_name, "person"],
+    ["Assessed", formatDate(assessment.assessment_date), "calendar"], ["Next review", formatDate(assessment.review_date), "calendar"]];
   const attachments = await Promise.all([
     ["Permit to work", "permit", assessment.permit_reference, assessment.permit_document_path, assessment.permit_document_name],
     ["Safe system of work", "overview", assessment.safe_system_reference, assessment.ssow_document_path, assessment.ssow_document_name],
@@ -575,10 +607,7 @@ export default async function RiskAssessmentWorkspacePage({ params, searchParams
         <section className={s.recordPanel}><h2>Purpose and scope</h2><p className={s.recordProse}>{assessment.task_description || "No scope recorded."}</p></section>
       </DocumentRecordPanel>
       <DocumentRecordPanel name="details">
-        <section className={s.recordPanel}><h2>Assessment details</h2><Facts entries={[...summary,
-          ["Area / department", assessment.area_department], ["Section / lab", assessment.section_lab],
-          ["People at risk", assessment.persons_at_risk?.join(", ") || null], ["Consultation", assessment.consultation_summary]
-        ]}/></section>
+        <AssessmentDetails assessment={assessment} summary={summary}/>
       </DocumentRecordPanel>
       <DocumentRecordPanel name="scope">
         <section className={s.recordPanel}><h2 className={styles.iconTitle}><RecordIcon name="alert"/>Hazards and risk decisions</h2>
