@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 
 const views = { all:"All POWRA", active:"Active", review:"Awaiting Supervisor", stop:"Stop Work", completed:"Completed", closed:"Closed" };
 const cards = [
-  ["Total POWRA","neutral","all", () => true],
-  ["Safe to Start","safe","safe", row => row.status === "open" && powraDecision(row) === "safe_to_start"],
-  ["Additional Controls Required","controls","controls", row => row.status === "supervisor_review" && powraDecision(row) === "additional_controls"],
-  ["Stop Work","stop","stop", row => row.status === "stopped"],
-  ["Supervisor Review","review","review", row => powraViews(row).includes("review")],
+  ["Total POWRA","total","all","clipboard", () => true],
+  ["Safe to Start","safe","safe","checkCircle", row => row.status === "open" && powraDecision(row) === "safe_to_start"],
+  ["Additional Controls Required","controls","controls","scope", row => row.status === "supervisor_review" && powraDecision(row) === "additional_controls"],
+  ["Stop Work","stop","stop","alert", row => row.status === "stopped"],
+  ["Supervisor Review","review","review","distribution", row => powraViews(row).includes("review")],
 ];
 const headings = ["Task / reference","Location","Assessor","Assessment time","Safety decision","Controls outstanding","Record status"];
 
@@ -33,7 +33,7 @@ export default async function PowraRegisterPage({ searchParams }) {
   const site = typeof query?.site === "string" ? query.site : "";
   const assessor = typeof query?.assessor === "string" ? query.assessor : "";
   const filtered = records.filter(row =>
-    (view === "all" || powraViews(row).includes(view)) && (!selectedCard || selectedCard[3](row)) &&
+    (view === "all" || powraViews(row).includes(view)) && (!selectedCard || selectedCard[4](row)) &&
     (!site || site === row.site_location) && (!assessor || assessor === row.completed_by) &&
     [row.powra_reference,row.task,row.work_area,row.site_location,row.completed_by].join(" ").toLowerCase().includes(keyword.toLowerCase()));
   const options = key => [...new Set(records.map(row => row[key]).filter(Boolean))].sort();
@@ -51,8 +51,9 @@ export default async function PowraRegisterPage({ searchParams }) {
       <Link className={styles.primary} href={POWRA_ROOT + "/new"}><RecordIcon name="overview"/>Start New POWRA</Link>
     </PowraHero>
     <section className={styles.metrics} aria-label="Operational status">
-      {cards.map(([label,tone,key,filter]) => <Link key={key} href={listHref("all",key)} className={styles.metric + " " + styles[tone]} aria-current={selectedCard?.[2] === key}>
-        <strong>{records.filter(filter).length}</strong>{label}
+      {cards.map(([label,tone,key,icon,filter]) => <Link key={key} href={listHref("all",key)} className={styles.metric + " " + styles[tone]} aria-current={selectedCard?.[2] === key}>
+        <span className={styles.metricIcon}><RecordIcon name={icon}/></span>
+        <span className={styles.metricContent}><strong>{records.filter(filter).length}</strong>{label}</span>
       </Link>)}
     </section>
     <section className={styles.panel}>

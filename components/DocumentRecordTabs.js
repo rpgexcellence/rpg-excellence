@@ -20,6 +20,8 @@ const paths = {
   download: 'M12 3v11 M8 10l4 4 4-4 M5 15v5h14v-5',
   open: 'M14 4h6v6 M20 4l-9 9 M11 6H5v13h13v-6',
   check: 'M5 12l4 4 10-10',
+  checkCircle: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z M7 12l3 3 7-7',
+  clipboard: 'M8 5H5a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3 M9 3h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M8 12h8 M8 16h6',
   more: 'M5 12h.01 M12 12h.01 M19 12h.01',
   alert: 'M12 3 2 20h20z M12 9v4 M12 16h.01',
   electrical: 'M13 2 4 14h7l-1 8 10-12h-7z',

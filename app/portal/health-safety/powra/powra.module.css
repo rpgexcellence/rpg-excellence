@@ -9,7 +9,11 @@
 .page :is(a,button,summary,input,select,textarea):focus-visible{outline:2px solid #2684ba;outline-offset:2px}
 .metrics,.summary,.grid{margin:12px 0;display:grid;gap:10px;grid-template-columns:repeat(5,minmax(0,1fr))}.summary{grid-template-columns:repeat(3,minmax(0,1fr))}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .metric,.panel{min-width:0;background:#fff;border:1px solid #d1e0eb;border-radius:8px;padding:14px}
-.metric{border-top:3px solid var(--signal,#5397c9);display:grid;gap:5px;color:#102d47;font-size:.9rem;font-weight:700;text-decoration:none}.metric strong{font:700 1.8rem Georgia,serif}.metric[aria-current=true]{box-shadow:inset 0 0 0 1px var(--signal,#5397c9)}
+.metric{border-top:3px solid var(--signal,#5397c9);display:flex;align-items:flex-start;gap:10px;color:#102d47;font-size:.9rem;font-weight:700;text-decoration:none}
+.metricIcon{display:grid;place-items:center;flex:none;width:clamp(28px,3vw,38px);aspect-ratio:1;border-radius:7px;background:var(--tint);color:var(--signal)}
+.metricIcon svg{width:62%;height:62%}.metricContent{display:grid;gap:5px;min-width:0;overflow-wrap:anywhere}
+.metric strong{font:700 1.8rem Georgia,serif}.metric[aria-current=true]{box-shadow:inset 0 0 0 1px var(--signal,#5397c9)}
+.total{--signal:#215483;--tint:#e5effc}
 .panel{margin:12px 0}.summary>.panel,.grid>.panel{margin:0}.panel h2{font:700 19px/1.2 Georgia,serif;color:#102d47;margin:0 0 10px}.panel h3{font-size:1rem}.panel h2 svg{margin-right:5px}
 .tabs{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 10px}.recordTabs{padding:5px;border:1px solid #d1e0eb;border-radius:7px;background:#fff;margin:12px 0}
 .tabs :is(a,button){min-height:44px;padding:8px 10px;border:0;border-radius:4px;background:#eaf1f7;color:#244b6c;font:700 .86rem Arial,sans-serif;display:inline-flex;align-items:center;gap:5px;text-decoration:none;cursor:pointer}
