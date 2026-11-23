@@ -45,17 +45,27 @@ function Badge({children,tone="blue"}){
 function Panel({id,icon,label,children,className=""}){
   return <section id={id} className={p.panel+" "+className}><h2><RecordIcon name={icon}/>{label}</h2>{children}</section>;
 }
-function Table({columns,rows,empty}){
-  return rows.length ? <div className={p.tableWrap}><table className={p.table+" "+s.table}>
+function Table({columns,rows,empty,className=""}){
+  return rows.length ? <div className={p.tableWrap}><table className={p.table+" "+s.table+" "+className}>
     <thead><tr>{columns.map(label=><th key={label} scope="col">{label}</th>)}</tr></thead>
     <tbody>{rows.map(([id,...cells])=><tr key={id}>{cells.map((cell,index)=>
       <td data-label={columns[index]} key={columns[index]}>{cell}</td>)}</tr>)}</tbody>
   </table></div> : <p className={shared.notice}>{empty}</p>;
 }
-function location(row,zone){
-  return <>{zone?<Link href={"/portal/company/sites/"+zone.site_id+"/zones"}>{row.administration_location_label||"Site profile"}</Link>:
-    row.administration_location_label||"Site not recorded"}
-    <small>{row.area_department}{zone&&<> {row.area_department&&"· "}<Link href={href("zones",{zone:zone.public_token})}>{zone.name}</Link></>}</small></>;
+const cleanLocation = value => String(value || "").replace(/Â[\s\u00a0]*(?=·)|Â\u00a0/g,"").trim();
+function location(row,zone,site,compact){
+  const full = cleanLocation(row.administration_location_label);
+  const short = [site?.site_reference,site?.site_name].map(cleanLocation).filter(Boolean).join(" · ") ||
+    full.split(/\s+·\s+/).slice(0,2).join(" · ");
+  const label = (compact ? short : full) || short || "Site not recorded";
+  const area = cleanLocation(row.area_department);
+  const zoneName = cleanLocation(zone?.name);
+  return <><span className={s.siteLabel} title={full||undefined}>
+    {zone ? <Link href={"/portal/company/sites/"+zone.site_id+"/zones"}>{label}</Link> : label}
+  </span>
+    {(area||zoneName) && <small>{area&&area.toLowerCase()!==zoneName.toLowerCase() && area}
+      {zoneName && <>{area&&area.toLowerCase()!==zoneName.toLowerCase() && " · "}<Link href={href("zones",{zone:zone.public_token})}>{zoneName}</Link></>}
+    </small>}</>;
 }
 function href(view,filters={}){
   const params=new URLSearchParams({view});
@@ -91,13 +101,13 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     allRows(()=>admin.from("organization_people").select("id,first_name,last_name,email").eq("organization_id",org).order("id")),
     allRows(()=>admin.from("organization_zones").select("id,site_id,building_id,reference,name,public_token,show_assessments")
       .eq("organization_id",org).eq("status","published").order("reference").order("id")),
-    allRows(()=>admin.from("organization_sites").select("id,site_name").eq("organization_id",org).eq("status","active").order("id")),
+    allRows(()=>admin.from("organization_sites").select("id,site_reference,site_name").eq("organization_id",org).eq("status","active").order("id")),
     allRows(()=>admin.from("organization_buildings").select("id,name").eq("organization_id",org).order("id")),
   ]);
   const peopleById=new Map(people.map(row=>[row.id,[row.first_name,row.last_name].filter(Boolean).join(" ")||row.email]));
   const person=id=>peopleById.get(id)||(id?"Company user unavailable":"Unassigned");
-  const siteNames=new Map(sites.map(row=>[row.id,row.site_name]));
-  const published=zones.filter(zone=>siteNames.has(zone.site_id));
+  const sitesById=new Map(sites.map(row=>[row.id,row]));
+  const published=zones.filter(zone=>sitesById.has(zone.site_id));
   const zoneById=new Map(published.map(zone=>[zone.id,zone]));
   const buildingNames=new Map(buildings.map(row=>[row.id,row.name]));
   const zone=published.find(row=>row.public_token===zoneToken);
@@ -135,25 +145,25 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     ["Overdue actions",overdueActions.length,"amber","calendar",href("findings",{focus:"overdue"})],
     ["Awaiting verification",awaiting.length,"blue","scope",href("findings",{focus:"verification"})],
   ];
-  const programmeTable=(rows)=><Table columns={["Programme","Location / scope","Owner / lead","Frequency","Next inspection","Programme status"]}
+  const programmeTable=(rows)=><Table className={view==="overview"?s.programmeTable:""} columns={["Programme","Location / scope","Owner / lead","Frequency","Next inspection","Programme status"]}
     rows={rows.map(row=>[row.id,<><Link href={ROOT+"/programmes/"+row.id}>{row.title}</Link><small>{row.programme_reference}</small></>,
-      location(row,zoneById.get(row.zone_id)),<>{person(row.accountable_person_id)}<small>Lead · {person(row.lead_inspector_person_id)}</small></>,
+      location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id),view==="overview"),<>{person(row.accountable_person_id)}<small>Lead · {person(row.lead_inspector_person_id)}</small></>,
       row.frequency_amount&&row.frequency_unit?`Every ${row.frequency_amount} ${row.frequency_amount===1?row.frequency_unit.replace(/s$/,""):row.frequency_unit}`:"Not recorded",
       <>{date(row.next_inspection_date)}{programmeDue(row,today)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
       <Badge tone={row.status==="active"?"green":"neutral"}>{title(row.status)}</Badge>,
     ])} empty="No programmes match this view."/>;
-  const fieldworkTable=(rows)=><Table columns={["Inspection","Location","Scheduled / completed","Status","Open"]}
+  const fieldworkTable=(rows)=><Table className={view==="overview"?s.fieldworkTable:""} columns={["Inspection","Location","Scheduled / completed","Status","Open"]}
     rows={rows.map(row=>{
       const editable=["contribute","review","approve","admin","owner"].includes(access.level);
       const start=editable&&canStartInspection(access,row);
       const continuing=editable&&row.status==="in_progress"&&access.person?.id===row.lead_inspector_person_id;
-      return [row.id,<><Link href={ROOT+"/"+row.id}>{row.title}</Link><small>{row.inspection_reference} · {person(row.lead_inspector_person_id)}</small></>,
-        location(row,zoneById.get(row.zone_id)),<>{date(row.planned_start_at,true)}{row.completed_at&&<small>Submitted · {date(row.completed_at,true)}</small>}
+      return [row.id,<><Link href={ROOT+"/"+row.id}>{row.title}</Link><small>{row.inspection_reference}</small><small>{person(row.lead_inspector_person_id)}</small></>,
+        location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id),view==="overview"),<>{row.planned_start_at?<time dateTime={row.planned_start_at}>{date(row.planned_start_at,true)}</time>:date(null)}{row.completed_at&&<small>Submitted · {date(row.completed_at,true)}</small>}
         {fieldworkOverdue(row,now)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
         <Badge tone={row.status==="in_progress"?"green":"blue"}>{title(row.status)}</Badge>,
         start ? <StartInspectionButton inspectionId={row.id}/> :
           <Link className={continuing?p.primary:p.button} href={ROOT+"/"+row.id+(continuing?"#inspection-checklist":"")}>
-            {continuing?"Continue checklist":"Open record"}</Link>];
+            {continuing?"Continue checklist":view==="overview"?"Open":"Open record"}</Link>];
     })} empty="No inspections in this queue."/>;
   const actionTable=(rows)=><Table columns={["Corrective action","Priority","Owner / verifier","Target","Status"]}
     rows={rows.map(row=>[row.id,<><Link href={ROOT+"/"+row.inspection_id+"#inspection-review-actions"}>{row.action_text}</Link><small>{row.action_reference}</small></>,
@@ -190,38 +200,49 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     {view==="overview" && <>
       <Panel icon="scope" label="Dynamic inspection planning">
         <div className={s.planning}>
-          <div>{next?<><h3><Link href={ROOT+"/programmes/"+next.id}>{next.title}</Link></h3>
+          <div className={s.planningSummary}>{next?<><h3><Link href={ROOT+"/programmes/"+next.id}>{next.title}</Link></h3>
             <p>Earliest programme due date · <strong>{date(next.next_inspection_date)}</strong> {programmeDue(next,today)&&<Badge tone="red">Overdue</Badge>}</p>
             <p>{next.planning_basis||"No planning explanation recorded for this programme."}</p>
-            <Link href={ROOT+"/programmes/"+next.id}>Open programme and full planning evidence</Link>
+            <Link href={ROOT+"/programmes/"+next.id}>View full planning evidence</Link>
           </>:<p>No active programme has a scheduled inspection date.</p>}</div>
-          {next&&<div>
-            <details open><summary>Planning signals</summary>{signals.error?<p>Planning signals could not be loaded.</p>:
+          {next&&<div className={s.planningEvidence}>
+            <details><summary>Planning signals{!signals.error&&<span>{(signals.data||[]).length}</span>}</summary>{signals.error?<p>Planning signals could not be loaded.</p>:
               (signals.data||[]).length?<ul>{signals.data.map(row=><li key={row.id}><strong>{sources[row.source_module]||title(row.source_module)}</strong>
-                {row.source_reference&&<> · {row.source_reference}</>} · {row.summary} ({row.signal_score} points)</li>)}</ul>:<p>No active programme signals recorded.</p>}</details>
-            <details><summary>Checklist packs and selection reasons</summary>{packs.error?<p>Checklist packs could not be loaded.</p>:
+                {row.source_reference&&<> · {row.source_reference}</>} <span className={s.signalScore}>{row.signal_score} points</span><small>{row.summary}</small></li>)}</ul>:<p>No active programme signals recorded.</p>}</details>
+            <details><summary>Checklist packs and selection reasons{!packs.error&&<span>{(packs.data||[]).length}</span>}</summary>{packs.error?<p>Checklist packs could not be loaded.</p>:
               (packs.data||[]).length?<ul>{packs.data.map(row=><li key={row.pack?.id||row.selection_reason}><strong>{row.pack?.title||"Checklist pack"}</strong>
                 {row.selection_reason&&<> · {row.selection_reason}</>}</li>)}</ul>:<p>No additional checklist packs recorded.</p>}</details>
           </div>}
         </div>
       </Panel>
-      <div className={s.queues}>
-        <Panel icon="clipboard" label="Inspection programmes">{programmeTable(programmes.slice(0,5))}<Link href={href("programmes")}>View all programmes</Link></Panel>
-        <Panel icon="calendar" label="Scheduled fieldwork">{fieldworkTable(inspections.filter(row=>["planned","active"].includes(fieldworkState(row))).slice(0,5))}
-          <Link href={href("fieldwork")}>View fieldwork queues</Link></Panel>
-      </div>
-      <div className={s.queues}>
-        <Panel icon="alert" label="Findings requiring action">{actionTable(actionsOpen.slice(0,5))}
-          <Link href={href("findings")}>View findings and actions</Link>
-        </Panel>
-        <Panel icon="matrix" label="Inspection performance · last six months">
-          <div className={s.performance}><div><strong>{onTimePercent===null?"Not available":onTimePercent+"%"}</strong><p>On-time fieldwork</p>
-            {onTimePercent!==null&&<div className={s.track} aria-hidden="true"><span style={{width:onTimePercent+"%"}}/></div>}</div>
-            <ul className={s.compact}><li>On time · {performance.onTime}</li><li>Late · {performance.late}</li>
-              <li>Recurring checklist findings · {performance.repeats.length}</li></ul></div>
-          <Link href={href("performance")}>View performance and recurring findings</Link>
-        </Panel>
-      </div>
+      <div className={s.overview}><div className={s.overviewGrid}>
+        <div className={s.overviewColumn}>
+          <Panel className={s.programmePanel} icon="clipboard" label="Inspection programmes">
+            {programmeTable(programmes.slice(0,5))}
+            <Link className={s.panelLink} href={href("programmes")}>View all programmes</Link>
+          </Panel>
+          <Panel className={s.findingsPanel} icon="alert" label="Findings requiring action">
+            {actionTable(actionsOpen.slice(0,5))}
+            <Link className={s.panelLink} href={href("findings")}>View findings and actions</Link>
+          </Panel>
+        </div>
+        <div className={s.overviewColumn}>
+          <Panel className={s.fieldworkPanel} icon="calendar" label="Scheduled fieldwork">
+            {fieldworkTable(inspections.filter(row=>["planned","active"].includes(fieldworkState(row))).slice(0,5))}
+            <Link className={s.panelLink} href={href("fieldwork")}>View fieldwork queues</Link>
+          </Panel>
+          <Panel className={s.performancePanel} icon="matrix" label="Inspection performance">
+            <p className={s.period}>Last six months</p>
+            <div className={s.performance}>
+              <div><strong>{onTimePercent===null?"Not available":onTimePercent+"%"}</strong><p>On-time fieldwork</p>
+                {onTimePercent!==null&&<div className={s.track} aria-hidden="true"><span style={{width:onTimePercent+"%"}}/></div>}</div>
+              <ul className={s.compact}><li>On time · {performance.onTime}</li><li>Late · {performance.late}</li>
+                <li>Recurring checklist findings · {performance.repeats.length}</li></ul>
+            </div>
+            <Link className={s.panelLink} href={href("performance")}>View performance and recurring findings</Link>
+          </Panel>
+        </div>
+      </div></div>
     </>}
 
     {view==="programmes" && <Panel icon="clipboard" label={params?.due==="1"?"Overdue programme inspections":params?.active==="1"?"Active inspection programmes":"Inspection programmes"}>
@@ -295,7 +316,7 @@ export default async function WorkplaceInspectionsPage({searchParams}){
       </Panel>
       {zone?<Panel icon="calendar" label="Fieldwork in this zone">{fieldworkTable(scopedZoneRows)}</Panel>:
         <Panel icon="pin" label="Published zones"><Table columns={["Zone","Site / building","Fieldwork","Controls"]}
-          rows={published.map(row=>[row.id,row.reference+" · "+row.name,<>{siteNames.get(row.site_id)}<small>{buildingNames.get(row.building_id)||"No building recorded"}</small></>,
+          rows={published.map(row=>[row.id,row.reference+" · "+row.name,<>{cleanLocation(sitesById.get(row.site_id)?.site_name)}<small>{buildingNames.get(row.building_id)||"No building recorded"}</small></>,
             <Link href={href("zones",{zone:row.public_token})}>Find zone inspections</Link>,
             <Link href={"/area/"+row.public_token+"#controls"}>PPE &amp; key controls</Link>])} empty="No published zones for active sites."/>
           <Link href="/portal/company/sites">Open site profiles</Link>
