@@ -1,45 +1,61 @@
-// VERIFIED_POWRA_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../../../components/ControlledDeviceDrafts";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createPowra } from "./actions";
 import { loadPowraAdministrationOptions } from "../../../../../lib/powraCompanyOptions";
+import { listPowraZones, resolvePowraZone } from "../../../../../lib/powra-zones";
+import { POWRA_ROOT } from "../../../../../lib/powra-workflow.mjs";
+import { UUID } from "../../../../../lib/zone-policy.mjs";
 import PowraForm from "../../../../../components/PowraForm";
 import { createClient } from "../../../../../lib/supabase/server";
-import { requirePlanAccess } from "../../../../../lib/plan-access";
-export const metadata = {
-  "title": "New POWRA | RPG Excellence"
-};
+import { PowraHero } from "../PowraUI";
+import styles from "../powra.module.css";
+
+export const metadata = { title: "New POWRA | RPG Excellence" };
 export const dynamic = "force-dynamic";
-export default async function NewPowraPage() {
+
+export default async function NewPowraPage({ searchParams }) {
+  const query = await searchParams;
   const supabase = await createClient();
-  const {
-    data: {
-      user
-    }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/health-safety/powra/new");
-  await requirePlanAccess(user.id, "professional", "POWRA");
-  const {
-    data: organization,
-    error: orgError
-  } = await supabase.from("organizations").select("*").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
-  if (orgError) throw new Error(orgError.message);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/portal/login?next=" + POWRA_ROOT + "/new");
+  const { data: organization, error } = await supabase.from("organizations").select("*").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
+  if (error) throw error;
   if (!organization) redirect("/portal");
-  const {
-    sites,
-    people
-  } = await loadPowraAdministrationOptions(organization.id);
-  const {
-    data: assessments,
-    error: assessmentError
-  } = await supabase.from("hs_risk_assessments").select("id,assessment_reference,title").eq("owner_id", user.id).in("status", ["approved", "communicated"]).order("updated_at", {
-    "ascending": false
-  });
-  if (assessmentError) throw new Error(assessmentError.message);
-  return <ControlledDeviceDrafts userId={user.id} organizationId={organization.id} recordKey={'powra:new:administration-v1'} label="POWRA" baseline={{
-    "sites": sites,
-    "people": people,
-    "assessments": assessments || []
-  }}><main className="pnPage"><style>{"*{box-sizing:border-box}.pnPage{min-height:100vh;padding:32px 22px 90px;background:#edf4f8;color:#071d3a;font-family:Arial,sans-serif}.pnShell{width:100%;max-width:1120px;min-width:0;margin:auto}.pnPage,.pnPage *{box-sizing:border-box}.pnTop>div{min-width:0}.pnTop h1,.pnTop p{overflow-wrap:anywhere}.pnTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap;margin-bottom:22px}.pnTop small{color:#087f6c;font-weight:900;letter-spacing:.1em}.pnTop h1{margin:6px 0;font-size:34px}.pnTop p{margin:0;color:#657b91}.pnBack{padding:11px 15px;border:1px solid #cbd8e3;border-radius:9px;background:#fff;color:#173b59;text-decoration:none;font-weight:850;max-width:100%;white-space:normal}@media(max-width:760px){.pnPage{padding:20px 12px 100px}.pnTop{gap:14px}.pnTop h1{font-size:clamp(25px,7vw,34px);line-height:1.15}.pnTop p{line-height:1.5}}"}</style><div className="pnShell"><header className="pnTop"><div><small>H&amp;S HUB · POINT OF WORK CONTROL</small><h1>Point of Work Risk Assessment</h1><p>Stop, think, act and review before and after the task.</p></div><Link className="pnBack" href="/portal/health-safety/powra">← POWRA Register</Link></header><PowraForm action={createPowra} sites={sites} people={people} numbering={organization} assessments={assessments || []} today={new Date().toISOString().slice(0, 10)} /></div></main></ControlledDeviceDrafts>;
+  const { sites, people } = await loadPowraAdministrationOptions(organization.id);
+  const siteIds = sites.map(site => site.id);
+  const zoneLink = typeof query?.zone === "string" ? query.zone.trim() : "";
+  const token = zoneLink.match(/^(?:https?:\/\/[^/]+)?\/area\/([\da-f-]{36})(?:[?#].*)?$/i)?.[1] || zoneLink;
+  const priorId = typeof query?.reassess === "string" && UUID.test(query.reassess) ? query.reassess : null;
+  const [assessments, zones, initialZone, prior] = await Promise.all([
+    supabase.from("hs_risk_assessments").select("id,assessment_reference,title").eq("owner_id",user.id).eq("organization_id",organization.id).in("status",["approved","communicated"]).order("updated_at",{ascending:false}),
+    listPowraZones(organization.id, siteIds),
+    zoneLink ? resolvePowraZone(organization.id, token, siteIds, true) : null,
+    priorId ? supabase.from("hs_powra_assessments").select("id,task,powra_reference,administration_location_id,end_review").eq("id",priorId).eq("owner_id",user.id).eq("organization_id",organization.id).in("decision",["stop_work","supervisor_review"]).maybeSingle() : { data:null },
+  ]);
+  if (assessments.error || prior.error) throw assessments.error || prior.error;
+  return <ControlledDeviceDrafts userId={user.id} organizationId={organization.id} recordKey={`powra:new:workflow:${prior.data?.id || initialZone?.id || "manual"}`} label="POWRA"
+    baseline={{sites, people, assessments:assessments.data ?? [], zones}}>
+    <main className={styles.page}>
+      <PowraHero title="Start New POWRA" description="Point of Work Risk Assessment">
+        <Link className={styles.button} href={POWRA_ROOT}>POWRA register</Link>
+        <Link className={styles.button} href={POWRA_ROOT + "/new?scan=1" + (priorId ? "&reassess="+priorId : "")}>Use zone QR</Link>
+      </PowraHero>
+      {(query?.scan === "1" || (zoneLink && !initialZone)) && <section className={styles.panel} data-device-draft-exclude>
+        <h2>Workplace zone QR</h2>
+        <p>Scan the zone QR with your phone camera and select Start POWRA on the zone page, or paste the zone link here.</p>
+        {zoneLink && !initialZone && <p role="alert">This zone could not be found among your company’s active sites and published zones.</p>}
+        <form action={POWRA_ROOT+"/new"} className={styles.filters}>
+          {priorId && <input type="hidden" name="reassess" value={priorId}/>}
+          <label>Zone link or code<input name="zone" maxLength={350} required/></label><button className={styles.primary}>Use zone</button>
+        </form>
+      </section>}
+      {initialZone && <p className={styles.notice}>Workplace zone selected · {initialZone.reference} · {initialZone.name}</p>}
+      {!initialZone && prior.data?.end_review?.point_of_work?.zone?.id && !zones.some(zone => zone.id === prior.data.end_review.point_of_work.zone.id) &&
+        <p className={styles.notice}>The earlier workplace zone is unavailable. Confirm the location before reassessment.</p>}
+      <PowraForm action={createPowra} sites={sites} people={people} zones={zones} prior={prior.data}
+        initialZone={initialZone || zones.find(zone => zone.id === prior.data?.end_review?.point_of_work?.zone?.id)}
+        numbering={organization} assessments={assessments.data ?? []} today={new Date().toISOString().slice(0,10)}/>
+    </main>
+  </ControlledDeviceDrafts>;
 }
