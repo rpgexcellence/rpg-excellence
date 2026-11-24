@@ -4,3 +4,8 @@
 .list li { min-width:0; overflow-wrap:anywhere; background:#f5f9fc; border:1px solid #dbe6ef; border-radius:6px; padding:10px; }
 .list small { display:block; color:#48657d; margin-top:3px; }
 @media(max-width:460px) { .scores { grid-template-columns:1fr; } }
+.documentRows > li > small { display:block; margin:3px 0 0 21px; }
+.controlReferences { list-style:none; margin:4px 0 0 21px; padding:0; }
+.controlReferences li { padding:3px 0; border:0; }
+.timeline li time { display:block; margin:2px 0 0; }
+.timeline li p { margin:3px 0 0; color:#48657d; font-size:.82rem; }

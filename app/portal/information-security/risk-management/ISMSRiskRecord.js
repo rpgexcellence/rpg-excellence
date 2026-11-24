@@ -1,4 +1,5 @@
 import Link from "next/link";
+import QRCode from "qrcode";
 import { Acceptance, ISMSRecordHeatMap } from "../../../../components/ISMSRiskAssuranceCentre";
 import { DocumentRecordPanel, DocumentRecordTabButton, DocumentRecordTabs, RecordIcon } from "../../../../components/DocumentRecordTabs";
 import { acceptanceState, BASES, rating, riskBand, treatmentOpen } from "../../../../lib/isms-risk-assurance.mjs";
@@ -49,6 +50,48 @@ function Control({ control }) {
   const label = controlRef(control.control_id) + (control.name ? " · " + control.name : "");
   return control.assessment_id ?
     <Link href={soaControlHref(control.assessment_id, control.control_id)}>{label}</Link> : label;
+}
+
+async function RecordAccess({ href, reference }) {
+  let image;
+  try {
+    const base = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://www.rpgexcellence.com";
+    const url = new URL(href, base);
+    if (["http:", "https:"].includes(url.protocol)) {
+      image = await QRCode.toDataURL(url.href, { width: 360, margin: 4, errorCorrectionLevel: "M" });
+    }
+  } catch {
+    // The direct record link remains available.
+  }
+  return <aside className={shared.qrPanel}>
+    <h3 className={shared.iconTitle}><RecordIcon name="qr"/>Record access (QR)</h3>
+    <ul className={shared.qrCards}><li>
+      {image && <img src={image} width={132} height={132} alt={"QR code for ISMS risk record " + reference}/>}
+      <div><strong>{reference}</strong><p>Company owner sign-in required.</p>
+        <Link className={s.recordButton} href={href}><RecordIcon name="open"/>Open ISMS record</Link></div>
+    </li></ul>
+  </aside>;
+}
+
+function RecordHistory({ risk, decisions }) {
+  const events = [
+    { key: "created", label: "Risk assessment created", at: risk.created_at },
+    risk.updated_at !== risk.created_at && { key: "updated", label: "Risk assessment last updated", at: risk.updated_at },
+    { key: "reviewed", label: "Risk assessment reviewed", at: risk.last_reviewed_at },
+    ...decisions.flatMap(item => [
+      { key: item.id + ":request", label: "Residual-risk acceptance requested", at: item.created_at, details: "Score " + item.accepted_score },
+      { key: item.id + ":decision", label: "Residual-risk decision recorded · " + display(item.decision), at: item.decided_at,
+        details: [item.acceptance_authority, item.rationale].filter(Boolean).join(" · ") },
+    ]),
+  ].filter(event => event?.at && Number.isFinite(Date.parse(event.at)))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  return <Panel title="Record History">
+    {events.length ? <ul className={s.recordHistory + " " + styles.timeline}>{events.map(event => <li key={event.key}>
+      <div>{event.label}</div>
+      <time dateTime={event.at}>{date(event.at)}</time>
+      {event.details && <p className={s.recordProse}>{event.details}</p>}
+    </li>)}</ul> : <p>No record events recorded.</p>}
+  </Panel>;
 }
 
 export default function ISMSRiskRecord({ record, organizationName, today, initialTab, acceptanceAction }) {
@@ -159,33 +202,46 @@ export default function ISMSRiskRecord({ record, organizationName, today, initia
         </div>
       </DocumentRecordPanel>
       <DocumentRecordPanel name="documents">
-        <Panel title="Documents & Applicability">
-          <Facts entries={[["Scope",risk.scope],["Organisation",organizationName],["Affected processes",risk.affected_processes?.join(", ") || null],
-            ["Evidence reference",risk.evidence_reference]]}/>
-          <h3>Linked assets</h3>
-          {assets.length ? <ul className={styles.list}>{assets.map(asset => <li key={asset.id}><strong>{asset.asset_reference} · {asset.asset_name}</strong>
-            <small>{asset.classification || "Classification not recorded"} · {display(asset.status)}</small></li>)}</ul> : <p>No assets linked.</p>}
-          <h3>Statement of Applicability</h3>
-          {controls.length ? <ul>{controls.map(control => <li key={control.id}><Control control={control}/></li>)}</ul> : <p>No controls linked.</p>}
+        <Panel title={<span className={shared.iconTitle}><RecordIcon name="documents"/>Documents &amp; Applicability</span>}>
+          <div className={shared.documentsGrid}>
+            <div>
+              <h3>Linked documents</h3>
+              <ul className={s.recordDecisions + " " + styles.documentRows}>
+                <li><strong className={shared.iconTitle}><RecordIcon name="book"/>Evidence reference</strong>
+                  <small className={s.recordProse}>{risk.evidence_reference || "No reference recorded"}</small></li>
+                <li><strong className={shared.iconTitle}><RecordIcon name="matrix"/>Statement of Applicability</strong>
+                  {controls.length ? <ul className={styles.controlReferences}>{controls.map(control => <li key={control.id}><Control control={control}/></li>)}</ul> :
+                    <small>No controls linked.</small>}</li>
+              </ul>
+              <h3 className={shared.iconTitle}><RecordIcon name="pin"/>Applicability</h3>
+              <p>{[organizationName, risk.scope].filter(Boolean).join(" · ") || "Scope not recorded"}</p>
+              {risk.affected_processes?.length > 0 && <p className={s.recordProse}>Affected processes · {risk.affected_processes.join(", ")}</p>}
+              <h3>Linked assets</h3>
+              {assets.length ? <ul className={s.recordDecisions + " " + styles.documentRows}>{assets.map(asset => <li key={asset.id}>
+                <strong>{asset.asset_reference} · {asset.asset_name}</strong>
+                <small>{asset.classification || "Classification not recorded"} · {display(asset.status)}</small>
+              </li>)}</ul> : <p>No assets linked.</p>}
+              <Link className={s.recordButton} href={href + "&edit=1"}>Edit assessment details</Link>
+            </div>
+            <RecordAccess href={href} reference={risk.risk_reference}/>
+          </div>
         </Panel>
       </DocumentRecordPanel>
       <DocumentRecordPanel name="distribution">
-        <Panel title="Distribution & accountability">
-          <Facts entries={[["Risk owner",risk.risk_owner],["Organisation",organizationName]]}/>
-          <p>This ISMS record has no distribution or acknowledgement log.</p>
+        <Panel title="Distribution list">
+          <p><strong>Current record access</strong> · Company owner</p>
+          <p className={s.notice}>No recipients or acknowledgements are recorded for this ISMS assessment.</p>
+          <ul className={s.recordDecisions + " " + styles.documentRows}>
+            <li><strong className={shared.iconTitle}><RecordIcon name="person"/>Accountable risk owner</strong><small>{risk.risk_owner || "Not recorded"}</small></li>
+          </ul>
+          <p>Use Document Control to publish an approved copy and request acknowledgements from selected company users.</p>
+          <div className={s.recordHeaderActions}>
+            <a className={s.recordButton} href={ROOT + "/" + encodeURIComponent(risk.id) + "/report"}><RecordIcon name="download"/>Download record PDF</a>
+            <Link className={s.recordButton} href="/portal/documents"><RecordIcon name="open"/>Open Document Control</Link>
+          </div>
         </Panel>
       </DocumentRecordPanel>
-      <DocumentRecordPanel name="history">
-        <Panel title="Record History">
-          <Facts entries={[["Created",date(risk.created_at)],["Last updated",date(risk.updated_at)],["Last reviewed",date(risk.last_reviewed_at)]]}/>
-          <h3>Acceptance requests and decisions</h3>
-          {decisions.length ? <ul className={styles.list}>{decisions.map(item => <li key={item.id}>
-            <strong>{display(item.decision)} · Score {item.accepted_score}</strong>
-            <small>{item.acceptance_authority} · {date(item.decided_at || item.created_at)}</small>
-            <p className={s.recordProse}>{item.rationale}</p>
-          </li>)}</ul> : <p>No acceptance requests recorded.</p>}
-        </Panel>
-      </DocumentRecordPanel>
+      <DocumentRecordPanel name="history"><RecordHistory risk={risk} decisions={decisions}/></DocumentRecordPanel>
     </DocumentRecordTabs>
   </div></main>;
 }

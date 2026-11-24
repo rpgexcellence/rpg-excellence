@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import ISMSRiskWorkspace from "../../../../components/ISMSRiskWorkspace";
 import ISMSWorkspaceShell from "../../../../components/ISMSWorkspaceShell";
-import { siteToday } from "../../../../lib/zone-policy.mjs";
+import { siteToday, UUID } from "../../../../lib/zone-policy.mjs";
 import { createAdminClient } from "../../../../lib/supabase/admin";
 import ISMSRiskRecord from "./ISMSRiskRecord";
 import { loadRiskRecord } from "./risk-record-data";
@@ -21,7 +21,11 @@ export default async function ISMSRiskPage({searchParams}) {
         user
       }
     } = await s.auth.getUser();
-  if (!user) redirect("/portal/login?next=/portal/information-security/risk-management");
+  if (!user) {
+    const risk = query?.risk ?? query?.id;
+    const next = "/portal/information-security/risk-management" + (typeof risk === "string" && UUID.test(risk) ? "?risk=" + risk : "");
+    redirect("/portal/login?next=" + encodeURIComponent(next));
+  }
   const {
     data: org
   } = await s.from("organizations").select("id,name").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();

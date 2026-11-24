@@ -10,6 +10,11 @@ export function middleware(request) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-rpg-pathname", request.nextUrl.pathname);
+  requestHeaders.delete("x-rpg-isms-risk");
+  if (request.nextUrl.pathname === "/portal/information-security/risk-management") {
+    const risk = request.nextUrl.searchParams.get("risk") ?? request.nextUrl.searchParams.get("id");
+    if (risk?.length === 36 && /^[\da-f-]+$/i.test(risk)) requestHeaders.set("x-rpg-isms-risk", risk);
+  }
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const match = request.nextUrl.pathname.match(/^\/audit-actions\/([^/]+)$/);
