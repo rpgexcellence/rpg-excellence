@@ -157,12 +157,16 @@ export default async function WorkplaceInspectionsPage({searchParams}){
       <>{date(row.next_inspection_date)}{programmeDue(row,today)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
       <Badge tone={row.status==="active"?"green":"neutral"}>{title(row.status)}</Badge>,
     ])} empty="No programmes match this view."/>;
-  const fieldworkTable=(rows)=><Table columns={["Inspection","Location","Scheduled / completed","Status","Open"]}
+  const fieldworkTable=(rows,{showInspector=false}={})=><Table columns={[
+    "Inspection",...(showInspector?["Inspector"]:[]),"Location","Scheduled / completed","Status","Open",
+  ]}
     rows={rows.map(row=>{
       const editable=["contribute","review","approve","admin","owner"].includes(access.level);
       const start=editable&&canStartInspection(access,row);
       const continuing=editable&&row.status==="in_progress"&&access.person?.id===row.lead_inspector_person_id;
-      return [row.id,<><Link href={ROOT+"/"+row.id}>{row.title}</Link><small>{row.inspection_reference}</small><small>{person(row.lead_inspector_person_id)}</small></>,
+      const inspector=person(row.lead_inspector_person_id);
+      return [row.id,<><Link href={ROOT+"/"+row.id}>{row.title}</Link><small>{row.inspection_reference}</small>
+        {!showInspector&&<small>{inspector}</small>}</>,...(showInspector?[inspector]:[]),
         location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id)),<>{row.planned_start_at?<time dateTime={row.planned_start_at}>{date(row.planned_start_at,true)}</time>:date(null)}{row.completed_at&&<small>Submitted · {date(row.completed_at,true)}</small>}
         {fieldworkOverdue(row,now)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
         <Badge tone={row.status==="in_progress"?"green":"blue"}>{title(row.status)}</Badge>,
@@ -246,7 +250,7 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     {view==="fieldwork" && <Panel icon="calendar" label="Scheduled fieldwork">
       <nav className={p.tabs} aria-label="Fieldwork queues">{queues.map(([key,label])=><Link key={key} href={href("fieldwork",{queue:key})}
         aria-current={key===queue?"page":undefined}>{label} ({inspections.filter(row=>fieldworkState(row)===key).length})</Link>)}</nav>
-      {fieldworkTable(fieldworkRows)}
+      {fieldworkTable(fieldworkRows,{showInspector:true})}
     </Panel>}
 
     {view==="findings" && <>
