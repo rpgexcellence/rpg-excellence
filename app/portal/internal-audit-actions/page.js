@@ -1,4 +1,7 @@
 import { notFound, redirect } from "next/navigation";
+import { getOrganizationAccess, requireOrganizationAccess } from "../../../lib/organization-access";
+import { requirePlanAccess } from "../../../lib/plan-access";
+import WorkplaceInspectionsPage from "../health-safety/workplace-inspections/page";
 import { createClient } from "../../../lib/supabase/server";
 import { buildNonconformityRows } from "../../../lib/nonconformity-reporting.mjs";
 import ControlledDeviceDrafts from "../../../components/ControlledDeviceDrafts";
@@ -17,6 +20,11 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
     const params = new URLSearchParams(Object.entries(query || {}).filter(([key,value]) => !["record","raise"].includes(key) && typeof value === "string"));
     redirect(target + (params.size ? "?" + params.toString() : ""));
   }
+  if (!pageMode && query?.source === "workplace_inspection") {
+    const access = await requireOrganizationAccess("internal_audit", "view", "/portal/internal-audit-actions?source=workplace_inspection");
+    await requirePlanAccess(access.user, "professional", "Internal Audit Findings and Actions");
+    return <WorkplaceInspectionsPage searchParams={query} central/>;
+  }
   const client = await createClient();
   const { data: { user } } = await client.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/internal-audit-actions");
@@ -24,6 +32,9 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
   // Failed reads never produce a misleading empty register or dashboard.
   const snapshot = await getNonconformityWorkspaceSnapshot();
   if (snapshot.currentUserId !== user.id) throw new Error("Your signed-in account changed. Refresh this page before opening a finding draft.");
+  const inspectionAccess = !pageMode ? await getOrganizationAccess("risk_management", "view") : null;
+  const showInspectionSource = inspectionAccess?.allowed && inspectionAccess.organization?.id === snapshot.organization.id &&
+    inspectionAccess.user?.id === snapshot.currentUserId;
   const scope = { userId: snapshot.currentUserId, organizationId: snapshot.organization.id };
   const sourceRequested = query?.audit_id !== undefined || query?.question_id !== undefined;
   const auditId = uuid(query?.audit_id), questionId = uuid(query?.question_id);
@@ -86,6 +97,7 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
   return <NonconformityWorkspace
     key={`${scope.userId}:${scope.organizationId}:${draftKey}:${initialRecordId || ""}:${initialRaise ? "raise" : "browse"}`}
     snapshot={snapshot}
+    showInspectionSource={showInspectionSource}
     pageMode={pageMode}
     initialRecordTab={query?.tab === "follow_up" ? "follow_up" : "report"}
     initialView={query?.view === "management" ? "management" : "register"}
