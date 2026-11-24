@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import s from './documents.module.css';
 
-export default function DocumentRegisterFilter({ label, name, choices, selected, emptyLabel, search }) {
+export default function DocumentRegisterFilter({ label, name, choices, selected, emptyLabel, search, searchOptions }) {
   const [checked, setChecked] = useState(() => new Set(selected));
   const [query, setQuery] = useState(search?.value ?? '');
   const searchText = query.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-GB');
@@ -27,11 +27,11 @@ export default function DocumentRegisterFilter({ label, name, choices, selected,
       }
     }}>
       <summary aria-label={label + (checked.size ? ', ' + checked.size + ' selected' : '')}>
-        {checked.size ? checked.size + ' selected' : query.trim() || emptyLabel}
+        {checked.size ? checked.size + ' selected' : (search && query.trim()) || emptyLabel}
       </summary>
       <div className={s.filterMenu}>
-        {search && <input type="search" aria-label={search.placeholder} placeholder={search.placeholder}
-          name={checked.size ? undefined : search.name} maxLength={150} value={query} onChange={event => setQuery(event.target.value)}/>}
+        {(search || searchOptions) && <input type="search" aria-label={search?.placeholder || "Search " + label.toLowerCase() + " options"} placeholder={search?.placeholder || "Search options"}
+          name={checked.size ? undefined : search?.name} maxLength={150} value={query} onChange={event => setQuery(event.target.value)}/>}
         <div className={s.filterChoices} role="group" aria-label={label + ' choices'}>
           {shown.map(({ value, label }) => <label key={value}>
             <input type="checkbox" checked={checked.has(value)} onChange={event => toggle(value, event.target.checked)}/>
