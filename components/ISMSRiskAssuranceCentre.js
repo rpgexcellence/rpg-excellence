@@ -2,6 +2,8 @@
 
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
+import DocumentRegisterFilter from "../app/portal/documents/DocumentRegisterFilter";
+import hs from "../app/portal/health-safety/risk-assessment/risk-assurance.module.css";
 import { RecordIcon } from "./DocumentRecordTabs";
 import { soaControlHref } from "../lib/soa-workflow.mjs";
 import { BASES, RISK_BANDS, acceptanceState, activeRisk, controlState, rating, riskBand, toRiskCsv, treatmentOpen } from "../lib/isms-risk-assurance.mjs";
@@ -16,6 +18,37 @@ const RESPONSES = { modify: "Modify", avoid: "Avoid", share: "Share or transfer"
 const DATE = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "Europe/London" });
 const title = text => text ? text.replaceAll("_", " ").replace(/^\w/, c => c.toUpperCase()) : "Not recorded";
 const date = value => value && Number.isFinite(Date.parse(value)) ? DATE.format(new Date(value)) : "Not recorded";
+
+const REGISTER_VIEWS = [
+  ["open", "Open risks"], ["scope", "By Scope"], ["owner", "By Owner"],
+  ["level", "By Residual Risk"], ["all", "All records"],
+];
+const REGISTER_COLUMNS = ["Risk", "Scope & owner", "Status & acceptance", "Inherent → residual risk", "Treatments & review date", "Quick actions"];
+const registerChoices = values => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "en-GB"))
+  .map(value => ({ value, label: value }));
+const registerResidual = risk => riskBand(rating(risk)?.score)?.[2] || "Unrated";
+
+function groupedRisks(records, view) {
+  if (view === "open" || view === "all") return [["", records]];
+  const groups = new Map();
+  for (const row of records) {
+    const label = view === "level" ? registerResidual(row.risk) :
+      view === "scope" ? row.risk.scope || "Scope not recorded" : row.risk.risk_owner || "Owner not recorded";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(row);
+  }
+  const labels = view === "level" ? [...RISK_BANDS].reverse().map(band => band[2]).concat("Unrated") :
+    [...groups.keys()].sort((a, b) => a.localeCompare(b, "en-GB"));
+  return labels.filter(label => groups.has(label)).map(label => [label, groups.get(label)]);
+}
+
+function RegisterScore({ risk, basis }) {
+  const item = rating(risk, basis);
+  const band = item ? riskBand(item.score) : null;
+  const tone = [ "acceptable", "adequate", "inadequate", "unacceptable", "unacceptable" ][RISK_BANDS.indexOf(band)];
+  return <span className={hs.badge} data-band={tone} title={item ? item.likelihood + " × " + item.impact : undefined}>
+    {item ? item.score + " · " + band[2] : "Unrated"}</span>;
+}
 
 function Score({ risk, basis }) {
   const item = rating(risk, basis);
@@ -131,9 +164,11 @@ export default function ISMSRiskAssuranceCentre({
   const [view, setView] = useState("management");
   const [metric, setMetric] = useState("");
   const [band, setBand] = useState("");
-  const [owner, setOwner] = useState("");
-  const [scope, setScope] = useState("");
-  const [lifecycle, setLifecycle] = useState("current");
+  const [owners, setOwners] = useState([]);
+  const [scopes, setScopes] = useState([]);
+  const [selectedRisks, setSelectedRisks] = useState([]);
+  const [registerView, setRegisterView] = useState("open");
+  const [filterVersion, setFilterVersion] = useState(0);
   const [treatmentFilter, setTreatmentFilter] = useState("");
   const [detailId, setDetailId] = useState("");
   const dialog = useRef(null);
@@ -167,12 +202,14 @@ export default function ISMSRiskAssuranceCentre({
     ["treatments", "Open treatments", "Outstanding actions", "clipboard", "purple", row => row.actions.some(treatmentOpen), activeActions.filter(treatmentOpen).length],
   ].map(([key, label, note, icon, tone, match, count]) => ({ key, label, note, icon, tone, match, count: count ?? current.filter(match).length }));
   const selectedMetric = definitions.find(item => item.key === metric);
-  const portfolio = lifecycle === "all" && !metric && !cell && !band ? records : current;
+  const portfolio = registerView === "all" && !metric && !cell && !band ? records : current;
   const term = String(query || "").trim().toLowerCase();
   const visible = portfolio.filter(record => {
     const { risk } = record;
     return (!selectedMetric || selectedMetric.match(record)) && (!cell || rating(risk, mode)?.cell === cell) &&
-      (!band || riskBand(rating(risk)?.score)?.[2] === band) && (!owner || owner === risk.risk_owner) && (!scope || scope === risk.scope) &&
+      (!band || riskBand(rating(risk)?.score)?.[2] === band) &&
+      (!owners.length || owners.includes(risk.risk_owner)) && (!scopes.length || scopes.includes(risk.scope)) &&
+      (!selectedRisks.length || selectedRisks.includes(risk.id)) &&
       (!term || [risk.risk_reference, risk.title, risk.risk_owner, risk.scope, ...record.controls.map(control => control.control_id)].join(" ").toLowerCase().includes(term));
   });
   const movement = current.reduce((count, { risk }) => {
@@ -191,12 +228,31 @@ export default function ISMSRiskAssuranceCentre({
   }
   function selectMetric(key) {
     const next = key === metric ? "" : key;
-    setMetric(next); setCell(""); setBand(""); setLifecycle("current");
+    setMetric(next); setCell(""); setBand("");
+    if (registerView === "all") setRegisterView("open");
     if (key === "treatments" && next) { setView("operational"); setTreatmentFilter("open"); }
     window.requestAnimationFrame(() => document.getElementById(key === "treatments" && next ? "ismsTreatments" : "ismsRiskRegister")?.scrollIntoView({ block: "nearest" }));
   }
-  function clear() {
-    setQuery(""); setOwner(""); setScope(""); setMetric(""); setCell(""); setBand(""); setLifecycle("current"); setTreatmentFilter("");
+  function clearDrill() {
+    setMetric(""); setCell(""); setBand("");
+  }
+  function applyRegisterFilters(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setSelectedRisks(form.getAll("risk"));
+    setScopes(form.getAll("scope"));
+    setOwners(form.getAll("owner"));
+    setQuery(String(form.get("q") || ""));
+    setFilterVersion(version => version + 1);
+  }
+  function clearRegisterFilters() {
+    setQuery(""); setSelectedRisks([]); setScopes([]); setOwners([]);
+    setFilterVersion(version => version + 1);
+    clearDrill();
+  }
+  function selectRegisterView(next) {
+    setRegisterView(next);
+    if (next === "all") clearDrill();
   }
   function statusFor(risk, acceptance) {
     const recorded = acceptanceState(risk, acceptance, today);
@@ -249,7 +305,7 @@ export default function ISMSRiskAssuranceCentre({
     {view === "management" ? <div className={s.board}>
       <HeatMap records={current} methodology={methodology} appetite={appetite} mode={mode} cell={cell}
         setMode={next => { setMode(next); setCell(""); }}
-        selectCell={key => { setCell(cell === key ? "" : key); setMetric(""); setBand(""); }}/>
+        selectCell={key => { setCell(cell === key ? "" : key); setMetric(""); setBand(""); if (registerView === "all") setRegisterView("open"); }}/>
       <div className={s.stack}>
         <Panel heading="Risk position" icon="scope">
           <p className={s.muted}>Approved appetite · {appetite}/25{methodology?.version && " · Methodology v" + methodology.version}</p>
@@ -265,7 +321,7 @@ export default function ISMSRiskAssuranceCentre({
         </Panel>
         <Panel heading="Residual risk profile">
           <div className={s.dataRows}>{RISK_BANDS.map(([min,max,label,color]) => <button type="button" key={label} aria-pressed={band === label}
-            onClick={() => { setBand(band === label ? "" : label); setMetric(""); setCell(""); }}>
+            onClick={() => { setBand(band === label ? "" : label); setMetric(""); setCell(""); if (registerView === "all") setRegisterView("open"); }}>
             <span><i style={{ background: color }}/> {label} · {min}–{max}</span>
             <strong>{current.filter(({ risk }) => riskBand(rating(risk)?.score)?.[2] === label).length} →</strong>
           </button>)}</div>
@@ -303,33 +359,72 @@ export default function ISMSRiskAssuranceCentre({
       </Panel>
     </div>}
 
-    <section id="ismsRiskRegister" className={s.panel + " " + s.register}>
-      <div className={s.headingRow}><h2>Information security risk register</h2>
-        <div className={p.actions}><button type="button" className={p.button} onClick={exportRegister} disabled={!visible.length}><RecordIcon name="download"/>Export register CSV</button>
-          <button type="button" className={p.button} onClick={exportSummary}><RecordIcon name="download"/>Export management summary</button></div>
+    <section id="ismsRiskRegister" className={hs.panel + " " + hs.register + " " + s.register} aria-labelledby="ismsRegisterTitle">
+      <header className={hs.panelHead}>
+        <h2 id="ismsRegisterTitle">Information security risk register</h2>
+        <div className={hs.filterActions}>
+          <button type="button" className={hs.button} onClick={exportRegister} disabled={!visible.length}>Export CSV</button>
+          <button type="button" className={hs.button} onClick={exportSummary}>Export management summary</button>
+        </div>
+      </header>
+      <p className={hs.sub}>Current risk scores, treatment progress and review dates. All records includes drafts and closed risks.</p>
+      <div className={hs.tabs} aria-label="Register grouping" role="group">
+        {REGISTER_VIEWS.map(([key, label]) => <button type="button" key={key}
+          className={hs.button + " " + s.registerTab} aria-pressed={registerView === key}
+          onClick={() => selectRegisterView(key)}>{label}</button>)}
       </div>
-      <div className={s.filterRow}>
-        <input aria-label="Search risks" type="search" placeholder="Search risk, reference, owner or control" value={query || ""} onChange={event => setQuery(event.target.value)}/>
-        <label>Scope <select value={scope} onChange={event => setScope(event.target.value)}><option value="">All scopes</option>{[...new Set(risks.map(risk => risk.scope).filter(Boolean))].sort().map(value => <option key={value}>{value}</option>)}</select></label>
-        <label>Owner <select value={owner} onChange={event => setOwner(event.target.value)}><option value="">All owners</option>{[...new Set(risks.map(risk => risk.risk_owner).filter(Boolean))].sort().map(value => <option key={value}>{value}</option>)}</select></label>
-        <label>Records <select value={portfolio === records ? "all" : "current"} onChange={event => { setLifecycle(event.target.value); setMetric(""); setCell(""); setBand(""); }}>
-          <option value="current">Open risks</option><option value="all">All non-archived records</option>
-        </select></label>
-        <button type="button" className={p.button} onClick={clear}>Clear filters</button>
+      <form className={hs.filterRow} onSubmit={applyRegisterFilters}>
+        <DocumentRegisterFilter key={"risk-" + filterVersion} name="risk" label="Search" emptyLabel="All risks" selected={selectedRisks}
+          choices={risks.map(risk => ({ value: risk.id, label: [risk.risk_reference, risk.title].filter(Boolean).join(" · ") }))}
+          search={{ name: "q", value: query || "", placeholder: "Find a risk, reference, owner or control" }}/>
+        <DocumentRegisterFilter key={"scope-" + filterVersion} name="scope" label="Scope" emptyLabel="All scopes" selected={scopes}
+          choices={registerChoices(risks.map(risk => risk.scope))}/>
+        <DocumentRegisterFilter key={"owner-" + filterVersion} name="owner" label="Owner" emptyLabel="All owners" selected={owners}
+          choices={registerChoices(risks.map(risk => risk.risk_owner))}/>
+        <div className={hs.filterActions}>
+          <button className={hs.primary} type="submit">Apply</button>
+          <button className={hs.button} type="button" onClick={clearRegisterFilters}>Clear filters</button>
+        </div>
+      </form>
+      <div className={hs.selection}>
+        <span role="status">{visible.length} of {portfolio.length} {portfolio === records ? "records" : "open risks"}</span>
+        {(selectedMetric || band || cell) && <>
+          <strong>{selectedMetric?.label || (band ? "Residual " + band : BASES[mode] + " cell " + cell.replace("-", " × "))}</strong>
+          <button className={hs.linkButton} type="button" onClick={clearDrill}>Clear drill-down</button>
+        </>}
       </div>
-      <p className={s.muted} role="status">{visible.length} of {portfolio.length} risks shown{selectedMetric && " · " + selectedMetric.label}{band && " · Residual " + band}{cell && " · " + BASES[mode] + " cell " + cell.replace("-", " × ")}</p>
-      <Table headers={["Risk / scope","Owner","Inherent","Residual","Target","Treatment / acceptance","SoA controls","Next review"]} rows={visible.map(record => {
-        const {risk,controls:mapped,actions,acceptance}=record;
-        return [risk.id,
-          <><button type="button" className={s.textButton} onClick={() => openRisk(risk.id)}>{risk.risk_reference} · {risk.title}</button><small>{risk.scope || "Scope not recorded"}</small></>,
-          risk.risk_owner, <Score risk={risk} basis="inherent"/>,
-          <><Score risk={risk} basis="residual"/>{isAbove(record) && <small className={s.danger}>Above appetite</small>}</>,
-          <Score risk={risk} basis="target"/>,
-          <>{RESPONSES[risk.treatment_decision] || "Decision not recorded"} · {statusFor(risk,acceptance)}<small>{actions.filter(treatmentOpen).length} open · Acceptance {acceptanceState(risk,acceptance,today).toLowerCase()}</small></>,
-          mapped.length ? <span className={s.controlLinks}>{mapped.map(control => <ControlLink key={control.id} control={control}/>)}</span> : "None linked",
-          date(risk.review_due_date),
-        ];
-      })}/>
+      {visible.length ? <div className={hs.tableWrap} role="region" aria-label="Information security risk records" tabIndex={0}>
+        <table className={hs.records}>
+          <colgroup>{[22, 18, 16, 17, 13, 14].map((width, index) => <col key={index} style={{ width: width + "%" }}/>)}</colgroup>
+          <thead><tr>{REGISTER_COLUMNS.map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+          {groupedRisks(visible, registerView).map(([group, rows]) => <tbody key={group}>
+            {group && <tr><th className={hs.groupHead} colSpan={REGISTER_COLUMNS.length} scope="rowgroup">{group} · {rows.length}</th></tr>}
+            {rows.map(record => {
+              const {risk,controls:mapped,actions,acceptance}=record;
+              const open = actions.filter(treatmentOpen);
+              const late = open.filter(action => action.target_date && action.target_date < today).length;
+              const riskPath = ROOT + "?risk=" + encodeURIComponent(risk.id);
+              return <tr key={risk.id}>
+                <th scope="row"><button type="button" className={s.textButton} onClick={() => openRisk(risk.id)}>{risk.risk_reference || risk.title}</button>
+                  {risk.risk_reference && <div>{risk.title}</div>}</th>
+                <td>{risk.scope || "Scope not recorded"}<small>{risk.risk_owner || "Owner not recorded"}</small></td>
+                <td><span className={hs.workflow} data-status={risk.status === "acceptance_pending" ? "in_review" : risk.status}>{statusFor(risk,acceptance)}</span>
+                  <small>{RESPONSES[risk.treatment_decision] || "Decision not recorded"} · Acceptance {acceptanceState(risk,acceptance,today).toLowerCase()}</small></td>
+                <td><div className={hs.scores}><span>{rating(risk,"inherent")?.score ?? "Unrated"}</span><span aria-hidden="true">→</span>
+                  <span className={hs.srOnly}>Residual</span><RegisterScore risk={risk} basis="residual"/></div>
+                  <small>Target {rating(risk,"target")?.score ?? "unrated"}{isAbove(record) && <span className={hs.overdue}> · Above appetite</span>}</small></td>
+                <td><span className={late ? hs.overdue : undefined}>{open.length} open{late > 0 && " · " + late + " overdue"}</span>
+                  <small className={overdue(record) ? hs.overdue : undefined}>{risk.review_due_date ? "Review " + date(risk.review_due_date) : "No review date"}</small></td>
+                <td><div className={hs.rowActions}><button type="button" className={hs.linkButton} onClick={() => openRisk(risk.id)}>Open</button>
+                  <Link href={riskPath}>Review assessment</Link></div>
+                  {mapped.length > 0 ? <details className={hs.history}><summary>SoA controls ({mapped.length})</summary>
+                    <span className={s.controlLinks}>{mapped.map(control => <ControlLink key={control.id} control={control}/>)}</span>
+                  </details> : <small>No SoA controls</small>}</td>
+              </tr>;
+            })}
+          </tbody>)}
+        </table>
+      </div> : <p className={hs.empty}>No risks match this selection.</p>}
     </section>
 
     <dialog ref={dialog} className={s.dialog} aria-labelledby="ismsRiskDetails" onClose={() => setDetailId("")}>
