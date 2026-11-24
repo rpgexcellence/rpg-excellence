@@ -132,18 +132,23 @@
 }
 .chart h3 { margin: 0 0 11px; color: #153652; }
 .chart h3 small { color: #48657d; }
-.ringRow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ringRow {
+  display: grid;
+  grid-template-columns: min(44%, 216px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
 .donut {
-  width: 112px;
-  height: 112px;
+  container-type: inline-size;
+  width: 100%;
+  aspect-ratio: 1;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  flex: none;
 }
 .donut > div {
-  width: 81px;
-  height: 81px;
+  width: 72%;
+  aspect-ratio: 1;
   border-radius: 50%;
   background: #f8fbfe;
   display: grid;
@@ -151,8 +156,12 @@
   text-align: center;
   font-size: .77rem;
 }
-.donut strong { font: bold 1.5rem Georgia,serif; }
-.chartLegend { display: grid; flex: 1 1 145px; gap: 4px; }
+.donut strong { font: bold clamp(1.25rem, 17cqi, 2.25rem) Georgia,serif; }
+.chartLegend { display: grid; gap: 4px; }
+.ringRow > .chartLegend {
+  width: min(100%, 270px);
+  justify-self: end;
+}
 .chart button {
   min-height: 34px;
   min-width: 0;
@@ -183,6 +192,11 @@
 }
 @container inspection-charts (max-width: 550px) {
   .charts { grid-template-columns: minmax(0,1fr); }
+}
+@container inspection-charts (max-width: 310px) {
+  .ringRow { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .donut { width: min(100%, 176px); }
+  .ringRow > .chartLegend { width: 100%; justify-self: stretch; }
 }
 @media (max-width: 760px) {
   .tickOptions { position: static; width: min(235px, 80vw); }
