@@ -1,5 +1,6 @@
 // VERIFIED_ISMS_RISK_DRAFT_20261021: explicit conditions and unique draft keys.
 "use client";
+import ISMSRiskAssuranceCentre from "./ISMSRiskAssuranceCentre";
 import {soaControlHref} from "../lib/soa-workflow.mjs";
 
 import { useDeviceDraftState } from "./DeviceDraftWorkspace";
@@ -55,74 +56,13 @@ function Example({
 }) {
   return <small className="irmExample">Example: {children}</small>;
 }
-function Metric({
-  n,
-  t,
-  tone = ""
-}) {
-  return <article className={tone}><span>{t}</span><strong>{n}</strong></article>;
-}
-function HeatMap({
-  risks,
-  mode,
-  setMode,
-  selected,
-  setSelected,
-  appetite
-}) {
-  const fields = (() => {
-    if (mode === "inherent") {
-      return ["inherent_likelihood", "inherent_impact"];
-    }
-    return (() => {
-      if (mode === "target") {
-        return ["target_likelihood", "target_impact"];
-      }
-      return ["residual_likelihood", "residual_impact"];
-    })();
-  })();
-  const cells = useMemo(() => {
-    const m = new Map();
-    risks.forEach(r => {
-      const l = +r[fields[0]],
-        i = +r[fields[1]];
-      if (!l || !i) return;
-      const k = l + "-" + i;
-      m.set(k, [...(m.get(k) || []), r]);
-    });
-    return m;
-  }, [risks, mode, fields[0], fields[1]]);
-  return <section className="irmPanel"><header className="irmPanelHead"><div><small>INTERACTIVE RISK POSITION</small><h2>Risk heat map</h2><p>Select a cell to filter the register.</p></div><div className="irmToggle">{["inherent", "residual", "target"].map(x => <button type="button" className={(() => {
-          if (mode === x) {
-            return "active";
-          }
-          return "";
-        })()} onClick={() => {
-          setMode(x);
-          setSelected("");
-        }} key={x}>{title(x)}</button>)}</div></header><div className="irmHeat">{[5, 4, 3, 2, 1].map(i => <div className="irmHeatRow" key={i}><label><b>{i}</b><span>{impact[i - 1]}</span></label>{[1, 2, 3, 4, 5].map(l => {
-          const s = l * i,
-            [band, bg, fg] = colour(s),
-            k = l + "-" + i,
-            count = cells.get(k)?.length || 0;
-          return <button type="button" key={k} className={(() => {
-            if (selected === k) {
-              return "selected";
-            }
-            return "";
-          })()} style={{
-            "background": bg,
-            "color": fg
-          }} onClick={() => setSelected((() => {
-            if (selected === k) {
-              return "";
-            }
-            return k;
-          })())}><i>{s}</i><strong>{count}</strong><small>{band}</small>{s > appetite && <em>Above appetite</em>}</button>;
-        })}</div>)}<div className="irmLikelihood"><span /><span>1<small>Rare</small></span><span>2<small>Unlikely</small></span><span>3<small>Possible</small></span><span>4<small>Likely</small></span><span>5<small>Almost certain</small></span></div></div></section>;
-}
 export default function ISMSRiskWorkspace({
   action,
+  acceptanceAction,
+  acceptances = [],
+  soaEntries = [],
+  organizationName,
+  today,
   methodology,
   risks,
   assets,
@@ -177,22 +117,7 @@ export default function ISMSRiskWorkspace({
   const statement = statementEdit || generated,
     missing = [!cause && "cause", !event && "event", !consequence && "consequence"].filter(Boolean);
   const completion = Math.round([riskTitle, riskOwner, source, scope, cause, event, consequence, cia.length, rationale, selectedControls.length, decision, fieldCache.review_due_date].filter(Boolean).length / 12 * 100);
-  const appetite = methodology?.appetite_score || 9,
-    above = risks.filter(r => r.residual_score > appetite).length,
-    overdue = risks.filter(r => r.review_due_date && new Date(r.review_due_date) < new Date()).length,
-    unmapped = risks.filter(r => !links.some(l => l.risk_id === r.id)).length;
-  const fields = (() => {
-    if (mode === "inherent") {
-      return ["inherent_likelihood", "inherent_impact"];
-    }
-    return (() => {
-      if (mode === "target") {
-        return ["target_likelihood", "target_impact"];
-      }
-      return ["residual_likelihood", "residual_impact"];
-    })();
-  })();
-  const visible = risks.filter(r => (!cell || r[fields[0]] + "-" + r[fields[1]] === cell) && (!query || ((r.risk_reference || "") + " " + r.title + " " + r.risk_owner).toLowerCase().includes(query.toLowerCase())));
+  const appetite = methodology?.appetite_score ?? 9;
   const toggleControl = c => setSelectedControls((() => {
     if (selectedControls.some(x => x.control_id === c.control_id)) {
       return selectedControls.filter(x => x.control_id !== c.control_id);
@@ -353,47 +278,12 @@ export default function ISMSRiskWorkspace({
     }
     submitAllowed.current = false;
   };
-  return <div className="irmWorkspace"><style>{styles}</style><style>{".irmRow{grid-template-columns:minmax(0,1.6fr) repeat(2,minmax(90px,.6fr)) auto auto}.irmRow>div{min-width:0;overflow-wrap:anywhere}.irmEdit{display:inline-flex;text-decoration:none}@media(max-width:1100px){.irmRow{grid-template-columns:minmax(0,1fr) auto auto}.irmRow>div:first-child{grid-column:1/-1}}@media(max-width:600px){.irmRow{grid-template-columns:minmax(0,1fr) auto}.irmRow p{line-height:1.6}}.irmEdit{padding:9px 12px;border:1px solid #1762e8;border-radius:8px;background:#fff;color:#1252bd;font-weight:900;white-space:nowrap}"}</style>
-  <div className="irmViewSwitch"><button type="button" className={(() => {
-        if (view === "register") {
-          return "active";
-        }
-        return "";
-      })()} onClick={() => setView("register")}>Risk Register</button><button type="button" className={(() => {
-        if (view === "new" && !editingId) {
-          return "active";
-        }
-        return "";
-      })()} onClick={openNew}>New Risk Assessment</button></div>
-  {(() => {
-      if (view === "register") {
-        return <><section className="irmMetrics"><Metric n={risks.length} t="Open risks" /><Metric n={above} t="Above appetite" tone={(() => {
-              if (above) {
-                return "red";
-              }
-              return "green";
-            })()} /><Metric n={unmapped} t="Without SoA controls" tone={(() => {
-              if (unmapped) {
-                return "amber";
-              }
-              return "green";
-            })()} /><Metric n={overdue} t="Reviews overdue" tone={(() => {
-              if (overdue) {
-                return "red";
-              }
-              return "green";
-            })()} /><Metric n={treatments.filter(x => !["verified", "cancelled"].includes(x.status)).length} t="Open treatments" /></section><HeatMap risks={risks} mode={mode} setMode={setMode} selected={cell} setSelected={setCell} appetite={appetite} /><section className="irmPanel"><header className="irmPanelHead"><div><small>CONTROLLED REGISTER</small><h2>Information-security risks</h2><p>{visible.length} of {risks.length} risks visible · appetite {appetite}/25</p></div><button className="irmPrimary" type="button" onClick={openNew}>+ Assess new risk</button></header><div className="irmFilters"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search risk, reference or owner" /><button type="button" onClick={() => {
-                setQuery("");
-                setCell("");
-              }}>Clear</button></div>{(() => {
-              if (visible.length) {
-                return <div className="irmRows">{visible.map(r => <article className="irmRow" key={r.id}><div><strong>{r.risk_reference} · {r.title}</strong><small>{r.risk_owner} · {title(r.status)}</small><p>Because of {r.cause || "an unrecorded cause"}, {r.event || "an event"} may occur, resulting in {r.consequence || "an unrecorded consequence"}.</p></div><Score l={r.inherent_likelihood} i={r.inherent_impact} /><Score l={r.residual_likelihood} i={r.residual_impact} /><span><b>{links.filter(x => x.risk_id === r.id).length}</b> SoA controls</span><a className="irmEdit" href={`/portal/information-security/risk-management?risk=${encodeURIComponent(r.id)}`}>Open risk →</a></article>)}</div>;
-              }
-              return <div className="irmEmpty">No risks match this view.</div>;
-            })()}</section></>;
-      }
-      return null;
-    })()}
+  return <div className="irmWorkspace"><style>{styles}</style>
+  {view === "register" ? <ISMSRiskAssuranceCentre organizationName={organizationName} today={today} methodology={methodology}
+    risks={risks} controls={controls} links={links} treatments={treatments} acceptances={acceptances}
+    soaEntries={soaEntries} acceptanceAction={acceptanceAction} onNew={openNew}
+    mode={mode} setMode={setMode} cell={cell} setCell={setCell} query={query} setQuery={setQuery}/> :
+    <div className="irmViewSwitch"><button type="button" onClick={cancel}>← Risk Register</button></div>}
   {(() => {
       if (view === "new") {
         return <form key={editingId || "new"} ref={formRef} action={action} className="irmForm" onChange={rememberField} onSubmit={guardSubmit}>
@@ -564,4 +454,4 @@ export default function ISMSRiskWorkspace({
     })()}
  </div>;
 }
-const styles = "*{box-sizing:border-box}.irmWorkspace{width:100%;max-width:none;min-width:0;margin:auto}.irmViewSwitch{display:flex;width:max-content;margin:0 0 14px;padding:4px;border:1px solid #cad8e4;border-radius:10px;background:#fff}.irmViewSwitch button{padding:10px 16px;border:0;border-radius:7px;background:transparent;color:#49657d;font-weight:900}.irmViewSwitch button.active{background:#123e70;color:#fff}.irmMetrics{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}.irmMetrics article{padding:16px;border:1px solid #d2dee8;border-top:4px solid #1762e8;border-radius:12px;background:#fff}.irmMetrics article.red{border-top-color:#b42318}.irmMetrics article.amber{border-top-color:#d99100}.irmMetrics article.green{border-top-color:#15966a}.irmMetrics span,.irmMetrics strong{display:block}.irmMetrics span{font-size:11px;color:#657b90;font-weight:850}.irmMetrics strong{margin-top:6px;font-size:29px}.irmPanel{margin-top:14px;padding:21px;border:1px solid #d1dde7;border-radius:15px;background:#fff}.irmPanelHead{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.irmPanelHead small,.irmForm>header small{color:#07859a;font-weight:950;letter-spacing:.12em}.irmPanelHead h2,.irmForm>header h2{margin:6px 0}.irmPanelHead p,.irmForm>header p{margin:0;color:#667c90}.irmToggle{display:flex;padding:4px;border-radius:9px;background:#edf3f7}.irmToggle button{padding:8px 10px;border:0;border-radius:7px;background:transparent;color:#557086;font-weight:800}.irmToggle button.active{background:#fff;color:#0b3357}.irmHeat{display:grid;gap:5px;max-width:980px;margin:20px auto 0}.irmHeatRow,.irmLikelihood{display:grid;grid-template-columns:125px repeat(5,1fr);gap:5px}.irmHeatRow>label{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding-right:8px}.irmHeatRow>label span,.irmLikelihood small{color:#6c8294;font-size:10px}.irmHeatRow>button{position:relative;min-height:70px;border:3px solid transparent;border-radius:9px;display:grid;place-items:center}.irmHeatRow>button.selected{border-color:#061b35}.irmHeatRow button i{position:absolute;left:6px;top:5px;font-style:normal;font-size:10px}.irmHeatRow button strong{font-size:25px}.irmHeatRow button em{position:absolute;right:5px;top:5px;font-size:7px;font-style:normal}.irmLikelihood{text-align:center}.irmLikelihood small{display:block}.irmPrimary{padding:11px 15px;border:0!important;border-radius:8px;background:#1762e8!important;color:#fff!important;font-weight:900}.irmFilters{display:flex;gap:8px;margin:17px 0}.irmFilters input{flex:1;padding:11px;border:1px solid #c7d6e3;border-radius:8px}.irmFilters button{border:1px solid #c7d6e3;border-radius:8px;background:#fff}.irmRows{display:grid;gap:7px}.irmRow{display:grid;grid-template-columns:minmax(300px,1.6fr) repeat(3,minmax(120px,.6fr));gap:12px;align-items:center;padding:13px;border:1px solid #dce5ed;border-radius:10px}.irmRow strong,.irmRow small{display:block}.irmRow small{margin-top:4px;color:#6e8395}.irmRow p{margin:7px 0 0;color:#526a7e;font-size:11px}.irmScore{display:inline-block;padding:7px 8px;border-radius:8px;font-size:10px;font-weight:900}.irmEmpty,.irmNotice{padding:18px;border-radius:9px;background:#f0f5f8;color:#647b8f}.irmForm{padding:25px;border:1px solid #bfd1de;border-radius:16px;background:#fff}.irmProgress{display:grid;grid-template-columns:repeat(5,1fr);margin:22px 0;border-radius:11px;overflow:hidden;border:1px solid #cfdae4}.irmProgress button{display:flex;gap:8px;align-items:center;padding:13px 10px;border:0;border-right:1px solid #d8e1e8;background:#f5f8fa;color:#536d83;font-weight:850}.irmProgress button:last-child{border:0}.irmProgress button b{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#dfe8ef}.irmProgress button.active{background:#e8f0ff;color:#124fbe}.irmProgress button.active b{background:#1762e8;color:#fff}.irmProgress button.done{color:#087b61}.irmProgress button.done b{background:#d9f5ec}.irmForm fieldset{margin:20px 0 95px;padding:19px;border:1px solid #d3dfe8;border-radius:12px}.irmForm legend{padding:0 7px;color:#0c3157;font-size:18px;font-weight:900}.irmForm fieldset>p{color:#637a8e}.irmGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.irmForm label{display:grid;gap:6px;color:#193a59;font-size:12px;font-weight:850}.irmForm input,.irmForm textarea,.irmForm select{width:100%;min-width:0;padding:12px;border:1px solid #bfd0de;border-radius:8px;background:#fff;color:#0b2947;font:14px Arial,sans-serif}.irmForm textarea{min-height:75px;resize:vertical}.irmForm .wide{grid-column:1/-1}.irmExample{color:#6d8191;font-weight:500;font-size:10px}.irmStatement{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:15px;padding:15px;border-left:5px solid #d79a00;border-radius:9px;background:#fff8e7}.irmStatement.complete{border-color:#15966a;background:#edfaf5}.irmStatement div{grid-column:1/-1;display:flex;justify-content:space-between}.irmStatement small{color:#936900}.irmStatement textarea{grid-column:1;min-height:70px}.irmStatement button{border:1px solid #bacbd8;border-radius:8px;background:#fff;font-weight:850}.irmChoices,.irmAssetChoices{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.irmChoices>b{width:100%}.irmChoices button,.irmAssetChoices button{padding:8px 10px;border:1px solid #c6d6e2;border-radius:999px;background:#f7fafc;color:#2a4a64}.irmChoices button.active,.irmAssetChoices button.active{background:#1762e8;border-color:#1762e8;color:#fff}.irmImpactGrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.irmSlider{padding:12px;border-radius:9px;background:#f3f7fa}.irmSlider>span{display:flex;justify-content:space-between;gap:10px}.irmSlider input{padding:0;margin:12px 0 6px;accent-color:#1762e8}.irmScale{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}.irmScale span{color:#667d91;font-size:9px;text-align:center}.irmScale b{display:block;color:#183b5b;font-size:10px}.irmPositionGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.irmPositionGrid section{padding:15px;border-radius:10px;background:#f5f8fb}.irmControlSelect{margin-top:16px}.irmControlSelect>div{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px;max-height:390px;overflow:auto}.irmControlSelect button{display:grid;grid-template-columns:auto 1fr;gap:7px;padding:9px;border:1px solid #d3e0e9;border-radius:8px;background:#f8fafc;color:#25445e;text-align:left;font-size:11px}.irmControlSelect button.active{border-color:#1762e8;background:#eaf1ff}.irmControlSelect button span{color:#1762e8;font-weight:900}.irmControlSelect button small{grid-column:2;color:#718699}.irmSticky{position:sticky;z-index:20;bottom:10px;display:flex;justify-content:flex-end;align-items:center;gap:9px;padding:11px 14px;border:1px solid #c6d4df;border-radius:12px;background:#fffffff2;box-shadow:0 9px 30px #1a365233;backdrop-filter:blur(8px)}.irmSticky>div{margin-right:auto;min-width:150px}.irmSticky>div b{display:block;font-size:12px}.irmSticky>div span{display:block;height:5px;margin-top:5px;border-radius:9px;background:#dce5ec;overflow:hidden}.irmSticky>div i{display:block;height:100%;background:#169a78}.irmSticky button{padding:10px 13px;border:1px solid #c3d3df;border-radius:8px;background:#fff;font-weight:900}@media(max-width:900px){.irmMetrics{grid-template-columns:repeat(2,1fr)}.irmRow{grid-template-columns:1fr auto}.irmRow>:nth-child(2),.irmRow>:nth-child(4){display:none}.irmControlSelect>div{grid-template-columns:1fr 1fr}.irmProgress button{display:grid;justify-items:center}.irmProgress button span{font-size:10px}}@media(max-width:620px){.irmViewSwitch{width:100%}.irmViewSwitch button{flex:1}.irmMetrics{grid-template-columns:1fr 1fr}.irmPanel,.irmForm{padding:14px;overflow:hidden}.irmPanelHead{display:block}.irmToggle{margin-top:12px;overflow:auto}.irmHeatRow,.irmLikelihood{grid-template-columns:55px repeat(5,minmax(42px,1fr))}.irmHeatRow>label span,.irmLikelihood small,.irmHeatRow button small,.irmHeatRow button em{display:none}.irmHeatRow>button{min-height:46px}.irmGrid,.irmImpactGrid,.irmPositionGrid{grid-template-columns:1fr}.irmForm .wide{grid-column:auto}.irmProgress button{padding:9px 3px}.irmProgress button span{display:none}.irmStatement{grid-template-columns:1fr}.irmStatement textarea,.irmStatement button{grid-column:1}.irmControlSelect>div{grid-template-columns:1fr}.irmScale span{font-size:7px}.irmSticky{position:fixed;left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:1fr 1fr}.irmSticky>div{grid-column:1/-1;width:100%}.irmSticky button{width:100%}}";
+const styles = "*{box-sizing:border-box}.irmWorkspace{width:100%;max-width:none;min-width:0;margin:auto}.irmViewSwitch{display:flex;width:max-content;margin:0 0 14px;padding:4px;border:1px solid #cad8e4;border-radius:10px;background:#fff}.irmViewSwitch button{padding:10px 16px;border:0;border-radius:7px;background:transparent;color:#49657d;font-weight:900}.irmViewSwitch button.active{background:#123e70;color:#fff}.irmMetrics{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}.irmForm{padding:25px;border:1px solid #bfd1de;border-radius:16px;background:#fff}.irmProgress{display:grid;grid-template-columns:repeat(5,1fr);margin:22px 0;border-radius:11px;overflow:hidden;border:1px solid #cfdae4}.irmProgress button{display:flex;gap:8px;align-items:center;padding:13px 10px;border:0;border-right:1px solid #d8e1e8;background:#f5f8fa;color:#536d83;font-weight:850}.irmProgress button:last-child{border:0}.irmProgress button b{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#dfe8ef}.irmProgress button.active{background:#e8f0ff;color:#124fbe}.irmProgress button.active b{background:#1762e8;color:#fff}.irmProgress button.done{color:#087b61}.irmProgress button.done b{background:#d9f5ec}.irmForm fieldset{margin:20px 0 95px;padding:19px;border:1px solid #d3dfe8;border-radius:12px}.irmForm legend{padding:0 7px;color:#0c3157;font-size:18px;font-weight:900}.irmForm fieldset>p{color:#637a8e}.irmGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.irmForm label{display:grid;gap:6px;color:#193a59;font-size:12px;font-weight:850}.irmForm input,.irmForm textarea,.irmForm select{width:100%;min-width:0;padding:12px;border:1px solid #bfd0de;border-radius:8px;background:#fff;color:#0b2947;font:14px Arial,sans-serif}.irmForm textarea{min-height:75px;resize:vertical}.irmForm .wide{grid-column:1/-1}.irmExample{color:#6d8191;font-weight:500;font-size:10px}.irmStatement{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:15px;padding:15px;border-left:5px solid #d79a00;border-radius:9px;background:#fff8e7}.irmStatement.complete{border-color:#15966a;background:#edfaf5}.irmStatement div{grid-column:1/-1;display:flex;justify-content:space-between}.irmStatement small{color:#936900}.irmStatement textarea{grid-column:1;min-height:70px}.irmStatement button{border:1px solid #bacbd8;border-radius:8px;background:#fff;font-weight:850}.irmChoices,.irmAssetChoices{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.irmChoices>b{width:100%}.irmChoices button,.irmAssetChoices button{padding:8px 10px;border:1px solid #c6d6e2;border-radius:999px;background:#f7fafc;color:#2a4a64}.irmChoices button.active,.irmAssetChoices button.active{background:#1762e8;border-color:#1762e8;color:#fff}.irmImpactGrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.irmSlider{padding:12px;border-radius:9px;background:#f3f7fa}.irmSlider>span{display:flex;justify-content:space-between;gap:10px}.irmSlider input{padding:0;margin:12px 0 6px;accent-color:#1762e8}.irmScale{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}.irmScale span{color:#667d91;font-size:9px;text-align:center}.irmScale b{display:block;color:#183b5b;font-size:10px}.irmPositionGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.irmPositionGrid section{padding:15px;border-radius:10px;background:#f5f8fb}.irmControlSelect{margin-top:16px}.irmControlSelect>div{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px;max-height:390px;overflow:auto}.irmControlSelect button{display:grid;grid-template-columns:auto 1fr;gap:7px;padding:9px;border:1px solid #d3e0e9;border-radius:8px;background:#f8fafc;color:#25445e;text-align:left;font-size:11px}.irmControlSelect button.active{border-color:#1762e8;background:#eaf1ff}.irmControlSelect button span{color:#1762e8;font-weight:900}.irmControlSelect button small{grid-column:2;color:#718699}.irmSticky{position:sticky;z-index:20;bottom:10px;display:flex;justify-content:flex-end;align-items:center;gap:9px;padding:11px 14px;border:1px solid #c6d4df;border-radius:12px;background:#fffffff2;box-shadow:0 9px 30px #1a365233;backdrop-filter:blur(8px)}.irmSticky>div{margin-right:auto;min-width:150px}.irmSticky>div b{display:block;font-size:12px}.irmSticky>div span{display:block;height:5px;margin-top:5px;border-radius:9px;background:#dce5ec;overflow:hidden}.irmSticky>div i{display:block;height:100%;background:#169a78}.irmSticky button{padding:10px 13px;border:1px solid #c3d3df;border-radius:8px;background:#fff;font-weight:900}@media(max-width:900px){.irmMetrics{grid-template-columns:repeat(2,1fr)}.irmRow{grid-template-columns:1fr auto}.irmRow>:nth-child(2),.irmRow>:nth-child(4){display:none}.irmControlSelect>div{grid-template-columns:1fr 1fr}.irmProgress button{display:grid;justify-items:center}.irmProgress button span{font-size:10px}}@media(max-width:620px){.irmViewSwitch{width:100%}.irmViewSwitch button{flex:1}.irmMetrics{grid-template-columns:1fr 1fr}.irmPanel,.irmForm{padding:14px;overflow:hidden}.irmPanelHead{display:block}.irmToggle{margin-top:12px;overflow:auto}.irmHeatRow,.irmLikelihood{grid-template-columns:55px repeat(5,minmax(42px,1fr))}.irmHeatRow>label span,.irmLikelihood small,.irmHeatRow button small,.irmHeatRow button em{display:none}.irmHeatRow>button{min-height:46px}.irmGrid,.irmImpactGrid,.irmPositionGrid{grid-template-columns:1fr}.irmForm .wide{grid-column:auto}.irmProgress button{padding:9px 3px}.irmProgress button span{display:none}.irmStatement{grid-template-columns:1fr}.irmStatement textarea,.irmStatement button{grid-column:1}.irmControlSelect>div{grid-template-columns:1fr}.irmScale span{font-size:7px}.irmSticky{position:fixed;left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:1fr 1fr}.irmSticky>div{grid-column:1/-1;width:100%}.irmSticky button{width:100%}}";

@@ -1,11 +1,12 @@
 // VERIFIED_ISMS_RISK_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../../components/ControlledDeviceDrafts";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/server";
 import ISMSRiskWorkspace from "../../../../components/ISMSRiskWorkspace";
 import ISMSWorkspaceShell from "../../../../components/ISMSWorkspaceShell";
-import { saveISMSRisk } from "./actions";
+import { siteToday } from "../../../../lib/zone-policy.mjs";
+import { createAdminClient } from "../../../../lib/supabase/admin";
+import { recordISMSRiskAcceptance, saveISMSRisk } from "./actions";
 export const metadata = {
   "title": "ISMS Risk Management | RPG Excellence"
 };
@@ -24,16 +25,18 @@ export default async function ISMSRiskPage({searchParams}) {
   } = await s.from("organizations").select("id,name").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
   if (!org) redirect("/portal");
   let {
-    data: methodology
+    data: methodology, error: methodologyError
   } = await s.from("isms_risk_methodologies").select("*").eq("organization_id", org.id).eq("status", "approved").order("approved_at", {
     "ascending": false
   }).limit(1).maybeSingle();
+  if (methodologyError) throw new Error("The approved risk methodology could not be loaded.");
   if (!methodology) {
     const result = await s.from("isms_risk_methodologies").insert({
       "owner_id": user.id,
       "organization_id": org.id,
       "approved_by": user.email || "Account owner"
     }).select("*").single();
+    if (result.error || !result.data) throw new Error("The approved risk methodology could not be initialised.");
     methodology = result.data;
   }
   const [riskResult, assetResult, controlResult, assessmentResult, linkResult, assetLinkResult, treatmentResult, teamResult] = await Promise.all([s.from("isms_risks").select("*").eq("organization_id", org.id).neq("status", "archived").order("residual_score", {
@@ -43,6 +46,20 @@ export default async function ISMSRiskPage({searchParams}) {
   }), s.from("isms_risk_controls").select("*").eq("organization_id", org.id), s.from("isms_risk_assets").select("risk_id,asset_id").eq("owner_id", user.id), s.from("isms_risk_treatments").select("*").eq("owner_id", user.id), s.from("organization_people").select("id,first_name,last_name,email").eq("organization_id",org.id).eq("account_status","active").order("last_name")]);
   for (const result of [riskResult, assetResult, controlResult, assessmentResult, linkResult, assetLinkResult, treatmentResult]) if (result.error) throw new Error(result.error.message);
   if(teamResult.error)throw new Error(teamResult.error.message);
+  const riskIds = new Set((riskResult.data || []).map(risk => risk.id));
+  const riskLinks = (linkResult.data || []).filter(link => riskIds.has(link.risk_id));
+  const assessmentIds = [...new Set(riskLinks.map(link => link.assessment_id).filter(Boolean))];
+  const admin = assessmentIds.length ? createAdminClient() : null;
+  const [acceptanceResult, soaResult] = await Promise.all([
+    s.from("isms_risk_acceptances").select("id,risk_id,acceptance_authority,rationale,conditions,accepted_score,decision,decided_at,expires_at,created_at")
+      .eq("owner_id", user.id).order("created_at", { ascending: false }).order("id", { ascending: false }),
+    admin ? admin.from("assessment_soa_entries").select("assessment_id,control_id,implementation_status,implementation_evidence,effectiveness_evidence,action_status,action_verification_conclusion,action_required,target_date")
+      .eq("owner_id", user.id).eq("organization_id", org.id).in("assessment_id", assessmentIds) : { data: [] },
+  ]);
+  if (acceptanceResult.error || soaResult.error) throw new Error("The risk acceptance or SoA control records could not be loaded.");
+  const linkedKeys = new Set(riskLinks.map(link => link.assessment_id + ":" + link.control_id));
+  const soaEntries = (soaResult.data || []).filter(entry => linkedKeys.has(entry.assessment_id + ":" + entry.control_id));
+  const acceptances = (acceptanceResult.data || []).filter(row => riskIds.has(row.risk_id));
   const ownerOptions=(teamResult.data||[]).map(person=>({id:person.id,name:[person.first_name,person.last_name].filter(Boolean).join(" ")||person.email,email:person.email||""}));
   const initialRiskId=query?.risk||query?.id||null;
   if(initialRiskId && !(riskResult.data||[]).some(r=>r.id===initialRiskId))notFound();
@@ -56,6 +73,6 @@ export default async function ISMSRiskPage({searchParams}) {
     "assetLinks": assetLinkResult.data || [],
     "treatments": treatmentResult.data || [],
     "ownerOptions": ownerOptions
-  }}><ISMSWorkspaceShell active="risk"><main className="irmPage"><style>{pageStyles}</style><header className="irmTop"><div><small>ISMS HUB · ISO/IEC 27001 RISK MANAGEMENT</small><h1>Information Security Risk Management</h1><p>{org.name} · risks, treatment, SoA controls and accountable acceptance.</p></div><div><Link href="/portal/information-security">← ISMS Hub</Link><Link href="/portal/soa">SoA Register</Link></div></header><ISMSRiskWorkspace initialRiskId={initialRiskId} action={saveISMSRisk} methodology={methodology} risks={riskResult.data || []} assets={assetResult.data || []} controls={controlResult.data || []} assessments={assessmentResult.data || []} links={linkResult.data || []} assetLinks={assetLinkResult.data || []} treatments={treatmentResult.data || []} ownerOptions={ownerOptions} /></main></ISMSWorkspaceShell></ControlledDeviceDrafts>;
+  }}><ISMSWorkspaceShell active="risk"><main className="irmPage"><style>{pageStyles}</style><ISMSRiskWorkspace initialRiskId={initialRiskId} action={saveISMSRisk} acceptanceAction={recordISMSRiskAcceptance} acceptances={acceptances} soaEntries={soaEntries} organizationName={org.name} today={siteToday("Europe/London")} methodology={methodology} risks={riskResult.data || []} assets={assetResult.data || []} controls={controlResult.data || []} assessments={assessmentResult.data || []} links={linkResult.data || []} assetLinks={assetLinkResult.data || []} treatments={treatmentResult.data || []} ownerOptions={ownerOptions} /></main></ISMSWorkspaceShell></ControlledDeviceDrafts>;
 }
-const pageStyles = ".irmPage{min-height:100vh;padding:27px clamp(14px,3vw,46px) 80px;background:#edf3f8;font-family:Arial,sans-serif;color:#071d3a}.irmTop{max-width:none;margin:0 auto 20px;display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.irmTop small{color:#07859a;font-weight:950;letter-spacing:.12em}.irmTop h1{margin:7px 0;font-size:40px}.irmTop p{margin:0;color:#60768c}.irmTop div:last-child{display:flex;gap:8px;flex-wrap:wrap}.irmTop a{padding:11px 14px;border:1px solid #c9d7e4;border-radius:8px;background:#fff;color:#153b60;text-decoration:none;font-weight:850}@media(max-width:650px){.irmPage{padding:16px 10px 105px;overflow-x:hidden}.irmTop{display:block}.irmTop h1{font-size:30px}.irmTop div:last-child{margin-top:14px}.irmTop a{flex:1;text-align:center}}";
+const pageStyles = ".irmPage{min-height:100vh;padding:16px clamp(12px,3vw,46px) 60px;background:#edf3f8;font-family:Arial,sans-serif;color:#102b46}";

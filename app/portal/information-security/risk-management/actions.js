@@ -2,6 +2,8 @@
 import {redirect} from "next/navigation";
 import {revalidatePath} from "next/cache";
 import {createAdminClient} from "../../../../lib/supabase/admin";
+import {acceptanceState} from "../../../../lib/isms-risk-assurance.mjs";
+import {siteToday,UUID} from "../../../../lib/zone-policy.mjs";
 import {createClient} from "../../../../lib/supabase/server";
 
 const clean=v=>String(v||"").trim();
@@ -24,9 +26,12 @@ export async function saveISMSRisk(fd){
  if(intent==="complete"&&!clean(fd.get("review_due_date")))throw new Error("Select the risk review due date before completing the assessment.");
  const id=clean(fd.get("risk_id")),soaAssessmentId=clean(fd.get("soa_assessment_id"))||null,controls=list(fd.get("controls")),assets=list(fd.get("asset_ids"));
  if(soaAssessmentId){const{data:owned}=await s.from("assessments").select("id").eq("id",soaAssessmentId).eq("owner_id",user.id).maybeSingle();if(!owned)throw new Error("The selected SoA workspace is not available to this account.")}
- const{data:methodology}=await s.from("isms_risk_methodologies").select("id,appetite_score").eq("organization_id",org.id).eq("status","approved").order("approved_at",{ascending:false}).limit(1).maybeSingle();
+ const {data:methodology,error:methodologyError}=await s.from("isms_risk_methodologies").select("id").eq("organization_id",org.id).eq("status","approved").order("approved_at",{ascending:false}).limit(1).maybeSingle();
+ if(methodologyError)throw new Error("The approved risk methodology could not be loaded.");
  const inherentLikelihood=number(fd.get("inherent_likelihood")),inherentImpact=number(fd.get("inherent_impact")),residualLikelihood=number(fd.get("residual_likelihood")),residualImpact=number(fd.get("residual_impact")),targetLikelihood=number(fd.get("target_likelihood")),targetImpact=number(fd.get("target_impact")),residualScore=residualLikelihood*residualImpact,treatmentDecision=clean(fd.get("treatment_decision"))||null;
- const status=intent==="draft"?"draft":treatmentDecision==="retain"?(residualScore>(methodology?.appetite_score||9)?"acceptance_pending":"approved"):(clean(fd.get("treatment_action"))?"treatment_in_progress":"treatment_required");
+ const requestAcceptance=intent==="complete"&&treatmentDecision==="retain";
+ if(requestAcceptance&&clean(fd.get("acceptance_expires_at"))&&clean(fd.get("acceptance_expires_at"))<siteToday("Europe/London"))throw new Error("Choose an acceptance expiry of today or later.");
+ const status=intent==="draft"?"draft":requestAcceptance?"acceptance_pending":(clean(fd.get("treatment_action"))?"treatment_in_progress":"treatment_required");
  const data={owner_id:user.id,organization_id:org.id,methodology_id:methodology?.id||null,soa_assessment_id:soaAssessmentId,title,cause:cause||null,event:event||null,consequence:consequence||null,risk_owner:riskOwner,risk_owner_person_id:ownerPerson.id,source:clean(fd.get("source")),scope:clean(fd.get("scope")),cia_properties:list(fd.get("cia_properties")),affected_processes:list(fd.get("affected_processes")),status,treatment_decision:treatmentDecision,inherent_likelihood:inherentLikelihood,inherent_impact:inherentImpact,residual_likelihood:residualLikelihood,residual_impact:residualImpact,target_likelihood:targetLikelihood,target_impact:targetImpact,impact_dimensions:object(fd.get("impact_dimensions")),assessment_rationale:rationale||null,assumptions:clean(fd.get("assumptions")),evidence_reference:clean(fd.get("evidence_reference")),review_due_date:clean(fd.get("review_due_date"))||null,completion_percent:number(fd.get("completion_percent"),0,100),current_assessment_step:number(fd.get("current_assessment_step"),1,5),updated_at:new Date().toISOString()};
  let risk,error;
 if(id){const result=await s.from("isms_risks").update(data).eq("id",id).eq("owner_id",user.id).select("id,risk_reference").single();risk=result.data;error=result.error}else{const refResult=await s.rpc("next_isms_risk_reference");const reference=refResult.data||("ISR-"+new Date().getUTCFullYear()+"-"+crypto.randomUUID().slice(0,6).toUpperCase());const result=await s.from("isms_risks").insert({...data,risk_reference:reference}).select("id,risk_reference").single();risk=result.data;error=result.error}
@@ -37,9 +42,49 @@ if(id){const result=await s.from("isms_risks").update(data).eq("id",id).eq("owne
  if(assets.length){const{error:assetError}=await s.from("isms_risk_assets").insert(assets.map(assetId=>({risk_id:risk.id,asset_id:assetId,owner_id:user.id})));if(assetError)throw new Error(assetError.message)}
  const action=clean(fd.get("treatment_action"));
  if(action){const treatmentData={action,action_owner:clean(fd.get("treatment_owner"))||riskOwner,target_date:clean(fd.get("treatment_target_date"))||null,status:"planned",resources:clean(fd.get("treatment_resources"))};const treatmentId=clean(fd.get("treatment_id"));if(treatmentId){const{error:treatmentError}=await s.from("isms_risk_treatments").update(treatmentData).eq("id",treatmentId).eq("risk_id",risk.id).eq("owner_id",user.id);if(treatmentError)throw new Error(treatmentError.message)}else{const{error:treatmentError}=await s.from("isms_risk_treatments").insert({risk_id:risk.id,owner_id:user.id,...treatmentData});if(treatmentError)throw new Error(treatmentError.message)}}
- if(treatmentDecision==="retain"&&residualScore>(methodology?.appetite_score||9)){await s.from("isms_risk_acceptances").insert({risk_id:risk.id,owner_id:user.id,acceptance_authority:clean(fd.get("acceptance_authority"))||"Senior management",rationale:clean(fd.get("acceptance_rationale"))||rationale,accepted_score:residualScore,decision:"pending",expires_at:clean(fd.get("acceptance_expires_at"))||null})}
+ if(requestAcceptance){
+  const {error:requestError}=await s.from("isms_risk_acceptances").insert({
+   risk_id:risk.id,owner_id:user.id,acceptance_authority:clean(fd.get("acceptance_authority"))||"Senior management",
+   rationale:clean(fd.get("acceptance_rationale"))||rationale,accepted_score:residualScore,decision:"pending",
+   expires_at:clean(fd.get("acceptance_expires_at"))||null
+  });
+  if(requestError)throw new Error("The assessment was saved, but its acceptance request could not be recorded. Reopen the risk and retry.");
+ }
  revalidatePath("/portal/information-security/risk-management");
  revalidatePath("/portal/soa/management-board");
  if(soaAssessmentId)revalidatePath(`/portal/assessments/${soaAssessmentId}/soa`);
  redirect("/portal/information-security/risk-management?risk="+encodeURIComponent(risk.id)+"&saved="+(intent==="draft"?"draft":"1"));
+}
+
+export async function recordISMSRiskAcceptance(_state, formData) {
+ const riskId=clean(formData.get("risk_id")), requestId=clean(formData.get("request_id"));
+ const decision=clean(formData.get("decision")), rationale=clean(formData.get("justification"));
+ if(!UUID.test(riskId)||!UUID.test(requestId)||!["accepted","rejected"].includes(decision)||rationale.length<10||rationale.length>2000){
+  return {error:"Choose a decision and enter a justification of 10 to 2,000 characters."};
+ }
+ const s=await createClient();
+ const {data:{user}}=await s.auth.getUser();
+ if(!user) return {error:"Sign in as the company owner to record the decision."};
+ const {data:org,error:orgError}=await s.from("organizations").select("id").eq("owner_id",user.id).order("created_at").limit(1).maybeSingle();
+ if(orgError||!org) return {error:"Company owner approval is required."};
+ const decidedAt=new Date();
+ const [riskResult,requestResult]=await Promise.all([
+  s.from("isms_risks").select("id,status,treatment_decision,residual_likelihood,residual_impact,updated_at")
+   .eq("id",riskId).eq("owner_id",user.id).eq("organization_id",org.id).maybeSingle(),
+  s.from("isms_risk_acceptances").select("id,decision,accepted_score,created_at,expires_at")
+   .eq("risk_id",riskId).eq("owner_id",user.id).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(1).maybeSingle(),
+ ]);
+ const risk=riskResult.data, request=requestResult.data;
+ if(riskResult.error||requestResult.error||!risk||!request||request.id!==requestId||
+    risk.status!=="acceptance_pending"||risk.treatment_decision!=="retain"||
+    acceptanceState(risk,request,siteToday("Europe/London",decidedAt))!=="Pending decision"){
+  return {error:"This request is no longer current. Refresh the risk and review the latest assessment."};
+ }
+ const {data,error}=await s.from("isms_risk_acceptances").update({
+  decision,rationale,acceptance_authority:user.email || "Company owner",decided_at:decidedAt.toISOString(),
+ }).eq("id",request.id).eq("risk_id",riskId).eq("owner_id",user.id).eq("decision","pending").select("id").maybeSingle();
+ if(error||!data) return {error:"The decision could not be saved. Refresh the register and check its current status."};
+ revalidatePath("/portal/information-security/risk-management");
+ revalidatePath("/portal/soa/management-board");
+ return {success:decision==="accepted"?"Acceptance recorded.":"Rejection recorded."};
 }
