@@ -6,6 +6,8 @@ import ISMSRiskWorkspace from "../../../../components/ISMSRiskWorkspace";
 import ISMSWorkspaceShell from "../../../../components/ISMSWorkspaceShell";
 import { siteToday } from "../../../../lib/zone-policy.mjs";
 import { createAdminClient } from "../../../../lib/supabase/admin";
+import ISMSRiskRecord from "./ISMSRiskRecord";
+import { loadRiskRecord } from "./risk-record-data";
 import { recordISMSRiskAcceptance, saveISMSRisk } from "./actions";
 export const metadata = {
   "title": "ISMS Risk Management | RPG Excellence"
@@ -24,6 +26,13 @@ export default async function ISMSRiskPage({searchParams}) {
     data: org
   } = await s.from("organizations").select("id,name").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
   if (!org) redirect("/portal");
+  const initialRiskId = query?.risk ?? query?.id ?? null;
+  if (initialRiskId !== null && query?.edit !== "1") {
+    const record = await loadRiskRecord(s, user.id, org.id, initialRiskId);
+    if (!record) notFound();
+    return <ISMSRiskRecord record={record} organizationName={org.name} today={siteToday("Europe/London")}
+      initialTab={query?.tab} acceptanceAction={recordISMSRiskAcceptance}/>;
+  }
   let {
     data: methodology, error: methodologyError
   } = await s.from("isms_risk_methodologies").select("*").eq("organization_id", org.id).eq("status", "approved").order("approved_at", {
@@ -69,7 +78,6 @@ export default async function ISMSRiskPage({searchParams}) {
     }));
   const acceptances = (acceptanceResult.data || []).filter(row => riskIds.has(row.risk_id));
   const ownerOptions=(teamResult.data||[]).map(person=>({id:person.id,name:[person.first_name,person.last_name].filter(Boolean).join(" ")||person.email,email:person.email||""}));
-  const initialRiskId=query?.risk||query?.id||null;
   if(initialRiskId && !(riskResult.data||[]).some(r=>r.id===initialRiskId))notFound();
   return <ControlledDeviceDrafts userId={user.id} organizationId={org.id} recordKey={'isms-risk:'+(initialRiskId||'register')} label="Information-security risks" baseline={{
     "methodology": methodology,

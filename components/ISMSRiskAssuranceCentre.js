@@ -79,7 +79,7 @@ function ControlLink({ control }) {
     <span title="No linked SoA workspace">{label}</span>;
 }
 
-function HeatMap({ records, mode, setMode, cell, selectCell, appetite, methodology }) {
+function HeatMap({ records, mode, setMode, cell, selectCell, appetite, methodology, recordOnly = false }) {
   const counts = new Map();
   for (const { risk } of records) {
     const item = rating(risk, mode);
@@ -90,7 +90,7 @@ function HeatMap({ records, mode, setMode, cell, selectCell, appetite, methodolo
   const impacts = labels(methodology?.impact_criteria, IMPACT);
   const likelihood = labels(methodology?.likelihood_criteria, LIKELIHOOD);
   return <Panel heading="Risk heat map" icon="matrix" className={s.heatPanel}>
-    <div className={s.headingRow}><p className={s.muted}>Select a cell to filter the register. Large numbers count risks.</p>
+    <div className={s.headingRow}><p className={s.muted}>{recordOnly ? "Switch between scores to see this risk in the matrix." : "Select a cell to filter the register. Large numbers count risks."}</p>
       <div className={s.segment} aria-label="Risk score basis">{Object.entries(BASES).map(([key, label]) =>
         <button key={key} type="button" aria-pressed={mode === key} onClick={() => setMode(key)}>{label}</button>)}</div>
     </div>
@@ -100,9 +100,10 @@ function HeatMap({ records, mode, setMode, cell, selectCell, appetite, methodolo
         const score = x * y, key = x + "-" + y;
         const [, , label, background, color] = riskBand(score);
         const count = counts.get(key) || 0;
-        return <button key={key} type="button" style={{ background, color }} data-above={score > appetite || undefined}
+        const above = appetite != null && score > appetite;
+        return <button key={key} type="button" style={{ background, color }} data-above={above || undefined}
           aria-pressed={cell === key} onClick={() => selectCell(key)}
-          aria-label={BASES[mode] + ", likelihood " + x + ", impact " + y + ", score " + score + ", " + count + " risks" + (score > appetite ? ", above appetite" : "")}>
+          aria-label={BASES[mode] + ", likelihood " + x + ", impact " + y + ", score " + score + ", " + count + " risks" + (above ? ", above appetite" : "")}>
           <small>{score}</small><strong>{count}</strong><span>{label}</span>
         </button>;
       })}
@@ -110,12 +111,22 @@ function HeatMap({ records, mode, setMode, cell, selectCell, appetite, methodolo
     <div className={s.heatRow + " " + s.likelihood}><span/>{likelihood.map((label, index) =>
       <div key={index}><strong>{index + 1}</strong><span>{label}</span></div>)}</div>
     <p className={s.axis}>Likelihood →</p>
-    <p className={s.muted}>Corner markers show scores above appetite. The portfolio position uses residual scores.</p>
-    <a className={s.jump} href="#ismsRiskRegister">View risk register ↓</a>
+    <p className={s.muted}>{appetite == null ? "No approved appetite recorded." : "Corner markers show scores above appetite. The portfolio position uses residual scores."}</p>
+    {!recordOnly && <a className={s.jump} href="#ismsRiskRegister">View risk register ↓</a>}
   </Panel>;
 }
 
-function Acceptance({ action, record, today }) {
+export function ISMSRecordHeatMap({ risk, methodology }) {
+  const [mode, setMode] = useState("residual");
+  const [selected, setSelected] = useState(null);
+  return <HeatMap recordOnly records={[{ risk }]} mode={mode}
+    setMode={value => { setMode(value); setSelected(null); }}
+    cell={selected ?? rating(risk, mode)?.cell}
+    selectCell={key => setSelected(key === selected ? null : key)}
+    appetite={methodology?.appetite_score} methodology={methodology}/>;
+}
+
+export function Acceptance({ action, record, today }) {
   const [result, submit, pending] = useActionState(action, null);
   const { risk, acceptance } = record;
   const status = acceptanceState(risk, acceptance, today);
@@ -405,7 +416,7 @@ export default function ISMSRiskAssuranceCentre({
               const late = open.filter(action => action.target_date && action.target_date < today).length;
               const riskPath = ROOT + "?risk=" + encodeURIComponent(risk.id);
               return <tr key={risk.id}>
-                <th scope="row"><button type="button" className={s.textButton} onClick={() => openRisk(risk.id)}>{risk.risk_reference || risk.title}</button>
+                <th scope="row"><Link href={riskPath}>{risk.risk_reference || risk.title}</Link>
                   {risk.risk_reference && <div>{risk.title}</div>}</th>
                 <td>{risk.scope || "Scope not recorded"}<small>{risk.risk_owner || "Owner not recorded"}</small></td>
                 <td><span className={hs.workflow} data-status={risk.status === "acceptance_pending" ? "in_review" : risk.status}>{statusFor(risk,acceptance)}</span>
@@ -415,8 +426,8 @@ export default function ISMSRiskAssuranceCentre({
                   <small>Target {rating(risk,"target")?.score ?? "unrated"}{isAbove(record) && <span className={hs.overdue}> · Above appetite</span>}</small></td>
                 <td><span className={late ? hs.overdue : undefined}>{open.length} open{late > 0 && " · " + late + " overdue"}</span>
                   <small className={overdue(record) ? hs.overdue : undefined}>{risk.review_due_date ? "Review " + date(risk.review_due_date) : "No review date"}</small></td>
-                <td><div className={hs.rowActions}><button type="button" className={hs.linkButton} onClick={() => openRisk(risk.id)}>Open</button>
-                  <Link href={riskPath}>Review assessment</Link></div>
+                <td><div className={hs.rowActions}><Link href={riskPath}>Open</Link>
+                  <Link href={riskPath + "&tab=approval"}>Review assessment</Link></div>
                   {mapped.length > 0 ? <details className={hs.history}><summary>SoA controls ({mapped.length})</summary>
                     <span className={s.controlLinks}>{mapped.map(control => <ControlLink key={control.id} control={control}/>)}</span>
                   </details> : <small>No SoA controls</small>}</td>
