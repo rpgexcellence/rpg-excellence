@@ -1,3 +1,5 @@
+import styles from "../app/portal/documents/documents.module.css";
+
 const LABELS = {
   task_created: "Incident created",
   status_changed: "Status changed",
@@ -51,9 +53,14 @@ function eventDetail(event) {
 }
 
 export default function SecurityIncidentTimeline({ events = [] }) {
-  return <section className="sit"><style>{styles}</style><header><div><small>CONTROLLED AUDIT TRAIL</small><h2>Incident timeline</h2><p>Chronological history of assignments, status decisions, verification and closure.</p></div><span>{events.length} event{events.length === 1 ? "" : "s"}</span></header>
-    {events.length ? <ol>{events.map((event, index) => <li key={event.id} className={event.event_type}><div className="sitMarker">{events.length-index}</div><article><div><strong>{LABELS[event.event_type] || label(event.event_type)}</strong><time>{formatDateTime(event.created_at)}</time></div><p>{eventDetail(event)}</p><small>Recorded by {event.actor_name || "System-controlled process"}</small></article></li>)}</ol> : <div className="sitEmpty"><strong>No timeline events are available</strong><span>New controlled changes will be recorded automatically.</span></div>}
+  return <section className={styles.recordPanel}>
+    <h2>Record History</h2>
+    <p>Recorded assignments, status changes, verification and closure decisions.</p>
+    {events.length ? <ol className={styles.recordHistory}>{events.map(event => <li key={event.id}>
+      <strong>{LABELS[event.event_type] || label(event.event_type)}</strong>
+      <time dateTime={event.created_at}>{formatDateTime(event.created_at)}</time>
+      <p className={styles.recordProse}>{eventDetail(event)}</p>
+      <small>Recorded by {event.actor_name || "System-controlled process"}</small>
+    </li>)}</ol> : <p>No timeline events are available.</p>}
   </section>;
 }
-
-const styles=`.sit{margin-bottom:16px;padding:20px;border:1px solid #cbdce6;border-radius:14px;background:#fff}.sit>header{display:flex;justify-content:space-between;gap:15px;align-items:flex-start;margin-bottom:15px}.sit>header small{color:#087f91;font-weight:950;letter-spacing:.11em}.sit>header h2{margin:5px 0;font-size:23px}.sit>header p{margin:0;color:#667e92}.sit>header>span{padding:6px 9px;border-radius:999px;background:#e8f0ff;color:#164fc6;font-size:12px;font-weight:900;white-space:nowrap}.sit ol{display:grid;gap:0;margin:0;padding:0;list-style:none}.sit li{position:relative;display:grid;grid-template-columns:34px 1fr;gap:11px;padding-bottom:12px}.sit li:not(:last-child):before{content:"";position:absolute;left:16px;top:30px;bottom:0;width:2px;background:#d8e4ec}.sitMarker{z-index:1;display:grid;place-items:center;width:34px;height:34px;border:2px solid #9db6c8;border-radius:50%;background:#fff;color:#46647a;font-size:11px;font-weight:950}.sit li.verification_effective .sitMarker,.sit li.closure_approved .sitMarker,.sit li.incident_closed .sitMarker{border-color:#20a67d;background:#e7f7f1;color:#087052}.sit li.verification_not_effective .sitMarker{border-color:#d4665d;background:#fff0ee;color:#9f1f17}.sit article{padding:11px 13px;border:1px solid #d9e4eb;border-radius:9px;background:#f8fafc}.sit article>div{display:flex;justify-content:space-between;gap:12px}.sit article strong{color:#0b2947}.sit article time{color:#637b8f;font-size:11px;white-space:nowrap}.sit article p{margin:6px 0;color:#405f76;line-height:1.4;white-space:pre-wrap}.sit article small{color:#718697}.sitEmpty{display:grid;gap:4px;padding:16px;border:1px dashed #c4d6e2;border-radius:9px;color:#637b8f}@media(max-width:650px){.sit{padding:16px}.sit>header{display:grid}.sit>header>span{justify-self:start}.sit article>div{display:grid;gap:4px}.sit article time{white-space:normal}}`;
