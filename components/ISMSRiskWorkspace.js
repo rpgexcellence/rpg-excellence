@@ -248,6 +248,10 @@ export default function ISMSRiskWorkspace({
   const initialOpened=useRef(false);
   useEffect(()=>{if(initialOpened.current)return;initialOpened.current=true;if(initialRiskId){const record=risks.find(r=>r.id===initialRiskId);if(record)startEdit(record);}},[initialRiskId]);
   const cancel = () => {
+    if (initialRiskId) {
+      window.location.assign("/portal/information-security/risk-management?risk=" + encodeURIComponent(initialRiskId));
+      return;
+    }
     setView("register");
     setStep(1);
     window.scrollTo({

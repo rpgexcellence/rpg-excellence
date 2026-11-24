@@ -1,0 +1,6 @@
+.scores { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.warning { color:#982c38; }
+.list { display:grid; gap:8px; padding:0; list-style:none; }
+.list li { min-width:0; overflow-wrap:anywhere; background:#f5f9fc; border:1px solid #dbe6ef; border-radius:6px; padding:10px; }
+.list small { display:block; color:#48657d; margin-top:3px; }
+@media(max-width:460px) { .scores { grid-template-columns:1fr; } }
