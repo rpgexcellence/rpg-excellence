@@ -17,8 +17,13 @@ export const metadata = { title: "Workplace Inspections | RPG Excellence" };
 export const dynamic = "force-dynamic";
 
 const ROOT = "/portal/health-safety/workplace-inspections";
-const VIEWS = [["overview","Overview"],["programmes","Inspection programmes"],["fieldwork","Scheduled fieldwork"],
-  ["findings","Findings & actions"],["performance","Performance"],["zones","Zone QR & PPE"]];
+const INSPECTION_VIEWS = [
+  ["programmes", "Inspection programmes", "clipboard", s.programmes],
+  ["fieldwork", "Scheduled fieldwork", "calendar", s.fieldwork],
+  ["findings", "Findings requiring action", "alert", s.findings],
+  ["performance", "Inspection performance", "matrix", s.performanceView],
+];
+const OTHER_VIEWS = [["overview", "Overview", "overview"], ["zones", "Zone QR & PPE", "qr"]];
 const queues = [["planned","Planned"],["active","In progress"],["completed","Fieldwork completed"]];
 const when = new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/London"});
 const day = new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeZone:"UTC"});
@@ -45,19 +50,19 @@ function Badge({children,tone="blue"}){
 function Panel({id,icon,label,children,className=""}){
   return <section id={id} className={p.panel+" "+className}><h2><RecordIcon name={icon}/>{label}</h2>{children}</section>;
 }
-function Table({columns,rows,empty,className=""}){
-  return rows.length ? <div className={p.tableWrap}><table className={p.table+" "+s.table+" "+className}>
+function Table({columns,rows,empty}){
+  return rows.length ? <div className={p.tableWrap}><table className={p.table+" "+s.table}>
     <thead><tr>{columns.map(label=><th key={label} scope="col">{label}</th>)}</tr></thead>
     <tbody>{rows.map(([id,...cells])=><tr key={id}>{cells.map((cell,index)=>
       <td data-label={columns[index]} key={columns[index]}>{cell}</td>)}</tr>)}</tbody>
   </table></div> : <p className={shared.notice}>{empty}</p>;
 }
 const cleanLocation = value => String(value || "").replace(/Â[\s\u00a0]*(?=·)|Â\u00a0/g,"").trim();
-function location(row,zone,site,compact){
+function location(row,zone,site){
   const full = cleanLocation(row.administration_location_label);
   const short = [site?.site_reference,site?.site_name].map(cleanLocation).filter(Boolean).join(" · ") ||
     full.split(/\s+·\s+/).slice(0,2).join(" · ");
-  const label = (compact ? short : full) || short || "Site not recorded";
+  const label = full || short || "Site not recorded";
   const area = cleanLocation(row.area_department);
   const zoneName = cleanLocation(zone?.name);
   return <><span className={s.siteLabel} title={full||undefined}>
@@ -80,7 +85,7 @@ export default async function WorkplaceInspectionsPage({searchParams}){
   const admin=createAdminClient();
   const org=base.organization.id;
   const now=Date.now(),today=siteToday("Europe/London",new Date(now));
-  const view=VIEWS.some(([key])=>key===params?.view)?params.view:"overview";
+  const view=[...INSPECTION_VIEWS, ...OTHER_VIEWS].some(([key])=>key===params?.view)?params.view:"overview";
   const queue=queues.some(([key])=>key===params?.queue)?params.queue:"planned";
   const search=typeof params?.q==="string"?params.q.trim().slice(0,160):"";
   const zoneToken=typeof params?.zone==="string"&&UUID.test(params.zone)?params.zone:"";
@@ -145,25 +150,25 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     ["Overdue actions",overdueActions.length,"amber","calendar",href("findings",{focus:"overdue"})],
     ["Awaiting verification",awaiting.length,"blue","scope",href("findings",{focus:"verification"})],
   ];
-  const programmeTable=(rows)=><Table className={view==="overview"?s.programmeTable:""} columns={["Programme","Location / scope","Owner / lead","Frequency","Next inspection","Programme status"]}
+  const programmeTable=(rows)=><Table columns={["Programme","Location / scope","Owner / lead","Frequency","Next inspection","Programme status"]}
     rows={rows.map(row=>[row.id,<><Link href={ROOT+"/programmes/"+row.id}>{row.title}</Link><small>{row.programme_reference}</small></>,
-      location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id),view==="overview"),<>{person(row.accountable_person_id)}<small>Lead · {person(row.lead_inspector_person_id)}</small></>,
+      location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id)),<>{person(row.accountable_person_id)}<small>Lead · {person(row.lead_inspector_person_id)}</small></>,
       row.frequency_amount&&row.frequency_unit?`Every ${row.frequency_amount} ${row.frequency_amount===1?row.frequency_unit.replace(/s$/,""):row.frequency_unit}`:"Not recorded",
       <>{date(row.next_inspection_date)}{programmeDue(row,today)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
       <Badge tone={row.status==="active"?"green":"neutral"}>{title(row.status)}</Badge>,
     ])} empty="No programmes match this view."/>;
-  const fieldworkTable=(rows)=><Table className={view==="overview"?s.fieldworkTable:""} columns={["Inspection","Location","Scheduled / completed","Status","Open"]}
+  const fieldworkTable=(rows)=><Table columns={["Inspection","Location","Scheduled / completed","Status","Open"]}
     rows={rows.map(row=>{
       const editable=["contribute","review","approve","admin","owner"].includes(access.level);
       const start=editable&&canStartInspection(access,row);
       const continuing=editable&&row.status==="in_progress"&&access.person?.id===row.lead_inspector_person_id;
       return [row.id,<><Link href={ROOT+"/"+row.id}>{row.title}</Link><small>{row.inspection_reference}</small><small>{person(row.lead_inspector_person_id)}</small></>,
-        location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id),view==="overview"),<>{row.planned_start_at?<time dateTime={row.planned_start_at}>{date(row.planned_start_at,true)}</time>:date(null)}{row.completed_at&&<small>Submitted · {date(row.completed_at,true)}</small>}
+        location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id)),<>{row.planned_start_at?<time dateTime={row.planned_start_at}>{date(row.planned_start_at,true)}</time>:date(null)}{row.completed_at&&<small>Submitted · {date(row.completed_at,true)}</small>}
         {fieldworkOverdue(row,now)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
         <Badge tone={row.status==="in_progress"?"green":"blue"}>{title(row.status)}</Badge>,
         start ? <StartInspectionButton inspectionId={row.id}/> :
           <Link className={continuing?p.primary:p.button} href={ROOT+"/"+row.id+(continuing?"#inspection-checklist":"")}>
-            {continuing?"Continue checklist":view==="overview"?"Open":"Open record"}</Link>];
+            {continuing?"Continue checklist":"Open record"}</Link>];
     })} empty="No inspections in this queue."/>;
   const actionTable=(rows)=><Table columns={["Corrective action","Priority","Owner / verifier","Target","Status"]}
     rows={rows.map(row=>[row.id,<><Link href={ROOT+"/"+row.inspection_id+"#inspection-review-actions"}>{row.action_text}</Link><small>{row.action_reference}</small></>,
@@ -172,7 +177,7 @@ export default async function WorkplaceInspectionsPage({searchParams}){
       <>{date(row.target_date)}{actionOverdue(row,today)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
       <>{title(row.status)}{row.verification_result&&row.verification_result!=="pending"&&<small>{title(row.verification_result)}</small>}</>,
     ])} empty="No corrective actions in this view."/>;
-  const performance=["overview","performance"].includes(view)?inspectionPerformance(inspections,findings,now):null;
+  const performance=view==="performance"?inspectionPerformance(inspections,findings,now):null;
   const measured=performance?performance.onTime+performance.late:0;
   const onTimePercent=measured?Math.round(performance.onTime/measured*100):null;
 
@@ -193,11 +198,22 @@ export default async function WorkplaceInspectionsPage({searchParams}){
       {metrics.map(([label,value,color,icon,target])=><Link key={label} href={target} className={p.metric+" "+shared[color]}>
         <span className={p.metricIcon}><RecordIcon name={icon}/></span><span className={p.metricContent}><strong>{value}</strong>{label}</span></Link>)}
     </section>
-    <nav className={p.tabs+" "+p.recordTabs} aria-label="Inspection views">
-      {VIEWS.map(([key,label])=><Link key={key} href={href(key)} aria-current={view===key?"page":undefined}>{label}</Link>)}
+    <nav className={s.viewPicker} aria-label="Inspection views">
+      <div className={s.viewUtilities}>
+        {OTHER_VIEWS.map(([key,label,icon])=><Link key={key} href={href(key)} aria-current={view===key?"page":undefined}>
+          <RecordIcon name={icon}/>{label}</Link>)}
+      </div>
+      <div className={s.viewCards}>
+        {INSPECTION_VIEWS.map(([key,label,icon,color])=><Link key={key} href={href(key)} className={s.viewCard+" "+color}
+          aria-current={view===key?"page":undefined}>
+          <span className={s.viewIcon}><RecordIcon name={icon}/></span>
+          <span>{label}</span>
+          {view===key && <span className={s.selectedIcon}><RecordIcon name="checkCircle"/></span>}
+        </Link>)}
+      </div>
     </nav>
 
-    {view==="overview" && <>
+    {view==="overview" &&
       <Panel icon="scope" label="Dynamic inspection planning">
         <div className={s.planning}>
           <div className={s.planningSummary}>{next?<><h3><Link href={ROOT+"/programmes/"+next.id}>{next.title}</Link></h3>
@@ -215,35 +231,7 @@ export default async function WorkplaceInspectionsPage({searchParams}){
           </div>}
         </div>
       </Panel>
-      <div className={s.overview}><div className={s.overviewGrid}>
-        <div className={s.overviewColumn}>
-          <Panel className={s.programmePanel} icon="clipboard" label="Inspection programmes">
-            {programmeTable(programmes.slice(0,5))}
-            <Link className={s.panelLink} href={href("programmes")}>View all programmes</Link>
-          </Panel>
-          <Panel className={s.findingsPanel} icon="alert" label="Findings requiring action">
-            {actionTable(actionsOpen.slice(0,5))}
-            <Link className={s.panelLink} href={href("findings")}>View findings and actions</Link>
-          </Panel>
-        </div>
-        <div className={s.overviewColumn}>
-          <Panel className={s.fieldworkPanel} icon="calendar" label="Scheduled fieldwork">
-            {fieldworkTable(inspections.filter(row=>["planned","active"].includes(fieldworkState(row))).slice(0,5))}
-            <Link className={s.panelLink} href={href("fieldwork")}>View fieldwork queues</Link>
-          </Panel>
-          <Panel className={s.performancePanel} icon="matrix" label="Inspection performance">
-            <p className={s.period}>Last six months</p>
-            <div className={s.performance}>
-              <div><strong>{onTimePercent===null?"Not available":onTimePercent+"%"}</strong><p>On-time fieldwork</p>
-                {onTimePercent!==null&&<div className={s.track} aria-hidden="true"><span style={{width:onTimePercent+"%"}}/></div>}</div>
-              <ul className={s.compact}><li>On time · {performance.onTime}</li><li>Late · {performance.late}</li>
-                <li>Recurring checklist findings · {performance.repeats.length}</li></ul>
-            </div>
-            <Link className={s.panelLink} href={href("performance")}>View performance and recurring findings</Link>
-          </Panel>
-        </div>
-      </div></div>
-    </>}
+    }
 
     {view==="programmes" && <Panel icon="clipboard" label={params?.due==="1"?"Overdue programme inspections":params?.active==="1"?"Active inspection programmes":"Inspection programmes"}>
       <form className={s.filters} action={ROOT}><input type="hidden" name="view" value="programmes"/>
