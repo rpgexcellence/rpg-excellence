@@ -50,15 +50,23 @@ export default async function ISMSRiskPage({searchParams}) {
   const riskLinks = (linkResult.data || []).filter(link => riskIds.has(link.risk_id));
   const assessmentIds = [...new Set(riskLinks.map(link => link.assessment_id).filter(Boolean))];
   const admin = assessmentIds.length ? createAdminClient() : null;
-  const [acceptanceResult, soaResult] = await Promise.all([
+  const [acceptanceResult, soaResult, evidenceResult] = await Promise.all([
     s.from("isms_risk_acceptances").select("id,risk_id,acceptance_authority,rationale,conditions,accepted_score,decision,decided_at,expires_at,created_at")
       .eq("owner_id", user.id).order("created_at", { ascending: false }).order("id", { ascending: false }),
     admin ? admin.from("assessment_soa_entries").select("assessment_id,control_id,implementation_status,implementation_evidence,effectiveness_evidence,action_status,action_verification_conclusion,action_required,target_date")
       .eq("owner_id", user.id).eq("organization_id", org.id).in("assessment_id", assessmentIds) : { data: [] },
+    admin ? admin.from("soa_control_evidence").select("assessment_id,control_id,evidence_kind").eq("owner_id", user.id)
+      .eq("organization_id", org.id).in("assessment_id", assessmentIds) : { data: [] },
   ]);
-  if (acceptanceResult.error || soaResult.error) throw new Error("The risk acceptance or SoA control records could not be loaded.");
+  if (acceptanceResult.error || soaResult.error || evidenceResult.error) throw new Error("The risk acceptance or SoA control records could not be loaded.");
   const linkedKeys = new Set(riskLinks.map(link => link.assessment_id + ":" + link.control_id));
-  const soaEntries = (soaResult.data || []).filter(entry => linkedKeys.has(entry.assessment_id + ":" + entry.control_id));
+  const evidenceKinds = new Set((evidenceResult.data || []).map(file => [file.assessment_id, file.control_id, file.evidence_kind].join(":")));
+  const soaEntries = (soaResult.data || []).filter(entry => linkedKeys.has(entry.assessment_id + ":" + entry.control_id))
+    .map(entry => ({
+      ...entry,
+      effectiveness_file: evidenceKinds.has([entry.assessment_id, entry.control_id, "effectiveness"].join(":")),
+      implementation_file: evidenceKinds.has([entry.assessment_id, entry.control_id, "implementation"].join(":")),
+    }));
   const acceptances = (acceptanceResult.data || []).filter(row => riskIds.has(row.risk_id));
   const ownerOptions=(teamResult.data||[]).map(person=>({id:person.id,name:[person.first_name,person.last_name].filter(Boolean).join(" ")||person.email,email:person.email||""}));
   const initialRiskId=query?.risk||query?.id||null;
