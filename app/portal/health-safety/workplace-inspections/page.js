@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { RecordIcon } from "../../../../components/DocumentRecordTabs";
-import { requireOrganizationAccess } from "../../../../lib/organization-access";
+import { getOrganizationAccess, requireOrganizationAccess } from "../../../../lib/organization-access";
 import { requirePlanAccess } from "../../../../lib/plan-access";
 import { createAdminClient } from "../../../../lib/supabase/admin";
 import { resolveInspectionAccess } from "../../../../lib/workplace-inspection-access";
 import { canStartInspection } from "../../../../lib/workplace-inspection-policy.mjs";
-import { OPEN_ACTIONS, actionOverdue, fieldworkOverdue, fieldworkState, inspectionPerformance, openFinding, programmeDue } from "../../../../lib/workplace-inspection-overview.mjs";
+import { OPEN_ACTIONS, actionOverdue, fieldworkOverdue, fieldworkState, openFinding, programmeDue } from "../../../../lib/workplace-inspection-overview.mjs";
 import { siteToday, UUID } from "../../../../lib/zone-policy.mjs";
+import InspectionPerformance from "./InspectionPerformance";
+import InspectionRegister, { InspectionTable as Table } from "./InspectionRegister";
 import InspectionZoneForm from "./InspectionZoneForm";
 import StartInspectionButton from "./StartInspectionButton";
 import p from "../powra/powra.module.css";
@@ -21,10 +23,10 @@ const INSPECTION_VIEWS = [
   ["programmes", "Inspection programmes", "clipboard", s.programmes],
   ["fieldwork", "Scheduled fieldwork", "calendar", s.fieldwork],
   ["findings", "Findings requiring action", "alert", s.findings],
-  ["performance", "Inspection performance", "matrix", s.performanceView],
 ];
+const CENTRAL = "/portal/internal-audit-actions";
 const OTHER_VIEWS = [["overview", "Overview", "overview"], ["zones", "Zone QR & PPE", "qr"]];
-const queues = [["planned","Planned"],["active","In progress"],["completed","Fieldwork completed"]];
+const queues = [["all","All fieldwork"],["planned","Planned"],["active","In progress"],["completed","Fieldwork completed"]];
 const when = new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/London"});
 const day = new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeZone:"UTC"});
 const date = (value,time=false)=>value&&Number.isFinite(Date.parse(value))?(time?when:day).format(new Date(value)):"Not recorded";
@@ -50,13 +52,6 @@ function Badge({children,tone="blue"}){
 function Panel({id,icon,label,children,className=""}){
   return <section id={id} className={p.panel+" "+className}><h2><RecordIcon name={icon}/>{label}</h2>{children}</section>;
 }
-function Table({columns,rows,empty}){
-  return rows.length ? <div className={p.tableWrap}><table className={p.table+" "+s.table}>
-    <thead><tr>{columns.map(label=><th key={label} scope="col">{label}</th>)}</tr></thead>
-    <tbody>{rows.map(([id,...cells])=><tr key={id}>{cells.map((cell,index)=>
-      <td data-label={columns[index]} key={columns[index]}>{cell}</td>)}</tr>)}</tbody>
-  </table></div> : <p className={shared.notice}>{empty}</p>;
-}
 const cleanLocation = value => String(value || "").replace(/Â[\s\u00a0]*(?=·)|Â\u00a0/g,"").trim();
 function location(row,zone,site){
   const full = cleanLocation(row.administration_location_label);
@@ -69,7 +64,7 @@ function location(row,zone,site){
     {zone ? <Link href={"/portal/company/sites/"+zone.site_id+"/zones"}>{label}</Link> : label}
   </span>
     {(area||zoneName) && <small>{area&&area.toLowerCase()!==zoneName.toLowerCase() && area}
-      {zoneName && <>{area&&area.toLowerCase()!==zoneName.toLowerCase() && " · "}<Link href={href("zones",{zone:zone.public_token})}>{zoneName}</Link></>}
+      {zoneName && <>{area&&area.toLowerCase()!==zoneName.toLowerCase() && " · "}{zone.status === "published" && zone.public_token ? <Link href={href("zones",{zone:zone.public_token})}>{zoneName}</Link> : zoneName}</>}
     </small>}</>;
 }
 function href(view,filters={}){
@@ -78,18 +73,18 @@ function href(view,filters={}){
   return ROOT+"?"+params;
 }
 
-export default async function WorkplaceInspectionsPage({searchParams}){
+export default async function WorkplaceInspectionsPage({searchParams, central = false}){
   const params=await searchParams;
-  const base=await requireOrganizationAccess("risk_management","view",ROOT);
+  const base=await requireOrganizationAccess("risk_management","view",central ? CENTRAL + "?source=workplace_inspection" : ROOT);
   await requirePlanAccess(base.user,"professional","Health and Safety");
   const admin=createAdminClient();
   const org=base.organization.id;
   const now=Date.now(),today=siteToday("Europe/London",new Date(now));
-  const view=[...INSPECTION_VIEWS, ...OTHER_VIEWS].some(([key])=>key===params?.view)?params.view:"overview";
-  const queue=queues.some(([key])=>key===params?.queue)?params.queue:"planned";
+  const view=central ? "findings" : [...INSPECTION_VIEWS, ...OTHER_VIEWS].some(([key])=>key===params?.view)?params.view:"overview";
+  const queue=queues.some(([key])=>key===params?.queue)?params.queue:"all";
   const search=typeof params?.q==="string"?params.q.trim().slice(0,160):"";
   const zoneToken=typeof params?.zone==="string"&&UUID.test(params.zone)?params.zone:"";
-  const [access,programmes,inspections,findings,actions,people,zones,sites,buildings]=await Promise.all([
+  const [access,programmes,inspections,findings,actions,people,zones,sites,buildings,centralAccess]=await Promise.all([
     resolveInspectionAccess(admin,base),
     allRows(()=>admin.from("hs_inspection_programmes")
       .select("id,programme_reference,title,administration_location_id,administration_location_label,area_department,zone_id,next_inspection_date,frequency_amount,frequency_unit,planning_basis,risk_score,risk_band,status,lead_inspector_person_id,accountable_person_id")
@@ -104,16 +99,17 @@ export default async function WorkplaceInspectionsPage({searchParams}){
       .select("id,inspection_id,finding_id,action_reference,action_text,priority,responsible_person_id,verifier_person_id,target_date,status,verification_result")
       .eq("organization_id",org).order("target_date").order("id")),
     allRows(()=>admin.from("organization_people").select("id,first_name,last_name,email").eq("organization_id",org).order("id")),
-    allRows(()=>admin.from("organization_zones").select("id,site_id,building_id,reference,name,public_token,show_assessments")
-      .eq("organization_id",org).eq("status","published").order("reference").order("id")),
-    allRows(()=>admin.from("organization_sites").select("id,site_reference,site_name").eq("organization_id",org).eq("status","active").order("id")),
+    allRows(()=>admin.from("organization_zones").select("id,site_id,building_id,reference,name,public_token,show_assessments,status")
+      .eq("organization_id",org).order("reference").order("id")),
+    allRows(()=>admin.from("organization_sites").select("id,site_reference,site_name,status").eq("organization_id",org).order("id")),
     allRows(()=>admin.from("organization_buildings").select("id,name").eq("organization_id",org).order("id")),
+    !central ? getOrganizationAccess("internal_audit", "view") : null,
   ]);
   const peopleById=new Map(people.map(row=>[row.id,[row.first_name,row.last_name].filter(Boolean).join(" ")||row.email]));
   const person=id=>peopleById.get(id)||(id?"Company user unavailable":"Unassigned");
   const sitesById=new Map(sites.map(row=>[row.id,row]));
-  const published=zones.filter(zone=>sitesById.has(zone.site_id));
-  const zoneById=new Map(published.map(zone=>[zone.id,zone]));
+  const published=zones.filter(zone=>zone.status === "published" && sitesById.get(zone.site_id)?.status === "active");
+  const zoneById=new Map(zones.map(zone=>[zone.id,zone]));
   const buildingNames=new Map(buildings.map(row=>[row.id,row.name]));
   const zone=published.find(row=>row.public_token===zoneToken);
   const inspectionById=new Map(inspections.map(row=>[row.id,row]));
@@ -132,10 +128,7 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     admin.from("hs_inspection_programme_packs").select("selection_reason,pack:hs_inspection_question_packs(id,title)")
       .eq("organization_id",org).eq("programme_id",next.id).limit(10),
   ]) : [{data:[]},{data:[]}];
-  const term=search.toLowerCase();
-  const programmeRows=programmes.filter(row=>!term || [row.programme_reference,row.title,row.administration_location_label,row.area_department,
-    zoneById.get(row.zone_id)?.name,person(row.accountable_person_id),person(row.lead_inspector_person_id)].join(" ").toLowerCase().includes(term));
-  const fieldworkRows=inspections.filter(row=>fieldworkState(row)===queue);
+  const fieldworkRows=inspections.filter(row=>queue==="all"||fieldworkState(row)===queue);
   const scopedZoneRows=zone?inspections.filter(row=>row.zone_id===zone.id&&["planned","active"].includes(fieldworkState(row))):[];
   const actionsByFinding=new Map();
   for(const row of actions){
@@ -148,19 +141,23 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     ["In progress",ongoing.length,"green","play",href("fieldwork",{queue:"active"})],
     ["Open findings",findingsOpen.length,"amber","alert",href("findings",{focus:"findings"})],
     ["Overdue actions",overdueActions.length,"amber","calendar",href("findings",{focus:"overdue"})],
-    ["Awaiting verification",awaiting.length,"blue","scope",href("findings",{focus:"verification"})],
   ];
-  const programmeTable=(rows)=><Table columns={["Programme","Location / scope","Owner / lead","Frequency","Next inspection","Programme status"]}
-    rows={rows.map(row=>[row.id,<><Link href={ROOT+"/programmes/"+row.id}>{row.title}</Link><small>{row.programme_reference}</small></>,
-      location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id)),<>{person(row.accountable_person_id)}<small>Lead · {person(row.lead_inspector_person_id)}</small></>,
-      row.frequency_amount&&row.frequency_unit?`Every ${row.frequency_amount} ${row.frequency_amount===1?row.frequency_unit.replace(/s$/,""):row.frequency_unit}`:"Not recorded",
-      <>{date(row.next_inspection_date)}{programmeDue(row,today)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
-      <Badge tone={row.status==="active"?"green":"neutral"}>{title(row.status)}</Badge>,
-    ])} empty="No programmes match this view."/>;
-  const fieldworkTable=(rows,{showInspector=false}={})=><Table columns={[
-    "Inspection",...(showInspector?["Inspector"]:[]),"Location","Scheduled / completed","Status","Open",
+  const scopeFor = record => {
+    const zone = zoneById.get(record?.zone_id);
+    const siteId = record?.administration_location_id || zone?.site_id;
+    const site = sitesById.get(siteId);
+    const siteLabel = [site?.site_reference, site?.site_name].map(cleanLocation).filter(Boolean).join(" · ") ||
+      cleanLocation(record?.administration_location_label) || "Site not recorded";
+    const area = cleanLocation(record?.area_department);
+    const zoneLabel = [zone?.reference, zone?.name].map(cleanLocation).filter(Boolean).join(" · ") || area || "Zone not recorded";
+    return { siteKey: siteId || siteLabel, site: siteLabel, zone: zoneLabel, location: [siteLabel, zoneLabel].join(" / ") };
+  };
+  const fieldworkColumns = ["Inspection", "Inspector", "Site / zone", "Scheduled / completed", "Status", "Open"];
+  const fieldworkTable=(rows,{showInspector=false}={})=><Table columns={showInspector ? fieldworkColumns : [
+    "Inspection", "Location", "Scheduled / completed", "Status", "Open",
   ]}
-    rows={rows.map(row=>{
+  rows={fieldworkCells(rows, showInspector)} empty="No inspections in this queue."/>;
+  const fieldworkCells = (rows, showInspector) => rows.map(row=>{
       const editable=["contribute","review","approve","admin","owner"].includes(access.level);
       const start=editable&&canStartInspection(access,row);
       const continuing=editable&&row.status==="in_progress"&&access.person?.id===row.lead_inspector_person_id;
@@ -173,17 +170,120 @@ export default async function WorkplaceInspectionsPage({searchParams}){
         start ? <StartInspectionButton inspectionId={row.id}/> :
           <Link className={continuing?p.primary:p.button} href={ROOT+"/"+row.id+(continuing?"#inspection-checklist":"")}>
             {continuing?"Continue checklist":"Open record"}</Link>];
-    })} empty="No inspections in this queue."/>;
-  const actionTable=(rows)=><Table columns={["Corrective action","Priority","Owner / verifier","Target","Status"]}
-    rows={rows.map(row=>[row.id,<><Link href={ROOT+"/"+row.inspection_id+"#inspection-review-actions"}>{row.action_text}</Link><small>{row.action_reference}</small></>,
-      <Badge tone={tone(row.priority)}>{title(row.priority)}</Badge>,
-      <>{person(row.responsible_person_id)}<small>Verifier · {person(row.verifier_person_id)}</small></>,
-      <>{date(row.target_date)}{actionOverdue(row,today)&&<small><Badge tone="red">Overdue</Badge></small>}</>,
-      <>{title(row.status)}{row.verification_result&&row.verification_result!=="pending"&&<small>{title(row.verification_result)}</small>}</>,
-    ])} empty="No corrective actions in this view."/>;
-  const performance=view==="performance"?inspectionPerformance(inspections,findings,now):null;
-  const measured=performance?performance.onTime+performance.late:0;
-  const onTimePercent=measured?Math.round(performance.onTime/measured*100):null;
+    });
+
+  const programmeColumns = ["Programme", "Site / zone", "Owner / lead", "Frequency", "Next inspection", "Programme status"];
+  const programmeEntries = view === "programmes" ? programmes
+    .filter(row=>(params?.due!=="1"||programmeDue(row,today))&&(params?.active!=="1"||row.status==="active"))
+    .map(row => {
+      const scope = scopeFor(row);
+      const owner = person(row.accountable_person_id);
+      const lead = person(row.lead_inspector_person_id);
+      const frequency = row.frequency_amount && row.frequency_unit ?
+        `Every ${row.frequency_amount} ${row.frequency_amount === 1 ? row.frequency_unit.replace(/s$/, "") : row.frequency_unit}` : "Not recorded";
+      const due = programmeDue(row, today) ? "Overdue" : !row.next_inspection_date ? "Unscheduled" :
+        row.next_inspection_date < today ? "Past date" : Date.parse(row.next_inspection_date) <= Date.parse(today) + 30 * 86400000 ? "Within 30 days" : "Later";
+      const status = title(row.status);
+      return {
+        search: [row.programme_reference, row.title, scope.location, row.administration_location_label, row.area_department, owner, lead].join(" "),
+        filters: [[scope.site], [scope.zone], [...new Set([owner, lead])], [frequency], [due], [status]],
+        csv: [row.programme_reference, row.title, scope.site, scope.zone, owner, lead, frequency, row.next_inspection_date, due, status],
+        row: [
+          row.id, <><Link href={ROOT+"/programmes/"+row.id}>{row.title}</Link><small>{row.programme_reference}</small></>,
+          location(row,zoneById.get(row.zone_id),sitesById.get(row.administration_location_id)),
+          <>{owner}<small>Lead · {lead}</small></>, frequency,
+          <>{date(row.next_inspection_date)}{due === "Overdue" && <small><Badge tone="red">Overdue</Badge></small>}</>,
+          <Badge tone={row.status==="active"?"green":"neutral"}>{status}</Badge>,
+        ],
+      };
+    }) : [];
+  const findingEntries = source => source.map(row => {
+    const inspection = inspectionById.get(row.inspection_id);
+    const scope = scopeFor(inspection);
+    const ref = inspection?.inspection_reference || "Inspection record";
+    const linked = actionsByFinding.get(row.id) || [];
+    const priority = title(row.priority);
+    const severity = row.severity == null ? "Not recorded" : String(row.severity);
+    const status = title(row.status);
+    const target = ROOT + "/" + row.inspection_id + "#inspection-review-actions";
+    return {
+      search: [row.finding_reference,row.title,ref,scope.location,inspection?.administration_location_label,...linked.map(item => item.action_reference)].join(" "),
+      filters: [[scope.site],[scope.zone],[ref],[priority],[severity],[status]],
+      csv: [row.finding_reference,row.title,scope.site,scope.zone,ref,priority,severity,linked.map(item=>item.action_reference).join(", "),status],
+      row: [
+        row.id, <><Link href={target}>{row.title}</Link><small>{row.finding_reference}</small></>, scope.location,
+        <Link href={ROOT+"/"+row.inspection_id}>{ref}</Link>, <><Badge tone={tone(row.priority)}>{priority}</Badge><small>Severity {severity}</small></>,
+        linked.length ? <Link href={target}>{linked.length} recorded</Link> : "Not recorded", status,
+      ],
+    };
+  });
+  const actionEntries = source => source.map(row => {
+    const inspection = inspectionById.get(row.inspection_id);
+    const scope = scopeFor(inspection);
+    const priority = title(row.priority);
+    const owner = person(row.responsible_person_id);
+    const verifier = person(row.verifier_person_id);
+    const status = title(row.status);
+    const due = actionOverdue(row,today);
+    const verification = row.verification_result && row.verification_result !== "pending" ? title(row.verification_result) : "";
+    return {
+      search: [row.action_reference,row.action_text,scope.location,inspection?.inspection_reference,owner,verifier].join(" "),
+      filters: [[scope.site],[scope.zone],[priority],[owner],[status]],
+      csv: [row.action_reference,row.action_text,scope.site,scope.zone,inspection?.inspection_reference,priority,owner,verifier,row.target_date,status,verification],
+      row: [
+        row.id, <><Link href={ROOT+"/"+row.inspection_id+"#inspection-review-actions"}>{row.action_text}</Link><small>{row.action_reference}</small></>,
+        scope.location,<Badge tone={tone(row.priority)}>{priority}</Badge>,
+        <>{owner}<small>Verifier · {verifier}</small></>, <>{date(row.target_date)}{due&&<small><Badge tone="red">Overdue</Badge></small>}</>,
+        <>{status}{verification&&<small>{verification}</small>}</>,
+      ],
+    };
+  });
+  const focus = params?.focus;
+  const showingActions = params?.register === "actions" || ["overdue","verification"].includes(focus);
+  const findingsHref = (filters = {}) => central ?
+    CENTRAL + "?" + new URLSearchParams({ source: "workplace_inspection", ...filters }) : href("findings", filters);
+  const findingsView = view === "findings" && <Panel icon="alert" label={central ? "Workplace Inspection findings and actions" : "Findings requiring action"}>
+    <nav className={p.tabs} aria-label="Inspection findings and actions">
+      <Link href={findingsHref()} aria-current={!showingActions?"page":undefined}>Inspection findings</Link>
+      <Link href={findingsHref({register:"actions"})} aria-current={showingActions?"page":undefined}>Corrective actions</Link>
+    </nav>
+    {showingActions ? <>
+      <nav className={p.tabs} aria-label="Corrective action views">
+        {[["open","Open"],["overdue","Overdue"],["verification","Awaiting verification"],["all","All actions"]].map(([key,label]) =>
+          <Link key={key} href={findingsHref({register:"actions",focus:key})} aria-current={(focus||"open")===key?"page":undefined}>{label}</Link>)}
+      </nav>
+      <InspectionRegister key={"actions:"+focus} columns={["Corrective action","Site / zone","Priority","Owner / verifier","Target","Status"]}
+        entries={actionEntries(focus==="overdue"?overdueActions:focus==="verification"?awaiting:focus==="all"?actions:actionsOpen)}
+        filters={["Site","Zone","Priority","Owner","Status"]} initialQuery={search}
+        exportColumns={["Reference","Corrective action","Site","Zone","Inspection","Priority","Owner","Verifier","Target","Status","Verification"]}
+        exportFile="workplace-inspection-actions.csv"/>
+    </> : <>
+      <nav className={p.tabs} aria-label="Finding views">
+        <Link href={findingsHref()} aria-current={focus!=="all"?"page":undefined}>Open findings</Link>
+        <Link href={findingsHref({focus:"all"})} aria-current={focus==="all"?"page":undefined}>All findings</Link>
+      </nav>
+      <InspectionRegister key={"findings:"+focus} columns={["Finding","Site / zone","Inspection","Severity / priority","Corrective actions","Status"]}
+        entries={findingEntries(focus==="all"?findings:findingsOpen)}
+        filters={["Site","Zone","Inspection","Priority","Severity","Status"]} initialQuery={search}
+        exportColumns={["Reference","Finding","Site","Zone","Inspection","Priority","Severity","Corrective actions","Status"]}
+        exportFile="workplace-inspection-findings.csv"/>
+    </>}
+  </Panel>;
+
+  if (central) return <main className={p.page}>
+    <p className={p.crumb}>Findings &amp; Actions / Workplace Inspection</p>
+    <header className={p.hero}>
+      <div className={p.identity}><span className={p.iconBox}><RecordIcon name="alert"/></span>
+        <div><h1>Findings &amp; Actions</h1><p>Workplace Inspection findings and corrective actions</p></div>
+      </div>
+      <Link className={p.button} href={href("findings")}>Open Workplace Inspections</Link>
+    </header>
+    <nav className={p.tabs + " " + p.recordTabs} aria-label="Finding source">
+      <Link href={CENTRAL}>Nonconformity Register</Link>
+      <Link href={findingsHref()} aria-current="page">Workplace Inspection</Link>
+    </nav>
+    {findingsView}
+  </main>;
 
   return <main className={p.page}>
     <p className={p.crumb}><Link href="/portal/health-safety">Health &amp; Safety Hub</Link> / Workplace Inspections</p>
@@ -191,22 +291,28 @@ export default async function WorkplaceInspectionsPage({searchParams}){
       <div className={p.identity}><span className={p.iconBox}><RecordIcon name="clipboard"/></span>
         <div><h1>Workplace Inspections</h1><p>Plan inspections, complete fieldwork and track findings through verification.</p></div></div>
       <div className={p.actions}>
+        <Link className={p.button} href={href("overview")} aria-current={view==="overview"?"page":undefined}><RecordIcon name="overview"/>Inspection overview</Link>
+        {centralAccess?.allowed && centralAccess.organization?.id === org && centralAccess.user?.id === base.user.id &&
+          <Link className={p.button} href={CENTRAL+"?source=workplace_inspection"}>Central Findings &amp; Actions</Link>}
         <Link className={p.button} href="/portal/tasks?view=mine&module=inspection"><RecordIcon name="person"/>My inspection work</Link>
-        <Link className={p.button} href={href("zones")}><RecordIcon name="qr"/>Zone QR</Link>
+        <Link className={p.button} href={href("zones")}><RecordIcon name="qr"/>Zone QR &amp; PPE</Link>
         <Link className={p.button} href="/portal/company/sites"><RecordIcon name="pin"/>Sites &amp; zones</Link>
         {["contribute","review","approve","admin","owner"].includes(access.level) &&
           <Link className={p.primary} href={ROOT+"/programmes/new"}><RecordIcon name="documents"/>New programme</Link>}
       </div>
     </header>
-    <section className={shared.tiles} aria-label="Inspection indicators">
+    <section className={p.metrics} aria-label="Inspection indicators">
       {metrics.map(([label,value,color,icon,target])=><Link key={label} href={target} className={p.metric+" "+shared[color]}>
-        <span className={p.metricIcon}><RecordIcon name={icon}/></span><span className={p.metricContent}><strong>{value}</strong>{label}</span></Link>)}
+        <span className={p.metricIcon}><RecordIcon name={icon}/></span><span className={p.metricContent}><strong>{value}</strong>{label}{label==="Overdue actions" && <small>{awaiting.length} awaiting verification</small>}</span></Link>)}
     </section>
+    {view === "overview" && <InspectionPerformance root={ROOT} asOf={now}
+      inspections={inspections.map(row => ({ id:row.id, title:row.title, inspection_reference:row.inspection_reference,
+        completed_at:row.completed_at, planned_end_at:row.planned_end_at, status:row.status, programme_id:row.programme_id,
+        template_id:row.template_id, zone_id:row.zone_id, inspector:person(row.lead_inspector_person_id), ...scopeFor(row) }))}
+      findings={findings.map(row => ({ ...row, reference:row.finding_reference, priorityLabel:title(row.priority), ...scopeFor(inspectionById.get(row.inspection_id)) }))}
+      overdueActions={overdueActions.map(row => ({ id:row.id, inspection_id:row.inspection_id, title:row.action_text,
+        reference:row.action_reference, target_date:row.target_date, priorityLabel:title(row.priority), ...scopeFor(inspectionById.get(row.inspection_id)) }))}/>}
     <nav className={s.viewPicker} aria-label="Inspection views">
-      <div className={s.viewUtilities}>
-        {OTHER_VIEWS.map(([key,label,icon])=><Link key={key} href={href(key)} aria-current={view===key?"page":undefined}>
-          <RecordIcon name={icon}/>{label}</Link>)}
-      </div>
       <div className={s.viewCards}>
         {INSPECTION_VIEWS.map(([key,label,icon,color])=><Link key={key} href={href(key)} className={s.viewCard+" "+color}
           aria-current={view===key?"page":undefined}>
@@ -238,63 +344,25 @@ export default async function WorkplaceInspectionsPage({searchParams}){
     }
 
     {view==="programmes" && <Panel icon="clipboard" label={params?.due==="1"?"Overdue programme inspections":params?.active==="1"?"Active inspection programmes":"Inspection programmes"}>
-      <form className={s.filters} action={ROOT}><input type="hidden" name="view" value="programmes"/>
-        {params?.due==="1"&&<input type="hidden" name="due" value="1"/>}
-        {params?.active==="1"&&<input type="hidden" name="active" value="1"/>}
-        <label>Search programmes<input type="search" name="q" defaultValue={search} placeholder="Reference, site, area or owner"/></label>
-        <button className={p.primary}>Search</button><Link className={p.button} href={href("programmes")}>Clear filters</Link>
-      </form>
-      {programmeTable(programmeRows.filter(row=>(params?.due!=="1"||programmeDue(row,today))&&(params?.active!=="1"||row.status==="active")))}
+      <InspectionRegister columns={programmeColumns} entries={programmeEntries} initialQuery={search}
+        filters={["Site","Zone","Owner / lead","Frequency","Next inspection","Programme status"]}
+        exportColumns={["Reference","Programme","Site","Zone","Owner","Lead inspector","Frequency","Next inspection","Due window","Programme status"]}
+        exportFile="workplace-inspection-programmes.csv"/>
     </Panel>}
 
     {view==="fieldwork" && <Panel icon="calendar" label="Scheduled fieldwork">
       <nav className={p.tabs} aria-label="Fieldwork queues">{queues.map(([key,label])=><Link key={key} href={href("fieldwork",{queue:key})}
-        aria-current={key===queue?"page":undefined}>{label} ({inspections.filter(row=>fieldworkState(row)===key).length})</Link>)}</nav>
-      {fieldworkTable(fieldworkRows,{showInspector:true})}
+        aria-current={key===queue?"page":undefined}>{label} ({inspections.filter(row=>key==="all"||fieldworkState(row)===key).length})</Link>)}</nav>
+      <InspectionRegister key={queue} columns={fieldworkColumns} initialQuery={search}
+        filters={["Site","Zone","Status"]} entries={fieldworkCells(fieldworkRows,true).map((cells,index) => {
+          const row = fieldworkRows[index];
+          const scope = scopeFor(row);
+          return { row:cells, search:[row.title,row.inspection_reference,scope.location,row.administration_location_label,person(row.lead_inspector_person_id)].join(" "),
+            filters:[[scope.site],[scope.zone],[title(row.status)]] };
+        })}/>
     </Panel>}
 
-    {view==="findings" && <>
-      <Panel icon="alert" label="Inspection findings">
-        <form action={ROOT} className={s.filters}><input type="hidden" name="view" value="findings"/>
-          <label>Finding status<select name="focus" defaultValue={params?.focus==="all"?"all":"findings"}><option value="findings">Open</option><option value="all">All findings</option></select></label>
-          <button className={p.button}>Apply</button></form>
-        <Table columns={["Finding","Inspection","Severity / priority","Corrective actions","Status"]}
-          rows={(params?.focus==="all"?findings:findingsOpen).map(row=>[row.id,<><strong>{row.title}</strong><small>{row.finding_reference}</small></>,
-            <Link href={ROOT+"/"+row.inspection_id}>{inspectionById.get(row.inspection_id)?.inspection_reference||"Inspection record"}</Link>,
-            <><Badge tone={tone(row.priority)}>{title(row.priority)}</Badge><small>Severity {row.severity??"not recorded"}</small></>,
-            actionsByFinding.get(row.id)?.length ? <Link href={ROOT+"/"+row.inspection_id+"#inspection-review-actions"}>{actionsByFinding.get(row.id).length} recorded</Link> : "Not recorded",
-            title(row.status)])} empty="No findings in this view."/>
-      </Panel>
-      <Panel icon="scope" label={params?.focus==="overdue"?"Overdue corrective actions":params?.focus==="verification"?"Actions awaiting verification":"Corrective actions"}>
-        <nav className={p.tabs} aria-label="Action views">
-          {[["","Open"],["overdue","Overdue"],["verification","Awaiting verification"],["all","All actions"]].map(([key,label])=><Link key={key} href={href("findings",{focus:key})}>{label}</Link>)}
-        </nav>
-        {actionTable(params?.focus==="overdue"?overdueActions:params?.focus==="verification"?awaiting:params?.focus==="all"?actions:actionsOpen)}
-      </Panel>
-    </>}
-
-    {view==="performance"&&<div className={s.queues}>
-      <Panel icon="matrix" label="Inspection performance · last six months">
-        {(()=>{
-          const percent=onTimePercent;
-          return <><div className={s.performance}><div><strong>{percent===null?"Not available":percent+"%"}</strong><p>On-time fieldwork</p>
-            {percent!==null&&<div className={s.track} aria-hidden="true"><span style={{width:percent+"%"}}/></div>}</div>
-            <ul className={s.compact}><li>On time · {performance.onTime}</li><li>Late · {performance.late}</li>
-              <li>Submitted without a scheduled end · {performance.unmeasured}</li>
-              <li>Overdue fieldwork now · {inspections.filter(row=>fieldworkOverdue(row,now)).length}</li></ul></div>
-            <p className={shared.muted}>On-time measures fieldwork submission against its recorded scheduled end. Submissions without a finish time are excluded from the rate.</p></>;
-        })()}
-      </Panel>
-      <Panel icon="alert" label="Recurring findings · last six months">
-        <p className={shared.muted}>The same checklist question raised in separate inspections within a programme or zone.</p>
-        <Table columns={["Checklist question","Site","Inspections"]} rows={performance.repeats.map(row=>[row.key,row.label,row.scope,row.count])}
-          empty="No recurring checklist findings recorded in this period."/>
-      </Panel>
-      <Panel icon="scope" label="Findings by status">
-        <ul className={s.compact}><li>Open · {findingsOpen.length}</li><li>Closed · {findings.filter(row=>row.status==="closed").length}</li>
-          <li>Cancelled · {findings.filter(row=>row.status==="cancelled").length}</li></ul>
-      </Panel>
-    </div>}
+    {findingsView}
 
     {view==="zones" && <>
       <Panel icon="qr" label="Zone QR and location controls">
