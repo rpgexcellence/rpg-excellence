@@ -1,0 +1,86 @@
+.centre { min-width: 0; color: #112b43; }
+.centre h2 { margin: 0 0 8px; font: 700 1.28rem Georgia,serif; }
+.centre h3 { margin: 12px 0 7px; font-size: .94rem; }
+.centre p { line-height: 1.45; }
+.centre :is(button,a,select,input,textarea):focus-visible { outline: 2px solid #1674aa; outline-offset: 2px; }
+.blue { --signal:#285982; --tint:#e8f2fa; }
+.red { --signal:#982c38; --tint:#fce8ec; }
+.green { --signal:#0b7058; --tint:#e2f3ea; }
+.amber { --signal:#8f5a19; --tint:#fbf0dc; }
+.purple { --signal:#684486; --tint:#f2eaf8; }
+.centre button[aria-pressed=true] { box-shadow: inset 0 0 0 1px var(--signal,#244c71); }
+.centre button[aria-pressed=true]:not([data-above]) { background-color: var(--tint,#e6f0f8); }
+.board, .operations { display: grid; gap: 10px; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr); align-items: stretch; }
+.operations { grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); }
+.stack { display: grid; gap: 10px; align-content: start; }
+.panel { padding: 12px; min-width: 0; border: 1px solid #cbdde9; border-radius: 6px; background: #fff; }
+.panel h2 svg { margin-right: 4px; }
+.headingRow, .filterRow { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.headingRow h2, .headingRow p { margin: 0; }
+.filterRow { margin: 10px 0; justify-content: flex-start; }
+.filterRow input, .filterRow select, .decisionForm select, .decisionForm textarea {
+  min-height: 40px; padding: 8px 9px; border: 1px solid #baccdd; border-radius: 5px;
+  background: #f6fafd; color: #112b43; font: inherit;
+}
+.filterRow input { min-width: 0; flex: 1 1 200px; }
+.filterRow select { max-width: min(230px, 65vw); }
+.filterRow label { display: flex; align-items: center; gap: 5px; font-size: .83rem; font-weight: 700; }
+.segment { display: flex; gap: 2px; background: #e8f0f6; padding: 3px; border-radius: 6px; }
+.segment button { padding: 6px; min-height: 34px; border: 0; border-radius: 4px; color: #234767; background: transparent; cursor: pointer; font: 700 .79rem Arial,sans-serif; }
+.segment button[aria-pressed=true] { background: #fff; }
+.heatRow { display: grid; grid-template-columns: minmax(34px,.65fr) repeat(5,minmax(0,1fr)); gap: 4px; margin-bottom: 4px; }
+.heatPanel .headingRow { margin-bottom: 12px; }
+.heatRow button { position: relative; min-height: 62px; border: 1px solid transparent; border-radius: 5px; padding: 12px 1px 3px; cursor: pointer; }
+.heatRow button:hover, .heatRow button[aria-pressed=true] { box-shadow: inset 0 0 0 2px white, inset 0 0 0 4px #1b4166; }
+.heatRow button strong { display: block; font-size: 1.22rem; }
+.heatRow button span { font-size: .67rem; }
+.heatRow button small { position: absolute; top: 4px; left: 4px; font-size: .68rem; }
+.heatRow button[data-above]::after { content: ""; position: absolute; top: 5px; right: 5px; border-top: 7px solid currentColor; border-left: 7px solid transparent; opacity: .85; }
+.likelihood { text-align: center; }
+.impact { align-self: center; text-align: right; }
+.likelihood span, .impact span { display: block; font-size: .66rem; color: #48657b; overflow-wrap: anywhere; }
+.axis { text-align: center; font-weight: bold; font-size: .78rem; }
+.jump { display: block; text-align: right; color: #1c527b; font-weight: 700; font-size: .8rem; }
+.muted { color: #49667d; font-size: .81rem; }
+.position { border-left: 4px solid #0b7058; background: #e7f4ee; border-radius: 5px; padding: 9px; }
+.position[data-tone=attention] { border-color: #a7313c; background: #faecef; color: #882632; }
+.position p, .note p { margin: 4px 0 0; }
+.movement { display: flex; background: #ebf1f6; height: 8px; border-radius: 6px; overflow: hidden; }
+.dataRows { display: grid; gap: 4px; margin: 9px 0; }
+.dataRows > :is(button,div) { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; padding: 6px 8px; background: #f0f5fa; border: 0; border-inline-start: 3px solid var(--signal,#477292); border-radius: 4px; color: #112b43; text-align: left; font: inherit; font-size: .84rem; }
+.dataRows button { cursor: pointer; }
+.dataRows button:hover { background: #e5eef6; }
+.dataRows i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.note { padding: 8px; background: #f1f6fa; border-radius: 5px; margin: 8px 0 0; font-size: .86rem; }
+.textButton { padding: 0; border: 0; background: transparent; color: #1a527f; text-decoration: underline; text-align: left; font: inherit; font-weight: 700; cursor: pointer; }
+.register { margin-top: 10px; scroll-margin-top: 80px; }
+.tableWrap { overflow: auto; }
+.table { border-collapse: collapse; width: 100%; text-align: left; font-size: .86rem; }
+.table th, .table td { border-bottom: 1px solid #dce7ef; padding: 8px; vertical-align: top; overflow-wrap: anywhere; }
+.table th { background: #e8f0f6; }
+.table tbody tr:nth-child(even) { background: #f6f9fc; }
+.table small { display: block; margin-top: 4px; }
+.badge { display: inline-block; min-width: 60px; padding: 5px 7px; border-radius: 5px; text-align: center; white-space: nowrap; font-weight: 700; }
+.badge small { display: block; margin: 2px 0 0; font-weight: normal; }
+.danger { color: #982c38; font-weight: 700; }
+.controlLinks { display: flex; flex-wrap: wrap; gap: 6px; }
+.controlLinks a, .table a { color: #1d527c; font-weight: 700; }
+.dialog { width: min(calc(100% - 24px), 860px); max-height: 90vh; padding: 16px; border: 1px solid #b9cddd; border-radius: 8px; color: #102b46; }
+.dialog::backdrop { background: #10263e99; }
+.detailScores { display: flex; gap: 8px; flex-wrap: wrap; }
+.detailScores > div { flex: 1 1 100px; padding: 8px; background: #eef4f8; border-radius: 5px; }
+.decisionForm { display: grid; margin: 9px 0; gap: 6px; justify-items: start; }
+.decisionForm label { display: grid; gap: 4px; width: 100%; font-weight: 700; font-size: .83rem; }
+.decisionForm textarea { min-height: 75px; }
+@media(max-width: 1310px) {
+  .board { grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); }
+  .board > .panel:last-child { grid-column: 1 / -1; }
+}
+@media(max-width: 880px) {
+  .board, .operations { grid-template-columns: minmax(0,1fr); }
+}
+@media(max-width: 670px) {
+  .table :is(th,td) { padding: 7px; }
+  .table th { white-space: nowrap; }
+  .heatRow button span, .impact span, .likelihood span { font-size: .59rem; }
+}
