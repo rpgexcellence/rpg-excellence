@@ -35,7 +35,7 @@ function RecordList({ selection, page, link, close }) {
   </section>;
 }
 
-export default function Board({ scopes, organization, values, accessOrganizationId, today, security, review, controls, registers, legacy, children }) {
+export default function Board({ scopes, organization, values, accessOrganizationId, today, security, review, controls, registers, legacy, portfolioHeatMap, children }) {
   const { org, assessment, theme, year, quarter, detail, page } = values;
   const { activeRisks, above, unresolved, overdue, undated, cohorts, activeIncidents, serious, overdueRecovery, incidentVerification, pending, expiring, expired } = security;
   const currentRiskWorkspace = Boolean(organization && organization.id === accessOrganizationId && activeRisks);
@@ -124,7 +124,7 @@ export default function Board({ scopes, organization, values, accessOrganization
   return <>
     <header className={styles.hero}>
       <div><span>ISMS management oversight</span><h1>Information Security Management Board</h1><p>Review residual exposure, treatment delivery, control effectiveness and security incidents.</p></div>
-      <nav aria-label="Information Security workspaces"><Link href="/portal/information-security">ISMS Hub</Link><Link href="/portal/soa">SoA register</Link><Link href={riskPath}>Risk register</Link><Link href={incidentPath}>Incident register</Link><Link href={boardPath + "/executive-report"}>Executive Report / PDF</Link></nav>
+      <nav aria-label="Information Security workspaces"><Link href="/portal/information-security">ISMS Hub</Link><Link href="/portal/soa">SoA register</Link><Link href={riskPath}>Risk register</Link><Link href={incidentPath}>Incident register</Link><Link href="/portal/tasks">My Tasks &amp; Approvals</Link><Link href={boardPath + "/executive-report"}>Executive Report / PDF</Link></nav>
     </header>
     <form className={styles.filters} action={boardPath}>
       <label>Organisation<select name="org" defaultValue={org}>{scopes.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}{!scopes.length && <option value="">No organisation</option>}</select></label>
@@ -134,21 +134,32 @@ export default function Board({ scopes, organization, values, accessOrganization
       <label>Treatment due quarter<select name="quarter" defaultValue={quarter}><option value="all">All quarters</option>{[1, 2, 3, 4].map(n => <option key={n} value={n}>Q{n}</option>)}</select></label>
       <button type="submit">Apply filters</button>
     </form>
-    <p className={styles.scope}>As at {displayDate(today)} (Europe/London). SoA and theme filters apply to control records and the existing SoA heat map. Due period applies to treatment cohorts and verification. The heat map retains its existing authorised SoA scope.</p>
+    <p className={styles.scope}>As at {displayDate(today)} (Europe/London). The risk heat map shows the selected organisation’s risks. SoA and theme filters apply to control records and the separate SoA matrix. Due period applies to treatment cohorts and verification.</p>
     <ExecutiveInsight review={review} controls={controls} detailUrl={detailUrl}/>
     <section className={styles.cards} aria-label="Management KPIs">
       {headlineCards.map(({ key, ...card }) => <Card key={key} {...card} href={selections[key] && detailUrl(key)}/>)}
     </section>
     {selections[detail] && <RecordList selection={selections[detail]} page={page} link={number => detailUrl(detail, number)} close={detailUrl()}/>}
     <DeliveryQueue review={review} detailUrl={detailUrl}/>
+    <div className={styles.oversight}>
+      <div className={styles.portfolioMap} id="risk-position">{portfolioHeatMap}</div>
+      <div className={styles.treatmentPanels}>
+        <section className={styles.panel}>
+          <h2>Treatment delivery by due quarter</h2><p>Compare due treatments with those currently verified. Cancelled treatments are excluded.</p>
+          {cohorts ? <ul className={styles.chart}>{cohorts.map(group => <li key={group.number}>
+            <div><Link href={detailUrl("q" + group.number)}>Q{group.number} {year}</Link><span>{group.verified.length} verified / {group.rows.length} due</span></div>
+            <div className={styles.track} aria-hidden="true"><div className={styles.cohort} style={{width: percentage(group.rows.length, maxDue) + "%"}}><i style={{width: (percentage(group.verified.length, group.rows.length) ?? 0) + "%"}}/></div></div>
+          </li>)}</ul> : <p>{unavailable}.</p>}
+        </section>
+        <section className={styles.panel}>
+          <h2>Treatment verification</h2>
+          <div className={styles.donut} style={{"--portion": (verification ?? 0) + "%"}}><strong>{displayPercentage(verification)}</strong></div>
+          <p>{cohortRows ? verified + " of " + cohortRows.length + " dated, non-cancelled treatments verified" : unavailable}.</p>
+          {cohortRows && <Link href={detailUrl("verification")}>View verified treatments</Link>}
+        </section>
+      </div>
+    </div>
     <div className={styles.grid}>
-      <section className={styles.panel}>
-        <h2>Treatment delivery by due quarter</h2><p>Compare due treatments with those currently verified. Cancelled treatments are excluded.</p>
-        {cohorts ? <ul className={styles.chart}>{cohorts.map(group => <li key={group.number}>
-          <div><Link href={detailUrl("q" + group.number)}>Q{group.number} {year}</Link><span>{group.verified.length} verified / {group.rows.length} due</span></div>
-          <div className={styles.track} aria-hidden="true"><div className={styles.cohort} style={{width: percentage(group.rows.length, maxDue) + "%"}}><i style={{width: (percentage(group.verified.length, group.rows.length) ?? 0) + "%"}}/></div></div>
-        </li>)}</ul> : <p>{unavailable}.</p>}
-      </section>
       <section className={styles.panel}>
         <h2>Annex A control position</h2><p>Applicable control records by theme. Counts reflect the selected SoA filters.</p>
         {controls ? <ul className={styles.chart}>{controls.groups.filter(group => group.key !== "unclassified" || group.rows.length).map(group => <li key={group.key}>
@@ -157,12 +168,6 @@ export default function Board({ scopes, organization, values, accessOrganization
             <i className={styles.effective} style={{flex: group.effective}}/><i className={styles.implemented} style={{flex: group.implemented}}/><i className={styles.other} style={{flex: group.other}}/>
           </>}</div>
         </li>)}</ul> : <p>{unavailable}.</p>}
-      </section>
-      <section className={styles.panel}>
-        <h2>Treatment verification</h2>
-        <div className={styles.donut} style={{"--portion": (verification ?? 0) + "%"}}><strong>{displayPercentage(verification)}</strong></div>
-        <p>{cohortRows ? verified + " of " + cohortRows.length + " dated, non-cancelled treatments verified" : unavailable}.</p>
-        {cohortRows && <Link href={detailUrl("verification")}>View verified treatments</Link>}
       </section>
       <section className={styles.panel}>
         <h2>Next deadlines and reviews</h2>

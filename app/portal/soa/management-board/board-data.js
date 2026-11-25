@@ -41,3 +41,19 @@ export async function loadSecurityBoard(supabase, admin, organization, ownsOrgan
   ]);
   return { risks: risks || null, methodologies: methodologies || null, treatments: treatments || null, incidents, acceptances: acceptances || null };
 }
+
+export async function loadPortfolioHeatMap(supabase, organization, userId, ownsOrganization) {
+  if (!organization) return { risks: null, appetite: null };
+  const [risks, methodology] = await Promise.all([
+    readRows(() => {
+      const query = supabase.from("isms_risks")
+        .select("id,risk_reference,title,inherent_likelihood,inherent_impact,residual_likelihood,residual_impact,target_likelihood,target_impact")
+        .eq("organization_id", organization.id).neq("status", "archived").order("id");
+      return ownsOrganization ? query.eq("owner_id", userId) : query;
+    }, "ISMS risk heat map"),
+    supabase.from("isms_risk_methodologies").select("appetite_score")
+      .eq("organization_id", organization.id).eq("status", "approved")
+      .order("approved_at", { ascending: false }).order("id").limit(1).maybeSingle(),
+  ]);
+  return { risks, appetite: methodology.error ? null : methodology.data?.appetite_score ?? null };
+}

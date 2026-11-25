@@ -298,7 +298,7 @@ export default function ISMSRiskAssuranceCentre({
         <p>{organizationName} · Review exposure against appetite, track treatments and record residual-risk decisions.</p>
       </div></div>
       <div className={p.actions}>
-        <Link className={p.button} href="/portal/information-security">ISMS Dashboard</Link>
+        <Link className={p.button} href="/portal/information-security">ISMS Hub</Link>
         <Link className={p.button} href="/portal/soa">SoA Register</Link>
         <button type="button" className={p.primary} onClick={onNew}>+ Assess new risk</button>
       </div>
