@@ -80,7 +80,7 @@ export default function RegisterOverview({ assets, maintenance, mocs, query = {}
       </Link>)}
     </section>
     <div className={s.assetAnalytics}>
-      <section><h2><RecordIcon name="matrix"/> Asset status</h2><p>Recorded operational availability.</p>
+      <section><h2><RecordIcon name="matrix"/> Asset status</h2><p>Recorded operational availability. Select a status to filter the register.</p>
         <div className={s.assetStatusChart}>
           <div className={s.assetRing} style={{ background: stops.length ? "conic-gradient(" + stops.join(",") + ")" : undefined }} aria-hidden="true"><span><b>{total}</b>Assets</span></div>
           <div className={s.assetLegend}>{distributed.map(([key, label, colour, count]) =>
@@ -99,7 +99,7 @@ export default function RegisterOverview({ assets, maintenance, mocs, query = {}
       <section><h2><RecordIcon name="history"/> Lifecycle actions</h2><p>Select a category to see its assets.</p>
         <div className={s.assetLegend}>{lifecycle.map(([key, label, count, icon]) => count == null
           ? <span key={key}><RecordIcon name={icon}/>{label}<b>N/A</b></span>
-          : <Link href={activate(key)} key={key} data-selected={query.focus === key}><RecordIcon name={icon}/><span>{label}</span><b>{count}</b></Link>)}</div>
+          : <Link href={activate(key)} key={key} data-selected={query.focus === key} data-lifecycle={key}><RecordIcon name={icon}/><span>{label}</span><b>{count}</b></Link>)}</div>
       </section>
     </div>
     <details className={s.assetDefinitions}><summary>How overdue work and recurring PPM are counted</summary>
@@ -108,3 +108,4 @@ export default function RegisterOverview({ assets, maintenance, mocs, query = {}
     </details>
   </>;
 }
+
