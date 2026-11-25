@@ -22,12 +22,18 @@
 .trend button span { font-size:.73rem; }
 .trend i { width:67%; display:block; background:#36799f; border-radius:4px 4px 0 0; }
 .trend button[aria-pressed=true],.drills button[aria-pressed=true] { outline:2px solid #275981; outline-offset:-2px; background:#e5f0f8; }
-.ringRow { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:10px 0 4px; }
-.ring { width:115px; aspect-ratio:1; border-radius:50%; background:#e0eaf2; display:grid; place-items:center; flex:none; }
-.ring > div { width:73%; aspect-ratio:1; border-radius:50%; background:#fff; display:grid; align-content:center; text-align:center; font-size:.78rem; }
-.ring strong { font:700 1.6rem Georgia,serif; }
+.ringRow { display:flex; align-items:center; flex-wrap:wrap; gap:16px; margin:12px 0 8px; }
+.ring { width:clamp(146px,12vw,210px); max-width:100%; aspect-ratio:1; border-radius:50%; background:#e0eaf2; display:grid; place-items:center; flex:none; }
+.ring > div { width:73%; aspect-ratio:1; border-radius:50%; background:#fff; display:grid; align-content:center; text-align:center; font-size:.875rem; }
+.ring strong { font:700 2.15rem Georgia,serif; }
 .drills { display:grid; gap:4px; flex:1 1 145px; }
 .drills button { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px 8px; min-height:34px; text-align:left; }
+.ringRow .drills { min-width:0; }
+.ringRow .drills button {
+  display:grid; grid-template-columns:minmax(0,1fr) max-content;
+  min-height:38px; column-gap:12px;
+}
+.ringRow .drills strong { justify-self:end; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .dot { display:inline-block; width:8px; height:8px; margin-right:5px; border-radius:50%; }
 .filters { display:grid; grid-template-columns:repeat(7,minmax(105px,1fr)) auto; gap:8px; align-items:end; margin-top:10px; }
 @media(max-width:1550px) { .filters { grid-template-columns:repeat(4,minmax(0,1fr)); } }
