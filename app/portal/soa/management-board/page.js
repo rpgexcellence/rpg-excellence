@@ -6,6 +6,7 @@ import RiskHeatMap from "./RiskHeatMap";
 import { soaBoardMetrics } from "./soa-board-metrics.mjs";
 import Board from "./Board";
 import styles from "./board.module.css";
+import workspace from "../../documents/documents.module.css";
 import ISMSDashboardRiskHeatMap from "../../../../components/ISMSDashboardRiskHeatMap";
 import { managementReview } from "./leadership.mjs";
 import { getOrganizationAccess } from "../../../../lib/organization-access";
@@ -75,7 +76,7 @@ export default async function SoaManagementBoard({ searchParams }) {
   const soa = soaBoardMetrics({ entries, controls, registers: companyRegisters ? visibleRegisters : null, review, findings, catalog: catalogMap });
   const treatmentYears = records.treatments?.map(row => row.target_date?.slice(0, 4)).filter(Boolean) ?? [];
   const soaOptions = (companyRegisters ?? []).map(row => ({ ...row, label: `${organization.name} · v${row.version} · ${row.status} · ${row.assessment_id.slice(0, 8)}` }));
-  return <ISMSWorkspaceShell active="soa-board"><main className={styles.boardPage}><div className={styles.boardShell}>
+  return <ISMSWorkspaceShell active="soa-board"><main className={[workspace.page, workspace.registerPage, styles.boardPage].join(" ")}><div className={workspace.shell}>
     <Board scopes={scopes} organization={organization} accessOrganizationId={access.organization?.id}
       portfolioHeatMap={portfolio.risks
         ? <ISMSDashboardRiskHeatMap key={organization.id} risks={portfolio.risks} appetite={portfolio.appetite} canOpenRisks={ownsOrganization}/>

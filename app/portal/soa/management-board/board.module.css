@@ -159,8 +159,7 @@
   .treatmentPanels { grid-template-columns: minmax(0, 1fr); }
 }
 
-.boardPage { min-height: 100vh; padding: 26px 20px 65px; color: #102841; background: #edf3f8; }
-.boardShell { max-width: 1650px; margin: auto; }
+.boardPage { padding-block: 26px 65px; color: #102841; background: #edf3f8; }
 .views { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 10px 0; padding: 5px; background: #fff; border: 1px solid #cbdbe5; border-radius: 7px; }
 .views a, .boardButton { border: 1px solid #bcd0e2; border-radius: 5px; padding: 7px 10px; background: #f5f9fc; color: #183e62; font: inherit; font-weight: 700; }
 .views a { text-align: center; text-decoration: none; }
