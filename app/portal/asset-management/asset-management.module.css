@@ -99,6 +99,21 @@
 .assetDetailPanel > header > h2 { margin: 0; }
 .assetDetailPanel[data-teal="true"] > header { background: linear-gradient(110deg, #133853, #06645c); color: white; padding: 8px; border-radius: 5px; }
 .assetDetailPanel[data-teal="true"] > header :is(h2, a) { color: white; }
+.assetDetailPanel[data-teal="true"] > header .assetPanelAction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid #bcdad8;
+  border-radius: 5px;
+  background: #f5fcfb;
+  color: #0d4249;
+  font-size: .78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.assetDetailPanel[data-teal="true"] > header .assetPanelAction:hover { background: #dff5f1; }
 .assetDetailPanel[data-warn="true"] { border-color: #e7a59d; background: #fff6f3; }
 .assetBadge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; background: #e5eff9; color: #1c3e69; font-size: .78rem; font-weight: 700; }
 .assetBadge[data-tone="green"] { background: #daf3e4; color: #115831; }
@@ -126,3 +141,4 @@
 }
 
 .assetRecord { min-width: 0; }
+
