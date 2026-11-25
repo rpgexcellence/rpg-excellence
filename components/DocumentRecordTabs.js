@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import Link from 'next/link';
 import s from '../app/portal/documents/documents.module.css';
 
 const documentTabs = [
@@ -53,10 +54,11 @@ export function RecordIcon({ name }) {
 
 const TabContext = createContext(null);
 
-export function DocumentRecordTabs({ children, initial = 'overview', tabs = documentTabs, sectionLabel = 'Document sections' }) {
+export function DocumentRecordTabs({ children, initial = 'overview', tabs = documentTabs, sectionLabel = 'Document sections', beforeTabs = null }) {
   const [active, setActive] = useState(initial);
   const buttons = useRef([]);
   return <TabContext.Provider value={{ active, setActive }}>
+    {beforeTabs}
     <div className={s.recordTabs} role="tablist" aria-label={sectionLabel}>
       {tabs.map(([key, label], index) => <button type="button" key={key} id={'record-tab-' + key} role="tab" aria-selected={active === key}
         aria-controls={'record-panel-' + key} tabIndex={active === key ? 0 : -1}
@@ -72,6 +74,30 @@ export function DocumentRecordTabs({ children, initial = 'overview', tabs = docu
     </div>
     {children}
   </TabContext.Provider>;
+}
+
+export function DocumentRecordEditLink({ className, path, editing = false }) {
+  const { active } = useContext(TabContext);
+  const query = new URLSearchParams({ tab: active });
+  if (!editing) query.set('edit', '1');
+  return <Link className={className} href={path + '?' + query} prefetch={false}>
+    {editing ? 'Cancel edit' : 'Edit asset'}
+  </Link>;
+}
+
+export function DocumentRecordTabJump({ name, anchor, children, ...props }) {
+  const { setActive } = useContext(TabContext);
+  return <button type="button" {...props} onClick={() => {
+    flushSync(() => setActive(name));
+    const target = anchor && document.getElementById(anchor);
+    if (target) target.scrollIntoView({ block: 'nearest' });
+    else document.getElementById('record-tab-' + name)?.focus();
+  }}>{children}</button>;
+}
+
+export function DocumentRecordActiveTabField({ name }) {
+  const { active } = useContext(TabContext);
+  return <input type="hidden" name={name} value={active}/>;
 }
 
 export function DocumentRecordPanel({ name, children }) {
@@ -114,3 +140,4 @@ export function DocumentPreview({ url, filename }) {
     {open && <iframe className={s.recordPreviewFrame} src={url} title={'Preview of ' + filename}/>}
   </>;
 }
+

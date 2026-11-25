@@ -2,13 +2,16 @@ import { createClient } from "../../../../../lib/supabase/server";
 import QRCode from "qrcode";
 import { assetRecordUrl } from "../../../../../lib/asset-label";
 import Link from "next/link";
-import { DocumentRecordPanel, DocumentRecordTabs, RecordIcon } from "../../../../../components/DocumentRecordTabs";
+import { DocumentRecordEditLink, DocumentRecordPanel, DocumentRecordTabJump, DocumentRecordTabs, RecordIcon } from "../../../../../components/DocumentRecordTabs";
 import shared from "../../../documents/documents.module.css";
 import ui from "../../asset-management.module.css";
 import { loadAssetControls } from "../../asset-record-links";
 import CompleteWorkOrder from "../../CompleteWorkOrder";
+import CompanyAssetRegister from "../../../../../components/CompanyAssetRegister";
+import { loadAdministrationLocations } from "../../../../../lib/rcaCompanyLinks";
+import { saveInlineAssetRecord } from "../../../company/assets/actions";
 import { requireAssetRecord, recordAssetAccess, recordPath, evidencePath } from "../../../../../lib/asset-record";
-import { loadAssetRows } from "../../../../../lib/asset-management";
+import { loadAssetDocumentOptions, loadAssetRows } from "../../../../../lib/asset-management";
 import { getOrganizationAccess } from "../../../../../lib/organization-access";
 import { loadAssetAssurance, sameCompanyAccess } from "../../../../../lib/asset-assurance";
 import { assuranceOpen } from "../../../../../lib/asset-assurance-model";
@@ -85,7 +88,7 @@ export default async function AssetRecord({
       access,
       admin
     } = context;
-  const [people, allMaintenance, documentAccess, ncrAccess, mocAccess] = await Promise.all([loadAssetRows(admin, "organization_people", access.organization.id, "id,first_name,last_name,account_status"), loadAssetRows(admin, "organization_asset_maintenance", access.organization.id), getOrganizationAccess("documents", "view"),
+  const [people, allMaintenance, documentAccess, ncrAccess, mocAccess] = await Promise.all([loadAssetRows(admin, "organization_people", access.organization.id, "id,first_name,last_name,email,position,account_status"), loadAssetRows(admin, "organization_asset_maintenance", access.organization.id), getOrganizationAccess("documents", "view"),
     getOrganizationAccess("internal_audit", "contribute"),
     getOrganizationAccess("risk_management", "contribute"),
   ]);
@@ -98,24 +101,40 @@ export default async function AssetRecord({
     return p ? ([p.first_name, p.last_name].filter(Boolean).join(" ") || "Name not recorded") + (p.account_status !== "active" ? " (inactive)" : "") : "Not recorded";
   };
   const canDocuments = sameCompanyAccess(documentAccess, access);
+  const editing = access.canWrite && query.edit === "1";
+  const orgId = access.organization.id;
   let documents = [];
-  if (canDocuments) {
+  let linkedDocumentIds = [];
+  if (canDocuments || editing) {
     const {
       data: links,
       error
     } = await admin.from("organization_asset_document_links").select("controlled_document_id").eq("organization_id", access.organization.id).eq("asset_id", asset.id).eq("owner_id", access.organization.owner_id);
     if (error) throw new Error("Linked document information is unavailable. Please try again later.");
-    const ids = [...new Set((links || []).map(r => r.controlled_document_id))];
-    for (let offset = 0; offset < ids.length; offset += 100) {
+    linkedDocumentIds = [...new Set((links || []).map(r => r.controlled_document_id))];
+    for (let offset = 0; canDocuments && !editing && offset < linkedDocumentIds.length; offset += 100) {
       const {
         data,
         error: documentError
-      } = await (await createClient()).from("controlled_documents").select("id,document_number,title,revision,document_type").in("id", ids.slice(offset, offset + 100)).eq("status", "Current").in("audience", ["Customer", "Both"]);
+      } = await (await createClient()).from("controlled_documents").select("id,document_number,title,revision,document_type").in("id", linkedDocumentIds.slice(offset, offset + 100)).eq("status", "Current").in("audience", ["Customer", "Both"]);
       if (documentError) throw new Error("Linked document information is unavailable. Please try again later.");
       documents.push(...(data || []));
     }
   }
-  const assurance = await loadAssetAssurance(access, maintenance);
+  const [assurance, editorChoices] = await Promise.all([
+    loadAssetAssurance(access, maintenance),
+    editing ? Promise.all([
+      loadAdministrationLocations(access.organization),
+      admin.from("suppliers").select("id,legal_name,approval_status")
+        .eq("organization_id", orgId).in("approval_status", ["approved", "conditionally_approved"]).order("legal_name"),
+      canDocuments ? createClient().then(loadAssetDocumentOptions) : [],
+    ]) : null,
+  ]);
+  if (editorChoices?.[1].error) throw new Error("Approved maintenance suppliers could not be loaded.");
+  if (editing && canDocuments) {
+    const ids = new Set(linkedDocumentIds);
+    documents = editorChoices[2].filter(row => ids.has(row.id));
+  }
   const linked = [...assurance.findings, ...assurance.cases, ...assurance.mocs].filter(row => row.asset_id === asset.id);
   const today = new Date().toISOString().slice(0, 10);
   const openWork = maintenance.filter(r => !["completed", "cancelled"].includes(r.status));
@@ -151,7 +170,7 @@ export default async function AssetRecord({
   const path = recordPath(asset.id);
   const workUrl = root + "/maintenance?q=" + encodeURIComponent(asset.asset_reference) + "&asset=" + encodeURIComponent(asset.id);
   const recordWorkUrl = row => workUrl + "&record=" + encodeURIComponent(row.id) + "#maintenance-" + encodeURIComponent(row.id);
-  const workLink = row => <Link href={["planned", "due", "overdue", "in_progress"].includes(row.status)
+  const workLink = row => editing ? row.maintenance_reference : <Link href={["planned", "due", "overdue", "in_progress"].includes(row.status)
     ? path + "?tab=details&work=" + row.id + "#asset-order" : recordWorkUrl(row)} prefetch={false}>{row.maintenance_reference}</Link>;
   const evidence = maintenance.filter(row => row.evidence_storage_path || row.evidence_reference);
   const [controlRecords, auditEvents] = await Promise.all([
@@ -173,9 +192,10 @@ export default async function AssetRecord({
   const tone = asset.operational_status === "active" ? "green" : "amber";
   const status = row => row.scheduled_date && row.scheduled_date < today && !["completed", "cancelled"].includes(row.status)
     ? <Badge tone="red">Overdue</Badge> : <Badge tone={row.status === "completed" ? "green" : "blue"}>{words(row.status)}</Badge>;
-  const jump = (tab, name, anchor) => <Link href={path + "?tab=" + tab + (anchor ? "#" + anchor : "")} prefetch={false}>{name}</Link>;
+  const jump = (tab, name, anchor) => editing
+    ? <DocumentRecordTabJump name={tab} anchor={anchor}>{name}</DocumentRecordTabJump>
+    : <Link href={path + "?tab=" + tab + (anchor ? "#" + anchor : "")} prefetch={false}>{name}</Link>;
   const openSource = row => <Link href={row.href} prefetch={false}>{row.reference || row.title}</Link>;
-  const editUrl = root + "/register?edit=" + asset.id;
   const counts = [
     ["Maintenance records", maintenance.length, "calendar", "details", "asset-schedule"],
     ["Inspections", statutory.length, "clipboard", "documents", "asset-inspections"],
@@ -214,7 +234,7 @@ export default async function AssetRecord({
   const linkedTable = (rows, empty) => <Table headers={["Reference", "Description", "Status", "Target date"]}
     rows={rows.map(row => [row.source_id, openSource(row), row.title, words(row.status), date(row.due)])} empty={empty}/>;
   const chosen = tabs.some(([key]) => key === query?.tab) ? query.tab : "overview";
-  return <main className={[shared.page, shared.registerPage, shared.recordPage, ui.assetRecord].join(" ")}><div className={shared.shell}>
+  const header = <>
     <p className={shared.recordBreadcrumb}><Link href={root}>Asset Management</Link> / <Link href={root + "/register"}>Asset Register</Link> / {asset.asset_reference}</p>
     <header className={ui.assetRecordHeader}>
       <div className={shared.recordTitle}><span className={shared.recordTitleIcon}><RecordIcon name="clipboard"/></span>
@@ -222,8 +242,8 @@ export default async function AssetRecord({
       </div>
       <div className={shared.recordHeaderActions}>
         <Link className={shared.recordButton} href={root + "/register"}>Asset Register</Link>
-        {access.canWrite && <><Link className={shared.recordButton} href={editUrl}>Edit asset</Link>
-          {asset.operational_status !== "retired" && <Link className={shared.recordButton} href={workUrl}><RecordIcon name="calendar"/>Record work</Link>}</>}
+        {access.canWrite && <><DocumentRecordEditLink className={shared.recordButton} path={path} editing={editing}/>
+          {!editing && asset.operational_status !== "retired" && <Link className={shared.recordButton} href={workUrl}><RecordIcon name="calendar"/>Record work</Link>}</>}
         <details className={ui.assetRecordMore}><summary className={shared.recordButton}>More</summary><div>
           {access.canWrite && <a href={path + "/label"}><RecordIcon name="qr"/> Printable QR label</a>}
           <Link href="/portal/tasks">My Tasks &amp; Approvals</Link>{jump("history", "Audit history", "asset-audit")}
@@ -244,14 +264,40 @@ export default async function AssetRecord({
         ["Overdue work orders", workOverdue.length, "details", "alert", workOverdue.length ? "red" : "blue", "asset-order"],
         ["Linked MoC records", assurance.canMoc ? changes.length : "N/A", "workflow", "workflow", "purple", "asset-moc"],
         ["Asset compliance", "Review recorded controls", "documents", "scope", "amber", "asset-controls"],
-      ].map(([label, value, tab, icon, colour, anchor]) => <Link className={ui.recordMetric} data-tone={colour} href={path + "?tab=" + tab + "#" + anchor} prefetch={false} key={label}>
-        <RecordIcon name={icon}/><span><small>{label}</small><strong>{value}</strong></span>
-      </Link>)}
+      ].map(([label, value, tab, icon, colour, anchor]) => {
+        const tile = <><RecordIcon name={icon}/><span><small>{label}</small><strong>{value}</strong></span></>;
+        return editing ? <DocumentRecordTabJump name={tab} anchor={anchor} className={ui.recordMetric} data-tone={colour} key={label}>{tile}</DocumentRecordTabJump>
+          : <Link className={ui.recordMetric} data-tone={colour} href={path + "?tab=" + tab + "#" + anchor} prefetch={false} key={label}>{tile}</Link>;
+      })}
     </div>
-    <DocumentRecordTabs key={chosen} initial={chosen} tabs={tabs} sectionLabel="Asset record sections">
+    {editing && <p className={ui.assetEditNotice}><strong>Editing {asset.asset_reference}</strong> · Review the asset tabs and save your changes.</p>}
+  </>;
+  const readNotice = <>
+      {query.saved === "1" && <p className={ui.completeSuccess} role="status">Asset changes saved.</p>}
       <div className={ui.assetRecordNotice}><strong>Recorded availability and evidence</strong><p>Before use, check current condition, task controls and any required release. Status changes use the authorised asset workflow.</p></div>
       {!!alerts.length && <Panel title="Attention required" icon="alert" warn><ul>{alerts.map(message => <li key={message}>{message}</li>)}</ul></Panel>}
-      <DocumentRecordPanel name="overview">
+  </>;
+  const assurancePanel = <Panel title="Assurance summary" icon="scope"><ul className={ui.assetSummaryLinks}>
+            {counts.map(([label, count, icon, tab, anchor]) => <li key={label}>{editing
+              ? <DocumentRecordTabJump name={tab} anchor={anchor}><RecordIcon name={icon}/>{label}<b>{count ?? "N/A"}</b></DocumentRecordTabJump>
+              : <Link href={path + "?tab=" + tab + "#" + anchor} prefetch={false}><RecordIcon name={icon}/>{label}<b>{count ?? "N/A"}</b></Link>}</li>)}
+          </ul></Panel>;
+  const scheduledPanel = <Panel title="Scheduled work order" icon="alert" id="asset-order" warn={Boolean(scheduled?.scheduled_date && scheduled.scheduled_date < today)}>
+            {completedOrder && <p className={ui.completeSuccess} role="status">
+              <RecordIcon name="checkCircle"/> {completedOrder.maintenance_reference} closed on {date(completedOrder.completed_date)}.
+            </p>}
+            {scheduled ? <Fields rows={[["Work order", scheduled.maintenance_reference], ["Description", scheduled.work_completed],
+              ["Scheduled date", date(scheduled.scheduled_date)], ["Status", status(scheduled)],
+              ["Responsible person", person(scheduled.responsible_person_id)]]}/> : <p>No open work orders recorded.</p>}
+            {!editing && access.canWrite && scheduled && ["planned", "due", "overdue", "in_progress"].includes(scheduled.status) &&
+              <CompleteWorkOrder key={scheduled.id} assetId={asset.id} today={today}
+                calibrationCriteria={scheduled.maintenance_type === "calibration" ? asset.calibration_acceptance_criteria : undefined}
+                order={{ id: scheduled.id, maintenance_reference: scheduled.maintenance_reference,
+                  maintenance_type: scheduled.maintenance_type, evidence_reference: scheduled.evidence_reference,
+                  hasEvidence: Boolean(scheduled.evidence_storage_path),
+                  calibration_acceptance_criteria: scheduled.calibration_acceptance_criteria }}/>}
+          </Panel>;
+  const overviewPanel = <DocumentRecordPanel name="overview">
         <div className={ui.assetRecordThree}>
           <Panel title="Asset identity and ownership" icon="clipboard">{identity}{ownership}</Panel>
           <Panel title="Lifecycle & status" icon="history">
@@ -259,9 +305,7 @@ export default async function AssetRecord({
               ["Created", date(asset.created_at)], ["Last updated", date(asset.updated_at)],
               ["Safe-use release", "Check the authorised release record"]]} />
           </Panel>
-          <Panel title="Assurance summary" icon="scope"><ul className={ui.assetSummaryLinks}>
-            {counts.map(([label, count, icon, tab, anchor]) => <li key={label}><Link href={path + "?tab=" + tab + "#" + anchor} prefetch={false}><RecordIcon name={icon}/>{label}<b>{count ?? "N/A"}</b></Link></li>)}
-          </ul></Panel>
+          {assurancePanel}
         </div>
         <div className={ui.assetRecordTwo}>
           <Panel title="Next actions" icon="alert"><ul>
@@ -273,29 +317,15 @@ export default async function AssetRecord({
             <Table headers={workHeaders} rows={workRows(maintenance.filter(row => row.status === "completed").slice(0, 3))} empty="No completed work records."/>
           </Panel>
         </div>
-      </DocumentRecordPanel>
-      <DocumentRecordPanel name="details">
+      </DocumentRecordPanel>;
+  const detailsPanel = <DocumentRecordPanel name="details">
         <div className={ui.assetRecordThree}>
           <Panel title="Maintenance schedule" icon="calendar" id="asset-schedule"><Fields rows={[
             ["PPM requirement", asset.ppm_required ? "Required" : "Not required"], ["Frequency", ppm],
             ["Last recorded service", date(asset.last_maintenance_date)], ["Latest completed work type", latestService && words(latestService.maintenance_type)],
             ["Next recurring due date", nextPpm],
           ]}/></Panel>
-          <Panel title="Scheduled work order" icon="alert" id="asset-order" warn={Boolean(scheduled?.scheduled_date && scheduled.scheduled_date < today)}>
-            {completedOrder && <p className={ui.completeSuccess} role="status">
-              <RecordIcon name="checkCircle"/> {completedOrder.maintenance_reference} closed on {date(completedOrder.completed_date)}.
-            </p>}
-            {scheduled ? <Fields rows={[["Work order", scheduled.maintenance_reference], ["Description", scheduled.work_completed],
-              ["Scheduled date", date(scheduled.scheduled_date)], ["Status", status(scheduled)],
-              ["Responsible person", person(scheduled.responsible_person_id)]]}/> : <p>No open work orders recorded.</p>}
-            {access.canWrite && scheduled && ["planned", "due", "overdue", "in_progress"].includes(scheduled.status) &&
-              <CompleteWorkOrder key={scheduled.id} assetId={asset.id} today={today}
-                calibrationCriteria={scheduled.maintenance_type === "calibration" ? asset.calibration_acceptance_criteria : undefined}
-                order={{ id: scheduled.id, maintenance_reference: scheduled.maintenance_reference,
-                  maintenance_type: scheduled.maintenance_type, evidence_reference: scheduled.evidence_reference,
-                  hasEvidence: Boolean(scheduled.evidence_storage_path),
-                  calibration_acceptance_criteria: scheduled.calibration_acceptance_criteria }}/>}
-          </Panel>
+          {scheduledPanel}
           <Panel title="Calibration" icon="testing"><Fields rows={[
             ["Requirement", asset.calibration_required ? "Required" : "Not marked as required"],
             ["Last calibration", date(asset.last_calibration_date)], ["Next calibration due", date(asset.next_calibration_date)],
@@ -316,8 +346,8 @@ export default async function AssetRecord({
           </Panel>
         </div>
         <Panel title="Recent work history" icon="history" action={jump("history", "View full history", "asset-work")}><Table headers={workHeaders} rows={workRows(maintenance.slice(0, 5))} empty="No work records."/></Panel>
-      </DocumentRecordPanel>
-      <DocumentRecordPanel name="workflow">
+      </DocumentRecordPanel>;
+  const workflowPanel = <DocumentRecordPanel name="workflow">
         <div className={ui.recordMetrics}>{[
           ["Open NCs", assurance.canFindings && assurance.linksReady ? findings.filter(assuranceOpen).length : "N/A", "alert", "red", "asset-nc"],
           ["CAPA actions", assurance.canCapa && assurance.linksReady && assurance.actionsReady ? actions.length : "N/A", "checkCircle", "green", "asset-capa"],
@@ -345,8 +375,8 @@ export default async function AssetRecord({
           <Panel title="Key ownership and dates" icon="person" teal>{ownership}<Fields rows={[["Next PPM", nextPpm]]}/></Panel>
         </div>
         <Panel title="Audit trail" icon="history">{jump("history", "View work-order audit history", "asset-audit")}</Panel>
-      </DocumentRecordPanel>
-      <DocumentRecordPanel name="documents">
+      </DocumentRecordPanel>;
+  const documentsPanel = <DocumentRecordPanel name="documents">
         <div className={ui.assetRecordThree} id="asset-controls">
           <Panel title="Asset identity and ownership" icon="person">{identity}{ownership}</Panel>
           <Panel title="Linked risk assessments" icon="scope" id="asset-risks">
@@ -372,8 +402,8 @@ export default async function AssetRecord({
           <Panel title="Document summary" icon="overview"><Fields rows={[["Current linked documents", canDocuments ? String(documents.length) : "Unavailable"],
             ["Change screening", asset.change_control_required ? "Material changes require MoC screening" : "Not marked as required"]]}/></Panel>
         </div>
-      </DocumentRecordPanel>
-      <DocumentRecordPanel name="history">
+      </DocumentRecordPanel>;
+  const historyPanel = <DocumentRecordPanel name="history">
         <div className={ui.assetRecordTwo}>
           <Panel title="Asset lifecycle & work history" icon="history"><ol className={ui.assetActivity}>
             {maintenance.map(row => <li key={row.id}><RecordIcon name={row.maintenance_type === "inspection" ? "clipboard" : "calendar"}/>
@@ -390,9 +420,24 @@ export default async function AssetRecord({
           {attachmentPanel}
         </div>
         {auditPanel}
-      </DocumentRecordPanel>
-    </DocumentRecordTabs>
+      </DocumentRecordPanel>;
+  return <main className={[shared.page, shared.registerPage, shared.recordPage, ui.assetRecord].join(" ")}><div className={shared.shell}>
+    {editing ? <CompanyAssetRegister key={asset.id} asset={asset} locations={editorChoices[0]}
+      people={people.filter(row => row.account_status === "active").sort((a, b) => (a.last_name || "").localeCompare(b.last_name || ""))}
+      suppliers={editorChoices[1].data || []} documents={editorChoices[2]} linkedDocumentIds={linkedDocumentIds}
+      saveAction={saveInlineAssetRecord.bind(null, asset.id)}
+      recordEditor={{
+        initial: chosen, tabs, path, header, workflow: workflowPanel, history: historyPanel,
+        assurance: assurancePanel, scheduled: scheduledPanel,
+        lifecycle: <Fields rows={[[ "Operational status", <Badge tone={tone}>{operationalStatus}</Badge> ],
+          [ "Created", date(asset.created_at) ], [ "Last updated", date(asset.updated_at) ],
+          [ "Safe-use release", "Check the authorised release record" ]]}/>,
+      }}/>
+      : <DocumentRecordTabs key={chosen} initial={chosen} tabs={tabs} sectionLabel="Asset record sections" beforeTabs={header}>
+        {readNotice}{overviewPanel}{detailsPanel}{workflowPanel}{documentsPanel}{historyPanel}
+      </DocumentRecordTabs>}
   </div></main>;
 }
+
 
 
