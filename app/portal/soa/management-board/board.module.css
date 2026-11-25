@@ -141,3 +141,20 @@
 }
 .cards .card:nth-child(even), .attentionGrid .card:nth-child(even) { background-position: center, right bottom; }
 .cards .card[href]:hover, .attentionGrid .card[href]:hover { box-shadow: inset 0 0 0 2px #8cb9ca; }
+
+.oversight {
+  display: grid;
+  grid-template-columns: minmax(0, 1.32fr) minmax(0, .9fr);
+  align-items: start;
+  gap: 11px;
+  margin-block: 11px;
+}
+.portfolioMap { min-width: 0; scroll-margin-top: 90px; }
+.treatmentPanels { display: grid; gap: 11px; min-width: 0; }
+@media (max-width: 1050px) {
+  .oversight { grid-template-columns: minmax(0, 1fr); }
+  .treatmentPanels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 630px) {
+  .treatmentPanels { grid-template-columns: minmax(0, 1fr); }
+}

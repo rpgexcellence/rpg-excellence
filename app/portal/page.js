@@ -471,7 +471,7 @@ export default async function PortalPage({ searchParams }) {
                 Information Security
               </SideLink>
               <div className="pdEvidenceMenu" aria-label="Information security hub">
-                <Link href="/portal/information-security">ISMS Dashboard</Link>
+                <Link href="/portal/information-security">ISMS Hub</Link>
                 <Link href="/portal/information-security/risk-management">
                   Risk Management
                 </Link>

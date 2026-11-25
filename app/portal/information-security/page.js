@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "../../../lib/supabase/server";
 import { requireOrganizationAccess } from "../../../lib/organization-access";
-import ISMSDashboardRiskHeatMap from "../../../components/ISMSDashboardRiskHeatMap";
 export const metadata = { title: "ISMS Hub | RPG Excellence" };
 export const dynamic = "force-dynamic";
 const Card = ({ href, n, title, text }) => (
@@ -22,13 +21,12 @@ export default async function ISMSHub() {
   let risks = [],
     soa = [],
     treatments = [],
-    incidents = [],
-    appetite = 9;
+    incidents = [];
   if (org) {
     const results = await Promise.all([
       s
         .from("isms_risks")
-        .select("id,residual_score,status,review_due_date,inherent_likelihood,inherent_impact,residual_likelihood,residual_impact,target_likelihood,target_impact")
+        .select("id,residual_score,status,review_due_date")
         .eq("organization_id", org.id)
         .neq("status", "archived"),
       s
@@ -44,20 +42,11 @@ export default async function ISMSHub() {
         .select("id,status,severity")
         .eq("organization_id", org.id)
         .not("status", "in", '(closed,cancelled)'),
-      s
-        .from("isms_risk_methodologies")
-        .select("appetite_score")
-        .eq("organization_id", org.id)
-        .eq("status", "approved")
-        .order("approved_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
     ]);
     risks = results[0].data || [];
     soa = results[1].data || [];
     treatments = results[2].data || [];
     incidents = results[3].data || [];
-    appetite = results[4].data?.appetite_score || 9;
   }
   const elevated = risks.filter((x) => x.residual_score >= 10).length,
     overdue = treatments.filter(
@@ -76,7 +65,7 @@ export default async function ISMSHub() {
         <small>ISMS HUB</small>
         <nav>
           <Link className="active" href="/portal/information-security">
-            ISMS Dashboard
+            ISMS Hub
           </Link>
           <Link href="/portal/information-security/risk-management">
             Risk Management
@@ -85,7 +74,7 @@ export default async function ISMSHub() {
             Security Incidents
           </Link>
           <Link href="/portal/soa">Statement of Applicability</Link>
-          <Link href="/portal/soa/management-board">SoA Management Board</Link>
+          <Link href="/portal/soa/management-board">Management Board</Link>
           <Link href="/portal?standard=ISO%2FIEC%2027001%3A2022%2FAmd%201%3A2024#new-assessment">
             Gap Analysis
           </Link>
@@ -138,7 +127,6 @@ export default async function ISMSHub() {
             </b>
           </div>
         </section>
-        <ISMSDashboardRiskHeatMap risks={risks} appetite={appetite} />
         <section className="ishCards">
           <Card
             n="01"
@@ -166,7 +154,7 @@ export default async function ISMSHub() {
           />
           <Card
             n="05"
-            title="Management Oversight"
+            title="Management Board"
             text="Review residual exposure, control status, overdue treatment and risk acceptance across the ISMS."
             href="/portal/soa/management-board"
           />
