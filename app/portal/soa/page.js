@@ -1,45 +1,118 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase/server";
+import { createAdminClient } from "../../../lib/supabase/admin";
 import { getAvailableStandaloneSoaPasses, getUserSubscription, hasActiveSubscription } from "../../../lib/subscription";
 import { createStandaloneSoa } from "../actions";
 import ISMSWorkspaceShell from "../../../components/ISMSWorkspaceShell";
+import SoaRegister from "./SoaRegister";
+import { summarizeControls } from "./soa-register.mjs";
+import s from "../documents/documents.module.css";
 
 export const metadata = { title: "Statement of Applicability Register | RPG Intelligence" };
 export const dynamic = "force-dynamic";
 
-const date = (value) => value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)) : "—";
-const label = (value) => String(value ?? "draft").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+async function readRows(query, source) {
+  const size = 500;
+  const rows = [];
+  for (let offset = 0; ; offset += size) {
+    const { data, error } = await query().range(offset, offset + size - 1);
+    if (error) throw new Error("The SoA register could not load " + source + ".");
+    rows.push(...(data ?? []));
+    if (!data || data.length < size) return rows;
+  }
+}
+
+function byAssessment(items) {
+  const groups = new Map();
+  for (const item of items) {
+    if (!groups.has(item.assessment_id)) groups.set(item.assessment_id, []);
+    groups.get(item.assessment_id).push(item);
+  }
+  return groups;
+}
 
 export default async function SoaRegisterPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login?next=/portal/soa");
 
-  const [{ data: organisations, error: orgError }, { data: assessments, error: assessmentError }, { data: registers, error: registerError }] = await Promise.all([
-    supabase.from("organizations").select("id,name").eq("owner_id", user.id).order("created_at"),
-    supabase.from("assessments").select("id,organization_id,standard,status,workspace_type,created_at").eq("owner_id", user.id).in("standard", ["ISO/IEC 27001:2022", "ISO/IEC 27001:2022/Amd 1:2024"]).order("created_at", { ascending: false }),
-    supabase.from("assessment_soa_registers").select("assessment_id,status,version,updated_at,approved_at").eq("owner_id", user.id),
+  const [organisations, assessments, registers, subscription, passes] = await Promise.all([
+    readRows(() => supabase.from("organizations").select("id,name").eq("owner_id", user.id).order("created_at").order("id"), "organisations"),
+    readRows(() => supabase.from("assessments").select("id,organization_id,standard,workspace_type,created_at")
+      .eq("owner_id", user.id).in("standard", ["ISO/IEC 27001:2022", "ISO/IEC 27001:2022/Amd 1:2024"])
+      .order("created_at", { ascending: false }).order("id"), "assessments"),
+    readRows(() => supabase.from("assessment_soa_registers").select("id,assessment_id,status,version,updated_at,approved_at")
+      .eq("owner_id", user.id).order("assessment_id"), "statements"),
+    getUserSubscription(user.id),
+    getAvailableStandaloneSoaPasses(user.id),
   ]);
-  if (orgError || assessmentError || registerError) throw new Error(orgError?.message || assessmentError?.message || registerError?.message);
+  const registerByAssessment = new Map(registers.map(register => [register.assessment_id, register]));
+  const statements = assessments.filter(assessment => registerByAssessment.has(assessment.id));
+  const organisation = organisations[0];
+  const orgNames = new Map(organisations.map(item => [item.id, item.name]));
+  const catalog = statements.length ? await readRows(
+    () => supabase.from("iso27001_control_catalog").select("control_id,control_title").eq("active", true).order("control_order").order("control_id"),
+    "the Annex A catalogue",
+  ) : [];
+  const admin = statements.length ? createAdminClient() : null;
+  const rows = [];
+  for (let start = 0; start < statements.length; start += 50) {
+    const batch = statements.slice(start, start + 50);
+    const ids = batch.map(assessment => assessment.id);
+    // Scope service queries to assessments already returned by the signed-in owner's session.
+    const scoped = (table, columns) => admin.from(table).select(columns)
+      .eq("owner_id", user.id).in("assessment_id", ids).order("assessment_id").order("control_id");
+    const [entryRows, fileRows, linkRows] = await Promise.all([
+      readRows(() => scoped("assessment_soa_entries", "assessment_id,soa_register_id,control_id,applicability,applicability_justification,implementation_status,implementation_evidence,inclusion_source"), "control decisions"),
+      readRows(() => scoped("soa_control_evidence", "assessment_id,control_id,evidence_kind").order("id"), "evidence metadata"),
+      readRows(() => scoped("isms_risk_controls", "assessment_id,control_id,risk_id,organization_id").order("risk_id"), "risk-treatment links"),
+    ]);
+    const riskIds = [...new Set(linkRows.map(link => link.risk_id))];
+    const risks = [];
+    for (let offset = 0; offset < riskIds.length; offset += 100) {
+      const chunk = riskIds.slice(offset, offset + 100);
+      risks.push(...await readRows(() => supabase.from("isms_risks").select("id,organization_id,risk_reference,title,status")
+        .eq("owner_id", user.id).in("id", chunk).order("id"), "linked risks"));
+    }
+    const riskById = new Map(risks.map(risk => [risk.id, risk]));
+    const entries = byAssessment(entryRows);
+    const files = byAssessment(fileRows);
+    const links = byAssessment(linkRows);
+    for (const assessment of batch) {
+      const register = registerByAssessment.get(assessment.id);
+      const standalone = assessment.workspace_type === "soa_only";
+      const assessmentLinks = (links.get(assessment.id) ?? []).filter(link => link.organization_id === assessment.organization_id);
+      const assessmentRisks = assessmentLinks.map(link => riskById.get(link.risk_id))
+        .filter(risk => risk && risk.organization_id === assessment.organization_id);
+      const summary = summarizeControls(catalog,
+        (entries.get(assessment.id) ?? []).filter(entry => entry.soa_register_id === register.id),
+        files.get(assessment.id) ?? [], assessmentLinks, assessmentRisks);
+      rows.push({
+        id: assessment.id,
+        reference: "SOA-" + register.id.toUpperCase(),
+        type: standalone ? "standalone" : "assessment",
+        title: standalone ? "Standalone Statement of Applicability" : "Assessment-linked Statement of Applicability",
+        organization: orgNames.get(assessment.organization_id) ?? "Organisation",
+        version: register.version || "1.0",
+        updatedAt: register.updated_at,
+        approvedAt: register.approved_at,
+        status: register.status || "draft",
+        assessmentReference: standalone ? null : assessment.id,
+        summary,
+      });
+    }
+  }
 
-  const subscription = await getUserSubscription(user.id);
-  const passes = await getAvailableStandaloneSoaPasses(user.id);
-  const organisation = organisations?.[0] ?? null;
-  const orgMap = new Map((organisations ?? []).map((item) => [item.id, item.name]));
-  const registerMap = new Map((registers ?? []).map((item) => [item.assessment_id, item]));
-  const rows = (assessments ?? []).filter((item) => registerMap.has(item.id)).map((item) => ({ ...item, register: registerMap.get(item.id) }));
-  const standaloneCount = rows.filter((item) => item.workspace_type === "soa_only").length;
-  const approvedCount = rows.filter((item) => item.register.status === "approved").length;
-
-  return <ISMSWorkspaceShell active="soa"><main className="soaRegisterPage"><style>{`
-    *{box-sizing:border-box}.soaRegisterPage{min-height:100vh;background:#edf4f8;color:#071a33;padding:34px 20px 70px;font-family:Arial,sans-serif}.soaRegisterShell{width:100%;max-width:none;min-width:0;margin:auto}.soaRegisterTop{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.soaRegisterTop span{color:#0b8e81;font-size:12px;font-weight:900;letter-spacing:.1em}.soaRegisterTop h1{font-size:34px;margin:7px 0}.soaRegisterTop p{margin:0;color:#657990}.soaRegisterActions{display:flex;gap:9px;flex-wrap:wrap}.soaBtn{display:inline-flex;padding:12px 16px;border:0;border-radius:9px;background:#1459d9;color:#fff;text-decoration:none;font-weight:850;cursor:pointer}.soaBtn.secondary{background:#fff;color:#071a33;border:1px solid #cbd8e8}.soaHero{margin-top:24px;padding:28px;border-radius:18px;background:linear-gradient(115deg,#061d3b,#075d69);color:#fff;display:grid;grid-template-columns:1fr auto;gap:25px;align-items:center}.soaHero h2{margin:0 0 7px}.soaHero p{margin:0;color:#cce2e5}.soaHero strong{font-size:46px}.soaMetrics{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin:15px 0}.soaMetric{padding:18px;border:1px solid #d5e3e6;border-radius:13px;background:#fff}.soaMetric span,.soaMetric strong{display:block}.soaMetric span{color:#647b8e;font-size:12px;font-weight:850}.soaMetric strong{font-size:30px;margin-top:8px}.soaLaunch,.soaList{padding:22px;border:1px solid #d5e3e6;border-radius:15px;background:#fff;margin-top:15px}.soaLaunch form{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.soaLaunch small{color:#38766f;font-weight:800}.soaList h2{margin-top:0}.soaRows{display:grid;gap:9px}.soaRow{display:grid;grid-template-columns:1.4fr .7fr .6fr auto;gap:16px;align-items:center;padding:16px;border:1px solid #dce7e9;border-radius:11px;color:#183d55;text-decoration:none}.soaRow:hover{border-color:#58bfb1;background:#f4fcfa}.soaRow strong,.soaRow small{display:block}.soaRow small{color:#718699;margin-top:4px}.soaPill{justify-self:start;padding:6px 9px;border-radius:999px;background:#e7f7f3;color:#087568;font-size:12px;font-weight:850}@media(max-width:750px){.soaHero{grid-template-columns:1fr}.soaMetrics{grid-template-columns:1fr}.soaRow{grid-template-columns:1fr auto}.soaRow>:nth-child(2),.soaRow>:nth-child(3){display:none}}
-  `}</style><div className="soaRegisterShell">
-    <header className="soaRegisterTop"><div><span>RPG INTELLIGENCE · CONTROLLED SoA</span><h1>Statement of Applicability Register</h1><p>Standalone and assessment-linked ISO/IEC 27001 Statements of Applicability in one place.</p></div><div className="soaRegisterActions"><Link href="/portal/information-security/risk-management" className="soaBtn">ISMS Risk Register</Link><Link href="/portal" className="soaBtn secondary">← Product Dashboard</Link><Link href="/portal/soa/management-board" className="soaBtn">Management Board</Link><Link href="/en/iso-27001" className="soaBtn secondary">ISO 27001 guide</Link></div></header>
-    <section className="soaHero"><div><h2>Control selection, risk treatment and approval</h2><p>Manage all 93 Annex A controls with ISO/IEC 27002-aligned guidance, evidence and controlled reporting.</p></div><strong>{rows.length}</strong></section>
-    <section className="soaMetrics"><div className="soaMetric"><span>ALL SoA RECORDS</span><strong>{rows.length}</strong></div><div className="soaMetric"><span>STANDALONE WORKSPACES</span><strong>{standaloneCount}</strong></div><div className="soaMetric"><span>APPROVED</span><strong>{approvedCount}</strong></div></section>
-    {organisation && (hasActiveSubscription(subscription) || passes.length > 0) && <section className="soaLaunch"><h2>Create a new standalone SoA</h2><form action={createStandaloneSoa}><input type="hidden" name="organization_id" value={organisation.id}/><button className="soaBtn">Create 93-control SoA →</button>{passes.length > 0 && <small>{passes.length} purchased workspace{passes.length === 1 ? "" : "s"} available</small>}</form></section>}
-    {!hasActiveSubscription(subscription) && passes.length === 0 && <section className="soaLaunch"><h2>Need another standalone SoA?</h2><p>Purchase one controlled workspace for £129 with no subscription.</p><Link href="/en/pricing" className="soaBtn">View standalone offer →</Link></section>}
-    <section className="soaList"><h2>Controlled SoA records</h2>{rows.length ? <div className="soaRows">{rows.map((row) => <Link className="soaRow" href={`/portal/assessments/${row.id}/soa`} key={row.id}><div><strong>{row.workspace_type === "soa_only" ? "Standalone Statement of Applicability" : "Assessment-linked Statement of Applicability"}</strong><small>{orgMap.get(row.organization_id) || "Organisation"} · created {date(row.created_at)}</small></div><div><strong>Version {row.register.version || "1.0"}</strong><small>Updated {date(row.register.updated_at)}</small></div><span className="soaPill">{label(row.register.status)}</span><strong>Open →</strong></Link>)}</div> : <p>No Statement of Applicability has been created yet.</p>}</section>
-  </div></main></ISMSWorkspaceShell>;
+  const activePlan = hasActiveSubscription(subscription);
+  return <ISMSWorkspaceShell active="soa">
+    <SoaRegister rows={rows}>
+      {organisation && (activePlan || passes.length > 0) && <form action={createStandaloneSoa}>
+        <input type="hidden" name="organization_id" value={organisation.id}/>
+        <button className={s.recordButton}>Create 93-control SoA</button>
+        {passes.length > 0 && <p>{passes.length} purchased workspace{passes.length === 1 ? "" : "s"} available</p>}
+      </form>}
+      {!activePlan && passes.length === 0 && <Link href="/en/pricing" className={s.recordButton}>View standalone offer</Link>}
+    </SoaRegister>
+  </ISMSWorkspaceShell>;
 }

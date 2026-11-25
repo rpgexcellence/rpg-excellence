@@ -26,11 +26,17 @@ export default async function ISMSRiskPage({searchParams}) {
     const next = "/portal/information-security/risk-management" + (typeof risk === "string" && UUID.test(risk) ? "?risk=" + risk : "");
     redirect("/portal/login?next=" + encodeURIComponent(next));
   }
-  const {
-    data: org
-  } = await s.from("organizations").select("id,name").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
-  if (!org) redirect("/portal");
   const initialRiskId = query?.risk ?? query?.id ?? null;
+  let organizationQuery = s.from("organizations").select("id,name").eq("owner_id", user.id);
+  if (typeof initialRiskId === "string" && UUID.test(initialRiskId) && query?.edit !== "1") {
+    const { data: target, error } = await s.from("isms_risks").select("organization_id")
+      .eq("id", initialRiskId).eq("owner_id", user.id).neq("status", "archived").maybeSingle();
+    if (error) throw new Error("The risk assessment could not be loaded.");
+    if (!target?.organization_id) notFound();
+    organizationQuery = organizationQuery.eq("id", target.organization_id);
+  }
+  const { data: org } = await organizationQuery.order("created_at").limit(1).maybeSingle();
+  if (!org) redirect("/portal");
   if (initialRiskId !== null && query?.edit !== "1") {
     const record = await loadRiskRecord(s, user.id, org.id, initialRiskId);
     if (!record) notFound();
