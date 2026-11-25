@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getOrganizationAccess, requireOrganizationAccess } from "../../../lib/organization-access";
 import { requirePlanAccess } from "../../../lib/plan-access";
+import { ASSET_UUID, recordAssetAccess, recordPath, requireAssetRecord } from "../../../lib/asset-record";
 import WorkplaceInspectionsPage from "../health-safety/workplace-inspections/page";
 import { createClient } from "../../../lib/supabase/server";
 import { buildNonconformityRows } from "../../../lib/nonconformity-reporting.mjs";
@@ -59,10 +60,24 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
   }
   // Preserve the established manual/supplier draft keys. Audit-origin drafts
   // additionally distinguish the question and an explicitly separate finding.
-  const supplierId = sourceRequested ? "" : uuid(query?.supplier_id) || uuid(query?.supplier) || "";
+  const assetRequested = pageMode === "new" && query?.asset !== undefined;
+  let assetSource = null;
+  if (assetRequested && snapshot.canCreate) {
+    if (!ASSET_UUID.test(text(query.asset)) || sourceRequested || query.supplier_id || query.supplier) notFound();
+    const context = await requireAssetRecord(query.asset);
+    if (context.access.organization.id !== scope.organizationId || context.access.user.id !== scope.userId) notFound();
+    await recordAssetAccess(context, "record_view");
+    assetSource = {
+      id: context.asset.id,
+      reference: context.asset.asset_reference,
+      name: context.asset.asset_name,
+      href: recordPath(context.asset.id) + "?tab=workflow#asset-nc",
+    };
+  }
+  const supplierId = sourceRequested || assetRequested ? "" : uuid(query?.supplier_id) || uuid(query?.supplier) || "";
   const draftKey = auditSource
     ? `nc:audit:${auditSource.audit.id}:${auditSource.question.id}${additionalDraft ? ":additional:" + additionalDraft.toLowerCase() : ""}`
-    : "nc:manual:new" + (supplierId ? ":supplier:" + supplierId : "");
+    : "nc:manual:new" + (assetSource ? ":asset:" + assetSource.id : supplierId ? ":supplier:" + supplierId : "");
   const manualForm = snapshot.canCreate ? auditSourceError ? (
     <ManualNonconformityForm scope={scope} auditSourceError={auditSourceError} />
   ) : (
@@ -78,6 +93,7 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
         contacts: snapshot.contacts,
         people: snapshot.people,
         ...(auditSource ? { auditSource, additionalDraft } : {}),
+        ...(assetSource ? { assetSource } : {}),
       }}
     >
       <ManualNonconformityForm
@@ -87,7 +103,8 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
         people={snapshot.people}
         initialSupplierId={supplierId}
         auditSource={auditSource}
-        draftInstanceKey={additionalDraft || ""}
+        assetSource={assetSource}
+        draftInstanceKey={assetSource?.id || additionalDraft || ""}
       />
     </ControlledDeviceDrafts>
   ) : null;
@@ -106,3 +123,4 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
     manualForm={manualForm}
   />;
 }
+

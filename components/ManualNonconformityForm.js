@@ -12,8 +12,9 @@ const EVIDENCE_SOURCES = [["document_record","Document or controlled record"],["
 const GUIDES = {requirement_source:"Identify where the requirement comes from, such as a standard, organisation procedure, customer requirement, legal requirement or other controlled document.",criteria:"State clearly what is required. Reference the relevant clause or section where possible.",evidence_source:"State where and how the evidence was obtained, such as a record reviewed, interview, workplace observation or sample examined.",objective_evidence:"Describe factually what was found and identify the records, samples or observations that support it. For an NC, explain the gap against the requirement. Do not assume a failure for an Observation or OFI."};
 const STEPS = ["Finding", "Requirement & evidence", "Owner & submission"];
 const freshFields = supplierId => ({finding_type:"minor_nc",source_category:supplierId?"supplier":"operations",supplier_id:supplierId||"",supplier_contact_id:"",responsible_person_id:"",title:"",source_reference:"",source_audit_id:"",source_audit_label:"",detected_at:new Date().toISOString().slice(0,10),requirement_source:"",requirement_standard_id:"",requirement_standard_label:"",clause:"",evidence_source:"",criteria:"",objective_evidence:"",failure_statement:"",process_area:"",risk_level:"medium",responsible_owner_name:"",responsible_owner_email:"",agreed_date:""});
-function initialReportFields(supplierId,auditSource){
+function initialReportFields(supplierId,auditSource,assetSource){
   const fields=freshFields(supplierId);
+  if(assetSource)fields.source_reference=assetSource.reference || "";
   if(!auditSource?.audit?.id||!auditSource?.question?.id)return fields;
   const first=auditSource.requirements?.find(row=>row.standardId&&row.clause);
   return {...fields,...auditSource.defaults,source_category:'internal_audit',
@@ -50,10 +51,10 @@ export default function ManualNonconformityForm(props) {
   if(!props.scope?.userId || !props.scope?.organizationId)return <LegacyManualNonconformityForm {...props}/>;
   return <SharedManualForm key={`${props.scope.userId}:${props.scope.organizationId}:${props.auditSource?.audit?.id||'manual'}:${props.auditSource?.question?.id||'new'}:${props.draftInstanceKey||''}`} {...props}/>;
 }
-function SharedManualForm({scope,suppliers=[],contacts=[],people=[],initialSupplierId='',onCreated,auditSource=null}) {
+function SharedManualForm({scope,suppliers=[],contacts=[],people=[],initialSupplierId='',onCreated,auditSource=null,assetSource=null}) {
   // Use the same context, save/restore checks and expiry as existing modules.
   // No separate NC database, snapshot cache, offline page or worker is used.
-  const [fields,setFields]=useDeviceDraftState('nc_manual_fields',()=>initialReportFields(initialSupplierId,auditSource));
+  const [fields,setFields]=useDeviceDraftState('nc_manual_fields',()=>initialReportFields(initialSupplierId,auditSource,assetSource));
   const [identity,setIdentity]=useDeviceDraftState('nc_manual_identity','');
   const [attempt,setAttempt]=useDeviceDraftState('nc_manual_attempt',null);
   const [catalogue,setCatalogue]=useState(null),[catalogueError,setCatalogueError]=useState(''),[catalogueBusy,setCatalogueBusy]=useState(false),[clauseWindow,setClauseWindow]=useState(false),[clauseQuery,setClauseQuery]=useState(''),[standardFilter,setStandardFilter]=useState(''),[clausePage,setClausePage]=useState(1);
@@ -155,6 +156,10 @@ function SharedManualForm({scope,suppliers=[],contacts=[],people=[],initialSuppl
   }
   return <form ref={formRef} className="ncf" onSubmit={submit} noValidate><style>{CSS}</style>
     <p className="ncfNotice">Use the existing <strong>Save device draft</strong> and <strong>Restore draft</strong> controls above this form. As in the other modules, files and formal confirmations are excluded. Keep this loaded page open while offline.</p>
+    {assetSource && <div className="ncfNotice">
+      <strong>Asset reference</strong><p>{assetSource.reference} — {assetSource.name}</p>
+      <a href={assetSource.href}>Return to asset record</a>
+    </div>}
     {auditSource&&<section className="ncfClausePanel" aria-label="Linked audit question" style={{marginBottom:18}}>
       <div><strong>Audit and criterion already linked</strong><p className="ncfGuide">{auditSource.audit.reference} · {auditSource.audit.title}</p></div>
       <div><strong>{auditSource.question.code}</strong><p style={{margin:'5px 0',lineHeight:1.7}}>{auditSource.question.text}</p></div>
@@ -221,3 +226,4 @@ function LegacyManualNonconformityForm({ action, suppliers = [], contacts = [], 
     <div className="wide"><button className="ncrSubmit">Create Controlled Finding</button></div>
   </form>;
 }
+

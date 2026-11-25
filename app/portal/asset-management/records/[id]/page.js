@@ -84,7 +84,13 @@ export default async function AssetRecord({
       access,
       admin
     } = context;
-  const [people, allMaintenance, documentAccess] = await Promise.all([loadAssetRows(admin, "organization_people", access.organization.id, "id,first_name,last_name,account_status"), loadAssetRows(admin, "organization_asset_maintenance", access.organization.id), getOrganizationAccess("documents", "view")]);
+  const [people, allMaintenance, documentAccess, ncrAccess, mocAccess] = await Promise.all([loadAssetRows(admin, "organization_people", access.organization.id, "id,first_name,last_name,account_status"), loadAssetRows(admin, "organization_asset_maintenance", access.organization.id), getOrganizationAccess("documents", "view"),
+    getOrganizationAccess("internal_audit", "contribute"),
+    getOrganizationAccess("risk_management", "contribute"),
+  ]);
+  const canCreateNcr = sameCompanyAccess(ncrAccess, access);
+  const canCreateMoc = sameCompanyAccess(mocAccess, access);
+  const assetQuery = "?asset=" + encodeURIComponent(asset.id);
   const maintenance = allMaintenance.filter(r => r.asset_id === asset.id && r.owner_id === access.organization.owner_id).sort((a, b) => String(b.completed_date || b.scheduled_date || "").localeCompare(String(a.completed_date || a.scheduled_date || "")));
   const person = id => {
     const p = people.find(p => p.id === id);
@@ -303,12 +309,16 @@ export default async function AssetRecord({
         ].map(([label, value, icon, colour, anchor]) => <a href={"#" + anchor} className={ui.recordMetric} data-tone={colour} key={label}><RecordIcon name={icon}/><span><small>{label}</small><strong>{value}</strong></span></a>)}</div>
         {assurance.issues.map(issue => <p role="status" key={issue}>{issue}</p>)}
         <div className={ui.assetRecordTwo}>
-          <Panel title="Nonconformances (NC)" icon="alert" id="asset-nc" teal>{linkedTable(findings, assurance.canFindings ? "No linked nonconformances available." : "Audit source access is required.")}</Panel>
+          <Panel title="Nonconformances (NC)" icon="alert" id="asset-nc" teal action={canCreateNcr &&
+            <Link className={ui.assetPanelAction} href={"/portal/internal-audit-actions/new" + assetQuery}>+ Create NCR</Link>
+          }>{linkedTable(findings, assurance.canFindings ? "No linked nonconformances available." : "Audit source access is required.")}</Panel>
           <Panel title="Corrective & preventive actions (CAPA)" icon="clipboard" id="asset-capa" teal>
             {actionTable}
             {linkedTable(cases, "No linked CAPA cases available.")}
           </Panel>
-          <Panel title="Management of Change" icon="workflow" id="asset-moc" teal>{linkedTable(changes, assurance.canMoc ? "No linked change records." : "Change source access is required.")}</Panel>
+          <Panel title="Management of Change" icon="workflow" id="asset-moc" teal action={canCreateMoc &&
+            <Link className={ui.assetPanelAction} href={"/portal/health-safety/moc/new" + assetQuery}>+ Create MoC</Link>
+          }>{linkedTable(changes, assurance.canMoc ? "No linked change records." : "Change source access is required.")}</Panel>
           <Panel title="Risk assessments" icon="scope" id="asset-change-risks" teal>{jump("documents", "View risk assessments linked through permits", "asset-risks")}</Panel>
           <Panel title="Approvals & effectiveness verification" icon="scope" id="asset-verification" teal>
             <Table headers={["Case", "Action", "Recorded status"]} rows={verification.map(row => [row.id, <Link href={row.href}>{row.case_reference}</Link>, row.title, words(row.status)])}
@@ -366,3 +376,4 @@ export default async function AssetRecord({
     </DocumentRecordTabs>
   </div></main>;
 }
+
