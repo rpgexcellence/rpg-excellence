@@ -6,6 +6,7 @@ import { DocumentRecordPanel, DocumentRecordTabs, RecordIcon } from "../../../..
 import shared from "../../../documents/documents.module.css";
 import ui from "../../asset-management.module.css";
 import { loadAssetControls } from "../../asset-record-links";
+import CompleteWorkOrder from "../../CompleteWorkOrder";
 import { requireAssetRecord, recordAssetAccess, recordPath, evidencePath } from "../../../../../lib/asset-record";
 import { loadAssetRows } from "../../../../../lib/asset-management";
 import { getOrganizationAccess } from "../../../../../lib/organization-access";
@@ -150,7 +151,8 @@ export default async function AssetRecord({
   const path = recordPath(asset.id);
   const workUrl = root + "/maintenance?q=" + encodeURIComponent(asset.asset_reference) + "&asset=" + encodeURIComponent(asset.id);
   const recordWorkUrl = row => workUrl + "&record=" + encodeURIComponent(row.id) + "#maintenance-" + encodeURIComponent(row.id);
-  const workLink = row => <Link href={recordWorkUrl(row)} prefetch={false}>{row.maintenance_reference}</Link>;
+  const workLink = row => <Link href={["planned", "due", "overdue", "in_progress"].includes(row.status)
+    ? path + "?tab=details&work=" + row.id + "#asset-order" : recordWorkUrl(row)} prefetch={false}>{row.maintenance_reference}</Link>;
   const evidence = maintenance.filter(row => row.evidence_storage_path || row.evidence_reference);
   const [controlRecords, auditEvents] = await Promise.all([
     loadAssetControls(admin, access.organization.id, [asset.id], assurance.canMoc),
@@ -162,7 +164,8 @@ export default async function AssetRecord({
   const changes = linked.filter(row => row.kind === "MOC");
   const actions = assurance.actions.filter(row => row.asset_id === asset.id);
   const verification = actions.filter(row => /effectiveness|verification/.test(row.status || "") && assuranceOpen(row));
-  const scheduled = [...openWork].sort((a, b) => (a.scheduled_date || "9999").localeCompare(b.scheduled_date || "9999"))[0];
+  const completedOrder = maintenance.find(row => row.id === query.completed && row.status === "completed");
+  const scheduled = openWork.find(row => row.id === query.work) || [...openWork].sort((a, b) => (a.scheduled_date || "9999").localeCompare(b.scheduled_date || "9999"))[0];
   const categories = assetCategories(asset).map(categoryLabel).join(" · ");
   const operationalStatus = asset.operational_status === "active" ? "Operational" : words(asset.operational_status);
   const ppm = asset.ppm_required ? interval(asset.ppm_frequency_value, asset.ppm_frequency_unit) : "Not required";
@@ -278,10 +281,20 @@ export default async function AssetRecord({
             ["Last recorded service", date(asset.last_maintenance_date)], ["Latest completed work type", latestService && words(latestService.maintenance_type)],
             ["Next recurring due date", nextPpm],
           ]}/></Panel>
-          <Panel title="Scheduled work order" icon="alert" id="asset-order" warn={workOverdue.length > 0}>
-            {scheduled ? <Fields rows={[["Work order", workLink(scheduled)], ["Description", scheduled.work_completed],
+          <Panel title="Scheduled work order" icon="alert" id="asset-order" warn={Boolean(scheduled?.scheduled_date && scheduled.scheduled_date < today)}>
+            {completedOrder && <p className={ui.completeSuccess} role="status">
+              <RecordIcon name="checkCircle"/> {completedOrder.maintenance_reference} closed on {date(completedOrder.completed_date)}.
+            </p>}
+            {scheduled ? <Fields rows={[["Work order", scheduled.maintenance_reference], ["Description", scheduled.work_completed],
               ["Scheduled date", date(scheduled.scheduled_date)], ["Status", status(scheduled)],
               ["Responsible person", person(scheduled.responsible_person_id)]]}/> : <p>No open work orders recorded.</p>}
+            {access.canWrite && scheduled && ["planned", "due", "overdue", "in_progress"].includes(scheduled.status) &&
+              <CompleteWorkOrder key={scheduled.id} assetId={asset.id} today={today}
+                calibrationCriteria={scheduled.maintenance_type === "calibration" ? asset.calibration_acceptance_criteria : undefined}
+                order={{ id: scheduled.id, maintenance_reference: scheduled.maintenance_reference,
+                  maintenance_type: scheduled.maintenance_type, evidence_reference: scheduled.evidence_reference,
+                  hasEvidence: Boolean(scheduled.evidence_storage_path),
+                  calibration_acceptance_criteria: scheduled.calibration_acceptance_criteria }}/>}
           </Panel>
           <Panel title="Calibration" icon="testing"><Fields rows={[
             ["Requirement", asset.calibration_required ? "Required" : "Not marked as required"],
@@ -295,7 +308,12 @@ export default async function AssetRecord({
         <div className={ui.assetRecordTwo}>
           <Panel title="Latest inspection / calibration" icon="clipboard"><Table headers={workHeaders}
             rows={workRows(maintenance.filter(row => row.status === "completed" && ["inspection", "statutory", "calibration"].includes(row.maintenance_type)).slice(0, 1))} empty="No completed inspection or calibration available."/></Panel>
-          <Panel title="Supporting documents" icon="documents">{jump("history", evidence.length + " evidence records", "asset-evidence")}{jump("documents", "Open controlled documents", "asset-documents")}</Panel>
+          <Panel title="Supporting documents" icon="documents">
+            <div className={ui.assetEvidenceLinks}>
+              {jump("history", evidence.length + " evidence records", "asset-evidence")}
+              {jump("documents", "Open controlled documents", "asset-documents")}
+            </div>
+          </Panel>
         </div>
         <Panel title="Recent work history" icon="history" action={jump("history", "View full history", "asset-work")}><Table headers={workHeaders} rows={workRows(maintenance.slice(0, 5))} empty="No work records."/></Panel>
       </DocumentRecordPanel>
@@ -376,4 +394,5 @@ export default async function AssetRecord({
     </DocumentRecordTabs>
   </div></main>;
 }
+
 

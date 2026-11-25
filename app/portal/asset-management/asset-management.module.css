@@ -142,3 +142,70 @@
 
 .assetRecord { min-width: 0; }
 
+
+
+.workspace:has(> .assetRegister) > .moduleHeader { display: none; }
+.assetRegister:global(.arPage) { padding-top: 20px; }
+.assetBreadcrumb { margin: 0 0 12px; color: #405972; font-size: .8rem; }
+.assetBreadcrumb a { color: #153d62; }
+.assetRegisterHero {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px;
+  min-height: 128px; border-radius: 8px; padding: 20px;
+  color: #fff; background: linear-gradient(110deg, #122740, #1e3d58);
+}
+.assetRegisterIdentity { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.assetRegisterIdentity > span {
+  display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px;
+  background: #234e70; border: 1px solid #7798b2; border-radius: 7px;
+}
+.assetRegisterIdentity svg { width: 23px; height: 23px; }
+.assetRegisterHero h1 { margin: 3px 0; color: #fff; font: 700 clamp(1.8rem, 3vw, 2.65rem)/1.12 Georgia, serif; }
+.assetRegisterHero small { font-size: .76rem; color: #b7edf6; font-weight: 800; letter-spacing: .045em; }
+.assetRegisterHero p { font-size: .86rem; margin: 6px 0 0; }
+.assetRegisterHero nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.assetRegisterHero nav a {
+  color: #123759; background: #f7fbff; border-radius: 5px; padding: 8px 11px;
+  border: 1px solid #99b7d0; font-weight: 700; font-size: .8rem; text-decoration: none;
+}
+.assetRegisterHero nav a + a { color: #fff; background: #254d76; }
+.assetRegisterHero nav a:hover { outline: 2px solid #a1d0ec; }
+.assetRegister .registerKpis > a { min-height: 88px; background: #fff; }
+.assetRegister .registerKpis > a[data-selected="true"] { background: #e6f0f8; }
+.assetRegister .registerKpis strong, .assetRegister .assetRing b { font-family: Georgia, serif; font-size: 1.8rem; }
+.assetRegister .assetAnalytics h2 { font: 700 1.52rem/1.15 Georgia, serif; }
+.assetRegister .assetAnalytics > section { padding: 14px; }
+.assetRegister .assetStatusChart { grid-template-columns: clamp(96px, 10vw, 160px) minmax(0, 1fr); }
+.assetRegister .assetLegend > * {
+  background: #f3f8fc; border: 1px solid #d8e6f1; border-radius: 4px; margin-bottom: 4px; padding-inline: 7px;
+}
+.assetRegister .assetLegend [data-lifecycle="ppm_current"] svg { color: #228257; }
+.assetRegister .assetLegend [data-lifecycle="due"] svg { color: #926521; }
+.assetRegister .assetLegend [data-lifecycle="overdue"] svg { color: #a63533; }
+.assetRegister .assetBars a { background: #f3f8fc; border: 1px solid #d8e6f1; padding: 7px; }
+.assetRegister .assetBars a b { font: 700 1.15rem Georgia, serif; }
+.assetRegister .assetTrack { height: 91px; }
+
+.completeWork { margin-top: 14px; }
+.completeWork > summary, .completeWork button {
+  width: fit-content; min-height: 34px; display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; color: #fff; background: #09635b; border: 1px solid #09635b; border-radius: 5px;
+  padding: 6px 10px; font-weight: 700;
+}
+.completeWork > summary::-webkit-details-marker { display: none; }
+.completeWork > summary:hover, .completeWork button:hover { background: #075049; }
+.completeWork form { margin-top: 12px; }
+.completeWork fieldset {
+  display: grid; gap: 8px; min-width: 0; margin: 0; padding: 10px;
+  border: 1px solid #d3e0e9; border-radius: 5px; background: #fff;
+}
+.completeWork legend { font-weight: 700; background: #fff; padding: 0 4px; }
+.completeWork label { display: grid; gap: 4px; margin: 0; font-size: .82rem; font-weight: 700; }
+.completeWork :is(input, textarea, select) {
+  width: 100%; min-width: 0; border: 1px solid #bacddd; border-radius: 5px; padding: 7px;
+  color: #173550; background: #fcfdff; font: inherit;
+}
+.completeWork :is(input, textarea, select):focus-visible { outline: 2px solid #2684ba; }
+.completeWork fieldset p { font-size: .82rem; margin: 1px 0; }
+.completeError { color: #8c2525; }
+.completeSuccess { background: #e5f6ed; color: #155a34; border-radius: 5px; padding: 8px; }
+.assetEvidenceLinks { display: flex; flex-wrap: wrap; gap: 12px; }

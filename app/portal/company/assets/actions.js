@@ -1,8 +1,11 @@
 "use server";
 
 import { saveControlledAsset } from "../../../../lib/asset-save";
-import { addAssetInterval, validDay } from "../../../../lib/asset-catalog";
+import { addAssetInterval, CALIBRATION_RESULTS, validDay } from "../../../../lib/asset-catalog";
 import { requireAssetAccess } from "../../../../lib/asset-management";
+import { ASSET_UUID, recordPath, requireAssetRecord } from "../../../../lib/asset-record";
+import { createClient } from "../../../../lib/supabase/server";
+import { redirect } from "next/navigation";
 
 import {
   randomUUID,
@@ -655,6 +658,93 @@ export async function recordAssetMaintenance(
   }
 }
 
+export async function completeAssetWorkOrder(assetId, workId, _previousState, formData) {
+  const { access, asset, admin } = await requireAssetRecord(assetId, "contribute");
+  const { organization } = access;
+  if (!ASSET_UUID.test(workId)) return { error: "The work order reference is invalid." };
+
+  const client = await createClient();
+  const scopedOrder = () => client.from("organization_asset_maintenance").select("*")
+    .eq("id", workId).eq("asset_id", asset.id)
+    .eq("owner_id", organization.owner_id).eq("organization_id", organization.id);
+  const { data: order, error: readError } = await scopedOrder().maybeSingle();
+  if (readError || !order) return { error: "This work order could not be opened for completion." };
+  const destination = recordPath(asset.id) + "?tab=details&completed=" + workId + "#asset-order";
+  if (order.status === "completed") redirect(destination);
+  if (!["planned", "due", "overdue", "in_progress"].includes(order.status)) {
+    return { error: "This work order cannot be completed in its current status." };
+  }
+
+  const actualDate = clean(formData.get("completed_date"), 10);
+  const performedBy = clean(formData.get("performed_by"), 180);
+  const notes = clean(formData.get("work_completed"), 2000);
+  const evidenceReference = clean(formData.get("evidence_reference"), 500) || null;
+  const today = new Date().toISOString().slice(0, 10);
+  if (!validDay(actualDate) || actualDate > today) return { error: "Enter an actual completion date on or before today." };
+  if (!performedBy || !notes) return { error: "Enter who completed the work and what was done." };
+
+  const values = {
+    status: "completed",
+    completed_date: actualDate,
+    performed_by: performedBy,
+    work_completed: notes,
+    evidence_reference: evidenceReference,
+    updated_at: new Date().toISOString(),
+  };
+  if (order.maintenance_type === "calibration") {
+    const result = clean(formData.get("calibration_result"), 30);
+    const criteria = clean(formData.get("calibration_acceptance_criteria"), 2000) || asset.calibration_acceptance_criteria || null;
+    const explicitDue = clean(formData.get("calibration_next_due_date"), 10);
+    const nextDue = explicitDue || (asset.calibration_required && asset.calibration_frequency_value && asset.calibration_frequency_unit
+      ? addAssetInterval(actualDate, asset.calibration_frequency_value, asset.calibration_frequency_unit) : null);
+    if (!CALIBRATION_RESULTS.some(([key]) => key === result)) return { error: "Select the recorded calibration result." };
+    if (result !== "not_assessed" && !criteria) return { error: "Enter the acceptance criteria or decision rule for this calibration result." };
+    if ((nextDue && (!validDay(nextDue) || nextDue <= actualDate)) || (asset.calibration_required && !nextDue)) {
+      return { error: "Enter a next calibration due date after completion." };
+    }
+    Object.assign(values, { calibration_result: result, calibration_acceptance_criteria: criteria, next_due_date: nextDue });
+  }
+
+  const file = formData.get("evidence_file");
+  const bucket = admin.storage.from("asset-maintenance-evidence");
+  let uploadedPath;
+  if (file && typeof file !== "string" && file.size) {
+    if (order.evidence_storage_path) return { error: "This work order already has an evidence file." };
+    if (!EVIDENCE_TYPES.has(file.type) || file.size > 4 * 1024 * 1024) {
+      return { error: "Choose a supported maintenance evidence file up to 4 MB." };
+    }
+    uploadedPath = organization.id + "/" + asset.id + "/" + randomUUID() + "-" + safeFileName(file.name);
+    const { error } = await bucket.upload(uploadedPath, file, { contentType: file.type, upsert: false });
+    if (error) return { error: "The evidence could not be uploaded. Retry before closing the work order." };
+    Object.assign(values, {
+      evidence_storage_path: uploadedPath, evidence_file_name: clean(file.name, 180),
+      evidence_mime_type: file.type, evidence_size_bytes: file.size,
+    });
+  }
+
+  // Use the signed-in client so the existing task-history trigger records the actor.
+  // Match the loaded status and revision to prevent a concurrent completion or edit being overwritten.
+  const { data: closed, error: writeError } = await client.from("organization_asset_maintenance").update(values)
+    .eq("id", workId).eq("asset_id", asset.id).eq("organization_id", organization.id).eq("owner_id", organization.owner_id)
+    .eq("status", order.status).eq("updated_at", order.updated_at).select("id").maybeSingle();
+
+  if (!closed || writeError) {
+    const { data: current, error: confirmError } = await scopedOrder().maybeSingle();
+    if (uploadedPath && !confirmError && current?.evidence_storage_path !== uploadedPath) {
+      await bucket.remove([uploadedPath]);
+    }
+    if (!confirmError && current?.status === "completed") redirect(destination);
+    return { error: confirmError
+      ? "Completion could not be confirmed. Refresh the work order before trying again."
+      : "The work order could not be closed. Refresh the work order and check its current status." };
+  }
+
+  revalidatePath("/portal/asset-management", "layout");
+  revalidatePath("/portal/company/assets");
+  revalidatePath("/portal/tasks");
+  redirect(destination);
+}
+
 export async function changeCompanyAssetStatus(
   formData,
 ) {
@@ -716,3 +806,4 @@ export async function changeCompanyAssetStatus(
 }
 
 function performedCalibrationName(person){return [person.first_name,person.last_name].filter(Boolean).join(" ")||person.email;}
+
