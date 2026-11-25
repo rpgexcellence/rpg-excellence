@@ -1,8 +1,13 @@
 import { createClient } from "../../../lib/supabase/server";
 import { assetCategories, categoryLabel } from "../../../lib/asset-catalog";
-import { filterCompanyAssets, assetFilters } from "../../../lib/asset-dashboard";
+import { filterCompanyAssets, assetFilters, assetFilterValues } from "../../../lib/asset-dashboard";
 import { requireAssetAccess, loadAssetRows } from "../../../lib/asset-management";
 import Link from "next/link";
+import RegisterOverview, { AssetFacet, exportAssetRows } from "./RegisterOverview";
+import ExportAssets from "./ExportAssets";
+import { loadAssetControls } from "./asset-record-links";
+import registerStyles from "./asset-management.module.css";
+import { RecordIcon } from "../../../components/DocumentRecordTabs";
 import CompanyAssetRegister, { AssetMaintenanceForm } from "../../../components/CompanyAssetRegister";
 import { requireOrganizationAccess, getOrganizationAccess } from "../../../lib/organization-access";
 import { createAdminClient } from "../../../lib/supabase/admin";
@@ -36,7 +41,7 @@ export default async function AssetWorkspace({
   mode = "register",
   draftEnabled = false
 }) {
-  const query = await searchParams;
+  const query = (await searchParams) ?? {};
   const assetAccess = await requireAssetAccess(mode === "new" ? "contribute" : "view");
   const {
     organization,
@@ -67,14 +72,14 @@ export default async function AssetWorkspace({
   }
   const allAssets = assetResult.data || [];
   const filters = assetFilters(query);
-  const assets = filterCompanyAssets(allAssets, query);
+  const scopedAssets = filterCompanyAssets(allAssets, query);
   const people = peopleResult.data || [];
   const maintenance = (maintenanceResult.data || []).sort((a, b) => String(b.scheduled_date || "").localeCompare(String(a.scheduled_date || "")));
   const mocs = mocResult.data || [];
   const suppliers = supplierResult.data || [];
   const documents = documentResult.data || [];
   const documentLinks = documentLinkResult.data || [];
-  const editAsset = canWrite ? assets.find(item => item.id === query?.edit) || null : null;
+  const editAsset = canWrite ? allAssets.find(item => item.id === query?.edit) || null : null;
   const peopleById = new Map(people.map(person => [person.id, person]));
   const suppliersById = new Map(suppliers.map(supplier => [supplier.id, supplier]));
   const documentsById = new Map(documents.map(document => [document.id, document]));
@@ -83,13 +88,20 @@ export default async function AssetWorkspace({
   for (const record of maintenance) record.evidence_url = record.evidence_storage_path ? "/portal/asset-management/records/".concat(record.asset_id, "/evidence/").concat(record.id, "") : null;
   const today = new Date().toISOString().slice(0, 10);
   const soon = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const overdueWork = maintenance.filter(row => row.status === "planned" && row.scheduled_date && row.scheduled_date < today);
+  const workIds = new Set(overdueWork.map(row => row.asset_id));
+  const mocIds = new Set(mocs.map(row => row.organization_asset_id));
+  const focus = typeof query?.focus === "string" ? query.focus : "";
+  const assets = focus === "orders_overdue" ? scopedAssets.filter(row => workIds.has(row.id))
+    : focus === "linked_moc" ? scopedAssets.filter(row => mocIds.has(row.id)) : scopedAssets;
+  const controls = mode === "register" ? await loadAssetControls(admin, organization.id, assets.map(asset => asset.id), canMoc) : null;
   const active = assets.filter(item => item.operational_status === "active").length;
   const dueSoon = assets.filter(item => item.ppm_required && item.operational_status === "active" && item.next_maintenance_date >= today && item.next_maintenance_date <= soon).length;
-  const overdue = assets.filter(item => item.ppm_required && item.operational_status === "active" && item.next_maintenance_date < today).length;
+  const overdue = assets.filter(item => item.ppm_required && item.operational_status === "active" && item.next_maintenance_date && item.next_maintenance_date < today).length;
   const maintenanceByAsset = new Map(assets.map(asset => [asset.id, maintenance.filter(item => item.asset_id === asset.id)]));
   const mocByAsset = new Map(assets.map(asset => [asset.id, mocs.filter(item => item.organization_asset_id === asset.id)]));
   const documentsByAsset = new Map(assets.map(asset => [asset.id, documentLinks.filter(link => link.asset_id === asset.id).map(link => documentsById.get(link.controlled_document_id)).filter(Boolean)]));
-  return <main className="arPage">
+  return <main className={"arPage" + (mode === "register" ? " arRedesigned " + registerStyles.assetRegister : "")}>
       <style>{styles}</style>
 
       <div className="arShell">
@@ -127,7 +139,7 @@ export default async function AssetWorkspace({
           </nav>
         </header>
 
-        <section className="arSummary">
+        {mode === "register" ? <RegisterOverview assets={allAssets} maintenance={maintenance} mocs={canMoc ? mocs : null} query={query} today={today}/> : <section className="arSummary">
           <div className="arMetric">
             <span>
               ACTIVE ASSETS
@@ -167,24 +179,29 @@ export default async function AssetWorkspace({
               {mocs.length}
             </strong>
           </div>
-        </section>
+        </section>}
 
         <div className="arLayout" style={{
         gridTemplateColumns: "minmax(0,1fr)"
       }}>
           {canWrite && (mode === "new" || mode === "maintenance" || editAsset) && <div className="arForms">
             {(mode === "new" || editAsset) && <CompanyAssetRegister key={editAsset?.id || "new"} locations={locations} people={people} suppliers={suppliers} documents={documents} draftEnabled={draftEnabled && mode === "new" && !editAsset} asset={editAsset} linkedDocumentIds={editAsset ? documentLinks.filter(link => link.asset_id === editAsset.id).map(link => link.controlled_document_id) : []} />}
-            {mode === "maintenance" && <AssetMaintenanceForm assets={assets} people={people} suppliers={suppliers} />}</div>}
+            {mode === "maintenance" && <AssetMaintenanceForm assets={assets} people={people} suppliers={suppliers} selectedAssetId={allAssets.some(asset => asset.id === query?.asset) ? query.asset : undefined} />}</div>}
 
           {mode !== "new" && <section className="arPanel">
+            {mode === "register" && <div className="arRegisterHeader"><div><h2>Current assets</h2><p>{assets.length} of {allAssets.length} assets shown</p></div><ExportAssets rows={exportAssetRows(assets, peopleById)}/></div>}
             <form method="get" className="arFilters" role="search" aria-label="Search and filter company assets">
-  <input type="hidden" name="site" value={filters.site} />
+  {mode !== "register" && <input type="hidden" name="site" value={filters.site} />}
   <input type="hidden" name="type" value={filters.type} />
   <input type="hidden" name="owner" value={filters.owner} />
   <input type="hidden" name="days" value={filters.days} />
   <input type="hidden" name="focus" value={String(query?.focus || "")} />
   <div className="arFilterField arFilterSearch"><label htmlFor={"asset-search-" + mode}>Search assets</label><input id={"asset-search-" + mode} type="search" name="q" defaultValue={query?.q || ""} placeholder="Reference, name, serial number or site" /></div>
-  <div className="arFilterField"><label htmlFor={"asset-filter-status-" + mode}>Operational status</label><select id={"asset-filter-status-" + mode} name="status" defaultValue={query?.status || ""}><option value="">All statuses</option><option value="active">Active</option><option value="out_of_service">Out of service</option><option value="retired">Retired</option></select></div>
+   {mode === "register" ? <>
+     <AssetFacet name="site" title="Location" options={Array.from(new Map(allAssets.map(asset => [asset.site_location_id || "unassigned", asset.site_location_label || "Unassigned site"])))} values={assetFilterValues(query?.site)}/>
+     <AssetFacet name="status" title="Operational status" options={[["active", "Operational"], ["out_of_service", "Out of service"], ["retired", "Retired"]]} values={assetFilterValues(query?.status)}/>
+     <AssetFacet name="criticality" title="Criticality" options={Array.from(new Set(["low", "medium", "high", "critical", ...allAssets.map(asset => asset.criticality || "unassigned")])).map(key => [key, title(key)])} values={assetFilterValues(query?.criticality)}/>
+   </> : <div className="arFilterField"><label htmlFor={"asset-filter-status-" + mode}>Operational status</label><select id={"asset-filter-status-" + mode} name="status" defaultValue={query?.status || ""}><option value="">All statuses</option><option value="active">Active</option><option value="out_of_service">Out of service</option><option value="retired">Retired</option></select></div>}
   <div className="arFilterActions"><button type="submit">Apply filters</button><Link href={mode === "maintenance" ? "/portal/asset-management/maintenance" : "/portal/asset-management/register"}>Clear filters</Link></div>
           </form>
             {(filters.site || filters.type || filters.owner || query?.focus) && <p style={{
@@ -192,7 +209,7 @@ export default async function AssetWorkspace({
             background: "#edf6ff",
             borderRadius: 8
           }}>Dashboard selection applied{query?.focus ? " \xB7 ".concat(String(query.focus).replaceAll("_", " "), "") : ""}. Use Clear to show all company assets.</p>}
-            <h2>{mode === "maintenance" ? "Asset maintenance history & evidence" : "Current assets"}</h2>
+            {mode === "maintenance" && <h2>Asset maintenance history &amp; evidence</h2>}
 
             <p>
               Ownership, PPM and
@@ -209,7 +226,9 @@ export default async function AssetWorkspace({
               const records = maintenanceByAsset.get(asset.id) || [];
               const openPlanned = records.filter(record => record.status === "planned").sort((a, b) => String(a.scheduled_date || "9999").localeCompare(String(b.scheduled_date || "9999")));
               const maintenanceDates = [...openPlanned.map(record => record.scheduled_date), ...(asset.ppm_required ? [asset.next_maintenance_date] : [])].filter(Boolean).sort();
-              const nextMaintenance = maintenanceDates[0] || null;
+              const nextMaintenance = mode === "register" ? asset.ppm_required && asset.next_maintenance_date : maintenanceDates[0] || null;
+               const assetPermits = controls?.permits?.filter(row => row.organization_asset_id === asset.id);
+               const assetRisks = controls?.risks?.filter(row => assetPermits?.some(permit => permit.linked_assessment_id === row.id));
               const linkedMocs = mocByAsset.get(asset.id) || [];
               const linkedDocuments = documentsByAsset.get(asset.id) || [];
               const maintenanceOwner = peopleById.get(asset.maintenance_owner_person_id);
@@ -217,29 +236,33 @@ export default async function AssetWorkspace({
               const isOverdue = asset.ppm_required && asset.next_maintenance_date < today && asset.operational_status === "active";
               return <article className={"arAsset arRegisterCard " + (isOverdue ? "overdue" : "")} key={asset.id}>
   <header className="arCardHeading">
-    <div className="arCardIdentity">
+    <div className="arCardIdentity">{mode === "register" && <span className="arAssetGlyph"><RecordIcon name="clipboard"/></span>}
       <div className="arCardReference"><strong>{asset.asset_reference}</strong><span>{assetCategories(asset).map(categoryLabel).join(" · ")}</span></div>
       <h3>{asset.asset_name}</h3>
       <p className="arCardLocation">{asset.site_location_label || "Location not recorded"}</p>
       {asset.area_department && <p className="arCardArea">Area / department: {asset.area_department}</p>}
+       {mode === "register" && asset.serial_number && <p className="arCardArea">Serial: {asset.serial_number}</p>}
     </div>
-    <span className={"arOperationalStatus " + asset.operational_status}>Operational status: {title(asset.operational_status)}</span>
+    <span className={"arOperationalStatus " + asset.operational_status}>{asset.operational_status === "active" ? "Operational" : title(asset.operational_status)}</span>
   </header>
 
   <dl className="arCardFacts">
     <div><dt>Accountable owner</dt><dd>{personName(owner)}</dd></div>
     <div><dt>Criticality</dt><dd>{title(asset.criticality) || "Not recorded"}</dd></div>
     <div><dt>PPM requirement</dt><dd>{asset.ppm_required ? "Every " + asset.ppm_frequency_value + " " + asset.ppm_frequency_unit : "Not required"}</dd></div>
-    <div><dt>Next maintenance</dt><dd className={nextMaintenance && nextMaintenance < today ? "danger" : ""}>{nextMaintenance ? date(nextMaintenance) : "Not recorded"}</dd></div>
+    <div><dt>{mode === "register" ? "Next recurring maintenance" : "Next maintenance"}</dt><dd className={nextMaintenance && nextMaintenance < today ? "danger" : ""}>{nextMaintenance ? date(nextMaintenance) : mode === "register" && !asset.ppm_required ? "Not required" : "Not recorded"}{mode === "register" && asset.operational_status === "active" && nextMaintenance && nextMaintenance >= today && nextMaintenance <= soon && <small className="arPpmHighlight">Due within 30 days</small>}</dd></div>
   </dl>
 
   {asset.description && <p className="arCardDescription">{asset.description}</p>}
 
-  {openPlanned.length > 0 && <p className={"arWorkNotice " + (openPlanned[0].scheduled_date && openPlanned[0].scheduled_date < today ? "attention" : "")}>
-    <strong>{openPlanned[0].scheduled_date && openPlanned[0].scheduled_date < today ? "Scheduled work overdue" : "Next scheduled work"}</strong>
-    <span>{openPlanned[0].maintenance_reference} · {title(openPlanned[0].maintenance_type)} · {date(openPlanned[0].scheduled_date)} · {personName(peopleById.get(openPlanned[0].responsible_person_id))}</span>
-    {openPlanned.length > 1 && <small>{openPlanned.length} open planned records</small>}
-  </p>}
+  {(mode === "register" ? [openPlanned.find(row => row.scheduled_date && row.scheduled_date < today), openPlanned.find(row => row.scheduled_date && row.scheduled_date >= today)].filter(Boolean) : openPlanned.slice(0, 1)).map(work => {
+    const late = work.scheduled_date && work.scheduled_date < today;
+    return <div key={work.id} className={"arWorkNotice " + (late ? "attention" : "")}>
+      <strong>{late ? "Overdue work order" : work.scheduled_date ? "Upcoming work order" : "Work order date missing"}</strong>
+      <span>{work.maintenance_reference} · {date(work.scheduled_date)} · {personName(peopleById.get(work.responsible_person_id))}</span>
+      <Link href={"/portal/asset-management/maintenance?q=" + encodeURIComponent(asset.asset_reference) + "&record=" + encodeURIComponent(work.id) + "#maintenance-" + encodeURIComponent(work.id)}>Open work order →</Link>
+    </div>;
+  })}
 
   {asset.calibration_required && <p className="arCalibrationNotice">
     <strong>Calibration required</strong>
@@ -257,7 +280,9 @@ export default async function AssetWorkspace({
         <div className="arLinkedOverview">
           <section><h4>Maintenance</h4><p>{records.length ? records.length + " recorded work items" : "No records yet"}</p><a href={"#asset-maintenance-" + asset.id}>View maintenance history</a></section>
           <section><h4>Management of Change</h4>{!canMoc ? <p>Source module access is required.</p> : linkedMocs.length ? <ul>{linkedMocs.map(moc => <li key={moc.id}><Link prefetch={false} href={"/portal/health-safety/moc/" + moc.id}>{moc.moc_reference}</Link><small>{moc.title} · {title(moc.status)}</small></li>)}</ul> : <p>No linked MOC records.</p>}</section>
-          <section><h4>Documents</h4>{!canDocuments ? <p>Document module access is required.</p> : linkedDocuments.length ? <ul>{linkedDocuments.map(document => <li key={document.id}><Link prefetch={false} href="/portal/documents">{document.document_number} — {document.title}</Link><small>{document.document_type} · Revision {document.revision || "Not recorded"}</small></li>)}</ul> : <p>No current controlled work instruction or manual linked.</p>}</section>
+          <section><h4>Documents</h4>{!canDocuments ? <p>Document module access is required.</p> : linkedDocuments.length ? <ul>{linkedDocuments.map(document => <li key={document.id}><Link prefetch={false} href={"/portal/documents/" + document.id}>{document.document_number} — {document.title}</Link><small>{document.document_type} · Revision {document.revision || "Not recorded"}</small></li>)}</ul> : <p>No current controlled work instruction or manual linked.</p>}</section>
+          {mode === "register" && [["Permits to Work", assetPermits, "permit_reference", "task_description"], ["Risk assessments linked through permits", assetRisks, "assessment_reference", "title"]].map(([label, rows, ref, description]) =>
+            <section key={label}><h4>{label}</h4>{rows?.length ? <ul>{rows.map(row => <li key={row.id}><Link href={row.href}>{row[ref]} · {row[description]}</Link><small>{title(row.status)}</small></li>)}</ul> : <p>{rows ? "No linked records." : "Source unavailable or permission required."}</p>}</section>)}
         </div>
 
         {asset.calibration_required && <section className="arLinkedCalibration"><h4>Calibration controls and evidence</h4><dl>
