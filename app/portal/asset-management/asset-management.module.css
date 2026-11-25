@@ -209,3 +209,41 @@
 .completeError { color: #8c2525; }
 .completeSuccess { background: #e5f6ed; color: #155a34; border-radius: 5px; padding: 8px; }
 .assetEvidenceLinks { display: flex; flex-wrap: wrap; gap: 12px; }
+
+
+.assetEditNotice {
+  padding: 9px 12px;
+  border: 1px solid #c9deef;
+  border-radius: 6px;
+  background: #e7f2fb;
+}
+.inlineAssetGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.inlineAssetGrid :global(.carGrid) { grid-template-columns: minmax(0, 1fr); }
+.inlineAssetGrid :global(.carField:not(.carCategoryField)) {
+  display: grid;
+  grid-template-columns: minmax(0, .74fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.inlineAssetGrid :global(.carField:not(.carCategoryField)) > small { grid-column: 2; }
+.inlineAssetGrid :global(.carCard) { margin: 0; padding: 14px; }
+.inlineAssetGrid :global(.carCard) h2 { margin: 0 0 8px; font: 700 19px/1.2 Georgia, serif; }
+.inlineAssetGrid :global(.carPpm) { padding: 9px; }
+.inlineAssetActions {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  margin-block: 12px; padding: 10px 12px; border: 1px solid #bdd9d9; border-radius: 6px; background: #f1f9f8;
+}
+.inlineAssetActions :global(.carTitle) { display: flex; align-items: center; gap: 8px; margin: 0; }
+.inlineCancel { border: 1px solid #aac2d4; border-radius: 5px; background: #fff; padding: 8px 11px; text-decoration: none; }
+.assetSummaryLinks button {
+  display: flex; width: 100%; align-items: center; gap: 8px; padding: 7px 4px;
+  border: 0; border-bottom: 1px solid #e2ebf3; background: transparent; color: inherit; cursor: pointer; text-align: left;
+}
+.assetRecord button.recordMetric { font: inherit; cursor: pointer; text-align: left; }
+@media (max-width: 1050px) { .inlineAssetGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .inlineAssetGrid { grid-template-columns: minmax(0, 1fr); } }

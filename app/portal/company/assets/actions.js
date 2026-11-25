@@ -257,6 +257,16 @@ export async function saveCompanyAsset(_previousState, formData) {
   return saveControlledAsset(formData);
 }
 
+export async function saveInlineAssetRecord(assetId, _previousState, formData) {
+  if (!ASSET_UUID.test(assetId)) return { error: "The asset identity is invalid." };
+  const tab = formData.get("asset_record_tab");
+  const selectedTab = ["overview", "details", "workflow", "documents", "history"].includes(tab) ? tab : "overview";
+  formData.set("id", assetId);
+  const result = await saveControlledAsset(formData, { preserveOperationalStatus: true });
+  if (result.error || result.assetId !== assetId) return result;
+  redirect(recordPath(assetId) + "?tab=" + selectedTab + "&saved=1");
+}
+
 export async function recordAssetMaintenance(
   _previousState,
   formData,
@@ -806,4 +816,5 @@ export async function changeCompanyAssetStatus(
 }
 
 function performedCalibrationName(person){return [person.first_name,person.last_name].filter(Boolean).join(" ")||person.email;}
+
 
