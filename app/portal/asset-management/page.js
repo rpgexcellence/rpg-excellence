@@ -51,7 +51,7 @@ export default async function AssetDashboardPage({ searchParams }) {
   ['Out of service',d.out.length,'unavailable','slate',register({focus:'out_of_service'}),'Unavailable assets'],
   ['Planned jobs',d.planned.length,'planned','teal',work(),`Scheduled in next ${d.filters.days} days`],
  ];
- return <main className={styles.page}>
+ return <main className={styles.page + " " + styles.dashboardPage}>
   <header className={styles.hero}>
    <div className={styles.heroCopy}><span>CONTROL THROUGH EVIDENCE</span><h1>ASSET<br/>MANAGEMENT</h1><i aria-hidden="true"/><strong>RPG EXCELLENCE</strong></div>
    {canWrite && <Link className={styles.heroAction} href={`${ROOT}/new`}>＋ Create New Asset</Link>}
