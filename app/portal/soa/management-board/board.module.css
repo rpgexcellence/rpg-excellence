@@ -158,3 +158,36 @@
 @media (max-width: 630px) {
   .treatmentPanels { grid-template-columns: minmax(0, 1fr); }
 }
+
+.boardPage { min-height: 100vh; padding: 26px 20px 65px; color: #102841; background: #edf3f8; }
+.boardShell { max-width: 1650px; margin: auto; }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 10px 0; padding: 5px; background: #fff; border: 1px solid #cbdbe5; border-radius: 7px; }
+.views a, .boardButton { border: 1px solid #bcd0e2; border-radius: 5px; padding: 7px 10px; background: #f5f9fc; color: #183e62; font: inherit; font-weight: 700; }
+.views a { text-align: center; text-decoration: none; }
+.views a[aria-current='page'] { background: #1b4169; color: #fff; border-color: #1b4169; }
+.boardButton:not(:disabled) { cursor: pointer; }
+.boardButton:disabled { opacity: .55; }
+.filters [hidden] { display: none; }
+.portfolio { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.portfolio > div { padding: 8px; border: 1px solid #dae7ef; background: #f4f8fc; border-radius: 5px; }
+.portfolio dd { font: 700 1.25rem Georgia, serif; }
+.queue td[id] { scroll-margin-top: 110px; }
+.queue td:target { background: #fff0cd; }
+.scoreModes { display: flex; gap: 3px; padding: 3px; background: #edf3f8; border-radius: 6px; }
+.scoreModes button { border: 0; border-radius: 4px; padding: 6px 7px; background: transparent; color: #244a6b; font: inherit; font-weight: 700; cursor: pointer; }
+.scoreModes button[aria-pressed='true'] { background: #234e76; color: white; }
+.controlMatrixScroll { overflow: auto; margin: 12px 0 5px; padding: 2px; }
+.controlMatrix { min-width: 438px; max-width: 780px; margin: auto; }
+.matrixRow { display: grid; grid-template-columns: 72px repeat(5, minmax(0, 1fr)); gap: 4px; margin-bottom: 4px; }
+.matrixRow button { position: relative; display: grid; place-content: center; justify-items: center; min-height: 61px; border: 0; border-radius: 5px; cursor: pointer; }
+.matrixRow button[aria-pressed='true'] { outline: 3px solid #102841; outline-offset: -3px; }
+.matrixRow button i { position: absolute; top: 3px; left: 4px; font: 700 9px Arial, sans-serif; }
+.matrixRow button strong { font: 700 20px/1.1 Georgia, serif; }
+.matrixRow small { font-size: 10px; }
+.impactLabel, .likelihoodLabel { display: grid; align-content: center; text-align: center; }
+.impactLabel { text-align: right; padding-right: 4px; }
+.matrixAxis { text-align: center; font-weight: 700; }
+.mappedControls { min-width: 450px; border-collapse: collapse; width: 100%; }
+.mappedControls :is(th, td) { padding: 6px; text-align: left; border-bottom: 1px solid #dae7ef; }
+.mappedControls thead { background: #eaf2f8; }
+.mappedControls :is(th, td):nth-child(3) { text-align: right; white-space: nowrap; }

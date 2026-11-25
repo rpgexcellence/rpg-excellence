@@ -6,7 +6,7 @@ const WORKSTREAMS = [
   ["recovery", "Incident recovery"],
 ];
 
-export function managementReview({ security, treatments, entries, controls, registers, today }) {
+export function managementReview({ security, treatments, entries, controls, registers, today, includeSoa = true }) {
   const nextMonth = new Date(today + "T00:00:00Z");
   nextMonth.setUTCDate(nextMonth.getUTCDate() + 30);
   const cutoff = nextMonth.toISOString().slice(0, 10);
@@ -62,7 +62,7 @@ export function managementReview({ security, treatments, entries, controls, regi
   add("orange", "treatments-undated", "Risk treatments missing a due date", work[0].undated, "Set a date for each open treatment.");
   add("orange", "actions-undated", "SoA actions missing a due date", work[1].undated, "Set a date for each open action.");
 
-  const missingSources = [security.above, security.activeIncidents, security.pending, treatments, entries, registers].some(rows => rows == null);
+  const missingSources = [security.above, security.activeIncidents, security.pending, treatments, ...(includeSoa ? [entries, registers] : [])].some(rows => rows == null);
   const hasBaseline = Boolean(controls?.applicable.length || security.activeRisks?.length || currentRegisters?.length || openTreatments?.length || security.activeIncidents?.length);
   const status = exceptions.some(item => item.severity === "red") ? "red"
     : missingSources || !hasBaseline ? "neutral"

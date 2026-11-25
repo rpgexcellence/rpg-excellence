@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { soaControlHref } from "../../../../lib/soa-workflow.mjs";
 import { percentage, THEMES } from "./metrics.mjs";
 import styles from "./board.module.css";
 import ExecutiveInsight, { DeliveryQueue } from "./ExecutiveInsight";
@@ -12,9 +13,9 @@ const human = value => value?.replaceAll("_", " ") || "—";
 const displayDate = value => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
 const displayPercentage = value => value === null ? "N/A" : value + "%";
 
-function Card({ title, value, text, href, tone, attention = false }) {
+function Card({ title, value, text, href, tone, attention = false, action = "View records" }) {
   const className = [styles.card, styles[tone], attention ? styles.attentionCard : ""].join(" ");
-  const content = <><h3>{title}</h3><strong>{value ?? "N/A"}</strong><small>{text}</small>{href && <span>View records →</span>}</>;
+  const content = <><h3>{title}</h3>{value !== false && <strong>{value ?? "N/A"}</strong>}<small>{text}</small>{href && <span>{action} →</span>}</>;
   return href ? <Link href={href} className={className}>{content}</Link> : <article className={className}>{content}</article>;
 }
 
@@ -35,12 +36,12 @@ function RecordList({ selection, page, link, close }) {
   </section>;
 }
 
-export default function Board({ scopes, organization, values, accessOrganizationId, today, security, review, controls, registers, legacy, portfolioHeatMap, children }) {
+export default function Board({ scopes, organization, values, accessOrganizationId, today, security, review, overviewReview, controls, soa, portfolioHeatMap, children }) {
   const { org, assessment, theme, year, quarter, detail, page } = values;
   const { activeRisks, above, unresolved, overdue, undated, cohorts, activeIncidents, serious, overdueRecovery, incidentVerification, pending, expiring, expired } = security;
   const currentRiskWorkspace = Boolean(organization && organization.id === accessOrganizationId && activeRisks);
   const riskLink = id => currentRiskWorkspace ? riskPath + "?risk=" + encodeURIComponent(id) : null;
-  const soaLink = (id, control) => "/portal/assessments/" + id + "/soa" + (control ? "?q=" + encodeURIComponent(control) : "");
+  const soaLink = (id, control) => control ? soaControlHref(id, control) : "/portal/assessments/" + id + "/soa";
   const riskEntry = row => ({ key: row.id, label: row.risk_reference, detail: row.appetite === undefined ? "Approved threshold unavailable" : "Residual " + row.residual_score + " · appetite " + row.appetite, href: riskLink(row.id) });
   const treatmentEntry = row => ({ key: row.id, label: row.risk.risk_reference, detail: "Treatment · " + human(row.status) + " · " + displayDate(row.target_date), href: riskLink(row.risk_id) });
   const incidentEntry = row => ({ key: row.id, label: row.incident_reference, detail: human(row.severity) + " · " + human(row.status) + (row.target_recovery_date ? " · " + displayDate(row.target_recovery_date) : ""), href: organization.id === accessOrganizationId ? incidentPath + "/" + row.id : null });
@@ -49,13 +50,11 @@ export default function Board({ scopes, organization, values, accessOrganization
   const actionEntry = row => ({ ...controlEntry(row), detail: "Control action · " + human(row.action_status) + " · " + displayDate(row.target_date) });
   const riskReviewEntry = row => ({ ...riskEntry(row), detail: "Risk review · " + displayDate(row.review_due_date) });
   const soaReviewEntry = row => ({ key: row.id, label: "SoA v" + row.version, detail: human(row.status) + " · " + displayDate(row.review_due_at), href: soaLink(row.assessment_id) });
-  const [treatmentDates, actionDates] = review.work;
+  const [treatmentDates] = overviewReview.work;
   const future = item => [...(item.today ?? []), ...(item.upcoming ?? [])];
   const upcoming = [
     ...future(treatmentDates).map(row => ({ ...treatmentEntry(row), key: "treatment:" + row.id, date: row.target_date, detail: "Risk treatment" })),
-    ...future(actionDates).map(row => ({ ...actionEntry(row), key: "action:" + row.id, date: row.target_date, detail: "SoA control action" })),
     ...(activeRisks ?? []).map(row => ({ ...riskEntry(row), key: "risk:" + row.id, date: row.review_due_date, detail: "Risk review" })),
-    ...registers.filter(row => row.status !== "superseded").map(row => ({ key: "soa:" + row.id, label: "SoA v" + row.version, date: row.review_due_at?.slice(0, 10), detail: "SoA review", href: soaLink(row.assessment_id) })),
     ...(activeIncidents ?? []).map(row => ({ ...incidentEntry(row), key: "incident:" + row.id, date: row.target_recovery_date, detail: "Incident recovery target" })),
     ...(expiring ?? []).map(row => ({ ...acceptanceEntry(row), key: "acceptance:" + row.id, date: row.expires_at, detail: "Acceptance expiry" })),
   ].filter(row => row.date && row.date >= today).sort((a, b) => a.date.localeCompare(b.date));
@@ -94,9 +93,30 @@ export default function Board({ scopes, organization, values, accessOrganization
   for (const group of cohorts ?? []) registerSelection("q" + group.number, "Q" + group.number + " treatment cohort", group.rows, treatmentEntry);
   for (const group of controls?.groups ?? []) registerSelection(group.key, group.label + " applicable controls", group.rows, controlEntry);
 
+  registerSelection("soa-critical", "Critical residual controls", soa.critical, controlEntry);
+  registerSelection("soa-unmapped", "Controls without a residual score", soa.unmapped, controlEntry);
+  registerSelection("soa-unowned", "Elevated controls without an owner", soa.unowned, controlEntry);
+  registerSelection("soa-open-findings", "Open SoA findings", soa.findings, row => ({
+    key: row.id, label: human(row.finding_type), detail: human(row.status),
+    href: "/portal/assessments/" + row.assessment_id + "/findings",
+  }));
+  const soaKeys = new Set(["effectiveness", ...Object.keys(THEMES), "unclassified"]);
+  const isSoaKey = key => key.startsWith("soa-") || key.startsWith("actions-") ||
+    key.startsWith("soaReviews-") || soaKeys.has(key);
+  const soaView = values.view === "soa" || (values.view !== "overview" && isSoaKey(detail));
+  const view = soaView ? "soa" : "overview";
+  const soaWork = review.work.filter(item => item.key === "actions" || item.key === "soaReviews");
+  const actions = soaWork[0];
+
   const query = new URLSearchParams({ org, assessment, theme, year, quarter });
+  function viewUrl(target) {
+    const params = new URLSearchParams(query);
+    params.set("view", target);
+    return boardPath + "?" + params;
+  }
   function detailUrl(key, number = 1) {
     const params = new URLSearchParams(query);
+    params.set("view", key ? isSoaKey(key) ? "soa" : "overview" : view);
     if (key) params.set("detail", key);
     if (number > 1) params.set("page", String(number));
     return boardPath + "?" + params + (key ? "#board-records" : "");
@@ -119,6 +139,31 @@ export default function Board({ scopes, organization, values, accessOrganization
     ["thresholds", "Unresolved risk appetite", unresolved, "Check the linked approved methodology", "blue"],
     ["undated", "Undated open treatments", undated, "Set a target date", "blue"],
   ];
+  const soaAttention = [
+    ["soa-critical", "Critical residual controls", soa.critical, "Recorded residual score of 20 or above", "danger"],
+    ["actions-overdue", "Overdue SoA control actions", actions.overdue, "Open control actions past their due date", "danger", true],
+    ["actions-verification", "SoA actions awaiting verification", actions.verification, "Open actions awaiting an effectiveness decision", "teal", true],
+    ["soa-undecided", "Applicability decisions pending", review.undecided, "Controls awaiting an applicability decision", "amber"],
+    ["soa-drafts", "Draft SoA statements", review.draftRegisters, "Statements still in draft", "amber"],
+    ["soa-open-findings", "Open SoA findings", soa.findings, theme === "all" ? "Open findings excluding conformity" : "Finding totals are available with All themes selected", "amber"],
+    ["soa-unmapped", "Controls without a residual score", soa.unmapped, "Controls missing a mapped residual position", "amber"],
+    ["soa-unowned", "Elevated controls without an owner", soa.unowned, "Recorded residual score of 10 or above", "amber"],
+  ];
+  const soaInsightCopy = {
+    red: ["Red · Intervention required", "Review Critical residual scores and confirm accountable owners, treatment decisions and recovery dates for overdue actions."],
+    orange: ["Amber · Review required", "Complete outstanding applicability decisions and agree what each draft needs before review."],
+    green: ["Green · No escalation triggered", "Continue routine review and verification."],
+    neutral: ["Not rated · Insufficient visibility", "Confirm the available records before relying on the overall position."],
+  };
+  const [soaRating, soaAction] = soaInsightCopy[soa.status];
+  const soaSignals = [
+    ["soa-critical", soa.critical?.length && soa.critical.length + " critical residual controls"],
+    ["actions-overdue", actions.overdue?.length && "Overdue SoA control actions"],
+    ["soa-undecided", review.undecided?.length && review.undecided.length + " applicability decisions pending"],
+    ["soa-drafts", review.draftRegisters?.length && review.draftRegisters.length + " draft SoA statements"],
+  ];
+  const selectedRecords = selections[detail] && isSoaKey(detail) === soaView &&
+    <RecordList selection={selections[detail]} page={page} link={number => detailUrl(detail, number)} close={detailUrl()}/>;
   const years = Array.from(new Set([today.slice(0, 4), year, ...values.treatmentYears])).sort().reverse();
 
   return <>
@@ -126,21 +171,27 @@ export default function Board({ scopes, organization, values, accessOrganization
       <div><span>ISMS management oversight</span><h1>Information Security Management Board</h1><p>Review residual exposure, treatment delivery, control effectiveness and security incidents.</p></div>
       <nav aria-label="Information Security workspaces"><Link href="/portal/information-security">ISMS Hub</Link><Link href="/portal/soa">SoA register</Link><Link href={riskPath}>Risk register</Link><Link href={incidentPath}>Incident register</Link><Link href="/portal/tasks">My Tasks &amp; Approvals</Link><Link href={boardPath + "/executive-report"}>Executive Report / PDF</Link></nav>
     </header>
+    <nav className={styles.views} aria-label="Management Board views">
+      <Link href={viewUrl("overview")} aria-current={soaView ? undefined : "page"}>ISMS overview</Link>
+      <Link href={viewUrl("soa")} aria-current={soaView ? "page" : undefined}>SoA oversight</Link>
+    </nav>
     <form className={styles.filters} action={boardPath}>
+      <input type="hidden" name="view" value={view}/>
       <label>Organisation<select name="org" defaultValue={org}>{scopes.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}{!scopes.length && <option value="">No organisation</option>}</select></label>
-      <label>Statement of Applicability<select name="assessment" defaultValue={assessment}><option value="all">All authorised SoA records</option>{values.soaOptions.map(row => <option value={row.assessment_id} key={row.assessment_id}>{row.label}</option>)}</select></label>
-      <label>Annex A theme<select name="theme" defaultValue={theme}><option value="all">All themes</option>{Object.entries(THEMES).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label>
-      <label>Treatment due year<select name="year" defaultValue={year}>{years.map(value => <option key={value}>{value}</option>)}</select></label>
-      <label>Treatment due quarter<select name="quarter" defaultValue={quarter}><option value="all">All quarters</option>{[1, 2, 3, 4].map(n => <option key={n} value={n}>Q{n}</option>)}</select></label>
+      <label hidden={!soaView}>Statement of Applicability<select name="assessment" defaultValue={assessment}><option value="all">All authorised SoA records</option>{values.soaOptions.map(row => <option value={row.assessment_id} key={row.assessment_id}>{row.label}</option>)}</select></label>
+      <label hidden={!soaView}>Annex A theme<select name="theme" defaultValue={theme}><option value="all">All themes</option>{Object.entries(THEMES).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label>
+      <label hidden={soaView}>Treatment due year<select name="year" defaultValue={year}>{years.map(value => <option key={value}>{value}</option>)}</select></label>
+      <label hidden={soaView}>Treatment due quarter<select name="quarter" defaultValue={quarter}><option value="all">All quarters</option>{[1, 2, 3, 4].map(n => <option key={n} value={n}>Q{n}</option>)}</select></label>
       <button type="submit">Apply filters</button>
     </form>
-    <p className={styles.scope}>As at {displayDate(today)} (Europe/London). The risk heat map shows the selected organisation’s risks. SoA and theme filters apply to control records and the separate SoA matrix. Due period applies to treatment cohorts and verification.</p>
-    <ExecutiveInsight review={review} controls={controls} detailUrl={detailUrl}/>
+    <p className={styles.scope}>As at {displayDate(today)} (Europe/London). {soaView ? "The SoA and theme filters scope Annex A control records. Statement and finding counts are reported at statement level." : "The risk heat map shows the selected organisation’s risks. Due period applies to treatment cohorts and verification."}</p>
+    {!soaView ? <>
+    <ExecutiveInsight review={overviewReview} detailUrl={detailUrl}/>
     <section className={styles.cards} aria-label="Management KPIs">
       {headlineCards.map(({ key, ...card }) => <Card key={key} {...card} href={selections[key] && detailUrl(key)}/>)}
     </section>
-    {selections[detail] && <RecordList selection={selections[detail]} page={page} link={number => detailUrl(detail, number)} close={detailUrl()}/>}
-    <DeliveryQueue review={review} detailUrl={detailUrl}/>
+    {selectedRecords}
+    <DeliveryQueue work={overviewReview.work.filter(item => item.key !== "actions" && item.key !== "soaReviews")} detailUrl={detailUrl}/>
     <div className={styles.oversight}>
       <div className={styles.portfolioMap} id="risk-position">{portfolioHeatMap}</div>
       <div className={styles.treatmentPanels}>
@@ -159,23 +210,60 @@ export default function Board({ scopes, organization, values, accessOrganization
         </section>
       </div>
     </div>
-    <div className={styles.grid}>
       <section className={styles.panel}>
+        <div className={styles.panelHead}><h2>Next deadlines and reviews</h2><Link href="/portal/tasks">My Tasks &amp; Approvals</Link></div>
+        {upcoming.length ? <ul className={styles.records}>{upcoming.slice(0, 6).map(row => <li key={row.key}><span>{row.href ? <Link href={row.href}>{row.label}</Link> : row.label}<small>{row.detail}</small></span><time dateTime={row.date}>{displayDate(row.date)}</time></li>)}</ul> : <p>{activeRisks || controls || activeIncidents ? "No upcoming dates in the available records." : unavailable + "."}</p>}
+      </section>
+    <section className={styles.attention} aria-labelledby="management-attention"><h2 id="management-attention">Management attention</h2><div className={styles.attentionGrid}>{attentionCards.map(([key, title, rows, text, tone]) => <Card key={key} title={title} value={rows?.length} text={rows ? text : unavailable} tone={tone} href={selections[key] && detailUrl(key)} attention/>)}</div></section>
+    </> : <>
+      <section className={styles.panel}>
+        <div className={styles.panelHead}><h2>SoA oversight</h2><Link href="/portal/soa">Open SoA Register →</Link></div>
+        <p>{assessment === "all" ? "All authorised SoA records" : "Selected SoA"} · {THEMES[theme] ?? "All themes"}</p>
+      </section>
+      <section className={styles.insight} aria-labelledby="soa-executive-insight">
+        <header className={styles.insightHead}>
+          <h2 id="soa-executive-insight">Executive Insight</h2>
+          <strong className={styles.signal + " " + styles[soa.status]}>{soaRating}</strong>
+        </header>
+        <ul className={styles.priorityList} aria-label="SoA rating indicators">
+          {soaSignals.filter(([, label]) => label).map(([key, label]) => <li key={key}>
+            <Link href={key === "actions-overdue" ? "#queue-actions-overdue" : detailUrl(key)}>{label}</Link>
+          </li>)}
+        </ul>
+        <p className={styles.insightDecision}><strong>Management action</strong> {soaAction}</p>
+        <details className={styles.ratingRules}><summary>How the rating is decided</summary>
+          <p>Red flags Critical residual control scores or overdue actions. Amber flags outstanding applicability decisions, draft statements or other elevated residual scores. Green requires records in scope and no triggered rule. The rating uses recorded residual scores for the selected scope.</p>
+        </details>
+      </section>
+      {selectedRecords}
+      <DeliveryQueue work={soaWork} detailUrl={detailUrl} soa/>
+      <div className={styles.oversight}>
+        <div className={styles.portfolioMap}>{children}</div>
+        <div className={styles.treatmentPanels}>
+      <section className={styles.panel} id="control-position">
         <h2>Annex A control position</h2><p>Applicable control records by theme. Counts reflect the selected SoA filters.</p>
-        {controls ? <ul className={styles.chart}>{controls.groups.filter(group => group.key !== "unclassified" || group.rows.length).map(group => <li key={group.key}>
+        {controls ? <ul className={styles.chart}>{controls.groups.filter(group => (theme === "all" || group.key === theme) && (group.key !== "unclassified" || group.rows.length)).map(group => <li key={group.key}>
           <div><Link href={detailUrl(group.key)}>{group.label}</Link><span>{group.effective} effective · {group.implemented} implemented · {group.other} other</span></div>
           <div className={styles.track} aria-hidden="true">{group.rows.length > 0 && <>
             <i className={styles.effective} style={{flex: group.effective}}/><i className={styles.implemented} style={{flex: group.implemented}}/><i className={styles.other} style={{flex: group.other}}/>
           </>}</div>
         </li>)}</ul> : <p>{unavailable}.</p>}
       </section>
-      <section className={styles.panel}>
-        <h2>Next deadlines and reviews</h2>
-        {upcoming.length ? <ul className={styles.records}>{upcoming.slice(0, 6).map(row => <li key={row.key}><span>{row.href ? <Link href={row.href}>{row.label}</Link> : row.label}<small>{row.detail}</small></span><time dateTime={row.date}>{displayDate(row.date)}</time></li>)}</ul> : <p>{activeRisks || controls || activeIncidents ? "No upcoming dates in the available records." : unavailable + "."}</p>}
+          <section className={styles.panel}>
+            <h2>SoA portfolio measures</h2>
+            <dl className={styles.portfolio}>{soa.measures.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? "N/A"}</dd></div>)}</dl>
+          </section>
+        </div>
+      </div>
+      <section className={styles.attention} aria-labelledby="soa-management-attention">
+        <h2 id="soa-management-attention">Management attention</h2>
+        <div className={styles.attentionGrid}>{soaAttention.map(([key, title, rows, description, tone, shortcut]) =>
+          <Card key={key} title={title} text={rows || key === "soa-open-findings" && theme !== "all" ? description : unavailable}
+            value={shortcut ? false : rows?.length} tone={rows?.length ? tone : "blue"}
+            href={shortcut ? "#queue-" + key : selections[key] && detailUrl(key)}
+            action={shortcut ? "View due dates" : "View records"} attention/>)}
+        </div>
       </section>
-    </div>
-    <section className={styles.attention} aria-labelledby="management-attention"><h2 id="management-attention">Management attention</h2><div className={styles.attentionGrid}>{attentionCards.map(([key, title, rows, text, tone]) => <Card key={key} title={title} value={rows?.length} text={rows ? text : unavailable} tone={tone} href={selections[key] && detailUrl(key)} attention/>)}</div></section>
-    <details className={styles.panel}><summary>SoA portfolio measures</summary><dl className={styles.portfolio}>{legacy.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? "N/A"}</dd></div>)}</dl></details>
-    {children}
+    </>}
   </>;
 }

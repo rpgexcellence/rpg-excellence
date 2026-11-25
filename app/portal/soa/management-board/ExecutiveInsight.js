@@ -55,21 +55,21 @@ export default function ExecutiveInsight({ review, controls, detailUrl }) {
   </section>;
 }
 
-export function DeliveryQueue({ review, detailUrl }) {
+export function DeliveryQueue({ work, detailUrl, soa = false }) {
   return <section className={`${styles.panel} ${styles.queue}`} aria-labelledby="delivery-queue">
     <h2 id="delivery-queue">Due dates and verification</h2>
     <p>Open items across all periods. An item awaiting verification can also be overdue.</p>
     <div className={styles.queueScroll} tabIndex={0} role="region" aria-label="Workstream deadlines and verification counts">
       <table>
         <thead><tr><th scope="col">Workstream</th>{workColumns.map(([key, label]) => <th key={key} scope="col">{label}</th>)}</tr></thead>
-        <tbody>{review.work.map(item => <tr key={item.key}>
+        <tbody>{work.map(item => <tr key={item.key}>
           <th scope="row">{item.label}</th>
-          {workColumns.map(([key, label]) => <td key={key}>
+          {workColumns.map(([key, label]) => <td key={key} id={soa ? "queue-" + item.key + "-" + key : undefined}>
             {item[key] === false ? "—" : item[key] == null ? "N/A" : item[key].length ? <Link href={detailUrl(item.key + "-" + key)} aria-label={`${item.label}, ${label.toLowerCase()}, ${item[key].length}`}>{item[key].length}</Link> : 0}
           </td>)}
         </tr>)}</tbody>
       </table>
     </div>
-    <p>For risk treatments, awaiting verification means implemented and still open for verification. For reviews, the verification column does not apply.</p>
+    <p>{soa ? "Verification applies to SoA control actions." : "For risk treatments, awaiting verification means implemented and still open for verification."} For reviews, the verification column does not apply.</p>
   </section>;
 }
