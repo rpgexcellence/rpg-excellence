@@ -1,4 +1,5 @@
 import SupplierRegister from "../../../components/SupplierRegister";
+import { buildSupplierRegisterRows } from "../../../lib/supplier-reporting.mjs";
 // VERIFIED_SUPPLIER_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
 import ControlledDeviceDrafts from "../../../components/ControlledDeviceDrafts";
 import { notFound, redirect } from "next/navigation";
@@ -10,6 +11,43 @@ export const metadata = {
   "title": "Supplier Assurance Hub | RPG Excellence"
 };
 export const dynamic = "force-dynamic";
+async function readRegisterRows(query) {
+  const rows = [];
+  for (let offset = 0; ;) {
+    const { data, error } = await query.range(offset, offset + 499);
+    if (error) throw new Error("Supplier register information could not be loaded.");
+    if (!data.length) return rows;
+    if (rows.at(-1)?.id === data.at(-1).id) throw new Error("Supplier register pagination could not be completed.");
+    rows.push(...data);
+    offset += data.length;
+  }
+}
+
+async function loadRegister(supabase, organizationId, ownerId) {
+  const suppliers = await readRegisterRows(supabase.from("suppliers")
+    .select("id,legal_name,trading_name,supplier_reference,supply_description,country,approval_status,approval_expiry,criticality,next_review_date")
+    .eq("organization_id", organizationId).eq("owner_id", ownerId)
+    .order("updated_at", { ascending: false }).order("id"));
+
+  const ids = suppliers.map(row => row.id);
+  const children = async (table, columns, filter, companyScoped = true) => {
+    const rows = [];
+    for (let offset = 0; offset < ids.length; offset += 100) {
+      let query = supabase.from(table).select(columns).eq("owner_id", ownerId).in("supplier_id", ids.slice(offset, offset + 100));
+      if (companyScoped) query = query.eq("organization_id", organizationId);
+      rows.push(...await readRegisterRows(filter(query).order("id")));
+    }
+    return rows;
+  };
+  const [reviews, actions, findings] = await Promise.all([
+    children("supplier_quarterly_business_reviews", "id,supplier_id,review_date,status,scorecard,updated_at", query => query.eq("status", "completed")),
+    children("supplier_qbr_actions", "id,supplier_id,status", query => query.in("status", ["open", "in_progress", "awaiting_review"])),
+    children("internal_audit_findings", "id,supplier_id,finding_type,status,closure_verified", query => query.in("finding_type", ["major_nc", "minor_nc"]), false),
+  ]);
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/London" });
+  return buildSupplierRegisterRows({ suppliers, reviews, actions, findings }, today);
+}
+
 export default async function SuppliersPage({
   searchParams
 }) {
@@ -71,6 +109,10 @@ export default async function SuppliersPage({
   let companyPeople = [];
   let dueDiligenceEvents = [];
   if (organization) {
+    if (!params?.id && params?.new !== "1") {
+      const register = await loadRegister(supabase, organization.id, user.id);
+      return <SupplierRegister suppliers={register} companyName={organization.name} />;
+    }
     const {
       data,
       error
@@ -81,7 +123,6 @@ export default async function SuppliersPage({
       throw new Error(error.message);
     }
     suppliers = data || [];
-    if (!params?.id && params?.new !== "1") return <SupplierRegister suppliers={suppliers} companyName={organization.name} />;
     if (suppliers.length) {
       const {
         data: supplierFindings = [],
@@ -250,3 +291,4 @@ export default async function SuppliersPage({
       return selected;
     })()} documents={documents} approvers={approvers} evidenceFiles={evidenceFiles} subTierSuppliers={subTierSuppliers} supplierSites={supplierSites} supplierNcStats={supplierNcStats} supplierContacts={supplierContacts} supplierAudits={supplierAudits} quarterlyReviews={quarterlyReviews} companyPeople={companyPeople} dueDiligenceEvents={dueDiligenceEvents} managementBoard={managementBoard} action={saveSupplier} generateAction={generateSupplierCodeOfConduct} saved={params?.saved === "1"} /></ControlledDeviceDrafts>;
 }
+
