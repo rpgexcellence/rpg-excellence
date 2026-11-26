@@ -1,3 +1,5 @@
+import Link from "next/link";
+import RpgSignInFrame from "../../../components/RpgSignInFrame";
 import { readSupplierInvitation, verifiedSupplierInvitation } from "../../../lib/supplier-invitation-store";
 import { SupplierResponseForm, SupplierSignIn } from "./SupplierResponseForm";
 
@@ -16,11 +18,21 @@ export default async function SupplierAccessPage({ params, searchParams }) {
   const { token } = await params;
   const query = await searchParams;
   const found = await readSupplierInvitation(token);
-  if (!found) return <Frame><p>This invitation is unavailable. Contact RPG Excellence for assistance.</p></Frame>;
+  if (!found) return <RpgSignInFrame supplier title="Invitation unavailable"
+    introduction="This supplier invitation is unavailable. Contact the RPG team that sent it to request a new link." />;
   let session;
   try { session=await verifiedSupplierInvitation(token); }
   catch (error) {
-    return <Frame>{error.status===403 ? <>{query?.signin==="retry" && <p role="alert">This sign-in could not be completed. Request a fresh link in this browser.</p>}<SupplierSignIn token={token} /></> : <p>{error.status ? error.message : "This assessment is temporarily unavailable."}</p>}</Frame>;
+    if (error.status !== 403) {
+      return <RpgSignInFrame supplier title="Assessment unavailable"
+        introduction={error.status ? error.message : "This assessment is temporarily unavailable."} />;
+    }
+    return <RpgSignInFrame supplier title="Sign in to your supplier assessment"
+      introduction="Use the email address on your invitation to request a secure sign-in link or verification code.">
+      {query?.signin==="retry" && <div className="loginMessage" role="alert">This sign-in could not be completed. Request a fresh link in this browser.</div>}
+      <SupplierSignIn token={token} />
+      <p className="legal">Read the <Link href="/en/privacy">RPG Excellence Privacy Policy</Link>.</p>
+    </RpgSignInFrame>;
   }
   const { row, document } = session;
   if (["submitted","reviewed"].includes(row.status)) {

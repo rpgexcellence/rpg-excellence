@@ -20,20 +20,42 @@ function Feedback({ feedback }) {
   return <p role="status" className={feedback?.error ? "supplierFeedback" : "supplierSuccess"}>{feedback?.error || feedback?.message}</p>;
 }
 export function SupplierSignIn({ token }) {
-  const [sent, send, sending] = useActionState(supplierSignIn.bind(null,token), {});
-  const [verified, verify, verifying] = useActionState(supplierVerifyCode.bind(null,token), {});
+  const [email, setEmail] = useState("");
+  const [sent, send, sending] = useActionState(supplierSignIn.bind(null, token), {});
+  const [verified, verify, verifying] = useActionState(supplierVerifyCode.bind(null, token), {});
+
   return <>
-    <style>{css}</style>
-    <p>Use the email address on your invitation to access the supplier assessment.</p>
-    <form action={send}>
-      <label>Invitation email address<input name="email" autoComplete="email" type="email" required /></label>
-      <button disabled={sending}>Request sign-in link or code</button>
-    </form><Feedback feedback={sent} />
-    {sent.message && <details><summary>Enter an email verification code</summary>
-      <form action={verify}><label>Invitation email address<input name="email" type="email" required /></label>
-      <label>Verification code<input name="code" inputMode="numeric" autoComplete="one-time-code" required /></label>
-      <button disabled={verifying}>Verify email</button></form><Feedback feedback={verified} />
-    </details>}
+    <form className="loginForm" action={send}>
+      <label htmlFor="supplier-invite-email">Invitation email address
+        <input id="supplier-invite-email" name="email" autoComplete="email" type="email"
+          placeholder="you@company.com" value={email} onChange={event => setEmail(event.target.value)} required />
+      </label>
+      <button className="primaryButton" type="submit" disabled={sending}>
+        {sending ? "Requesting sign-in…" : "Request sign-in link or code →"}
+      </button>
+    </form>
+    {sent.error && <p className="loginMessage" role="alert">{sent.error}</p>}
+    {sent.message && <>
+      <p className="supplierSignInNotice" role="status">{sent.message}</p>
+      <details className="supplierCodeEntry">
+        <summary>Enter a verification code</summary>
+        <form className="loginForm" action={verify}>
+          <label htmlFor="supplier-verify-email">Invitation email address
+            <input id="supplier-verify-email" name="email" type="email" autoComplete="email"
+              defaultValue={email} required />
+          </label>
+          <label htmlFor="supplier-verification-code">Verification code
+            <input id="supplier-verification-code" name="code" inputMode="numeric" autoComplete="one-time-code"
+              pattern="[0-9]{6,8}" minLength={6} maxLength={8} required />
+          </label>
+          <button className="primaryButton" type="submit" disabled={verifying}>
+            {verifying ? "Verifying email…" : "Verify email →"}
+          </button>
+        </form>
+        {verified.error && <p className="loginMessage" role="alert">{verified.error}</p>}
+        {verified.message && <p className="supplierSignInNotice" role="status">{verified.message}</p>}
+      </details>
+    </>}
   </>;
 }
 export function SupplierResponseForm({ token, invitation, document }) {
