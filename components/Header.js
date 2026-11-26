@@ -3,6 +3,7 @@ import { HOW_IT_WORKS_GROUPS } from "../lib/howItWorks";
 import AccountMenu from "./AccountMenu";
 import Link from "next/link";
 import ISO9001ReleaseBar from "./ISO9001ReleaseBar";
+const AUDITOR_TRAINING = "/internal-audit-training";
 const ISO_AT_A_GLANCE = [
   ["ISO/IEC 17025:2017", "Testing and calibration laboratories", "iso-17025", "LAB"],
   ["ISO 9001:2015", "Quality management — Amendment 1:2024", "iso-9001-2015", "Q15"],
@@ -11,6 +12,7 @@ const ISO_AT_A_GLANCE = [
   ["ISO 45001", "Occupational health & safety", "iso-45001", "S"],
   ["ISO 22301", "Business continuity", "iso-22301", "B"],
   ["ISO 27001", "Information security", "iso-27001", "IS"],
+  ["ISO 19011:2026", "Management system auditing guidance", "iso-19011", "AUD"],
 ];
 export default function Header({ locale, nav, variant = "default", hideAccountIdentity = false }) {
   const resources = [{ title: "Resources", links: [["Insights", "/insights"], ["Publications", "/publications"], ["Newsletter", "/insights#newsletter"], ["Training", "/pricing#learning"]] }];
@@ -19,7 +21,9 @@ export default function Header({ locale, nav, variant = "default", hideAccountId
     <>
       <header className={"header " + (variant === "home" ? "homeHeader" : "")}>
         <style>
-          {'\n          .isoAtGlance{position:relative;margin:0}\n          .isoAtGlance>summary{display:flex;align-items:center;gap:6px;list-style:none;cursor:pointer;color:inherit;font:inherit;font-weight:800;white-space:nowrap}\n          .isoAtGlance>summary::-webkit-details-marker{display:none}\n          .isoAtGlance>summary:after{content:"⌄";font-size:12px;transition:transform .18s ease}\n          .isoAtGlance[open]>summary:after{transform:rotate(180deg)}\n          .isoAtGlanceMenu{position:absolute;top:calc(100% + 18px);left:50%;width:370px;padding:10px;border:1px solid #d7e2ed;border-radius:14px;background:#fff;color:#0a2342;box-shadow:0 22px 55px rgba(4,31,64,.22);opacity:0;visibility:hidden;transform:translate(-50%,-7px);transition:opacity .16s ease,transform .16s ease,visibility .16s;z-index:80}\n          .isoAtGlance:hover .isoAtGlanceMenu,.isoAtGlance:focus-within .isoAtGlanceMenu,.isoAtGlance[open] .isoAtGlanceMenu{opacity:1;visibility:visible;transform:translate(-50%,0)}\n          .isoAtGlanceMenu:before{content:"";position:absolute;left:0;right:0;top:-20px;height:20px}\n          .isoAtGlanceTitle{display:block;padding:7px 9px 9px;color:#607a95;font-size:10px;font-weight:950;letter-spacing:.14em}\n          .isoAtGlanceMenu>a{display:grid!important;grid-template-columns:38px 1fr 18px;gap:10px;align-items:center;padding:10px!important;border-radius:9px;color:#12385f!important;opacity:1!important}\n          .isoAtGlanceMenu>a:hover,.isoAtGlanceMenu>a:focus{background:#edf4ff;color:#174fbc!important;outline:none}\n          .isoAtGlanceMenu>a>i{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:#e7efff;color:#245ee8;font-style:normal;font-size:11px;font-weight:950}\n          .isoAtGlanceMenu>a span{display:grid;gap:2px}\n          .isoAtGlanceMenu>a strong{font-size:13px}\n          .isoAtGlanceMenu>a small{color:#6b8298;font-size:10px;font-weight:600}\n          .isoAtGlanceMenu>a>b{color:#245ee8;font-size:15px}\n          .mobileNav{display:none;position:relative;margin-left:auto}\n          .mobileNav>summary{display:grid;width:44px;height:44px;place-items:center;border:1px solid ' +
+          {'\n          .isoAtGlance{position:relative;margin:0}\n          .isoAtGlance>summary{display:flex;align-items:center;gap:6px;list-style:none;cursor:pointer;color:inherit;font:inherit;font-weight:800;white-space:nowrap}\n          .isoAtGlance>summary::-webkit-details-marker{display:none}\n          .isoAtGlance>summary:after{content:"⌄";font-size:12px;transition:transform .18s ease}\n          .isoAtGlance[open]>summary:after{transform:rotate(180deg)}\n          .isoAtGlanceMenu{position:absolute;top:calc(100% + 18px);left:50%;width:370px;padding:10px;border:1px solid #d7e2ed;border-radius:14px;background:#fff;color:#0a2342;box-shadow:0 22px 55px rgba(4,31,64,.22);opacity:0;visibility:hidden;transform:translate(-50%,-7px);transition:opacity .16s ease,transform .16s ease,visibility .16s;z-index:80}\n          .isoAtGlance:hover .isoAtGlanceMenu,.isoAtGlance:focus-within .isoAtGlanceMenu,.isoAtGlance[open] .isoAtGlanceMenu{opacity:1;visibility:visible;transform:translate(-50%,0)}\n          .isoAtGlanceMenu:before{content:"";position:absolute;left:0;right:0;top:-20px;height:20px}\n          .isoAtGlanceTitle{display:block;padding:7px 9px 9px;color:#607a95;font-size:10px;font-weight:950;letter-spacing:.14em}\n          .isoAtGlanceMenu>a{display:grid!important;grid-template-columns:38px 1fr 18px;gap:10px;align-items:center;padding:10px!important;border-radius:9px;color:#12385f!important;opacity:1!important}\n          .isoAtGlanceMenu>a:hover,.isoAtGlanceMenu>a:focus{background:#edf4ff;color:#174fbc!important;outline:none}\n          .isoAtGlanceMenu>a>i{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:#e7efff;color:#245ee8;font-style:normal;font-size:11px;font-weight:950}\n          .isoAtGlanceMenu>a span{display:grid;gap:2px}\n          .isoAtGlanceMenu>a strong{font-size:13px}\n          .isoAtGlanceMenu>a small{color:#6b8298;font-size:10px;font-weight:600}\n          .isoAtGlanceMenu>a>b{color:#245ee8;font-size:15px}
+          .isoAtGlanceMenu>.isoAtGlanceTraining,.mobileIsoLinks>.isoAtGlanceTraining{margin-top:5px;border-top:1px solid #d7e2ed;background:#f4f8fb}
+          @media(max-height:680px){.isoAtGlanceMenu{max-height:calc(100dvh - 100px);overflow:auto}}\n          .mobileNav{display:none;position:relative;margin-left:auto}\n          .mobileNav>summary{display:grid;width:44px;height:44px;place-items:center;border:1px solid ' +
             (variant === "home" ? "#6783a5" : "#d2dce7") +
             ";border-radius:11px;background:" +
             (variant === "home" ? "#ffffff12" : "#fff") +
@@ -88,6 +92,11 @@ export default function Header({ locale, nav, variant = "default", hideAccountId
                   <b aria-hidden="true">→</b>
                 </Link>
               ))}
+              <Link className="isoAtGlanceTraining" href={`/${locale}${AUDITOR_TRAINING}`}>
+                <i aria-hidden="true">CPD</i>
+                <span><strong>ISO 19011 training</strong><small>RPG Internal Auditor Refresher</small></span>
+                <b aria-hidden="true">→</b>
+              </Link>
             </div>
           </details>
 
@@ -130,6 +139,9 @@ export default function Header({ locale, nav, variant = "default", hideAccountId
                     <strong>{code}</strong> · {name}
                   </Link>
                 ))}
+                <Link className="isoAtGlanceTraining" href={`/${locale}${AUDITOR_TRAINING}`}>
+                  <strong>ISO 19011 training</strong> · RPG Internal Auditor Refresher
+                </Link>
               </div>
             </details>
 
