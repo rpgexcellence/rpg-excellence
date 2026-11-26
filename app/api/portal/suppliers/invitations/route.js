@@ -6,7 +6,7 @@ import { escapeEmailHtml, proposalEmailHtml } from "../../../../../lib/commercia
 import { applicableQuestions } from "../../../../../lib/supplier-assurance";
 import {
   EVIDENCE_BUCKET, INVITATION_ORIGIN, INVITATION_TABLE, emailAddress, event, hashToken, invitationError,
-  invitationIdPattern, saveInvitation, supplierInvitationContext,
+  invitationIdPattern, readInvitationDocument, saveInvitation, supplierInvitationContext,
 } from "../../../../../lib/supplier-invitation-store";
 
 export const dynamic = "force-dynamic";
@@ -79,12 +79,25 @@ function draftFields(input, supplier) {
 }
 
 async function createDraft(ctx, input) {
-  const { supplier, admin, user } = ctx;
+  const { supplier, admin, user, supabase } = ctx;
   const fields = draftFields(input, supplier);
-  const { data: document } = await admin.from("supplier_code_of_conduct_documents").select("id")
-    .eq("supplier_id", supplier.id).eq("organization_id", supplier.organization_id).eq("status", "issued")
+  const { data: document, error: documentError } = await supabase.from("supplier_code_of_conduct_documents").select("id")
+    .eq("supplier_id", supplier.id).eq("owner_id", user.id).eq("status", "issued")
     .order("version", { ascending: false }).limit(1).maybeSingle();
+  if (documentError) {
+    console.error("Supplier issued document lookup failed", { code: documentError.code });
+    throw invitationError("The supplier's issued documents could not be checked. Try again shortly.", 503);
+  }
   if (!document) throw invitationError("Issue the Supplier Code of Conduct before creating an invitation.", 409);
+  const supplierDocument = await readInvitationDocument(admin, {
+    document_id: document.id, supplier_id: supplier.id, organization_id: supplier.organization_id,
+  });
+  if (!supplierDocument) {
+    throw invitationError("The issued document could not be matched to this supplier's organisation. Contact RPG Excellence.", 409);
+  }
+  if (supplierDocument.status !== "issued") {
+    throw invitationError("The issued Code of Conduct changed. Reload the supplier record and try again.", 409);
+  }
   const access = await microsoftAccessToken(ctx);
   const token = randomBytes(32).toString("hex");
   const id = randomUUID();
