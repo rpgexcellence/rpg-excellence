@@ -50,7 +50,7 @@
     .rawShell,.rrShell,.pnShell,.havShell,.traShell,.trdShell,.mocShell,
     .irmTop,.irmWorkspace,.soaRegisterShell,.soaBoardShell,.reportShell,
     .paShell,.editShell,.pahShell,.maShell,.confirmShell,.workspaceShell,
-    .gerWrap,.iacShell,.siteProfileInner,.bcpCardLayout
+    .gerWrap,.iacShell,.siteProfileInner,.bcpCardLayout,:where(.saRecordPage>.saShell)>.saWork
   ){
     width:100%!important;
     max-width:none!important;
