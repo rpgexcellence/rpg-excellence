@@ -56,7 +56,10 @@ export async function GET(request) {
     if (error) return reply({ error: "Invitation history is unavailable." }, 503);
     return reply({ summary: summarizeInvitations(data), invitations: data.map(row => {
       const { answers, attachments, ...visible } = publicRow(row);
-      return visible;
+      return {
+        ...visible,
+        questionnaire: row.questionnaire?.map(({ id, question }) => ({ id, question })),
+      };
     }) });
   } catch (error) {
     return reply({ error: error.status ? error.message : "Invitation history is unavailable." }, error.status || 503);

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import SupplierSubmissionRevision, { formatInvitationDate as formatDate } from "./SupplierSubmissionRevision";
+import "./supplier-invitation-history.css";
 
 const api = "/api/portal/suppliers/invitations";
 const statusLabel = { creating:"Creating draft", unknown:"Outlook outcome uncertain", draft:"Draft created", sent:"Sent", in_progress:"In progress", submitted:"Submitted", clarification:"Clarification requested", reviewed:"Reviewed", revoked:"Revoked" };
@@ -17,21 +19,8 @@ const css = `
 .saInviteDialog .saInviteError{color:#a72822}
 .saRecordPage button.saInvitationPrimary{border:1px solid #315fe6;background:#315fe6;color:#fff}
 .saInviteDialog details{margin-top:8px}
-.saInviteDialog dl>div{margin:4px 0}
-.saInviteDialog dt{font-weight:700}
-.saInviteDialog dd{margin:0}
 `;
-const formatDate = date => new Date(date).toLocaleString("en-GB", {timeZone:"Europe/London"});
 const nextExpiry = () => new Date(Date.now() + 14*86400000).toISOString().slice(0,10);
-
-function renderAnswers(data) {
-  return <dl>{Object.entries(data || {}).filter(([key])=>key!=="responseVersion").map(([section, values]) => <div key={section}>
-    <dt>{section.replace(/^./, c=>c.toUpperCase())}</dt>
-    <dd>{values && Object.entries(values).map(([field,value]) => <div key={field}><b>{field.replace(/([A-Z])/g," $1")}</b> · {
-      value && typeof value === "object" ? [value.response,value.evidence].filter(Boolean).join(" · ") : value || "—"
-    }</div>)}</dd>
-  </div>)}</dl>;
-}
 
 export default function SupplierInvitationDialog({ ready, supplierId, supplierName, supplierReference, contacts, onStatus, historyRef }) {
   const primary=contacts.find(contact=>contact.is_primary && contact.is_active !== false);
@@ -43,7 +32,8 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
   const [clarification,setClarification]=useState({});
   const dialog=useRef(null);
   useEffect(()=>{
-    if(!ready)return;
+    const latestSubmissionInvitation = items.find(item => item.submissions?.length);
+  if(!ready)return;
     const controller=new AbortController();
     fetch(api + "?" + new URLSearchParams({supplierId,summary:"1"}), {cache:"no-store",signal:controller.signal})
       .then(response=>response.ok ? response.json() : null)
@@ -84,14 +74,20 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
   }
   const change=event=>setFields(current=>({...current,[event.target.name]:event.target.value}));
   const button=(label,callback,primaryStyle=false)=><button type="button" className={"saSecondary"+(primaryStyle?" saInvitationPrimary":"")} onClick={callback} disabled={busy}>{label}</button>;
+  const latestSubmissionInvitation = items.find(item => item.submissions?.length);
   if(!ready)return <span className="saSecondary">Supplier invitations · setup pending</span>;
   return <>
     <style>{css}</style>
     {button("Invitation history",()=>open("history"))}
     {button("Invite supplier",()=>open("entry"),true)}
-    <dialog data-device-draft-exclude="true" ref={dialog} className="saInviteDialog" aria-labelledby="saInvitationTitle">
-      <header><h2 id="saInvitationTitle">{mode==="history"?"Invitation history":mode==="preview"?"Preview Outlook email":"Invite supplier"}</h2>
-      {button("Close",()=>dialog.current.close())}</header>
+    <dialog data-device-draft-exclude="true" ref={dialog} className={mode === "history" ? "saInviteDialog saInviteHistory" : "saInviteDialog"} aria-labelledby="saInvitationTitle">
+      <header className="saInviteDialogHeader">
+        <div>
+          <h2 id="saInvitationTitle">{mode==="history"?"Supplier submissions and invitation history":mode==="preview"?"Preview Outlook email":"Invite supplier"}</h2>
+          {mode === "history" && <p>{supplierName} · {supplierReference}</p>}
+        </div>
+        <button type="button" className="saSecondary" onClick={() => dialog.current.close()}>Close</button>
+      </header>
       {error && <p role="alert" className="saInviteError">{error}</p>}
       {mode==="entry" && <form onSubmit={event=>{event.preventDefault();setError("");setMode("preview");}}>
         <label>Supplier contact email<input name="recipient" type="email" value={fields.recipient} onChange={change} required maxLength={254} /></label>
@@ -112,8 +108,12 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
         {busy && <p role="status">Loading invitation details…</p>}
         {!items.length && !busy && <p>No invitations recorded for this supplier.</p>}
         {items.map(item=><article key={item.id}>
-          <strong>{item.contact_name} · {item.recipient}</strong>
-          <p>{Date.parse(item.expires_at)<=Date.now() && !["reviewed","submitted","revoked"].includes(item.status) ? "Expired" : statusLabel[item.status]} · Created {formatDate(item.created_at)} · Expires {formatDate(item.expires_at)}</p>
+          <div className="saInviteHistoryContact">
+            <h3>{item.contact_name}</h3>
+            <span>{Date.parse(item.expires_at)<=Date.now() && !["reviewed","submitted","revoked"].includes(item.status) ? "Expired" : statusLabel[item.status]}</span>
+          </div>
+          <p className="saSubmissionMeta">{item.recipient}</p>
+          <p className="saSubmissionMeta">Created {formatDate(item.created_at)} · Expires {formatDate(item.expires_at)}</p>
           <div className="saInviteActions">
             {item.outlook_url && <a href={item.outlook_url} target="_blank" rel="noopener noreferrer">Open in Outlook ↗</a>}
             {["draft","in_progress","submitted","reviewed","clarification"].includes(item.status) && !item.sent_at && button("Check Outlook send status",()=>operate("refresh",item.id))}
@@ -125,13 +125,25 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
             <label>Clarification required<textarea value={clarification[item.id] || ""} maxLength={2000} onChange={event=>setClarification({...clarification,[item.id]:event.target.value})} /></label>
             {button("Record clarification request",()=>operate("clarify",item.id,clarification[item.id]))}
           </details>}
-          {item.submissions?.map((submission,index)=><details key={submission.submittedAt}>
-            <summary>Submitted revision {index+1} · {formatDate(submission.submittedAt)}</summary>
-            {renderAnswers(submission.answers)}
-            {submission.evidence?.map(file=><p key={file.id}><a href={api+"?"+new URLSearchParams({supplierId,invitationId:item.id,file:file.id})}>{file.name}</a></p>)}
-          </details>)}
-          <details><summary>Invitation audit trail</summary>
-            <ul>{item.history.map((entry,index)=><li key={index}>{formatDate(entry.at)} · {entry.action} · {entry.actor}{entry.details ? " · "+entry.details : ""}</li>)}</ul>
+          {item.submissions?.slice().reverse().map((submission, index) =>
+            <SupplierSubmissionRevision
+              key={submission.submittedAt}
+              submission={submission}
+              questionnaire={item.questionnaire}
+              revision={item.submissions.length - index}
+              initiallyOpen={item === latestSubmissionInvitation && index === 0}
+              evidenceUrl={file => api + "?" + new URLSearchParams({ supplierId, invitationId: item.id, file })}
+            />
+          )}
+          <details className="saSubmissionPanel">
+            <summary><strong>Invitation audit trail</strong> <span className="saSubmissionMeta">({item.history.length})</span></summary>
+            <ol className="saInviteAuditTrail">
+              {item.history.map((entry, index) => <li key={index}>
+                <strong>{entry.action}</strong>
+                <span className="saSubmissionMeta"><time dateTime={entry.at}>{formatDate(entry.at)}</time> · {entry.actor}</span>
+                {entry.details && <p>{entry.details}</p>}
+              </li>)}
+            </ol>
           </details>
         </article>)}
       </>}
