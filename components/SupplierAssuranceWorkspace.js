@@ -324,7 +324,6 @@ export default function SupplierAssuranceWorkspace({
       <style>{styles}</style>
       <style>{`
         .saRecordPage .saShell{display:block!important}
-        .saRecordPage .saWork{max-width:1280px;margin:0 auto}
         .saRecordPage .saTop a,.saRecordPage .saSecondary{border:1px solid #c8d5e2;border-radius:8px;background:#fff;color:#173b60;padding:9px 12px;font:inherit;font-weight:700;cursor:pointer}
         .saRecordPage .saHero.saRecordHero{background:linear-gradient(110deg,#102748,#075b5d);padding:20px;grid-template-columns:minmax(180px,1fr) minmax(435px,1.45fr)}
         .saRecordPage .saHero.saRecordHero h2{font-size:24px;margin:0 0 5px}
