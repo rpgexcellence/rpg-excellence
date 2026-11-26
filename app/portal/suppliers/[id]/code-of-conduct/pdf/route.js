@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createClient } from "../../../../../../lib/supabase/server";
 import { SUPPLIER_STANDARDS } from "../../../../../../lib/supplier-assurance";
@@ -73,6 +75,7 @@ export async function GET(request, { params }) {
   const supplier = document.supplier_snapshot || {};
   const organization = document.organization_snapshot || {};
   const pdf = await PDFDocument.create();
+  const logo = await pdf.embedPng(await readFile(path.join(process.cwd(), "public", "rpg-report-logo.png")));
 
   pdf.setTitle(
     `${clean(document.document_reference)} - Supplier Code of Conduct`,
@@ -132,17 +135,13 @@ export async function GET(request, { params }) {
       color: C.teal,
     });
 
-    page.drawText("RPG EXCELLENCE", {
-      x: PAGE.margin,
-      y: PAGE.height - 28,
-      size: 9,
-      font: bold,
-      color: C.blue,
-    });
+    const logoWidth = 102;
+    const logoHeight = logo.height * logoWidth / logo.width;
+    page.drawImage(logo, { x: PAGE.margin, y: PAGE.height - 16 - logoHeight, width: logoWidth, height: logoHeight });
 
     page.drawText("SUPPLIER CODE OF CONDUCT", {
-      x: PAGE.margin + 93,
-      y: PAGE.height - 28,
+      x: PAGE.margin + 127,
+      y: PAGE.height - 34,
       size: 8,
       font: bold,
       color: C.navy,
@@ -150,13 +149,13 @@ export async function GET(request, { params }) {
 
     page.drawText(clean(document.document_reference), {
       x: PAGE.width - PAGE.margin - 125,
-      y: PAGE.height - 28,
+      y: PAGE.height - 34,
       size: 7,
       font: bold,
       color: C.grey,
     });
 
-    y = PAGE.height - 48;
+    y = PAGE.height - 59;
   };
 
   const ensure = (height = 50) => {

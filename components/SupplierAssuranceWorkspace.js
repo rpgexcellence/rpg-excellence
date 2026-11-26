@@ -3,6 +3,9 @@
 
 import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import Link from "next/link";
+import SupplierRecordSummary from "./SupplierRecordSummary";
+import SupplierCountrySelect from "./SupplierCountrySelect";
+import SupplierInvitationDialog from "./SupplierInvitationDialog";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { SUPPLIER_STANDARDS, SUPPLIER_TYPES, applicableQuestions, buildCodeOfConductSections, calculateSupplierAssurance } from "../lib/supplier-assurance";
 const tabs = ["Supplier profile", "Contact details", "Standards & scope", "Risk engine", "Due diligence", "Approval & monitoring", "Code of Conduct"];
@@ -49,6 +52,7 @@ const initialData = (source = {}) => ({
   "approved_by_person_id": source.approved_by_person_id || "",
   "approval_expiry": source.approval_expiry || "",
   "next_review_date": source.next_review_date || "",
+  "review_override_rationale": source.monitoring_plan?.reviewOverrideRationale || "",
   "review_frequency_months": source.review_frequency_months || 12
 });
 function Field({
@@ -111,8 +115,12 @@ export default function SupplierAssuranceWorkspace({
   managementBoard = false,
   action,
   generateAction,
+  invitationAvailable = false,
+  invitationReady = false,
   saved
 }) {
+  const [editingStep, setEditingStep] = useState(null);
+  const [invitationStatus, setInvitationStatus] = useState(invitationReady ? "Ready to invite" : "Setup pending");
   const [state, formAction, pending] = useActionState(action, {});
   const [step, setStep] = useDeviceDraftState("SupplierAssuranceWorkspace_step", 0);
   const [data, setData] = useDeviceDraftState("SupplierAssuranceWorkspace_data", () => initialData(initial || {}));
@@ -312,11 +320,32 @@ export default function SupplierAssuranceWorkspace({
       "total": 0
     };
   })();
-  return <main className="saPage">
+  return <main className={"saPage" + (active ? " saRecordPage" : "")} data-supplier-assurance-layout="record-v2">
       <style>{styles}</style>
+      <style>{`
+        .saRecordPage .saShell{display:block!important}
+        .saRecordPage .saWork{max-width:1280px;margin:0 auto}
+        .saRecordPage .saTop a,.saRecordPage .saSecondary{border:1px solid #c8d5e2;border-radius:8px;background:#fff;color:#173b60;padding:9px 12px;font:inherit;font-weight:700;cursor:pointer}
+        .saRecordPage .saHero.saRecordHero{background:linear-gradient(110deg,#102748,#075b5d);padding:20px;grid-template-columns:minmax(180px,1fr) minmax(435px,1.45fr)}
+        .saRecordPage .saHero.saRecordHero h2{font-size:24px;margin:0 0 5px}
+        .saRecordPage .saHero.saRecordHero aside article{display:flex;flex-direction:column;gap:4px;min-width:0}
+        .saRecordPage .saHero.saRecordHero strong{font-size:16px;overflow-wrap:anywhere}
+        .saRecordPage .saHero.saRecordHero aside{display:grid;grid-template-columns:repeat(auto-fit,minmax(87px,1fr))}
+        .saRecordPage .saCapitalize{text-transform:capitalize}
+        .saRecordPage .saSummaryCard{min-width:0;border:1px solid #d2dee9;border-radius:10px;padding:14px}
+        .saRecordPage .saSummaryCard h3{margin:0 0 8px}
+        .saRecordPage .saSummaryCard dl{margin:0}
+        .saRecordPage .saSummaryCard dl>div{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;padding:8px 0;border-top:1px solid #e0e7ee;font-size:13px}
+        .saRecordPage .saSummaryCard dd{margin:0;overflow-wrap:anywhere}
+        .saRecordPage .saPanel[hidden]{display:none!important}
+        .saRecordPage .saRationale{margin-top:14px}
+        .saRecordPage a:hover,.saRecordPage button:focus-visible{outline-color:#315fe6}
+        @media(max-width:850px){.saRecordPage .saHero.saRecordHero{grid-template-columns:1fr}}
+        @media(max-width:520px){.saRecordPage .saHero.saRecordHero aside{grid-template-columns:1fr 1fr}}
+      `}</style>
     <style>{"\n  .saPage{font-size:16px;line-height:1.5}\n  .saSide>small,.saSide nav>span,.saTop>div:first-child>small,.saSectionHead small,.saGenerate>div>small{font-size:12px}\n  .saSide nav>a,.saSide nav>a.supplier b,.saTop a,.saTabs button,.saGrid label>span,.saQuestions label>span,.saPerformance label>span,.saActions button,.saGenerate button{font-size:14px}\n  .saSide nav>a.supplier small,.saSideFoot span,.saMetric>span,.saMetric small,.saPill,.saDecision span,.saDecision small{font-size:12px}\n  .saCocPreview>header{padding:32px}\n  .saCocPreview>header>span{font-size:12px}\n  .saCocPreview h3{font-size:26px;line-height:1.25}\n  .saCocPreview>header p{font-size:15px;line-height:1.7}\n  .saCocStandards{padding:18px 24px}\n  .saCocPreview>article{gap:9px 18px;padding:20px 24px}\n  .saCocPreview>article>b{font-size:16px;line-height:1.4}\n  .saCocPreview>article>span{font-size:12px;line-height:1.4}\n  .saCocPreview>article>p{font-size:14px;line-height:1.6}\n  .saCocPreview>article>small{font-size:12px}\n  .saGenerate p,.saSectionHead p{font-size:15px}\n  .saGenerate form small{font-size:12px}\n  @media(max-width:600px){\n    .saCocPreview>header{padding:22px}\n    .saCocPreview>article{grid-template-columns:1fr;padding:18px}\n  }\n"}</style>
       <div className="saShell">
-        <aside className="saSide">
+        {!active && <aside className="saSide">
           <Link href="/portal" className="saBrand">
             <b>RPG</b> Excellence
           </Link>
@@ -375,12 +404,12 @@ export default function SupplierAssuranceWorkspace({
             })()} under assurance
             </span>
           </div>
-        </aside>
+        </aside>}
 
         <section className="saWork">
           <header className="saTop">
             <div>
-              <small>INTEGRATED SUPPLIER ASSURANCE</small>
+              {active ? <small><Link href="/portal/suppliers">Supplier Register</Link></small> : <small>INTEGRATED SUPPLIER ASSURANCE</small>}
               <h1>
                 {(() => {
                 if (managementBoard) {
@@ -428,14 +457,21 @@ export default function SupplierAssuranceWorkspace({
               }
               return null;
             })()}
-              <Link href="/portal">Product dashboard</Link>
-              <Link className="primary" href="/portal/suppliers?new=1">
-                + New supplier
-              </Link>
+              {active && invitationAvailable && <SupplierInvitationDialog ready={invitationReady} supplierId={active.id} supplierName={active.trading_name || active.legal_name} supplierReference={active.supplier_reference} contacts={supplierContacts} onStatus={setInvitationStatus} />}
+              {!active && <Link href="/portal/suppliers">Supplier Register</Link>}
             </div>
           </header>
 
-          <section className="saHero">
+          {active ? <section className="saHero saRecordHero">
+            <div><h2>Supplier assurance</h2><p>Evaluate supplier risk, evidence and approval.</p></div>
+            <aside>
+              <article><span>Approval</span><strong className="saCapitalize">{statusLabel}</strong></article>
+              <article><span>Criticality</span><strong className="saCapitalize">{data.criticality}</strong></article>
+              <article><span>Assurance</span><strong>{result.assuranceScore}%</strong></article>
+              <article><span>Next review</span><strong>{data.next_review_date || "Not set"}</strong></article>
+              {invitationAvailable && <article><span>Invitation</span><strong>{invitationStatus}</strong></article>}
+            </aside>
+          </section> : <section className="saHero">
             <div>
               <span>ONE SUPPLIER · ONE ASSURANCE POSITION</span>
               <h2>
@@ -467,9 +503,8 @@ export default function SupplierAssuranceWorkspace({
                 <span>approval blockers</span>
               </article>
             </aside>
-          </section>
-
-          <section className="saMetrics">
+          </section>}
+          {(!active || managementBoard) && <section className="saMetrics">
             <Metric label={(() => {
             if (quarterlyReviews.length) {
               return "Last QBR date";
@@ -558,7 +593,7 @@ export default function SupplierAssuranceWorkspace({
             }
             return undefined;
           })()} />
-          </section>
+          </section>}
 
           {managementBoard && <section className="saBoard">
               <header>
@@ -629,13 +664,17 @@ export default function SupplierAssuranceWorkspace({
               return "active";
             }
             return "";
-          })()} onClick={() => setStep(index)} key={tab}>
+          })()} onClick={() => { setEditingStep(null); setStep(index); }} key={tab}>
                 <b>{index + 1}</b>
                 {tab}
               </button>)}
           </div>}
 
-          {!managementBoard && <form action={formAction} className="saPanel">
+          {active && !managementBoard && step !== 4 && editingStep !== step && !state?.error &&
+            <SupplierRecordSummary step={step} supplier={active} sites={supplierSites} contacts={supplierContacts} subtiers={subTierSuppliers} audits={supplierAudits} reviews={quarterlyReviews} result={result} documents={documents} stats={supplierNcStats[active.id] || {}} onEdit={() => setEditingStep(step)} />}
+          {!managementBoard && <form action={formAction} className="saPanel" hidden={Boolean(active && step !== 4 && editingStep !== step && !state?.error)}>
+            {active && step !== 4 && <button className="saSecondary" type="button" onClick={() => setEditingStep(null)}>View saved summary</button>}
+            {step !== 5 && <input type="hidden" name="review_override_rationale" value={data.review_override_rationale} />}
             <input type="hidden" name="supplier_id" value={active?.id || ""} />
             <input type="hidden" name="supplier_types" value={JSON.stringify(types)} />
             <input type="hidden" name="applicable_standards" value={JSON.stringify(standards)} />
@@ -675,7 +714,7 @@ export default function SupplierAssuranceWorkspace({
                   <Field label="Legal supplier name *" name="legal_name" value={data.legal_name} onChange={value => update("legal_name", value)} required />
                   <Field label="Trading name" name="trading_name" value={data.trading_name} onChange={value => update("trading_name", value)} />
                   {[["address_line_1","Address line 1 *"],["address_line_2","Address line 2"],["city","Town / city"],["region","County / region"],["postal_code","Postcode / ZIP"]].map(([key,label])=><Field key={key} label={label} name={key} value={data[key]} onChange={value=>update(key,value)} required={key==="address_line_1"}/>)}
-                  <Field label="Country" name="country" value={data.country} onChange={value => update("country", value)} />
+                  <SupplierCountrySelect country={data.country} onChange={value => update("country", value)} />
                   <Field label="Company / registration number" name="company_number" value={data.company_number} onChange={value => update("company_number", value)} />
                   <Field label="Website" name="website" value={data.website} onChange={value => update("website", value)} type="url" />
                   <Field label="Products, services or outsourced process supplied *" name="supply_description" value={data.supply_description} onChange={value => update("supply_description", value)} area rows="4" className="wide" required />
@@ -1158,6 +1197,10 @@ export default function SupplierAssuranceWorkspace({
                 })()}</div>
                 </div>
 
+                {reviewDeviation && <div className="saGrid saRationale">
+                  <Field className="wide" label="Review interval override rationale" name="review_override_rationale" area rows="2" value={data.review_override_rationale} onChange={value => update("review_override_rationale", value)} />
+                </div>}
+                {!reviewDeviation && <input type="hidden" name="review_override_rationale" value={data.review_override_rationale} />}
                 <h3>Performance snapshot</h3>
                 <div className="saPerformance">
                   {[["conformity", "Conformity"], ["delivery", "On-time delivery"], ["responsiveness", "Responsiveness"], ["correctiveAction", "Corrective action"]].map(([key, label]) => <label key={key}>
@@ -1323,7 +1366,7 @@ export default function SupplierAssuranceWorkspace({
             </footer>
           </form>}
 
-          {active && <section className="saGenerate">
+          {active && step === 6 && <section className="saGenerate">
               <div>
                 <small>
                   CONTROLLED DOCUMENT GENERATOR
