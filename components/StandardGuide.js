@@ -396,7 +396,7 @@ function Iso9001Clause({ clause, contactHref }) {
     </details>
   );
 }
-function EnhancedClause({ clause, detail, contactHref, support }) {
+function EnhancedClause({ clause, detail, contactHref, support, isAuditGuidance }) {
   return (
     <details className="clauseCard isoClauseCard">
       <summary>
@@ -409,7 +409,7 @@ function EnhancedClause({ clause, detail, contactHref, support }) {
       </summary>
       <div className="isoClauseBody">
         <article className="isoClauseRequirements">
-          <h3>Requirement map</h3>
+          <h3>{isAuditGuidance ? "Guidance map" : "Requirement map"}</h3>
           <ol>
             {detail.requirements.map((item) => (
               <li key={item}>{item}</li>
@@ -437,7 +437,7 @@ function EnhancedClause({ clause, detail, contactHref, support }) {
           <p>{detail.failures}</p>
         </article>
         <article>
-          <h3>Required management output</h3>
+          <h3>{isAuditGuidance ? "Audit programme output" : "Required management output"}</h3>
           <p>{detail.output}</p>
         </article>
         <article className="isoFocus">
@@ -457,6 +457,7 @@ export default function StandardGuide({ guide, locale }) {
   const enhancedGuide =
     guide.enhancedGuide || getEnhancedGuide(guide.assessmentStandard);
   const isLaboratory = guide.assessmentStandard === "ISO/IEC 17025:2017";
+  const isAuditGuidance = guide.kind === "audit-guidance";
   const contactHref =
     "/" +
     locale +
@@ -466,7 +467,7 @@ export default function StandardGuide({ guide, locale }) {
     encodeURIComponent(
       isLaboratory
         ? "Laboratory gap analysis and accreditation readiness"
-        : "Gap analysis and certification readiness",
+        : isAuditGuidance ? "Audit programme, auditor competence and training" : "Gap analysis and certification readiness",
     );
   const assessmentHref = guide.assessmentStandard
     ? "/portal?standard=" +
@@ -488,31 +489,42 @@ export default function StandardGuide({ guide, locale }) {
           <aside>
             <strong>Educational guidance</strong>
             <p>
-              {isLaboratory
+              {isAuditGuidance ? guide.educationalNote : isLaboratory
                 ? "This independent guide supports practical understanding and accreditation planning. Use the licensed standard and applicable UKAS requirements as the criteria. RPG scores and completed actions do not confer accreditation."
                 : "This guide paraphrases key themes for practical understanding. It does not reproduce the standard or replace the official licensed publication, legal advice or accredited certification decisions."}
             </p>
           </aside>
-          <div className="assessmentLinkBox">
-            <div>
-              <span>RPG INTELLIGENCE ASSESSMENT</span>
-              <strong>
-                {guide.assessmentStandard
-                  ? "Assess your " + guide.code + " readiness"
-                  : "Explore " + guide.code + " assurance support"}
-              </strong>
-              <p>
-                {guide.assessmentStandard
-                  ? "Open the controlled clause-based assessment, record evidence and generate a management-ready readiness result."
-                  : "Open RPG Intelligence to review currently available assessments and assurance tools."}
-              </p>
+          {guide.training ? (
+            <div className="assessmentLinkBox">
+              <div>
+                <span>RPG INTERNAL AUDIT ACADEMY</span>
+                <strong>{guide.training.title}</strong>
+                <p>{guide.training.description}</p>
+              </div>
+              <Link href={`/${locale}${guide.training.href}`}>View training →</Link>
             </div>
-            <Link href={assessmentHref}>
-              {guide.assessmentStandard
-                ? "Start this assessment →"
-                : "Open RPG Intelligence →"}
-            </Link>
-          </div>
+          ) : (
+            <div className="assessmentLinkBox">
+              <div>
+                <span>RPG INTELLIGENCE ASSESSMENT</span>
+                <strong>
+                  {guide.assessmentStandard
+                    ? "Assess your " + guide.code + " readiness"
+                    : "Explore " + guide.code + " assurance support"}
+                </strong>
+                <p>
+                  {guide.assessmentStandard
+                    ? "Open the controlled clause-based assessment, record evidence and generate a management-ready readiness result."
+                    : "Open RPG Intelligence to review currently available assessments and assurance tools."}
+                </p>
+              </div>
+              <Link href={assessmentHref}>
+                {guide.assessmentStandard
+                  ? "Start this assessment →"
+                  : "Open RPG Intelligence →"}
+              </Link>
+            </div>
+          )}
           {guide.assessmentStandard === "ISO 9001:2026" && (
             <div className="assessmentLinkBox">
               <div><span>RPG EXCELLENCE COLLECTED EDITION</span>
@@ -590,13 +602,13 @@ export default function StandardGuide({ guide, locale }) {
         <div>
           <span className="kicker">Overview</span>
           <h2>
-            {isLaboratory
+            {isAuditGuidance ? "What an effective audit programme should achieve" : isLaboratory
               ? "What this laboratory standard is designed to achieve"
               : "What this management system is designed to achieve"}
           </h2>
           <p>{guide.purpose}</p>
           <p>
-            {isLaboratory
+            {isAuditGuidance ? guide.overviewNote : isLaboratory
               ? "Confidence depends on the technical work behind the result: the people, method, equipment, environment, references, data and review. A management-system certificate alone is not evidence of laboratory competence."
               : "The value comes from integrating requirements into normal governance and operations—not producing documents solely for an audit."}
           </p>
@@ -731,12 +743,12 @@ export default function StandardGuide({ guide, locale }) {
             aria-labelledby={"" + guide.accent + "-edition-status"}
           >
             <div className="isoSectionHead">
-              <span className="kicker">EDITION, STATUS & CONTROL BASELINE</span>
+              <span className="kicker">{isAuditGuidance ? "ISSUED EDITION & PRACTICAL RESPONSE" : "EDITION, STATUS & CONTROL BASELINE"}</span>
               <h2 id={"" + guide.accent + "-edition-status"}>
-                Use the correct published baseline
+                {isAuditGuidance ? "What changed in the fourth edition" : "Use the correct published baseline"}
               </h2>
               <p>
-                {isLaboratory
+                {isAuditGuidance ? enhancedGuide.baseline : isLaboratory
                   ? "Use ISO/IEC 17025:2017 and check the current UKAS publications applicable to your activities. Keep the declared scope, locations and evidence of technical competence aligned."
                   : "Confirm the applicable edition, amendments and transition arrangements with your certification body, then translate them into controlled implementation and assurance."}
               </p>
@@ -760,9 +772,9 @@ export default function StandardGuide({ guide, locale }) {
               The executive assurance brief
             </h2>
             <p className="clauseIntro">
-              Each theme connects the standard to a leadership decision, corroborating
-              evidence and an ISO 19011-aligned auditor challenge. Use it to test
-              implementation, not document presence alone.
+              {isAuditGuidance
+                ? "Use these decisions to set coverage across sites, select audit methods and check whether the programme is delivering reliable assurance."
+                : "Each theme connects the standard to a leadership decision, corroborating evidence and an ISO 19011-aligned auditor challenge. Use it to test implementation, not document presence alone."}
             </p>
             <div className="isoChangeGrid">
               {enhancedGuide.themes.map((item, index) => (
@@ -788,10 +800,11 @@ export default function StandardGuide({ guide, locale }) {
           <section className="isoBoardSection">
             <div>
               <span className="kicker">BOARD & MANAGEMENT REVIEW</span>
-              <h2>Eight questions that expose readiness</h2>
+              <h2>{isAuditGuidance ? "Eight questions for global audit oversight" : "Eight questions that expose readiness"}</h2>
               <p>
-                Answers should be supported by current evidence, named accountability
-                and a decision—not assurance language alone.
+                {isAuditGuidance
+                  ? "Use the answers in management review to agree priorities, allocate resources and assign action owners."
+                  : "Answers should be supported by current evidence, named accountability and a decision—not assurance language alone."}
               </p>
             </div>
             <ol>
@@ -808,7 +821,7 @@ export default function StandardGuide({ guide, locale }) {
               <span className="kicker">ISO 19011-ALIGNED AUDIT TRAILS</span>
               <h2>Test the system end to end</h2>
               <p>
-                {isLaboratory
+                {isAuditGuidance ? enhancedGuide.trailIntro : isLaboratory
                   ? "Follow a real laboratory job from the customer requirement to the released result. Combine technical witnessing, calculations, records, interviews and monitoring evidence; use changed or abnormal work where relevant."
                   : "Use risk-based sampling, interviews, observation, records and performance trends to corroborate whether controls operate as an interconnected management system."}
               </p>
@@ -835,7 +848,7 @@ export default function StandardGuide({ guide, locale }) {
         <span className="kicker">Clause navigator</span>
         <h2>Key clauses explained</h2>
         <p className="clauseIntro">
-          {guide.assessmentStandard === "ISO 9001:2026" || enhancedGuide
+          {isAuditGuidance ? "Clauses 1–3 cover scope, references and terms. Open Clauses 4–7 to see the guidance, practical decisions, evidence and auditor questions." : guide.assessmentStandard === "ISO 9001:2026" || enhancedGuide
             ? "Open each clause for its requirement map, practical application, evidence and sampling prompts, auditor questions, weaknesses and required management output."
             : "Open any clause to see practical application, possible evidence, common weaknesses and relevant RPG Excellence support."}
         </p>
@@ -861,6 +874,7 @@ export default function StandardGuide({ guide, locale }) {
                 detail={enhancedGuide.clauses[clause.number]}
                 contactHref={contactHref}
                 support={enhancedGuide.support}
+                isAuditGuidance={isAuditGuidance}
               />
             ) : (
               <details className="clauseCard" key={clause.number}>
@@ -926,7 +940,7 @@ export default function StandardGuide({ guide, locale }) {
                       fontWeight: 800,
                     }}
                   >
-                    Read official UKAS guidance ↗
+                    {card.linkLabel || "Read official UKAS guidance ↗"}
                   </a>
                 ) : null}
               </article>
@@ -939,9 +953,9 @@ export default function StandardGuide({ guide, locale }) {
           <span>RPG EXCELLENCE SUPPORT</span>
           <h2>Move from understanding to controlled implementation.</h2>
           <p>
-            Use RPG Excellence for gap analysis, implementation support, internal
-            auditing, evidence control, findings, CAPA-8D and management reporting
-            across a single or integrated system.
+            {isAuditGuidance
+              ? enhancedGuide.support
+              : "Use RPG Excellence for gap analysis, implementation support, internal auditing, evidence control, findings, CAPA-8D and management reporting across a single or integrated system."}
           </p>
         </div>
         <Link href={contactHref} className="button">
