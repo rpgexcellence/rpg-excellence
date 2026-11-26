@@ -33,7 +33,7 @@
   /* One horizontal gutter for every workspace; no extra central column. */
   .rpgPortalContent :is(
     .pdMain,.gapWork,.iaWorkspace,.ncrWork,.capaWork,.iapWork,.rpmWork,
-    .avWork,.iahContent,.iatWork,.hsvContent,.bcpWorkspace,.ishMain,.saWork,
+    .avWork,.iahContent,.iatWork,.hsvContent,.bcpWorkspace,.ishMain,.saWork,.qbrWork,
     .raPage,.nrPage,.prPage,.mr,.mn,.md,.harPage,.hmbPage,.taPage,.crPage,
     .rawPage,.rrPage,.pdPage,.pnPage,.havPage,.traPage,.trdPage,
     .irmPage,.soaRegisterPage,.soaBoard,.soaExecutivePage,.paPage,.editPage,
