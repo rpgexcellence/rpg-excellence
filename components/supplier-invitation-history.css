@@ -1,0 +1,206 @@
+.saRecordPage .saInviteDialog.saInviteHistory {
+  box-sizing: border-box;
+  width: min(980px, calc(100% - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.saInviteHistory > .saInviteDialogHeader {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  flex-wrap: nowrap;
+  padding: 16px clamp(12px, 3vw, 24px);
+  border-bottom: 1px solid #cfdae5;
+  background: #fff;
+}
+
+.saInviteHistory > .saInviteDialogHeader h2 {
+  margin: 0;
+  font-size: clamp(17px, 3vw, 22px);
+}
+
+.saInviteHistory > .saInviteDialogHeader p {
+  margin: 4px 0 0;
+  color: #455e77;
+  overflow-wrap: anywhere;
+}
+
+.saInviteDialog.saInviteHistory > article,
+.saInviteHistory > p {
+  margin: 14px clamp(10px, 3vw, 24px);
+}
+
+.saInviteHistoryContact {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.saInviteHistoryContact h3,
+.saSubmissionSection h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.saInviteHistoryContact > span,
+.saSubmissionResponse {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: #e9f0fa;
+  color: #173b60;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.saSubmissionMeta {
+  color: #455e77;
+  font-size: 13px;
+}
+
+.saInviteHistoryContact + p,
+.saInviteHistoryContact + p + p {
+  margin: 4px 0 10px;
+}
+
+.saInviteHistory summary {
+  cursor: pointer;
+}
+
+.saInviteHistory .saSubmissionPanel {
+  margin-top: 12px;
+  border: 1px solid #cfdae5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.saSubmissionPanel > summary {
+  padding: 10px 12px;
+}
+
+.saSubmissionSummary {
+  display: inline-flex;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.saSubmissionSummary time {
+  color: #455e77;
+  font-size: 13px;
+}
+
+.saSubmissionBody {
+  display: grid;
+  gap: 12px;
+  padding: clamp(8px, 2vw, 14px);
+  border-top: 1px solid #cfdae5;
+  background: #f3f7fb;
+  border-radius: 0 0 8px 8px;
+}
+
+.saSubmissionSection {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #cfdae5;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.saSubmissionFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 12px 0 0;
+}
+
+.saSubmissionFields .saSubmissionWide {
+  grid-column: 1 / -1;
+}
+
+.saSubmissionFields dt,
+.saSubmissionNotes dt {
+  color: #455e77;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.saSubmissionFields dd,
+.saSubmissionNotes dd {
+  margin: 3px 0 0;
+  white-space: pre-wrap;
+}
+
+.saSubmissionControls,
+.saInviteAuditTrail {
+  padding: 0;
+  margin: 10px 0 0;
+  list-style: none;
+}
+
+.saSubmissionControls > li,
+.saInviteAuditTrail > li {
+  border-top: 1px solid #dae4ee;
+  padding: 10px 0;
+}
+
+.saSubmissionControlHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: start;
+}
+
+.saSubmissionControlId {
+  margin-right: 8px;
+  color: #455e77;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.saSubmissionResponse[data-response="yes"] { background: #dff5ec; color: #085c42; }
+.saSubmissionResponse[data-response="partial"] { background: #fff0d0; color: #714600; }
+.saSubmissionResponse[data-response="no"] { background: #fce8e6; color: #8a2822; }
+
+.saSubmissionNotes {
+  margin: 6px 0 0;
+}
+
+.saSubmissionFiles {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+
+.saSubmissionFiles a {
+  display: inline-block;
+  padding: 4px 0;
+  color: #1c53a4;
+  text-decoration: underline;
+}
+
+.saInviteAuditTrail {
+  margin: 0 12px;
+}
+
+.saInviteAuditTrail > li {
+  display: grid;
+  gap: 4px;
+}
+
+.saInviteAuditTrail p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 560px) {
+  .saSubmissionFields,
+  .saSubmissionControlHeader {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
