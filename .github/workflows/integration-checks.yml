@@ -22,6 +22,7 @@ jobs:
       - run: npm run test:soa --prefix verification
       - run: npm run test:commercial --prefix verification
       - run: npm run test:microsoft --prefix verification
+      - run: node verification/supplier-invitation-sql.test.mjs
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co

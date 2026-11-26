@@ -164,6 +164,19 @@ export async function saveSupplier(_state, fd) {
     };
   }
 
+  if (intent === "approve" && id) {
+    const { data: invitation, error: invitationLookupError } = await storageAdmin.from("supplier_assurance_invitations")
+      .select("status").eq("supplier_id", id).eq("organization_id", organization.id).eq("owner_id", user.id)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    // Existing deployments can continue using the controlled approval form before invitations are enabled.
+    if (invitationLookupError && !["42P01","PGRST205"].includes(invitationLookupError.code)) {
+      return { error: "Supplier invitation status could not be checked. Try approval again shortly." };
+    }
+    if (invitation && !["reviewed","revoked"].includes(invitation.status)) {
+      return { error: "Complete the supplier invitation and RPG evidence review before approving this supplier." };
+    }
+  }
+
   if (intent === "approve") {
     const uncontrolledGaps = result.gaps.filter((gapId) => {
       const gap = answers[gapId] || {};
@@ -204,6 +217,10 @@ export async function saveSupplier(_state, fd) {
   const reviewMonths = Math.min(60, Math.max(1,
     Number(fd.get("review_frequency_months")) || result.reviewMonths
   ));
+  const reviewOverrideRationale = clean(fd.get("review_override_rationale")).slice(0, 2000);
+  if (intent === "approve" && reviewMonths !== result.reviewMonths && !reviewOverrideRationale) {
+    return { error: "Record the rationale for overriding the engine-recommended review interval." };
+  }
   const nextReviewDate = clean(fd.get("next_review_date")) || futureDate(reviewMonths);
   const approvalExpiry = clean(fd.get("approval_expiry")) || (intent === "approve" ? futureDate(reviewMonths) : null);
 
@@ -262,6 +279,7 @@ export async function saveSupplier(_state, fd) {
       reviewMonths,
       engineRecommendedReviewMonths: result.reviewMonths,
       approverOverride: reviewMonths !== result.reviewMonths,
+      reviewOverrideRationale: reviewMonths !== result.reviewMonths ? reviewOverrideRationale : null,
       auditRequired: ["High", "Critical"].includes(
         result.riskBand
       ),

@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: { serverActions: { bodySizeLimit: "6mb" } },
+  async headers() {
+    return [{
+      source: "/supplier-access/:path*",
+      headers: [
+        { key: "Cache-Control", value: "private, no-store" },
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        { key: "Content-Security-Policy", value: "script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" },
+      ],
+    }];
+  },
   outputFileTracingIncludes: {
     "/api/publications/iso-9001-2026-clauses/*/download": [
       "./private-assets/RPG_ISO9001_2026_Clause_*.pdf",

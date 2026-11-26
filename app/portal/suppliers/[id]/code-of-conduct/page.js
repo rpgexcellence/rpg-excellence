@@ -96,7 +96,7 @@ export default async function SupplierCodePage({
 
         <header className="cocHeader">
           <div>
-            <b>RPG EXCELLENCE</b>
+            <img src="/rpg-report-logo.png" width="230" height="77" alt="RPG Excellence" style={{ maxWidth:"100%", height:"auto", display:"block" }} />
             <span>CONTROLLED SUPPLIER ASSURANCE DOCUMENT</span>
           </div>
           <dl>

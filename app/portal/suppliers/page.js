@@ -1,3 +1,5 @@
+import { commercialAccess } from "../../../lib/commercial-access.mjs";
+import { invitationStoreReady } from "../../../lib/supplier-invitation-store";
 import SupplierRegister from "../../../components/SupplierRegister";
 import { buildSupplierRegisterRows } from "../../../lib/supplier-reporting.mjs";
 // VERIFIED_SUPPLIER_PAGE_DRAFT_20261021: explicit conditions and unique draft keys.
@@ -241,6 +243,8 @@ export default async function SuppliersPage({
     }
   }
   if(params?.id && !selected)notFound();
+  const invitationAvailable = Boolean(selected && commercialAccess(user));
+  const invitationReady = invitationAvailable && await invitationStoreReady();
   return <ControlledDeviceDrafts userId={user.id} organizationId={organization?.id} recordKey={'supplier:' + (selected?.id || 'new')} label="Supplier assessment" baseline={{
     "key": (() => {
       if (params?.new === "1") {
@@ -289,6 +293,5 @@ export default async function SuppliersPage({
         return null;
       }
       return selected;
-    })()} documents={documents} approvers={approvers} evidenceFiles={evidenceFiles} subTierSuppliers={subTierSuppliers} supplierSites={supplierSites} supplierNcStats={supplierNcStats} supplierContacts={supplierContacts} supplierAudits={supplierAudits} quarterlyReviews={quarterlyReviews} companyPeople={companyPeople} dueDiligenceEvents={dueDiligenceEvents} managementBoard={managementBoard} action={saveSupplier} generateAction={generateSupplierCodeOfConduct} saved={params?.saved === "1"} /></ControlledDeviceDrafts>;
+    })()} documents={documents} approvers={approvers} evidenceFiles={evidenceFiles} subTierSuppliers={subTierSuppliers} supplierSites={supplierSites} supplierNcStats={supplierNcStats} supplierContacts={supplierContacts} supplierAudits={supplierAudits} quarterlyReviews={quarterlyReviews} companyPeople={companyPeople} dueDiligenceEvents={dueDiligenceEvents} managementBoard={managementBoard} action={saveSupplier} generateAction={generateSupplierCodeOfConduct} invitationAvailable={invitationAvailable} invitationReady={invitationReady} saved={params?.saved === "1"} /></ControlledDeviceDrafts>;
 }
-
