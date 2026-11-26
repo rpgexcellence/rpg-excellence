@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 
 const api = "/api/portal/suppliers/invitations";
 const statusLabel = { creating:"Creating draft", unknown:"Outlook outcome uncertain", draft:"Draft created", sent:"Sent", in_progress:"In progress", submitted:"Submitted", clarification:"Clarification requested", reviewed:"Reviewed", revoked:"Revoked" };
@@ -33,7 +33,7 @@ function renderAnswers(data) {
   </div>)}</dl>;
 }
 
-export default function SupplierInvitationDialog({ ready, supplierId, supplierName, supplierReference, contacts, onStatus }) {
+export default function SupplierInvitationDialog({ ready, supplierId, supplierName, supplierReference, contacts, onStatus, historyRef }) {
   const primary=contacts.find(contact=>contact.is_primary && contact.is_active !== false);
   const [fields,setFields]=useState(()=>({recipient:primary?.email || "",contact:[primary?.first_name,primary?.last_name].filter(Boolean).join(" "),expiry:nextExpiry()}));
   const [mode,setMode]=useState("entry");
@@ -47,7 +47,7 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
     const controller=new AbortController();
     fetch(api + "?" + new URLSearchParams({supplierId,summary:"1"}), {cache:"no-store",signal:controller.signal})
       .then(response=>response.ok ? response.json() : null)
-      .then(data=>{if(data?.invitations?.[0]) onStatus?.(statusLabel[data.invitations[0].status]);})
+      .then(data=>{if(data?.summary) onStatus?.({...data.summary,label:statusLabel[data.summary.status]});})
       .catch(()=>{});
     return ()=>controller.abort();
   },[ready,supplierId,onStatus]);
@@ -56,7 +56,7 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
     const data=await response.json();
     if(!response.ok) throw new Error(data.error || "Invitation history is unavailable.");
     setItems(data.invitations);
-    if(data.invitations[0]) onStatus?.(statusLabel[data.invitations[0].status]);
+    if(data.summary) onStatus?.({...data.summary,label:statusLabel[data.summary.status]});
   }
   async function open(next) {
     setMode(next);setError("");dialog.current.showModal();
@@ -66,6 +66,7 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
       finally{setBusy(false);}
     }
   }
+  useImperativeHandle(historyRef, () => ({ openHistory: () => open("history") }));
   async function operate(operation, invitationId, note) {
     if(busy)return;
     setBusy(true);setError("");
@@ -75,7 +76,7 @@ export default function SupplierInvitationDialog({ ready, supplierId, supplierNa
       })});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error || "The invitation action could not be completed.");
-      onStatus?.(statusLabel[data.invitation.status]);
+
       setMode("history");
       await loadHistory();
     }catch(cause){setError(cause.message);}

@@ -3,12 +3,12 @@
 
 import { useDeviceDraftState } from "./DeviceDraftWorkspace";
 import Link from "next/link";
-import SupplierRecordSummary from "./SupplierRecordSummary";
+import SupplierRecordSummary, { SupplierCodeRequirements, SupplierControlledHistory, SupplierDueDiligenceSummary, SupplierInvitationWorkflow, SupplierRiskDecision, dateLabel } from "./SupplierRecordSummary";
 import SupplierCountrySelect from "./SupplierCountrySelect";
 import SupplierInvitationDialog from "./SupplierInvitationDialog";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { SUPPLIER_STANDARDS, SUPPLIER_TYPES, applicableQuestions, buildCodeOfConductSections, calculateSupplierAssurance } from "../lib/supplier-assurance";
-const tabs = ["Supplier profile", "Contact details", "Standards & scope", "Risk engine", "Due diligence", "Approval & monitoring", "Code of Conduct"];
+const tabs = ["Supplier Profile", "Contact Details", "Standards & Scope", "Dynamic Risk Engine", "Due Diligence", "Approval & Monitoring", "Code of Conduct"];
 const n = (value, fallback = 3) => (() => {
   if (Number.isFinite(Number(value))) {
     return Number(value);
@@ -107,6 +107,7 @@ export default function SupplierAssuranceWorkspace({
   subTierSuppliers = [],
   supplierSites = [],
   supplierNcStats = {},
+  supplierFindings = [],
   supplierContacts = [],
   supplierAudits = [],
   quarterlyReviews = [],
@@ -120,7 +121,15 @@ export default function SupplierAssuranceWorkspace({
   saved
 }) {
   const [editingStep, setEditingStep] = useState(null);
-  const [invitationStatus, setInvitationStatus] = useState(invitationReady ? "Ready to invite" : "Setup pending");
+  const [invitation, setInvitation] = useState({label: invitationReady ? "Ready to invite" : "Setup pending"});
+  const invitationDialog = useRef(null);
+  const showInvalidAssessment = event => {
+    if (!event.currentTarget.form?.checkValidity()) {
+      event.preventDefault();
+      setEditingStep(step);
+    }
+  };
+  const showInvitationHistory = invitationReady ? () => invitationDialog.current?.openHistory() : undefined;
   const [state, formAction, pending] = useActionState(action, {});
   const [step, setStep] = useDeviceDraftState("SupplierAssuranceWorkspace_step", 0);
   const [data, setData] = useDeviceDraftState("SupplierAssuranceWorkspace_data", () => initialData(initial || {}));
@@ -151,6 +160,9 @@ export default function SupplierAssuranceWorkspace({
     "riskInputs": risk,
     "criticality": data.criticality
   }), [standards, types, answers, risk, data.criticality]);
+  const savedCodeSections = useMemo(() => buildCodeOfConductSections({
+    standards: initial?.applicable_standards || [], types: initial?.supplier_types || [], supplierName: initial?.legal_name || "the Supplier",
+  }), [initial]);
   const codeSections = useMemo(() => buildCodeOfConductSections({
     "standards": standards,
     "types": types,
@@ -332,12 +344,7 @@ export default function SupplierAssuranceWorkspace({
         .saRecordPage .saHero.saRecordHero strong{font-size:16px;overflow-wrap:anywhere}
         .saRecordPage .saHero.saRecordHero aside{display:grid;grid-template-columns:repeat(auto-fit,minmax(87px,1fr))}
         .saRecordPage .saCapitalize{text-transform:capitalize}
-        .saRecordPage .saSummaryCard{min-width:0;border:1px solid #d2dee9;border-radius:10px;padding:14px}
-        .saRecordPage .saSummaryCard h3{margin:0 0 8px}
-        .saRecordPage .saSummaryCard dl{margin:0}
-        .saRecordPage .saSummaryCard dl>div{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;padding:8px 0;border-top:1px solid #e0e7ee;font-size:13px}
-        .saRecordPage .saSummaryCard dd{margin:0;overflow-wrap:anywhere}
-        .saRecordPage .saPanel[hidden]{display:none!important}
+        .saRecordPage :is(.saPanel,.saGenerate)[hidden]{display:none!important}
         .saRecordPage .saRationale{margin-top:14px}
         .saRecordPage a:hover,.saRecordPage button:focus-visible{outline-color:#315fe6}
         @media(max-width:850px){.saRecordPage .saHero.saRecordHero{grid-template-columns:1fr}}
@@ -457,7 +464,7 @@ export default function SupplierAssuranceWorkspace({
               }
               return null;
             })()}
-              {active && invitationAvailable && <SupplierInvitationDialog ready={invitationReady} supplierId={active.id} supplierName={active.trading_name || active.legal_name} supplierReference={active.supplier_reference} contacts={supplierContacts} onStatus={setInvitationStatus} />}
+              {active && invitationAvailable && <SupplierInvitationDialog ready={invitationReady} supplierId={active.id} supplierName={active.trading_name || active.legal_name} supplierReference={active.supplier_reference} contacts={supplierContacts} onStatus={setInvitation} historyRef={invitationDialog} />}
               {!active && <Link href="/portal/suppliers">Supplier Register</Link>}
             </div>
           </header>
@@ -468,8 +475,8 @@ export default function SupplierAssuranceWorkspace({
               <article><span>Approval</span><strong className="saCapitalize">{statusLabel}</strong></article>
               <article><span>Criticality</span><strong className="saCapitalize">{data.criticality}</strong></article>
               <article><span>Assurance</span><strong>{result.assuranceScore}%</strong></article>
-              <article><span>Next review</span><strong>{data.next_review_date || "Not set"}</strong></article>
-              {invitationAvailable && <article><span>Invitation</span><strong>{invitationStatus}</strong></article>}
+              <article><span>Next review</span><strong>{dateLabel(data.next_review_date) || "Not set"}</strong></article>
+              {invitationAvailable && <article><span>Invitation</span><strong>{invitation.label}</strong></article>}
             </aside>
           </section> : <section className="saHero">
             <div>
@@ -671,8 +678,20 @@ export default function SupplierAssuranceWorkspace({
           </div>}
 
           {active && !managementBoard && step !== 4 && editingStep !== step && !state?.error &&
-            <SupplierRecordSummary step={step} supplier={active} sites={supplierSites} contacts={supplierContacts} subtiers={subTierSuppliers} audits={supplierAudits} reviews={quarterlyReviews} result={result} documents={documents} stats={supplierNcStats[active.id] || {}} onEdit={() => setEditingStep(step)} />}
-          {!managementBoard && <form action={formAction} className="saPanel" hidden={Boolean(active && step !== 4 && editingStep !== step && !state?.error)}>
+            <SupplierRecordSummary step={step} supplier={active} sites={supplierSites} contacts={supplierContacts}
+              subtiers={subTierSuppliers} audits={supplierAudits} reviews={quarterlyReviews} documents={documents}
+              codeSections={savedCodeSections} findings={supplierFindings} invitation={invitation}
+              getRecommendedReviewDate={months => addMonths(reviewBaseDate, months)} openGapControl={openGapControl}
+              onEdit={() => setEditingStep(step)}
+              footer={<footer className="saActions"><div>
+                <button type="button" onClick={() => setStep(step - 1)} disabled={step === 0}>← Previous</button>
+                <button type="button" onClick={() => setStep(step + 1)} disabled={step === tabs.length - 1}>Next →</button>
+              </div><div>
+                <button form="supplier-assessment" name="intent" value="save" onClick={showInvalidAssessment} disabled={pending}>Save draft</button>
+                <button form="supplier-assessment" name="intent" value="submit" className="outline" onClick={showInvalidAssessment} disabled={pending}>Submit for approval</button>
+                <button form="supplier-assessment" name="intent" value="approve" className="primary" onClick={() => setEditingStep(step)} type="button" disabled={pending || result.blockers.length > 0}>Approve supplier</button>
+              </div></footer>} />}
+          {!managementBoard && <form id="supplier-assessment" action={formAction} className="saPanel" hidden={Boolean(active && step !== 4 && editingStep !== step && !state?.error)}>
             {active && step !== 4 && <button className="saSecondary" type="button" onClick={() => setEditingStep(null)}>View saved summary</button>}
             {step !== 5 && <input type="hidden" name="review_override_rationale" value={data.review_override_rationale} />}
             <input type="hidden" name="supplier_id" value={active?.id || ""} />
@@ -869,20 +888,7 @@ export default function SupplierAssuranceWorkspace({
                   </Pill>
                 </div>
 
-                <div className="saRiskSummary">
-                  <div>
-                    <span>ENGINE DECISION</span>
-                    <strong>{result.recommendation}</strong>
-                    <small>
-                      Recommended review: every{" "}
-                      {result.reviewMonths} months
-                    </small>
-                  </div>
-                  <div className={"saRiskDial " + riskTone + ""}>
-                    <strong>{result.riskScore}</strong>
-                    <span>RISK</span>
-                  </div>
-                </div>
+                <SupplierRiskDecision result={result} position="decision" />
 
                 <div className="saGrid risk">
                   <Field label="Supplier criticality" value={data.criticality} onChange={() => {}}>
@@ -917,22 +923,7 @@ export default function SupplierAssuranceWorkspace({
                     </label>)}
                 </div>
 
-                <div className="saRule">
-                  <b>Automated controls</b>
-                  <span>
-                    {(() => {
-                  if (["High", "Critical"].includes(result.riskBand)) {
-                    return "Technical approval + enhanced monitoring + supplier audit";
-                  }
-                  return (() => {
-                    if (result.riskBand === "Medium") {
-                      return "Documented approval + periodic monitoring";
-                    }
-                    return "Simplified approval + routine monitoring";
-                  })();
-                })()}
-                  </span>
-                </div>
+                <SupplierRiskDecision result={result} position="controls" />
               </>}
 
             {step === 4 && <>
@@ -1282,50 +1273,7 @@ export default function SupplierAssuranceWorkspace({
                   </Pill>
                 </div>
 
-                <div className="saCocPreview">
-                  <header>
-                    <span>
-                      RPG EXCELLENCE · CONTROLLED
-                      SUPPLIER DOCUMENT
-                    </span>
-                    <h3>
-                      Supplier Code of Conduct &amp;
-                      Assurance Requirements
-                    </h3>
-                    <p>
-                      <b>Supplier:</b>{" "}
-                      {data.legal_name || "Complete supplier name"}
-                      <br />
-                      <b>Address:</b>{" "}
-                      {data.registered_address || "Complete registered address"}
-                      <br />
-                      <b>Scope:</b>{" "}
-                      {data.supply_description || "Complete supply description"}
-                    </p>
-                  </header>
-
-                  <div className="saCocStandards">
-                    {standards.map(id => <Pill key={id}>
-                        {SUPPLIER_STANDARDS.find(item => item.id === id)?.label || id}
-                      </Pill>)}
-                  </div>
-
-                  {codeSections.map((item, index) => <article key={item.id}>
-                      <b>
-                        {index + 1}. {item.title}
-                      </b>
-                      <span>
-                        {item.applicability}
-                      </span>
-                      <p>
-                        {item.paragraphs[0]}
-                      </p>
-                      <small>
-                        {item.requirements.length}{" "}
-                        controlled requirements included
-                      </small>
-                    </article>)}
-                </div>
+                <SupplierCodeRequirements supplier={data} standards={standards} sections={codeSections} />
 
                 {!active && <div className="saNotice">
                     Save the supplier record first.
@@ -1337,6 +1285,8 @@ export default function SupplierAssuranceWorkspace({
                   </div>}
               </>}
 
+            {active && step === 4 && <SupplierDueDiligenceSummary findings={supplierFindings} stats={activeNc}
+              result={result} invitation={invitation} showInvitationHistory={showInvitationHistory} />}
             <footer className="saActions">
               <div>
                 <button type="button" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
@@ -1364,47 +1314,17 @@ export default function SupplierAssuranceWorkspace({
                 </button>
               </div>
             </footer>
+            {active && <SupplierControlledHistory supplier={active} review={quarterlyReviews[0]} invitation={invitation} />}
           </form>}
 
-          {active && step === 6 && <section className="saGenerate">
-              <div>
-                <small>
-                  CONTROLLED DOCUMENT GENERATOR
-                </small>
-                <h2>
-                  Supplier-specific Code of Conduct
-                </h2>
-                <p>
-                  Create a new controlled version using
-                  the supplier’s saved name, address,
-                  scope, classification and applicable
-                  standards.
-                </p>
-
-                {documents.length > 0 && <div className="saDocList">
-                    {documents.map(document => <Link key={document.id} href={"/portal/suppliers/" + active.id + "/code-of-conduct?document=" + document.id + ""}>
-                        <b>
-                          {document.document_reference}
-                        </b>
-                        <span>
-                          Version {document.version} ·{" "}
-                          {document.status}
-                        </span>
-                      </Link>)}
-                  </div>}
-              </div>
-
-              <form action={generateAction}>
-                <input type="hidden" name="supplier_id" value={active.id} />
-                <button type="submit">
-                  Generate Supplier Code of Conduct →
-                </button>
-                <small>
-                  Creates a controlled HTML preview
-                  and downloadable PDF
-                </small>
-              </form>
-            </section>}
+          {active && step === 6 && <section className="saGenerate" hidden={editingStep !== 6}>
+            <div><h2>Supplier-specific Code of Conduct</h2><p>Generate a controlled version using the saved supplier record.</p></div>
+            <form id="supplier-code-generator" action={generateAction}>
+              <input type="hidden" name="supplier_id" value={active.id} />
+              <button type="submit">Generate next version</button>
+            </form>
+          </section>}
+          {active && invitationAvailable && <SupplierInvitationWorkflow />}
         </section>
       </div>
     </main>;
