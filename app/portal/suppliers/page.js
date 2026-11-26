@@ -1,3 +1,4 @@
+import { SUPPLIER_METRICS, supplierMedian, supplierNumber } from "../../../lib/supplier-reporting.mjs";
 import { commercialAccess } from "../../../lib/commercial-access.mjs";
 import { invitationStoreReady } from "../../../lib/supplier-invitation-store";
 import SupplierRegister from "../../../components/SupplierRegister";
@@ -105,6 +106,8 @@ export default async function SuppliersPage({
   let subTierSuppliers = [];
   let supplierSites = [];
   let supplierNcStats = {};
+  let findingsForSupplier = [];
+  let allSupplierFindings = [];
   let supplierContacts = [];
   let supplierAudits = [];
   let quarterlyReviews = [];
@@ -129,7 +132,7 @@ export default async function SuppliersPage({
       const {
         data: supplierFindings = [],
         error: supplierFindingsError
-      } = await supabase.from("internal_audit_findings").select("id,supplier_id,status,linked_rca_case_id,closure_verified").eq("owner_id", user.id).in("supplier_id", suppliers.map(supplier => supplier.id));
+      } = await supabase.from("internal_audit_findings").select("id,supplier_id,status,linked_rca_case_id,closure_verified,finding_reference,title,finding_type").eq("owner_id", user.id).in("supplier_id", suppliers.map(supplier => supplier.id));
       if (supplierFindingsError) throw new Error(supplierFindingsError.message);
       supplierNcStats = Object.fromEntries(suppliers.map(supplier => [supplier.id, {
         "open": 0,
@@ -137,7 +140,8 @@ export default async function SuppliersPage({
         "closed": 0,
         "total": 0
       }]));
-      for (const finding of supplierFindings || []) {
+      allSupplierFindings = supplierFindings || [];
+      for (const finding of allSupplierFindings) {
         const stats = supplierNcStats[finding.supplier_id];
         if (!stats) continue;
         stats.total += 1;
@@ -167,6 +171,7 @@ export default async function SuppliersPage({
       selected = null;
     }
     if (selected) {
+      findingsForSupplier = allSupplierFindings.filter(finding => finding.supplier_id === selected.id);
       const {
         data: docs,
         error: docsError
@@ -199,7 +204,7 @@ export default async function SuppliersPage({
         "ascending": false
       }).order("last_name"), supabase.from("internal_audits").select("id,audit_reference,title,status,current_gate,audit_method,planned_start_at,planned_end_at,updated_at").eq("supplier_id", selected.id).eq("owner_id", user.id).order("updated_at", {
         "ascending": false
-      }), supabase.from("supplier_quarterly_business_reviews").select("id,qbr_reference,quarter,review_date,next_qbr_date,status").eq("supplier_id", selected.id).eq("owner_id", user.id).eq("status", "completed").order("review_date", {
+      }), supabase.from("supplier_quarterly_business_reviews").select("id,qbr_reference,quarter,review_date,next_qbr_date,status,scorecard").eq("supplier_id", selected.id).eq("owner_id", user.id).eq("status", "completed").order("review_date", {
         "ascending": false
       }), supabase.from("supplier_due_diligence_events").select("*").eq("supplier_id", selected.id).eq("owner_id", user.id).order("created_at", {
         "ascending": false
@@ -238,7 +243,11 @@ export default async function SuppliersPage({
         "client_key": contact.id
       }));
       supplierAudits = audits || [];
-      quarterlyReviews = qbrs || [];
+      quarterlyReviews = (qbrs || []).map(({ scorecard, ...review }) => ({
+        ...review,
+        measuredPerformance: supplierMedian(SUPPLIER_METRICS.filter(metric => metric.unit === "%")
+          .map(metric => supplierNumber(scorecard?.[metric.key]?.actual))),
+      }));
       dueDiligenceEvents = ddEvents || [];
     }
   }
@@ -293,5 +302,5 @@ export default async function SuppliersPage({
         return null;
       }
       return selected;
-    })()} documents={documents} approvers={approvers} evidenceFiles={evidenceFiles} subTierSuppliers={subTierSuppliers} supplierSites={supplierSites} supplierNcStats={supplierNcStats} supplierContacts={supplierContacts} supplierAudits={supplierAudits} quarterlyReviews={quarterlyReviews} companyPeople={companyPeople} dueDiligenceEvents={dueDiligenceEvents} managementBoard={managementBoard} action={saveSupplier} generateAction={generateSupplierCodeOfConduct} invitationAvailable={invitationAvailable} invitationReady={invitationReady} saved={params?.saved === "1"} /></ControlledDeviceDrafts>;
+    })()} documents={documents} approvers={approvers} evidenceFiles={evidenceFiles} subTierSuppliers={subTierSuppliers} supplierSites={supplierSites} supplierNcStats={supplierNcStats} supplierFindings={findingsForSupplier} supplierContacts={supplierContacts} supplierAudits={supplierAudits} quarterlyReviews={quarterlyReviews} companyPeople={companyPeople} dueDiligenceEvents={dueDiligenceEvents} managementBoard={managementBoard} action={saveSupplier} generateAction={generateSupplierCodeOfConduct} invitationAvailable={invitationAvailable} invitationReady={invitationReady} saved={params?.saved === "1"} /></ControlledDeviceDrafts>;
 }

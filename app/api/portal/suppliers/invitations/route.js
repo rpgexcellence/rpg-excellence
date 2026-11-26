@@ -15,6 +15,24 @@ const reply = (data, status = 200) => NextResponse.json(data, { status, headers:
 const publicRow = ({ id, recipient, contact_name, status, outlook_url, created_at, expires_at, history, submitted_at, sent_at, answers, attachments, submissions }) =>
   ({ id, recipient, contact_name, status, outlook_url, created_at, expires_at, history, submitted_at, sent_at, answers, attachments, submissions });
 
+function summarizeInvitations(data) {
+  const latest = data[0];
+  const submission = latest?.submissions?.at(-1);
+  const acknowledgements = data.flatMap(row => row.submissions || [])
+    .filter(item => item.answers?.acknowledgement?.documentId)
+    .map(item => ({ ...item.answers.acknowledgement, submittedAt: item.submittedAt }))
+    .sort((first, second) => second.submittedAt.localeCompare(first.submittedAt));
+  return latest ? {
+    status: latest.status,
+    fileCount: submission?.evidence?.length ?? 0,
+    review: latest.status === "reviewed" ? "Verified" : latest.status === "submitted" ? "Awaiting review" :
+      latest.status === "clarification" ? "Clarification requested" : "No new submission",
+    clarification: latest.status === "clarification"
+      ? latest.history.findLast(item => item.action === "RPG requested clarification")?.details : null,
+    acknowledgements,
+  } : null;
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -29,13 +47,14 @@ export async function GET(request) {
       return data?.signedUrl ? NextResponse.redirect(data.signedUrl) : reply({ error: "Evidence unavailable." }, 404);
     }
     if (searchParams.has("summary")) {
-      const { data, error } = await ctx.admin.from(INVITATION_TABLE).select("status").eq("supplier_id", ctx.supplier.id)
-        .eq("organization_id", ctx.supplier.organization_id).order("created_at", { ascending: false }).limit(1);
-      return error ? reply({ error: "Invitation status unavailable." },503) : reply({ invitations:data });
+      const { data, error } = await ctx.admin.from(INVITATION_TABLE).select("status,submissions,history")
+        .eq("supplier_id", ctx.supplier.id).eq("organization_id", ctx.supplier.organization_id)
+        .order("created_at", { ascending: false }).limit(30);
+      return error ? reply({ error: "Invitation status unavailable." }, 503) : reply({ summary: summarizeInvitations(data) });
     }
     const { data, error } = await query.order("created_at", { ascending: false }).limit(30);
     if (error) return reply({ error: "Invitation history is unavailable." }, 503);
-    return reply({ invitations: data.map(row => {
+    return reply({ summary: summarizeInvitations(data), invitations: data.map(row => {
       const { answers, attachments, ...visible } = publicRow(row);
       return visible;
     }) });
