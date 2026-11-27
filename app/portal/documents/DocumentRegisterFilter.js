@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import s from './documents.module.css';
 
-export default function DocumentRegisterFilter({ label, name, choices, selected, emptyLabel, search, searchOptions }) {
+export default function DocumentRegisterFilter({ label, name, choices, selected, emptyLabel, search, searchOptions, onSelectionChange }) {
   const [checked, setChecked] = useState(() => new Set(selected));
   const [query, setQuery] = useState(search?.value ?? '');
   const searchText = query.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-GB');
   const shown = choices.filter(choice => checked.has(choice.value) || choice.label.toLocaleLowerCase('en-GB').includes(searchText));
 
   function toggle(value, isChecked) {
+    onSelectionChange?.();
     setChecked(previous => {
       const next = new Set(previous);
       if (isChecked) next.add(value);
@@ -39,7 +40,7 @@ export default function DocumentRegisterFilter({ label, name, choices, selected,
           </label>)}
           {!shown.length && <p className={s.muted}>No matching choices.</p>}
         </div>
-        {(checked.size > 0 || query) && <button type="button" className={s.clearFilter} onClick={() => { setChecked(new Set()); setQuery(''); }}>Clear {label.toLowerCase()}</button>}
+        {(checked.size > 0 || query) && <button type="button" className={s.clearFilter} onClick={() => { setChecked(new Set()); setQuery(''); onSelectionChange?.(); }}>Clear {label.toLowerCase()}</button>}
       </div>
     </details>
     {[...checked].map(value => <input type="hidden" key={value} name={name} value={value}/>)}

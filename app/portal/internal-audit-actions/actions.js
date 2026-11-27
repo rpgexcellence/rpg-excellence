@@ -217,16 +217,20 @@ async function ncLoadSnapshot(ctx) {
   const findingIds = findings.map(f => f.id);
   const standardIds=[...new Set(findings.map(f=>f.requirement_standard_id).filter(Boolean))],requirementStandards=[];
   for(let i=0;i<standardIds.length;i+=100)requirementStandards.push(...await ncReadAll(()=>ctx.client.from('internal_audit_standard_catalogue').select('id,standard_code,display_name,edition_label').in('id',standardIds.slice(i,i+100)),'requirement standard references'));
-  const byIds = async (table, columns, ids, key = 'id') => {
+  const byIds = async (table, columns, ids, key = 'id', companyScoped = false) => {
     const result = [];
-    for (let i = 0; i < ids.length; i += 100) result.push(...await ncReadAll(() => admin.from(table).select(columns).eq('owner_id', ctx.ownerId).in(key, ids.slice(i,i+100)), table));
+    for (let i = 0; i < ids.length; i += 100) result.push(...await ncReadAll(() => {
+      let query = admin.from(table).select(columns).eq('owner_id', ctx.ownerId).in(key, ids.slice(i,i+100));
+      if (companyScoped) query = ctx.isOwner ? query.or(`organization_id.eq.${org.id},organization_id.is.null`) : query.eq('organization_id', org.id);
+      return query;
+    }, table));
     return result;
   };
   const [access, audits, capaCases, suppliers, contacts, people] = await Promise.all([
     // Select no access tokens, secret hashes or external response credentials.
     byIds('internal_audit_action_access', 'id,finding_id,assignee_user_id,assignee_name,status,created_at,updated_at', findingIds, 'finding_id'),
-    byIds('internal_audits', 'id,audit_reference,title', [...new Set(findings.flatMap(f=>[f.audit_id,f.source_audit_id]).filter(Boolean))]),
-    byIds('rca_cases', 'id,status', [...new Set(findings.map(f=>f.linked_rca_case_id).filter(Boolean))]),
+    byIds('internal_audits', 'id,audit_reference,title,audit_type,administration_location_label,departments', [...new Set(findings.flatMap(f=>[f.audit_id,f.source_audit_id]).filter(Boolean))], 'id', true),
+    byIds('rca_cases', 'id,status,case_reference', [...new Set(findings.map(f=>f.linked_rca_case_id).filter(Boolean))], 'id', true),
     ncReadAll(() => admin.from('suppliers').select('id,legal_name,supplier_reference,approval_status').eq('organization_id', org.id).eq('owner_id',ctx.ownerId), 'supplier options'),
     ncReadAll(() => admin.from('supplier_contacts').select('id,supplier_id,first_name,last_name,business_title,is_active').eq('organization_id', org.id).eq('owner_id',ctx.ownerId).eq('is_active',true), 'supplier contacts'),
     ncReadAll(() => admin.from('organization_people').select('id,first_name,last_name,position,account_status').eq('organization_id',org.id).eq('account_status','active'), 'company people'),
@@ -596,11 +600,15 @@ export async function createNonconformityExecutiveReport(options={}) {
     if (!hasPlanAccess(ctx.subscription,'consultant')) throw ncFailure('report_plan_required','Executive reporting requires Consultant access or an RPG platform-administrator entitlement.');
     if (!options || typeof options!=='object' || Array.isArray(options)) throw ncFailure('invalid_filters','Invalid report options.');
     const snapshot=await ncLoadSnapshot(ctx);
-    const safeKeys=['from','to','classification','risk','source','owner','location','query','supplierId'];
+    const safeKeys=['from','to','dueFrom','dueTo','classification','risk','source','owner','location','site','department','workflow','capa','ownership','query','supplierId'];
+    const multiKeys=new Set(['classification','source','owner']);
     const filters={};
     for(const key of safeKeys) if(options[key]!==undefined && options[key]!==null) {
-      if(typeof options[key]!=='string' || options[key].length>500) throw ncFailure('invalid_filters','A report filter is invalid.');
-      filters[key]=options[key].trim();
+      const selection=options[key];
+      const valid = value => typeof value === 'string' && value.length <= 500;
+      if (Array.isArray(selection) && multiKeys.has(key) && selection.every(valid)) filters[key]=selection.map(value=>value.trim()).filter(Boolean);
+      else if (valid(selection)) filters[key]=selection.trim();
+      else throw ncFailure('invalid_filters','A report filter is invalid.');
     }
     const analytics=buildNonconformityAnalytics(snapshot,filters);
     return { ok:true,report:{ reference:`NC-REVIEW-${randomUUID()}`,generatedAt:new Date().toISOString(),organization:snapshot.organization,analytics,brief:buildNonconformityExecutiveBrief(analytics,snapshot.organization.name) } };
