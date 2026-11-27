@@ -17,9 +17,17 @@
 .series{display:flex;gap:12px;flex-wrap:wrap;color:#36546c;font-weight:700;font-size:12px}
 .series span{display:inline-flex;gap:5px;align-items:center}
 .series i{width:8px;height:8px;border-radius:50%}
-.donutLayout{display:grid;width:100%;max-width:425px;grid-template-columns:minmax(94px,128px) minmax(0,1fr);gap:12px;align-items:center}
+.donutLayout{
+  display:grid;
+  width:100%;
+  max-width:520px;
+  grid-template-columns:clamp(100px,35%,180px) minmax(0,1fr);
+  gap:clamp(10px,4%,22px);
+  align-items:center;
+  margin-inline:auto;
+}
 .panel > .donutLayout{margin-block:auto}
-:global(.ncwDialog) .donutLayout{max-width:540px;grid-template-columns:minmax(104px,164px) minmax(0,1fr);margin-inline:auto}
+:global(.ncwDialog) .donutLayout{max-width:570px;grid-template-columns:clamp(104px,36%,200px) minmax(0,1fr)}
 .donut{width:100%;height:auto;overflow:visible;display:block}
 .slice{fill:none;stroke-width:19;pointer-events:stroke;cursor:pointer}
 .slice:hover,.slice:focus-visible{stroke-width:24;filter:brightness(.84);outline:none}
@@ -59,7 +67,7 @@
 @media(max-width:480px){
   .panel{padding:12px}
   .panel h2{font-size:15px}
-  .donutLayout,:global(.ncwDialog) .donutLayout{grid-template-columns:minmax(76px,95px) minmax(0,1fr);gap:7px}
+  .donutLayout,:global(.ncwDialog) .donutLayout{grid-template-columns:clamp(76px,30%,104px) minmax(0,1fr);gap:9px}
   .legend button,.legendColumns button,.bars button{font-size:12px}
 }
 .metrics:global(.ncwMetrics){grid-template-columns:repeat(6,minmax(0,1fr))}
