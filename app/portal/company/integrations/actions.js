@@ -2,7 +2,7 @@
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { validateIntegrationPermissions } from "../../../../lib/integration-policy.mjs";
+import { integrationExpiryCutoff, validateIntegrationPermissions } from "../../../../lib/integration-policy.mjs";
 import { canonicalIntegrationIp, integrationOwnerEntitled } from "../../../../lib/integration-api";
 import { requirePeopleAdmin } from "../people/actions";
 
@@ -13,14 +13,6 @@ function clean(value, maximum = 160) {
 
 function keyDigest(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
-function futureExpiry(value) {
-  const candidate = clean(value, 30);
-  if (!candidate) return null;
-  const date = new Date(candidate);
-  if (Number.isNaN(date.getTime()) || date <= new Date()) return undefined;
-  return date.toISOString();
 }
 
 export async function createIntegrationApiKey(_previousState, formData) {
@@ -37,12 +29,20 @@ export async function createIntegrationApiKey(_previousState, formData) {
   }
 
   const clientName = clean(formData.get("client_name"), 120);
-  const environment =
-    clean(formData.get("environment"), 10) === "test" ? "test" : "live";
-  const expiresAt = futureExpiry(formData.get("expires_at"));
-  let permissions;
-  try { permissions=validateIntegrationPermissions(formData.getAll("permissions").map(String)); }
-  catch(error){return {error:error.message};}
+  const environment = formData.get("environment");
+  if (environment !== "test" && environment !== "live") {
+    return { error: "Choose Test or Live before creating an API key." };
+  }
+
+  const expiresAt = integrationExpiryCutoff(formData.get("expires_at"));
+  const selectedPermissions = formData.getAll("permissions").map(String);
+  let permissions = [];
+  if (environment === "live") {
+    try { permissions = validateIntegrationPermissions(selectedPermissions); }
+    catch (error) { return { error: error.message }; }
+  } else if (selectedPermissions.length) {
+    return { error: "Test keys are for health checks only. Clear data permissions before creating a test key." };
+  }
   if(!await integrationOwnerEntitled(controlledOrganization.owner_id,organization.id)) return {error:"This organisation needs an active Consultant subscription or protected RPG platform-administrator entitlement. Existing keys can still be revoked."};
   const rawAddresses=String(formData.get("allowed_ips")||"").split(/[\s,]+/).filter(Boolean);
   const allowedIps=[...new Set(rawAddresses.map(canonicalIntegrationIp))];
@@ -55,12 +55,9 @@ export async function createIntegrationApiKey(_previousState, formData) {
       error: "Enter a client name containing at least three characters.",
     };
   }
-  if (!permissions.length) {
-    return { error: "Select at least one controlled API permission." };
-  }
-  if (expiresAt === undefined) {
+  if (expiresAt === undefined || (expiresAt && Date.parse(expiresAt) <= Date.now())) {
     return {
-      error: "Select a future expiry date or leave the expiry blank.",
+      error: "Select today or a future UTC date, or leave the expiry blank.",
     };
   }
 
@@ -140,7 +137,8 @@ export async function revokeIntegrationApiKey(_previousState, formData) {
   if(audit.error) console.error("INTEGRATION_KEY_REVOCATION_AUDIT_FAILED",{client_id:data.id});
   revalidatePath("/portal/company/integrations");
   return {
-    success: "API key revoked. Requests using it will now be rejected."+(audit.error?" The audit log needs administrator review; revocation remains effective.":""),
+    success: "API key revoked. Requests using it will now be rejected.",
+    warning: audit.error ? "The revocation audit entry could not be recorded. The audit log needs administrator review." : "",
   };
 }
 
@@ -276,6 +274,8 @@ export async function completeIntegrationApiKeyRotation(_previousState, formData
   });
   if (audit.error) console.error("INTEGRATION_ROTATION_COMPLETION_AUDIT_FAILED", { client_id: sourceId });
   revalidatePath("/portal/company/integrations");
-  return { success: "Rotation completed. The original key is revoked." +
-    (audit.error ? " The audit log needs administrator review; revocation remains effective." : "") };
+  return {
+    success: "Rotation completed. The original key is revoked.",
+    warning: audit.error ? "The rotation audit entry could not be recorded. The audit log needs administrator review." : "",
+  };
 }
