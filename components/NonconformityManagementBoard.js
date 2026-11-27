@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import styles from "./nonconformity-management-board.module.css";
 
 export const MANAGEMENT_CHARTS = [
@@ -30,23 +31,39 @@ function svgTarget(item, onSelect) {
 }
 
 function Trend({ months, onSelect }) {
+  const plot = useRef(null);
+  const [{ width, height }, setSize] = useState({ width: 470, height: 188 });
+  useEffect(() => {
+    if (!plot.current || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([{ contentRect }]) => {
+      const width = Math.round(contentRect.width);
+      const height = Math.round(contentRect.height);
+      if (width && height) setSize(size => size.width === width && size.height === height ? size : { width, height });
+    });
+    observer.observe(plot.current);
+    return () => observer.disconnect();
+  }, []);
+
   const series = [
     ["raised", "Raised", "#2365c9"],
     ["verified", "Verified closed", "#0a7e61"],
   ];
   const max = Math.max(4, Math.ceil(Math.max(...months.flatMap(month => [month.raised.count, month.verified.count])) / 4) * 4);
-  const x = index => 35 + index * 82;
-  const y = count => 156 - count / max * 132;
+  const left = Math.max(35, String(max).length * 7 + 15);
+  const right = width - 22;
+  const baseline = height - 26;
+  const x = index => left + index * (right - left) / (months.length - 1);
+  const y = count => baseline - count / max * (baseline - 18);
   return <>
     <div className={styles.series}>{series.map(([key, title, color]) =>
       <span key={key}><i style={{ background: color }} aria-hidden="true"/>{title}</span>)}</div>
-    <svg className={styles.trend} viewBox="0 0 470 187" role="group" aria-label="Monthly NCs raised and verified closed">
+    <svg ref={plot} className={styles.trend} viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Monthly NCs raised and verified closed">
       <g aria-hidden="true">
         {[4, 3, 2, 1, 0].map(tick => <g key={tick}>
-          <line x1="35" x2="445" y1={y(max * tick / 4)} y2={y(max * tick / 4)} className={styles.gridLine}/>
-          <text x="24" y={y(max * tick / 4) + 4} textAnchor="end">{max * tick / 4}</text>
+          <line x1={left} x2={right} y1={y(max * tick / 4)} y2={y(max * tick / 4)} className={styles.gridLine}/>
+          <text x={left - 12} y={y(max * tick / 4) + 4} textAnchor="end">{max * tick / 4}</text>
         </g>)}
-        {months.map((month, index) => <text key={month.date} x={x(index)} y="179" textAnchor="middle">{month.label.split(" ")[0]}</text>)}
+        {months.map((month, index) => <text key={month.date} x={x(index)} y={height - 5} textAnchor="middle">{month.label.split(" ")[0]}</text>)}
         {series.map(([key, , color]) => <polyline key={key} fill="none" stroke={color} strokeWidth="2.6"
           points={months.map((month, index) => x(index) + "," + y(month[key].count)).join(" ")}/>)}
       </g>
