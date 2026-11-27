@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { INTEGRATION_PERMISSION_GROUPS } from "../../../../lib/integration-policy.mjs";
+import { INTEGRATION_PERMISSION_GROUPS, integrationExpiryCutoff } from "../../../../lib/integration-policy.mjs";
 import {
   createIntegrationApiKey,
   revokeIntegrationApiKey,
@@ -22,6 +22,18 @@ function dateLabel(value) {
   }).format(new Date(value));
 }
 
+function expiryLabel(value) {
+  if (!value) return "No expiry";
+  const date = new Date(value);
+  const showSeconds = Boolean(date.getUTCSeconds() || date.getUTCMilliseconds());
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+    hourCycle: "h23", timeZone: "UTC",
+    ...(showSeconds ? { second: "2-digit" } : {}),
+    ...(date.getUTCMilliseconds() ? { fractionalSecondDigits: 3 } : {}),
+  }).format(date) + " UTC";
+}
+
 function RevokeControl({ clientId, disabled }) {
   const [state, action, pending] = useActionState(
     revokeIntegrationApiKey,
@@ -30,12 +42,12 @@ function RevokeControl({ clientId, disabled }) {
   return (
     <form action={action} className="integrationRevokeForm">
       <input type="hidden" name="client_id" value={clientId} />
-      <button className="integrationDanger" disabled={disabled || pending}>
-        {disabled ? "Revoked" : pending ? "Revoking…" : "Revoke key"}
+      <button className="integrationDanger" disabled={disabled || pending || Boolean(state?.success)}>
+        {disabled || state?.success ? "Revoked" : pending ? "Revoking…" : "Revoke key"}
       </button>
-      {state?.error ? (
-        <small className="integrationInlineError">{state.error}</small>
-      ) : null}
+      {state?.error ? <small className="integrationInlineError" role="alert">{state.error}</small> : null}
+      {state?.success ? <small role="status">{state.success}</small> : null}
+      {state?.warning ? <small className="integrationInlineError" role="alert">{state.warning}</small> : null}
     </form>
   );
 }
@@ -67,6 +79,12 @@ function RotationControl({ client, clients }) {
     }
   }
 
+  if (completed?.success) {
+    return <div className="integrationRotation">
+      <p role="status">{completed.success}</p>
+      {completed.warning ? <p className="integrationInlineError" role="alert">{completed.warning}</p> : null}
+    </div>;
+  }
   if (!canRotate) return null;
   return (
     <details className="integrationRotation">
@@ -115,7 +133,6 @@ function RotationControl({ client, clients }) {
           {completing ? "Checking and completing…" : completed?.success ? "Original key disabled" : "Complete rotation and revoke original"}
         </button>
         {completed?.error ? <p className="integrationInlineError" role="alert">{completed.error}</p> : null}
-        {completed?.success ? <p role="status">{completed.success}</p> : null}
       </form>
     </details>
   );
@@ -126,6 +143,10 @@ export default function IntegrationKeyManager({ clients = [] }) {
     createIntegrationApiKey,
     initialState,
   );
+  const [environment, setEnvironment] = useState("");
+  const [validThrough, setValidThrough] = useState("");
+  const [permissions, setPermissions] = useState([]);
+  const expiresAt = integrationExpiryCutoff(validThrough);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
 
@@ -187,17 +208,19 @@ export default function IntegrationKeyManager({ clients = [] }) {
           </label>
           <label>
             <span>Environment *</span>
-            <select name="environment" defaultValue="live">
+            <select name="environment" required value={environment} onChange={event => {
+              setEnvironment(event.target.value);
+              setPermissions([]);
+            }}>
+              <option value="">Select an environment</option>
               <option value="test">Test — credential check only; no customer data</option>
               <option value="live">Live — production records</option>
             </select>
           </label>
           <label>
-            <span>Expiry date</span>
-            <input name="expires_at" type="date" />
-            <small>
-              Recommended for temporary suppliers and implementation partners.
-            </small>
+            <span>Valid through (UTC, optional)</span>
+            <input name="expires_at" type="date" value={validThrough} onChange={event => setValidThrough(event.target.value)} />
+            <small>The key expires at 00:00 UTC on the following day.</small>
           </label>
 
           <label style={{gridColumn:"1 / -1"}}>
@@ -205,7 +228,7 @@ export default function IntegrationKeyManager({ clients = [] }) {
             <textarea name="allowed_ips" rows={2} maxLength={1600} placeholder="Exact IPv4 / IPv6 addresses, separated by commas or spaces" />
             <small>Leave blank for no IP restriction. Network ranges are not supported. Requires a hosting ingress header that is configured and overwritten by your trusted proxy.</small>
           </label>
-          <fieldset className="integrationPermissions">
+          {environment === "live" && <fieldset className="integrationPermissions">
             <legend>Permissions *</legend>
             <p>
               Permissions apply only to this organisation. API access does not
@@ -221,7 +244,11 @@ export default function IntegrationKeyManager({ clients = [] }) {
                         type="checkbox"
                         name="permissions"
                         value={value}
-                        defaultChecked={value === "findings:read"}
+                        checked={permissions.includes(value)}
+                        onChange={event => {
+                          const checked = event.target.checked;
+                          setPermissions(current => checked ? [...current, value] : current.filter(scope => scope !== value));
+                        }}
                       />
                       <span>{label}</span>
                     </label>
@@ -229,7 +256,15 @@ export default function IntegrationKeyManager({ clients = [] }) {
                 </div>
               ))}
             </div>
-          </fieldset>
+          </fieldset>}
+
+          {environment && <div className="integrationPermissions" aria-live="polite">
+            <strong>{environment === "test" ? "Test · Health check only" : "Live · Production access"}</strong>
+            <p>{environment === "test"
+              ? "This key can call /health."
+              : permissions.length ? "Selected permissions: " + permissions.join(" · ") : "Select at least one permission for production access."}</p>
+            <small>{expiresAt ? "Expires: " + expiryLabel(expiresAt) : "No expiry selected."}</small>
+          </div>}
 
           {state?.error ? (
             <div className="integrationMessage error">{state.error}</div>
@@ -284,14 +319,14 @@ export default function IntegrationKeyManager({ clients = [] }) {
                     <strong>{client.client_name}</strong>
                     <code>{client.key_prefix}••••••••</code>
                     <small>
-                      {client.permissions?.join(" · ") || "No permissions"}
+                      {client.environment === "test" ? "Health check only" : client.permissions?.join(" · ") || "No permissions"}
                     </small>
                   </div>
                   <div className="integrationClientMeta">
                     <span className={revoked ? "revoked" : "active"}>
                       {revoked ? "Revoked" : expired ? "Expired" : client.environment}
                     </span>
-                    <small>Expires: {dateLabel(client.expires_at)}</small>
+                    <small>Expires: {expiryLabel(client.expires_at)}</small>
                     <small>
                       Last used: {client.last_used_at
                         ? dateLabel(client.last_used_at)

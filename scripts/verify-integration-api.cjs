@@ -86,6 +86,45 @@ const fs=require('node:fs'),path=require('node:path'),Module=require('node:modul
  const keyForm=(permissions=['audits:read'])=>{const fd=new FormData();fd.set('client_name','Approved BI client');fd.set('environment','live');for(const permission of permissions)fd.append('permissions',permission);return fd;};
  reset();let issued=await keyActions.createIntegrationApiKey(null,keyForm());assert.match(issued.apiKey,/^rpg_live_/);assert.equal(data.integration_api_clients.at(-1).secret_hash,createHash('sha256').update(issued.apiKey).digest('hex'));assert.ok(!JSON.stringify(events).includes(issued.apiKey));
  reset();assert.match((await keyActions.createIntegrationApiKey(null,keyForm(['audits:write']))).error,/released/);
+ reset();
+ for (const environment of [null, '', 'unknown']) {
+  const form = keyForm();
+  if (environment === null) form.delete('environment');
+  else form.set('environment', environment);
+  assert.match((await keyActions.createIntegrationApiKey(null, form)).error, /Choose Test or Live/);
+ }
+ assert.match((await keyActions.createIntegrationApiKey(null, keyForm([]))).error, /at least one/);
+ assert.equal(data.integration_api_clients.length, 1);
+ const testForm = keyForm([]);
+ testForm.set('environment', 'test');
+ const testIssued = await keyActions.createIntegrationApiKey(null, testForm);
+ assert.match(testIssued.apiKey, /^rpg_test_/);
+ assert.deepEqual(testIssued.client.permissions, []);
+ const testHealth = await call('health', 'health', testIssued.apiKey);
+ assert.equal(testHealth.r.status, 200);
+ assert.deepEqual(testHealth.body.permissions, []);
+ assert.equal((await call('findings', 'findings', testIssued.apiKey)).r.status, 403);
+ testForm.append('permissions', 'findings:read');
+ assert.match((await keyActions.createIntegrationApiKey(null, testForm)).error, /health checks only/);
+ const expiryForm = keyForm();
+ expiryForm.set('expires_at', '2099-12-31');
+ const expiryIssued = await keyActions.createIntegrationApiKey(null, expiryForm);
+ assert.equal(expiryIssued.client.expires_at, '2100-01-01T00:00:00.000Z');
+ for (const badExpiry of ['2099-02-29', '2000-01-01', '2099-12-31T01:00:00.000Z']) {
+  expiryForm.set('expires_at', badExpiry);
+  assert.match((await keyActions.createIntegrationApiKey(null, expiryForm)).error, /UTC date/);
+ }
+ reset();
+ mode = 'audit_fail';
+ const revokeForm = new FormData();
+ revokeForm.set('client_id', 'client');
+ const revokeWithWarning = await keyActions.revokeIntegrationApiKey(null, revokeForm);
+ assert.match(revokeWithWarning.success, /API key revoked/);
+ assert.match(revokeWithWarning.warning, /audit entry could not be recorded/);
+ assert.equal(data.integration_api_clients[0].active, false);
+ mode = 'ok';
+ assert.equal((await call('health')).r.status, 401);
+ console.log('PASS explicit environments, test-only health with empty scopes, UTC expiry cutoff and separate revocation audit feedback');
  reset();mode='audit_fail';issued=await keyActions.createIntegrationApiKey(null,keyForm());assert.equal(issued.apiKey,undefined);assert.equal(data.integration_api_clients.at(-1).active,false);
  reset();entitled=false;let fd=new FormData();fd.set('client_id','client');const revoked=await keyActions.revokeIntegrationApiKey(null,fd);assert.ok(revoked.success);assert.equal(data.integration_api_clients[0].active,false);
  console.log('PASS key issuance stores hashes only, refuses unavailable scopes, withholds secrets on audit failure, and preserves revocation after entitlement expiry');
@@ -125,7 +164,7 @@ const fs=require('node:fs'),path=require('node:path'),Module=require('node:modul
  rotationSetup();data.integration_api_clients[0].allowed_ip_ranges=['192.0.2.4'];process.env.INTEGRATION_TRUSTED_IP_HEADER='x-vercel-forwarded-for';const restricted=await keyActions.startIntegrationApiKeyRotation(null,rotationForm());assert.ok(restricted.apiKey);assert.deepEqual(data.integration_api_clients.at(-1).allowed_ip_ranges,['192.0.2.4']);
  rotationSetup();const unrelated=await keyActions.createIntegrationApiKey(null,keyForm());assert.ok(unrelated.apiKey);assert.ok((await keyActions.completeIntegrationApiKeyRotation(null,rotationForm(unrelated.client.id))).error);assert.equal(data.integration_api_clients[0].active,true,'unlinked replacement never retires the original');
  rotationSetup();peopleAdminAllowed=false;await assert.rejects(()=>keyActions.startIntegrationApiKeyRotation(null,rotationForm()),/Administrator/);await assert.rejects(()=>keyActions.completeIntegrationApiKeyRotation(null,rotationForm(sourceId)),/Administrator/);
- rotationSetup();const next=await keyActions.startIntegrationApiKeyRotation(null,rotationForm());assert.equal((await call('audits','audits',next.apiKey)).r.status,200);mode='completion_audit_fail';completed=await keyActions.completeIntegrationApiKeyRotation(null,rotationForm(next.client.id));assert.ok(completed.success);assert.match(completed.success,/audit log/);assert.equal(data.integration_api_clients[0].active,false);
+ rotationSetup();const next=await keyActions.startIntegrationApiKeyRotation(null,rotationForm());assert.equal((await call('audits','audits',next.apiKey)).r.status,200);mode='completion_audit_fail';completed=await keyActions.completeIntegrationApiKeyRotation(null,rotationForm(next.client.id));assert.ok(completed.success);assert.match(completed.warning,/audit log/);assert.equal(data.integration_api_clients[0].active,false);
  console.log('PASS controlled rotation retains original until confirmed successful data access, resumes a cursor with the replacement, preserves restrictions and hashes, refuses unauthorised/invalid sources, withholds unaudited secrets and never reactivates a revoked key');
 
  Module._load=originalLoad;Module._extensions['.js']=originalExtension;
