@@ -203,7 +203,7 @@ async function ncReadAll(makeQuery, source) {
     rows.push(...data); offset += data.length; previousLast = last;
   }
 }
-async function ncLoadSnapshot(ctx) {
+async function ncLoadSnapshot(ctx, includeBoard = false) {
   const admin = createAdminClient();
   const org = ctx.organization;
   const findings = await ncReadAll(() => {
@@ -240,17 +240,45 @@ async function ncLoadSnapshot(ctx) {
   for (let i=0;i<myResponseIds.length;i+=100) myResponses.push(...await ncReadAll(() => admin.from('internal_audit_action_access')
     .select('id,finding_id,status,assignee_user_id,correction_and_containment,root_cause_response,extent_and_systemic_review,corrective_action_plan,effectiveness_measure,owner_submission_notes,auditor_response,updated_at')
     .eq('owner_id',ctx.ownerId).eq('assignee_user_id',ctx.user.id).in('id',myResponseIds.slice(i,i+100)), 'my response queue'));
+  let boardData;
+  if (includeBoard) {
+    const companyFindings = findings.filter(finding =>
+      finding.organization_id === org.id && ['major_nc', 'minor_nc'].includes(finding.finding_type));
+    const capaAccess = await getOrganizationAccess('capa_8d', 'view');
+    const canViewCapa = capaAccess?.allowed && capaAccess.user?.id === ctx.user.id &&
+      capaAccess.organization?.id === org.id && capaAccess.organization?.owner_id === ctx.ownerId;
+    const linkedCaseIds = new Set(companyFindings.map(finding => finding.linked_rca_case_id));
+    const caseIds = canViewCapa ? byIds('rca_cases', 'id,organization_id,access_scope',
+      capaCases.filter(item => linkedCaseIds.has(item.id)).map(item => item.id), 'id', true)
+      .then(cases => cases.filter(item => item.organization_id === org.id && item.access_scope !== 'single_assessment')
+        .map(item => item.id)) : Promise.resolve([]);
+    const [decisions, actions, causes] = await Promise.allSettled([
+      byIds('internal_audit_action_access', 'id,finding_id,rca_case_id,effectiveness_result,verified_at,verified_by',
+        companyFindings.map(item => item.id), 'finding_id'),
+      caseIds.then(ids => byIds('rca_actions', 'id,case_id,discipline,selection_status,effectiveness_result,verified_at,verified_by', ids, 'case_id')),
+      caseIds.then(ids => byIds('rca_causes', 'id,case_id,cause_type,status,profile_code', ids, 'case_id')),
+    ]);
+    // The queries follow the controlled finding's company-scoped links. The
+    // Board needs the decision and date, without exposing reviewer identities.
+    const verified = rows => rows.filter(row => row.verified_by).map(({ verified_by, ...row }) => row);
+    boardData = {
+      decisions: decisions.status === 'fulfilled' ? verified(decisions.value) : null,
+      actions: actions.status === 'fulfilled' ? verified(actions.value) : null,
+      causes: causes.status === 'fulfilled' ? causes.value : null,
+      capaRestricted: !canViewCapa,
+    };
+  }
   const supplierIds = new Set(suppliers.map(s=>s.id));
   return {
     asOf: new Date().toISOString().slice(0,10), fetchedAt: new Date().toISOString(), currentUserId: ctx.user.id,
     organization: { id: org.id, name: org.name || 'Organisation' },
-    findings, access, audits, capaCases, myResponses, suppliers, contacts: contacts.filter(c=>supplierIds.has(c.supplier_id)), people, requirementStandards,
+    findings, access, audits, capaCases, myResponses, suppliers, boardData, contacts: contacts.filter(c=>supplierIds.has(c.supplier_id)), people, requirementStandards,
     canCreate: ctx.canCreate, canManage: ctx.canReview, canApprove: ctx.canApprove, canExecutiveReport: hasPlanAccess(ctx.subscription,'consultant'),
     legacyUnassigned: findings.filter(f=>!f.organization_id).length,
   };
 }
-export async function getNonconformityWorkspaceSnapshot() {
-  return ncLoadSnapshot(await ncContext('view'));
+export async function getNonconformityWorkspaceSnapshot(includeBoard = false) {
+  return ncLoadSnapshot(await ncContext('view'), includeBoard === true);
 }
 
 // Audit references are scoped to the same authorised company as the NC.

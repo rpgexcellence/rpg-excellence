@@ -31,7 +31,7 @@ export default async function NonconformityRegister({ searchParams, pageMode = n
   if (!user) redirect("/portal/login?next=/portal/internal-audit-actions");
   // Existing module, company, role and subscription gates are checked here.
   // Failed reads never produce a misleading empty register or dashboard.
-  const snapshot = await getNonconformityWorkspaceSnapshot();
+  const snapshot = await getNonconformityWorkspaceSnapshot(!pageMode);
   if (snapshot.currentUserId !== user.id) throw new Error("Your signed-in account changed. Refresh this page before opening a finding draft.");
   const inspectionAccess = !pageMode ? await getOrganizationAccess("risk_management", "view") : null;
   const showInspectionSource = inspectionAccess?.allowed && inspectionAccess.organization?.id === snapshot.organization.id &&
