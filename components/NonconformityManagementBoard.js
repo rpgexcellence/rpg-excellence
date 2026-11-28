@@ -30,7 +30,7 @@ function svgTarget(item, onSelect) {
   };
 }
 
-function Trend({ months, onSelect }) {
+export function Trend({ months, onSelect, raisedLabel = "Raised", verifiedLabel = "Verified closed", chartLabel = "Monthly NCs raised and verified closed" }) {
   const plot = useRef(null);
   const [{ width, height }, setSize] = useState({ width: 470, height: 188 });
   useEffect(() => {
@@ -45,8 +45,8 @@ function Trend({ months, onSelect }) {
   }, []);
 
   const series = [
-    ["raised", "Raised", "#2365c9"],
-    ["verified", "Verified closed", "#0a7e61"],
+    ["raised", raisedLabel, "#2365c9"],
+    ["verified", verifiedLabel, "#0a7e61"],
   ];
   const max = Math.max(4, Math.ceil(Math.max(...months.flatMap(month => [month.raised.count, month.verified.count])) / 4) * 4);
   const left = Math.max(35, String(max).length * 7 + 15);
@@ -57,7 +57,7 @@ function Trend({ months, onSelect }) {
   return <>
     <div className={styles.series}>{series.map(([key, title, color]) =>
       <span key={key}><i style={{ background: color }} aria-hidden="true"/>{title}</span>)}</div>
-    <svg ref={plot} className={styles.trend} viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Monthly NCs raised and verified closed">
+    <svg ref={plot} className={styles.trend} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={chartLabel}>
       <g aria-hidden="true">
         {[4, 3, 2, 1, 0].map(tick => <g key={tick}>
           <line x1={left} x2={right} y1={y(max * tick / 4)} y2={y(max * tick / 4)} className={styles.gridLine}/>
@@ -92,7 +92,7 @@ function Legend({ items, onSelect, share, columns = false }) {
     </button>)}</div>;
 }
 
-function Donut({ items, onSelect, total, noun, label, showShare }) {
+export function Donut({ items, onSelect, total, noun, label, showShare, empty = "No NCs in scope." }) {
   const segments = items.filter(item => item.count);
   let start = 0;
   return <div className={styles.donutLayout}>
@@ -112,7 +112,7 @@ function Donut({ items, onSelect, total, noun, label, showShare }) {
       <text x="65" y="64" className={styles.centerCount} aria-hidden="true">{total}</text>
       <text x="65" y="79" className={styles.centerLabel} aria-hidden="true">{noun}</text>
     </svg>
-    {items.length ? <Legend items={items} onSelect={onSelect} share={showShare ? total : 0}/> : <p>No NCs in scope.</p>}
+    {items.length ? <Legend items={items} onSelect={onSelect} share={showShare ? total : 0}/> : <p>{empty}</p>}
   </div>;
 }
 
@@ -132,7 +132,7 @@ function Ageing({ items, onSelect, analytics }) {
   </>;
 }
 
-function Bars({ items, onSelect, total }) {
+export function Bars({ items, onSelect, total }) {
   const max = total || Math.max(1, ...items.map(item => item.count));
   return <div className={styles.bars}>{items.map(item => <button type="button" key={item.key}
     className={total ? styles.percentBar : undefined} onClick={event => onSelect(item, event)}>
