@@ -8,6 +8,8 @@ import { canStartInspection } from "../../../../lib/workplace-inspection-policy.
 import { OPEN_ACTIONS, actionOverdue, fieldworkOverdue, fieldworkState, openFinding, programmeDue } from "../../../../lib/workplace-inspection-overview.mjs";
 import { siteToday, UUID } from "../../../../lib/zone-policy.mjs";
 import InspectionPerformance from "./InspectionPerformance";
+import WorkplaceFindingsBoard from "./WorkplaceFindingsBoard";
+import findingsStyles from "./workplace-findings-board.module.css";
 import InspectionRegister, { InspectionTable as Table } from "./InspectionRegister";
 import InspectionZoneForm from "./InspectionZoneForm";
 import StartInspectionButton from "./StartInspectionButton";
@@ -96,7 +98,7 @@ export default async function WorkplaceInspectionsPage({searchParams, central = 
       .select("id,inspection_id,finding_reference,title,finding_type,priority,severity,status,created_at,response:hs_workplace_inspection_responses(question_code,question_text)")
       .eq("organization_id",org).order("created_at",{ascending:false}).order("id")),
     allRows(()=>admin.from("hs_workplace_inspection_actions")
-      .select("id,inspection_id,finding_id,action_reference,action_text,priority,responsible_person_id,verifier_person_id,target_date,status,verification_result")
+      .select("id,inspection_id,finding_id,action_reference,action_text,priority,responsible_person_id,verifier_person_id,target_date,status,verification_result,effectiveness_result,verified_at,verified_by_user_id")
       .eq("organization_id",org).order("target_date").order("id")),
     allRows(()=>admin.from("organization_people").select("id,first_name,last_name,email").eq("organization_id",org).order("id")),
     allRows(()=>admin.from("organization_zones").select("id,site_id,building_id,reference,name,public_token,show_assessments,status")
@@ -150,7 +152,7 @@ export default async function WorkplaceInspectionsPage({searchParams, central = 
       cleanLocation(record?.administration_location_label) || "Site not recorded";
     const area = cleanLocation(record?.area_department);
     const zoneLabel = [zone?.reference, zone?.name].map(cleanLocation).filter(Boolean).join(" · ") || area || "Zone not recorded";
-    return { siteKey: siteId || siteLabel, site: siteLabel, zone: zoneLabel, location: [siteLabel, zoneLabel].join(" / ") };
+    return { siteKey: siteId || siteLabel, site: siteLabel, zoneKey: zone?.id || JSON.stringify([siteId || siteLabel, zoneLabel]), zone: zoneLabel, location: [siteLabel, zoneLabel].join(" / ") };
   };
   const fieldworkColumns = ["Inspection", "Inspector", "Site / zone", "Scheduled / completed", "Status", "Open"];
   const fieldworkTable=(rows,{showInspector=false}={})=><Table columns={showInspector ? fieldworkColumns : [
@@ -197,6 +199,8 @@ export default async function WorkplaceInspectionsPage({searchParams, central = 
         ],
       };
     }) : [];
+  const findingLink = row => ROOT + "/" + row.inspection_id + "#finding-" + row.id;
+  const actionLink = row => ROOT + "/" + row.inspection_id + "#inspection-review-actions";
   const findingEntries = source => source.map(row => {
     const inspection = inspectionById.get(row.inspection_id);
     const scope = scopeFor(inspection);
@@ -205,15 +209,15 @@ export default async function WorkplaceInspectionsPage({searchParams, central = 
     const priority = title(row.priority);
     const severity = row.severity == null ? "Not recorded" : String(row.severity);
     const status = title(row.status);
-    const target = ROOT + "/" + row.inspection_id + "#inspection-review-actions";
+    const target = findingLink(row);
     return {
       search: [row.finding_reference,row.title,ref,scope.location,inspection?.administration_location_label,...linked.map(item => item.action_reference)].join(" "),
-      filters: [[scope.site],[scope.zone],[ref],[priority],[severity],[status]],
-      csv: [row.finding_reference,row.title,scope.site,scope.zone,ref,priority,severity,linked.map(item=>item.action_reference).join(", "),status],
+      filters: [[scope.site],[scope.zone],[ref],[priority],[severity],[status],[title(row.finding_type)]],
+      csv: [row.finding_reference,row.title,scope.site,scope.zone,ref,priority,severity,linked.map(item=>item.action_reference).join(", "),status,title(row.finding_type),row.created_at],
       row: [
-        row.id, <><Link href={target}>{row.title}</Link><small>{row.finding_reference}</small></>, scope.location,
+        row.id, <><Link href={target}>{row.title}</Link><small>{row.finding_reference} · {title(row.finding_type)}</small></>, scope.location,
         <Link href={ROOT+"/"+row.inspection_id}>{ref}</Link>, <><Badge tone={tone(row.priority)}>{priority}</Badge><small>Severity {severity}</small></>,
-        linked.length ? <Link href={target}>{linked.length} recorded</Link> : "Not recorded", status,
+        linked.length ? <Link href={actionLink(row)}>{linked.length} recorded</Link> : "Not recorded", status, date(row.created_at),
       ],
     };
   });
@@ -225,7 +229,8 @@ export default async function WorkplaceInspectionsPage({searchParams, central = 
     const verifier = person(row.verifier_person_id);
     const status = title(row.status);
     const due = actionOverdue(row,today);
-    const verification = row.verification_result && row.verification_result !== "pending" ? title(row.verification_result) : "";
+    const recordedResult = row.effectiveness_result || row.verification_result;
+    const verification = recordedResult && recordedResult !== "pending" ? title(recordedResult) : "";
     return {
       search: [row.action_reference,row.action_text,scope.location,inspection?.inspection_reference,owner,verifier].join(" "),
       filters: [[scope.site],[scope.zone],[priority],[owner],[status]],
@@ -239,42 +244,66 @@ export default async function WorkplaceInspectionsPage({searchParams, central = 
     };
   });
   const focus = params?.focus;
+  const management = params?.tab === "management";
   const showingActions = params?.register === "actions" || ["overdue","verification"].includes(focus);
   const findingsHref = (filters = {}) => central ?
     CENTRAL + "?" + new URLSearchParams({ source: "workplace_inspection", ...filters }) : href("findings", filters);
-  const findingsView = view === "findings" && <Panel icon="alert" label={central ? "Workplace Inspection findings and actions" : "Findings requiring action"}>
-    <nav className={p.tabs} aria-label="Inspection findings and actions">
-      <Link href={findingsHref()} aria-current={!showingActions?"page":undefined}>Inspection findings</Link>
-      <Link href={findingsHref({register:"actions"})} aria-current={showingActions?"page":undefined}>Corrective actions</Link>
+  const project = (row, reference, title, recordHref) => {
+    const inspection = inspectionById.get(row.inspection_id);
+    return {
+      id: row.id, inspection_id: row.inspection_id, reference, title, recordHref, ...scopeFor(inspection),
+      inspectionHref: ROOT + "/" + row.inspection_id, inspectionReference: inspection?.inspection_reference || "Inspection record",
+      priority: row.priority, status: row.status,
+    };
+  };
+  const findingsView = view === "findings" && <>
+    <nav className={p.tabs + " " + p.recordTabs + " " + findingsStyles.workspaceTabs} aria-label="Workplace inspection workspace">
+      <Link href={findingsHref()} aria-current={!management ? "page" : undefined}>Findings &amp; Actions Register</Link>
+      <Link href={findingsHref({tab:"management"})} aria-current={management ? "page" : undefined}>Management Board</Link>
     </nav>
-    {showingActions ? <>
-      <nav className={p.tabs} aria-label="Corrective action views">
-        {[["open","Open"],["overdue","Overdue"],["verification","Awaiting verification"],["all","All actions"]].map(([key,label]) =>
-          <Link key={key} href={findingsHref({register:"actions",focus:key})} aria-current={(focus||"open")===key?"page":undefined}>{label}</Link>)}
+    {management ? <WorkplaceFindingsBoard today={today} asOf={now}
+      findings={findings.map(row => ({ ...project(row, row.finding_reference, row.title, findingLink(row)),
+        finding_type: row.finding_type, created_at: row.created_at, response: row.response }))}
+      actions={actions.map(row => ({ ...project(row, row.action_reference, row.action_text, actionLink(row)),
+        finding_id: row.finding_id, target_date: row.target_date, owner: person(row.responsible_person_id),
+        verifier: person(row.verifier_person_id), verification_result: row.verification_result,
+        effectiveness_result: row.effectiveness_result, verified_at: row.verified_at, verifierRecorded: Boolean(row.verified_by_user_id) }))}
+      inspections={inspections.map(({id,programme_id,zone_id,template_id,administration_location_label}) =>
+        ({id,programme_id,zone_id,template_id,administration_location_label}))}
+    /> : <Panel className={findingsStyles.register} icon="alert" label="Workplace inspection findings and actions">
+      <nav className={p.tabs} aria-label="Inspection findings and actions">
+        <Link href={findingsHref()} aria-current={!showingActions?"page":undefined}>Inspection findings</Link>
+        <Link href={findingsHref({register:"actions"})} aria-current={showingActions?"page":undefined}>Corrective actions</Link>
       </nav>
-      <InspectionRegister key={"actions:"+focus} columns={["Corrective action","Site / zone","Priority","Owner / verifier","Target","Status"]}
-        entries={actionEntries(focus==="overdue"?overdueActions:focus==="verification"?awaiting:focus==="all"?actions:actionsOpen)}
-        filters={["Site","Zone","Priority","Owner","Status"]} initialQuery={search}
-        exportColumns={["Reference","Corrective action","Site","Zone","Inspection","Priority","Owner","Verifier","Target","Status","Verification"]}
-        exportFile="workplace-inspection-actions.csv"/>
-    </> : <>
-      <nav className={p.tabs} aria-label="Finding views">
-        <Link href={findingsHref()} aria-current={focus!=="all"?"page":undefined}>Open findings</Link>
-        <Link href={findingsHref({focus:"all"})} aria-current={focus==="all"?"page":undefined}>All findings</Link>
-      </nav>
-      <InspectionRegister key={"findings:"+focus} columns={["Finding","Site / zone","Inspection","Severity / priority","Corrective actions","Status"]}
-        entries={findingEntries(focus==="all"?findings:findingsOpen)}
-        filters={["Site","Zone","Inspection","Priority","Severity","Status"]} initialQuery={search}
-        exportColumns={["Reference","Finding","Site","Zone","Inspection","Priority","Severity","Corrective actions","Status"]}
-        exportFile="workplace-inspection-findings.csv"/>
-    </>}
-  </Panel>;
+      {showingActions ? <>
+        <nav className={p.tabs} aria-label="Corrective action views">
+          {[["open","Open"],["overdue","Overdue"],["verification","Awaiting verification"],["all","All actions"]].map(([key,label]) =>
+            <Link key={key} href={findingsHref({register:"actions",focus:key})} aria-current={(focus||"open")===key?"page":undefined}>{label}</Link>)}
+        </nav>
+        <InspectionRegister key={"actions:"+focus} columns={["Corrective action","Site / zone","Priority","Owner / verifier","Target","Status"]}
+          paginate entries={actionEntries(focus==="overdue"?overdueActions:focus==="verification"?awaiting:focus==="all"?actions:actionsOpen)}
+          filters={["Site","Zone","Priority","Owner","Status"]} initialQuery={search}
+          exportColumns={["Reference","Corrective action","Site","Zone","Inspection","Priority","Owner","Verifier","Target","Status","Verification"]}
+          exportFile="workplace-inspection-actions.csv"/>
+      </> : <>
+        <nav className={p.tabs} aria-label="Finding views">
+          <Link href={findingsHref()} aria-current={focus!=="all"?"page":undefined}>Open findings</Link>
+          <Link href={findingsHref({focus:"all"})} aria-current={focus==="all"?"page":undefined}>All findings</Link>
+        </nav>
+        <InspectionRegister key={"findings:"+focus} columns={["Finding","Site / zone","Inspection","Severity / priority","Corrective actions","Status","Raised"]}
+          paginate entries={findingEntries(focus==="all"?findings:findingsOpen)}
+          filters={["Site","Zone","Inspection","Priority","Severity","Status","Finding type"]} initialQuery={search}
+          exportColumns={["Reference","Finding","Site","Zone","Inspection","Priority","Severity","Corrective actions","Status","Finding type","Raised"]}
+          exportFile="workplace-inspection-findings.csv"/>
+      </>}
+    </Panel>}
+  </>;
 
   if (central) return <main className={p.page}>
-    <p className={p.crumb}>Findings &amp; Actions / Workplace Inspection</p>
+    <p className={p.crumb}>Findings &amp; Actions / Workplace Inspection{management && " / Management Board"}</p>
     <header className={p.hero}>
       <div className={p.identity}><span className={p.iconBox}><RecordIcon name="alert"/></span>
-        <div><h1>Findings &amp; Actions</h1><p>Workplace Inspection findings and corrective actions</p></div>
+        <div><h1>Workplace Inspection Findings</h1><p>Review findings, assigned corrective actions and verification outcomes.</p></div>
       </div>
       <Link className={p.button} href={href("findings")}>Open Workplace Inspections</Link>
     </header>
